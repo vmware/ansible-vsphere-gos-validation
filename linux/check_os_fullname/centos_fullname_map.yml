@@ -1,0 +1,40 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Map CentOS when ESXi < 6.5.0
+- name: Set guest_fullname variable for CentOS on ESXi < 6.5.0
+  set_fact:
+    guest_fullname: "CentOS 4/5 or later {{ bitness }}"
+  when: esxi_version_num | int < 650
+
+# Map CentOS-5 and earlier when ESXi >= 6.5.0
+- name: Set guest_fullname variable for CentOS on ESXi >= 6.5.0
+  set_fact:
+    guest_fullname: "CentOS {{ guest_os_ansible_distribution_major_ver }} {{ bitness }}"
+  when:
+    - guest_os_ansible_distribution_major_ver | int <= 5
+    - esxi_version_num | int >= 650
+
+# Map CentOS-6, CentOS-7 when ESXi = 6.5.0
+- name: Set guest_fullname variable for CentOS on ESXi = 6.5.0
+  set_fact:
+    guest_fullname: "CentOS {{ guest_os_ansible_distribution_major_ver }} {{ bitness }}"
+  when:
+    - guest_os_ansible_distribution_major_ver | int == 6 or guest_os_ansible_distribution_major_ver | int == 7
+    - esxi_version_num | int == 650
+
+# Map CentOS-8 and later when ESXi = 6.5.0
+- name: Set guest_fullname variable for CentOS on ESXi = 6.5.0
+  set_fact:
+    guest_fullname: "CentOS 7 {{ bitness }}"
+  when:
+    - guest_os_ansible_distribution_major_ver | int >= 8
+    - esxi_version_num | int == 650
+
+# Map CentOS-6 and later when ESXi >= 6.7.0
+- name: Set guest_fullname variable for CentOS on ESXi >= 6.7.0
+  set_fact:
+    guest_fullname: "CentOS {{ guest_os_ansible_distribution_major_ver }} {{ bitness }}"
+  when:
+    - guest_os_ansible_distribution_major_ver | int >= 6
+    - esxi_version_num | int >= 670

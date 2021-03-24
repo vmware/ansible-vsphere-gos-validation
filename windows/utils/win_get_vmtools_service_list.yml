@@ -1,0 +1,33 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VMware tools related services in Windows guest OS
+# Return:
+#   vmtools_service_dict: service and service status dict
+#
+- name: Get VMware tools installed service list in Windows guest OS
+  win_shell: "get-service | where-object {$_.displayname -match 'VMware'} | select Name, Status"
+  register: service_list_output
+  delegate_to: "{{ vm_guest_ip }}"
+- name: Display the powershell command result
+  debug: var=service_list_output
+  when: enable_debug is defined and enable_debug
+
+- name: Set fact of the service list length
+  set_fact:
+    output_length: "{{ service_list_output.stdout_lines|length|int - 2 }}"
+- name: Set fact of the service list
+  set_fact:
+    vmtools_service_list: "{{ service_list_output.stdout_lines[3:output_length | int] }}"
+- name: Display the service list
+  debug: var=vmtools_service_list
+
+- name: Initialize the service and service status dict
+  set_fact:
+    vmtools_service_dict: {}
+- name: Set fact of the service and service status dict
+  set_fact:
+    vmtools_service_dict: "{{ vmtools_service_dict | combine({item.split()[0]: item.split()[1]}) }}"
+  with_items: "{{ vmtools_service_list }}"
+- debug:
+    msg: "Get VMware tools installed service dict: {{ vmtools_service_dict | to_yaml }}"

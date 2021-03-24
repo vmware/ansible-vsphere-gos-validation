@@ -1,0 +1,57 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Hot remove disk
+- include_tasks: ../../common/vm_hot_add_remove_disk.yml
+  vars:
+    disk_operation: 'absent'
+    ctrl_number: "{{ new_disk_ctl_num }}"
+    unit_number: "{{ new_disk_unit_num }}"
+    scsi_controller_type: "{{ test_disk_controller_type }}"
+- name: Wait 15 seconds after disk hot remove
+  pause:
+    seconds: 15
+
+# Check removed disk in guest OS
+- name: Get the number of disks in guest OS
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(get-disk | measure).Count"
+- name: Set fact of the number of disk
+  set_fact:
+    disk_num: "{{ win_powershell_cmd_output.stdout_lines[0] if not win_powershell_cmd_output.failed else 0 }}"
+- name: Check disk number in guest OS after hot remove is the same as before hotadd
+  assert:
+    that:
+      - "{{ disk_num|int == disk_num_guest_before_hotadd|int }}"
+    fail_msg: "Disk number is not the same as before hotadd {{ disk_num_guest_before_hotadd }} in guest after hot remove {{ disk_num }}"
+    success_msg: "Disk number is the same as before hotadd in guest after hot remove"
+  when: disk_num_guest_before_hotadd|int != 0
+
+# Hot remove disk controller if new disk controller added in this test
+- block:
+    - include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
+      vars:
+        disk_controller_ops: "absent"
+        disk_controller_type: "{{ test_disk_controller_type }}"
+        disk_controller_number: "{{ new_vhba_bus_number }}"
+
+    # Check disk controller number after hot remove
+    - include_tasks: get_vm_disk_ctl_num.yml
+    - debug:
+        msg: "Get the number of {{ disk_controller }} controller after hot remove: {{ vhba_number }}"
+    - include_tasks: ../utils/win_get_disk_ctl.yml
+    - name: Set fact of the disk controller number got in guest OS after hotadd
+      set_fact:
+        ctl_num_guest_after_hotadd: "{{ ctls_in_guest_dict[test_disk_controller_type] }}"
+    - debug:
+        msg: "Get the number of '{{ test_disk_controller_type }}' controller in guest OS after hotadd: {{ ctl_num_guest_after_hotadd }}"
+
+    - name: Check disk controller number after hot remove is the same as before hotadd
+      assert:
+        that:
+          - "{{ vhba_number|int == vhba_number_before_hotadd|int }}"
+          - "{{ ctl_num_guest_after_hotadd|int == ctl_num_guest_before_hotadd|int }}"
+        fail_msg: "Disk controller number is not the same as before hotadd in guest {{ vhba_number_before_hotadd }} after hot remove {{ vhba_number }}"
+        success_msg: "Disk controller number is the same as before hotadd in guest after hot remove"
+  when: not in_adding_disk_existing_ctl

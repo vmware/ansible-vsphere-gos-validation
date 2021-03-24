@@ -1,0 +1,22 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Shutdown VM via executing shutdown command in VM
+- name: Execute guest OS shutdown
+  command: "shutdown -h now"
+  delegate_to: "{{ vm_guest_ip }}"
+  become: True
+  changed_when: false
+  async: 1
+  poll: 0
+
+- name: "Wait for port 22 to become stopped"
+  wait_for:
+    port: 22
+    host: "{{ vm_guest_ip }}"
+    state: "stopped"
+
+- include_tasks: ../../common/vm_wait_power_state.yml
+  vars:
+    expected_power_status: 'poweredOff'
+    wait_power_state_timeout: 300

@@ -1,0 +1,120 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Initialize timezone check result"
+  set_fact:
+    timezone_success: ""
+- name: "Initialize hardware clock check result for perl GOSC"
+  set_fact:
+    hwclock_success: ""
+  when: gosc_workflow == "perl"
+
+# Try to get timezone info by 'timedatectl' command
+- include_tasks: ../../common/vm_shell_in_guest.yml
+  vars:
+    vm_shell_cmd: "/usr/bin/timedatectl"
+    vm_shell_args: "status"
+    vm_shell_out: "/tmp/timedatectl_status"
+
+# If 'timedatectl' command succeed
+- block:
+    - include_tasks: ../../common/vm_guest_file_operation.yml
+      vars:
+        operation: "fetch_file"
+        src_path: "/tmp/timedatectl_status"
+        dest_path: "{{ testcase_info_collect_path }}/timedatectl_status"
+
+    - name: "Get time zone from 'timedatectl status'"
+      shell: grep -i "^ *time zone:" "{{ testcase_info_collect_path }}/timedatectl_status" | awk '{print $3}'
+      register: tz_result
+
+    - name: "Save guest timezone setting after GOSC"
+      set_fact:
+        guest_timezone: "{{ tz_result.stdout }}"
+
+    - block:
+        - name: "Get hwclock from 'timedatectl status'"
+          include_tasks: ../utils/file_content_search.yml
+          vars:
+            path: "{{ testcase_info_collect_path }}/timedatectl_status"
+            regexp: "^ *RTC in local TZ: no"
+          register: hwclock_result
+        - name: "Save guest hardware clock setting after GOSC"
+          set_fact:
+            guest_hwclockUTC: "{{ regexp_found | int > 0 }}"
+      when: (gosc_workflow == "perl")
+  when: vm_shell_result.exit_code is defined and vm_shell_result.exit_code == 0
+
+# If 'timedatectl' command failed
+# Get timezone by reading symbolic link of /etc/localtime
+- block:
+    - include_tasks: ../../common/vm_shell_in_guest.yml
+      vars:
+        vm_shell_cmd: "/usr/bin/readlink"
+        vm_shell_args: "/etc/localtime"
+        vm_shell_out: "/tmp/readlink_etc_localtime"
+
+    - include_tasks: ../../common/vm_guest_file_operation.yml
+      vars:
+        operation: "fetch_file"
+        src_path: "/tmp/readlink_etc_localtime"
+        dest_path: "{{ testcase_info_collect_path }}/readlink_etc_localtime"
+
+    - name: "Get timezone info from /etc/localtime"
+      command: cat "{{ testcase_info_collect_path }}/readlink_etc_localtime"
+      register: tz_result
+      changed_when: False
+
+    - name: "Save guest timezone setting after GOSC"
+      set_fact:
+        guest_timezone: "{{ tz_result.stdout.replace('/usr/share/zoneinfo/','') }}"
+
+    # Get hwclock by running command "hwclock -D" when test perl GOSC
+    - block:
+        - include_tasks: ../../common/vm_shell_in_guest.yml
+          vars:
+            vm_shell_cmd: "/usr/sbin/hwclock"
+            vm_shell_args: "-D"
+            vm_shell_out: "/tmp/hwclock_D"
+        - include_tasks: ../../common/vm_guest_file_operation.yml
+          vars:
+            operation: "fetch_file"
+            src_path: "/tmp/hwclock_D"
+            dest_path: "{{ testcase_info_collect_path }}/hwclock_D"
+        - name: "Get hwclock from 'hwclock -D'"
+          include_tasks: ../utils/file_content_search.yml
+          vars:
+            path: "{{ testcase_info_collect_path }}/hwclock_D"
+            regexp: "^Hardware clock is on UTC time"
+        - name: "Save hardware clock settting after GOSC"
+          set_fact:
+            guest_hwclockUTC: "{{ regexp_found | int > 0 }}"
+      when: gosc_workflow == "perl"
+  when: vm_shell_result.exit_code is undefined or vm_shell_result.exit_code != 0
+
+# Check guest time zone
+- name: "Check guest timezone is customized"
+  set_fact:
+    timezone_success: "{{ guest_timezone == linux_gosc_spec['timezone'] }}"
+
+- name: "Print timezone check result"
+  debug: var=timezone_success
+
+- include_tasks: ../../common/print_error_msg.yml
+  vars:
+    error_msg: "VM timezone is {{ guest_timezone }}, expected timezone is {{ linux_gosc_spec['timezone'] }}"
+  when: not timezone_success
+
+# Check guest hwclock
+# cloud-init GOSC doesn't support hwclock customization
+- block:
+    - name: Check guest hwclock is customized
+      set_fact:
+        hwclock_success: "{{ guest_hwclockUTC == linux_gosc_spec['hwclockUTC'] }}"
+    - name: "Print hardware clock check result"
+      debug: var=hwclock_success
+    - include_tasks: ../../common/print_error_msg.yml
+      vars:
+        error_msg: "VM hwclockUTC is {{ guest_hwclockUTC }}, expected hwclockUTC is {{ linux_gosc_spec['hwclockUTC'] }}"
+      when: not hwclock_success
+  when: gosc_workflow == "perl"

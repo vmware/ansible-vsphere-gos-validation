@@ -1,0 +1,33 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check Windows guest BSOD keyword in vmware.log,
+# default timeout is 60s
+- name: Set fact of the key strings
+  set_fact:
+    guest_bsod_keyword: "WinBSOD:"
+
+- name: Get key string in vmware.log
+  shell: "grep -c -e '{{ guest_bsod_keyword }}' {{ vm_files_path }}/vmware.log"
+  delegate_to: "{{ esxi_hostname }}"
+  register: get_keystring
+  changed_when: False
+  failed_when: False
+  until: get_keystring.stdout_lines | length != 0 and get_keystring.stdout_lines[0] | int != 0
+  retries: 20
+  delay: 3
+- name: Display the result of getting key strings
+  debug: var=get_keystring
+  when: enable_debug is defined and enable_debug
+
+# Fail when get Windows guest BSOD keyword in vmware.log
+- block:
+    - include_tasks: ../../common/vm_take_screenshot.yml
+      vars:
+        vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
+    - name: Check the number of key strings
+      fail:
+        msg: "Get Windows guest BSOD keyword '{{ guest_bsod_keyword }}' in vmware.log."
+  when:
+    - get_keystring.stdout_lines | length != 0
+    - get_keystring.stdout_lines[0] | int != 0

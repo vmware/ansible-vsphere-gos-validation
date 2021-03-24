@@ -1,0 +1,50 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check taking quiesce snapshot on VM through VMware tools.
+# When VMware tools is not installed or not running in VM, this test case result is 'No Run'.
+#
+- name: check_quiesce_snapshot
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+        - block:
+            - name: Set fact of the remote path in guest OS
+              set_fact:
+                quiesce_scripts_freeze_thaw_path: "C:\\Windows\\"
+                quiesce_scripts_tools_path: "C:\\Program Files\\VMware\\VMware Tools\\backupScripts.d\\"
+            - include_tasks: ../utils/win_get_time.yml
+            - name: Set fact of the time before taking snapshot
+              set_fact:
+                before_snapshot_time: "{{ time_variable }}"
+            - name: Set fact of the snapshot name
+              set_fact:
+                qs_snapshot_name: "quiesce_snapshot_{{ ansible_date_time.epoch }}"
+            - include_tasks: copy_custom_scripts_to_guest.yml
+            - name: Take quiesce snapshot of VM
+              include_tasks: ../../common/vm_take_snapshot.yml
+              vars:
+                snapshot_name: "{{ qs_snapshot_name }}"
+                is_quiesce: yes
+                dump_memory: no
+            - name: Take screenshot of VM after taking quiesce snapshot
+              include_tasks: ../../common/vm_take_screenshot.yml
+              vars:
+                vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
+            - include_tasks: check_custom_scripts_executed.yml
+            - include_tasks: ../../common/vm_remove_snapshot.yml
+              vars:
+                snapshot_name: "{{ qs_snapshot_name }}"
+          when: vmtools_is_installed and vmtools_is_running
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed }}, running: {{ vmtools_is_running }}"
+          when: not vmtools_is_installed or not vmtools_is_running
+      rescue:
+        - include_tasks: ../setup/rescue_cleanup.yml
+          vars:
+            current_testcase_name: "{{ ansible_play_name }}"

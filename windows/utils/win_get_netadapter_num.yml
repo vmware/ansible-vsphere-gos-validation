@@ -1,0 +1,49 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get network adapter number from guest OS, except Hyper-V vEthernet
+#
+- name: Get total number of network adapters in Windows guest OS
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-NetAdapter | where-object {$_.InterfaceDescription -notmatch 'Hyper-V'} | measure).Count"
+    win_execute_cmd_ignore_error: True
+
+- name: Set fact of the network adapter number
+  set_fact:
+    nic_num_os: "{{ win_powershell_cmd_output.stdout_lines[0] if (win_powershell_cmd_output.rc == 0 and win_powershell_cmd_output.stdout_lines | length != 0) else 'NA' }}"
+- debug:
+    msg: "Get total number of network adapters in guest OS: {{ nic_num_os }}"
+
+- name: Set fact of the searched keywords of vmxnet3 and e1000e network adapter
+  set_fact:
+    vmxnet3_adapter_name: "vmxnet3 Ethernet Adapter"
+    e1000e_adapter_name: "Intel\\(R\\) 82574L"
+
+- name: Get the number of vmxnet3 adapters in Windows guest OS
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-NetAdapter | where-object {$_.InterfaceDescription -match '{{ vmxnet3_adapter_name }}'} | measure).Count"
+
+- name: Set fact of the VMXNET3 network adapter number
+  set_fact:
+    vmxnet3_guest_num: "{{ win_powershell_cmd_output.stdout_lines[0] if (win_powershell_cmd_output.rc == 0 and win_powershell_cmd_output.stdout_lines | length != 0) else 'NA' }}"
+- debug:
+    msg: "Get vmxnet3 network adapter number in guest OS: {{ vmxnet3_guest_num }}"
+
+- name: Get the number of e1000e adapters in Windows guest OS
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-NetAdapter | where-object {$_.InterfaceDescription -match '{{ e1000e_adapter_name }}'} | measure).Count"
+
+- name: Set fact of the E1000E network adapter number
+  set_fact:
+    e1000e_guest_num: "{{ win_powershell_cmd_output.stdout_lines[0] if (win_powershell_cmd_output.rc == 0 and win_powershell_cmd_output.stdout_lines | length != 0) else 'NA' }}"
+- debug:
+    msg: "Get e1000e network adapter number in guest OS: {{ e1000e_guest_num }}"
+
+- name: Set fact of the network adapter dict
+  set_fact:
+    win_get_netadapter_num_dict: {'VMXNET3': "{{ vmxnet3_guest_num }}", 'E1000E': "{{ e1000e_guest_num }}", 'total': "{{ nic_num_os }}"}
+- debug:
+    msg: "Get network adatpers in guest OS: {{ win_get_netadapter_num_dict }}"

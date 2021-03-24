@@ -1,0 +1,22 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Wait for VM is connectable through ping command
+# Parameters:
+#   vm_wait_ping_ip: IP address of the host to connect to
+#   vm_wait_ping_timeout (optional): wait for timeout, default is 900s
+#
+- name: "Required parameter not specified"
+  fail:
+    msg: "Please specify the 'vm_wait_ping_ip' parameter when calling this task"
+  when: vm_wait_ping_ip is undefined
+
+- name: "Try to ping IP"
+  command: ping -c 5 "{{ vm_wait_ping_ip }}"
+  register: vm_wait_ping_result
+  until: vm_wait_ping_result.rc == 0
+  delay: 5
+  retries: "{{ ((vm_wait_ping_timeout | default(900) | int) / 5) | int }}"
+  changed_when: false
+- debug: var=vm_wait_ping_result
+  when: enable_debug is defined and enable_debug

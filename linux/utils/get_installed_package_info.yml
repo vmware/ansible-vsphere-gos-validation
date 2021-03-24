@@ -1,0 +1,65 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the installed package information
+# Parameter:
+#   package_name: the package name to query
+# Return:
+#   package_info
+
+- name: "Initialize variables for package information"
+  set_fact:
+    package_info: {}
+    package_query_cmd: ""
+
+# Get package query command in guest OS
+- name: "Get package query command for OS packages managed by {{ guest_os_ansible_pkg_mgr | upper }}"
+  set_fact:
+    package_query_cmd: "rpm -qi"
+  when: guest_os_ansible_pkg_mgr in ['yum', 'dnf', 'zypper']
+
+- name: "Get package query command for OS packages managed by {{ guest_os_ansible_pkg_mgr | upper }}"
+  set_fact:
+    package_query_cmd: "dpkg -s"
+  when: guest_os_ansible_pkg_mgr == 'apt'
+
+- name: "Check package query command"
+  assert:
+    that:
+      - package_query_cmd
+    fail_msg: "Unknown package manager detected: {{ guest_os_ansible_pkg_mgr }}"
+    success_msg: "Package query command: {{ package_query_cmd }}"
+
+# Run command to query package info
+- block:
+    - name: "Get information about package '{{ package_name }}'"
+      command: "{{ package_query_cmd }} {{ package_name }}"
+      failed_when: False
+      register: package_fact_result
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - block:
+        - name: "Set the fact of package info about '{{ package_name }}'"
+          set_fact:
+            package_info: "{{ package_info | combine({ package_info_item.split(':')[0].strip() | lower : package_info_item.split(':')[1].strip() }) }}"
+          with_items: "{{ package_fact_result.stdout_lines | select('match', '[^:]+:[^:]+') }}"
+          loop_control:
+            loop_var: package_info_item
+
+        # In the output of querying packages on Ubuntu/Debian, it is using 'Package' parameter for package name
+        - name: "Set package name in package info"
+          set_fact:
+            package_info: "{{ package_info | combine({ 'name': package_info['package'] }) }}"
+          when:
+            - guest_os_ansible_pkg_mgr == 'apt'
+            - package_info['package'] is defined
+      when:
+        - package_fact_result is defined
+        - package_fact_result.rc is defined
+        - package_fact_result.rc == 0
+        - package_fact_result.stdout is defined
+        - package_fact_result.stdout
+
+    - name: "Print package info"
+      debug: var=package_info
+  when: package_query_cmd

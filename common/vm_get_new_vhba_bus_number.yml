@@ -1,0 +1,47 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get new vhba bus number with specified type
+# Parameters:
+#   disk_controller_facts_data: 'disk_controller_facts.disk_controller_data'
+#     got from 'vm_get_disk_controller_facts.yml' task.
+#   new_vhba_type: disk controller type
+# Return:
+#   new_vhba_bus_number: the bus number of new disk controller with specified type
+#
+- name: Set fact of the valid vhba type list
+  set_fact:
+    valid_vhba_type_list:
+      - scsi
+      - sata
+      - nvme
+- name: Check required parameter
+  assert:
+    that:
+      - new_vhba_type is defined and new_vhba_type
+      - new_vhba_type in valid_vhba_type_list
+      - disk_controller_facts_data is defined and disk_controller_facts_data
+    fail_msg: "'new_vhba_type' and 'disk_controller_facts_data' are required parameters, and valid 'new_vhba_type' value '{{ valid_vhba_type_list }}'."
+
+- name: Initialize the new vhba bus number and found status
+  set_fact:
+    new_vhba_bus_number: ''
+    new_vhba_bus_found: False
+
+- debug:
+    msg: "The number of '{{ new_vhba_type }}' vhba already reach 4, can not get bus number of new adapter"
+  when: disk_controller_facts_data[new_vhba_type]|length == 4
+
+- name: "Get new '{{ new_vhba_type }}' controller bus number from 0 to 3"
+  set_fact:
+    new_vhba_bus_number: "{{ item }}"
+    new_vhba_bus_found: "{{ True if item|string not in disk_controller_facts_data[new_vhba_type] else False }}"
+  loop: "{{ range(0, 4)|list }}"
+  when:
+    - not new_vhba_bus_found
+    - disk_controller_facts_data[new_vhba_type]|length < 4
+
+- debug:
+    msg:
+      - "Get new '{{ new_vhba_type }}' controller bus number: {{ new_vhba_bus_found }}"
+      - "Get new '{{ new_vhba_type }}' controller bus number: {{ new_vhba_bus_number }}"

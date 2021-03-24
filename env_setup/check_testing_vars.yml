@@ -1,0 +1,73 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check testing variables
+# Check VM variables
+- name: "Check VM information is provided"
+  assert:
+    that:
+      - vm_name is defined and vm_name
+      - vm_username is defined and vm_username
+      - vm_password is defined and vm_password
+    fail_msg: "Invalid variables: vm_name, vm_username and vm_password must be set"
+
+- name: "Check privilege escalation variables of OS users"
+  assert:
+    that:
+      - vm_become_method is defined and vm_become_method
+      - vm_become_user is defined and vm_become_user
+      - vm_become_password is defined and vm_become_password
+  when: vm_enable_become is defined and vm_enable_become
+
+- block:
+    - name: "Check VM deploy method"
+      assert:
+        that:
+          - vm_deploy_method in ['iso', 'ova']
+        fail_msg: "vm_deploy_method must be set to 'iso' or 'ova'"
+      when: vm_deploy_method is defined
+
+    - name: "Check datastore is defined"
+      assert:
+        that:
+          - datastore is defined and datastore
+        fail_msg: "'datastore' must be set for new VM"
+
+    # Check variables for deploying VM from OVA
+    - name: "Check variables for deploying VM from OVA"
+      assert:
+        that:
+          - ova_path is defined and ova_path
+          - ova_nfs_server_path is undefined or (ova_nfs_server_path and ova_nfs_server_path.split(':') | length == 2)
+        fail_msg: "Invalid variables for deploying OVA"
+      when: vm_deploy_method is defined and vm_deploy_method == "ova"
+
+    # Check variables for deploying VM from ISO
+    - block:
+        - name: "Check variables for new VM settings"
+          assert:
+            that:
+              - guest_id is defined and guest_id
+              - hardware_version is undefined or ( hardware_version and hardware_version | int >= 13 )
+            fail_msg: "Invalid variables for new VM settings"
+
+        - name: "Check variables for installing OS from ISO images"
+          assert:
+            that:
+              - ( os_installation_iso_url is undefined and os_installation_iso_list is defined and os_installation_iso_list ) or
+                ( os_installation_iso_url is defined and os_installation_iso_url and
+                 os_installation_iso_checksum is defined and os_installation_iso_checksum and
+                 os_installation_iso_checksum.split(':')[0] in ['md5', 'sha256'] )
+            fail_msg: "Please either set os_installation_iso_url and os_installation_iso_checksum for downloading OS image, or set os_installation_iso_list with ISO images located on ESXi datastore"
+
+        - name: "Check CPU number and cores per socket"
+          assert:
+            that:
+              - cpu_number | int >= cpu_cores_per_socket | int
+              - ( cpu_number | int ) % ( cpu_cores_per_socket | int ) == 0
+            fail_msg: "Incorrect CPU number and cores per socket settings"
+          when:
+            - cpu_number is defined and cpu_number
+            - cpu_cores_per_socket is defined and cpu_cores_per_socket
+      when: vm_deploy_method is undefined or vm_deploy_method == "iso"
+  when: new_vm is defined and new_vm

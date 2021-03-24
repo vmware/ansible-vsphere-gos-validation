@@ -1,0 +1,27 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check if specified VM snapshot exists
+# Parameters:
+#   snapshot_name: the name of snapshot to check
+# Return:
+#   snapshot_exist: the flag of snapshot exist
+#
+- include_tasks: vm_get_snapshot_facts.yml
+
+- name: Initialize snapshot existence result
+  set_fact:
+    snapshot_exist: False
+
+- block:
+    - name: Loop snapshot list, set snapshot_exist True if found expected snapshot
+      set_fact:
+        snapshot_exist: "{{ vm_snapshot_facts.guest_snapshots.snapshots | selectattr('name', 'equalto', snapshot_name) | length == 1 }}"
+  when:
+    - vm_snapshot_facts is defined
+    - vm_snapshot_facts.guest_snapshots is defined
+    - vm_snapshot_facts.guest_snapshots.snapshots is defined
+
+- name: "Snapshot {{ snapshot_name }} exist: {{ snapshot_exist }}"
+  debug:
+    msg: "Snapshot '{{ snapshot_name }}' exist: {{ snapshot_exist }}"

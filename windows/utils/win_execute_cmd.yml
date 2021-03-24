@@ -1,0 +1,26 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Execute specified powershell command in Windows guest OS
+# Parameters:
+#   win_powershell_cmd: powershell command
+#   win_execute_cmd_ignore_error: True or False
+#   win_execute_cmd_guest_ip: the IP address of target to execute
+#     command
+# Return:
+#   win_powershell_cmd_output
+#
+- name: Check required parameter
+  fail:
+    msg: "win_powershell_cmd is not defined"
+  when: win_powershell_cmd is undefined
+
+- name: Execute powershell command in Windows guest
+  win_shell: "{{ win_powershell_cmd }}"
+  register: win_powershell_cmd_output
+  ignore_errors: "{{ win_execute_cmd_ignore_error | default(False) }}"
+  delegate_to: "{{ win_execute_cmd_guest_ip | default(vm_guest_ip) }}"
+
+- name: Display the powershell commmand result
+  debug: var=win_powershell_cmd_output
+  when: enable_debug is defined and enable_debug

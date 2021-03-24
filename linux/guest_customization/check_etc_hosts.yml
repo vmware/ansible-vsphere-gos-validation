@@ -1,0 +1,80 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Default not to check IPv6 IP address hostname binding result,
+# So set 'ipv6_hostname_check' to False
+- name: "Initialize test case temporary file path and hosts check result"
+  set_fact:
+    hosts_file_path: "{{ testcase_info_collect_path }}/etc/hosts"
+    etc_hosts_success: False
+    expected_ips: ['::1']
+    ipv6_hostname_check: False
+
+- include_tasks: ../../common/vm_guest_file_operation.yml
+  vars:
+    operation: "fetch_file"
+    src_path: "/etc/hosts"
+    dest_path: "{{ hosts_file_path }}"
+
+- name: "Get IP bindings for hostname {{ linux_gosc_spec['hostname'] }} in /etc/hosts"
+  shell: grep "{{ linux_gosc_spec['hostname'] }}.{{ linux_gosc_spec['domain'] }} *{{ linux_gosc_spec['hostname'] }}" {{ hosts_file_path }} | awk '{print $1}'
+  changed_when: False
+  register: etc_hosts_result
+- name: "Save hostname binding list"
+  set_fact:
+    actual_ips: "{{ etc_hosts_result.stdout_lines }}"
+
+# Perl GOSC:
+#   1. When ip assignment is dhcp, hostname will be bound to 127.0.1.1 and ::1
+#   2. When ip assignment is static ip, hostname will be bound to static ip and ::1.
+# cloudinit GOSC:
+#   /etc/hosts will be generated from hosts template file in /etc/cloud/templates,
+#   so will set expected_ips to the one got from template file
+#
+- name: "Set expected IP list to the one got from cloudinit /etc/hosts template file"
+  set_fact:
+    expected_ips: "{{ fqdn_hostname_bind_ip.stdout_lines }}"
+  when:
+    - enable_cloudinit_gosc
+    - fqdn_hostname_bind_ip is defined
+
+- name: "Append static IP address to expected IP list for perl GOSC"
+  set_fact:
+    expected_ips: "{{ expected_ips | union([linux_gosc_spec['ip']]) }}"
+  when:
+    - ip_assignment == "static"
+    - not enable_cloudinit_gosc
+
+# In Ubuntu, may contain 127.0.1.1 
+- name: "Append '127.0.1.1' to expected IP list for perl GOSC"
+  set_fact:
+    expected_ips: "{{ expected_ips | union(['127.0.1.1']) }}"
+  when:
+    - not enable_cloudinit_gosc
+
+- name: "Remove ::1 from hostname binding list when not check IPv6 binding"
+  set_fact:
+    actual_ips: "{{ actual_ips | difference(['::1']) }}"
+    expected_ips: "{{ expected_ips | difference(['::1']) }}"
+  when: not ipv6_hostname_check
+
+- name: "Print IP bindings for hostname {{ linux_gosc_spec['hostname'] }} in /etc/hosts"
+  debug:
+    msg:
+      - "Expected IP binding on hostname for {{ linux_gosc_spec['hostname'] }} in /etc/hosts: {{ expected_ips }}"
+      - "Actual IP binding on hostname for {{ linux_gosc_spec['hostname'] }} in /etc/hosts: {{ actual_ips }}"
+
+# Check hostname IP bindings in /etc/hosts
+- name: "Get /etc/hosts check result"
+  set_fact:
+    etc_hosts_success: True
+  when: >
+    (actual_ips | sort == expected_ips | sort) or
+    (expected_ips | difference(actual_ips) == ['127.0.1.1'])
+
+- include_tasks: ../../common/print_error_msg.yml
+  vars:
+    error_msg: "Found unexpected IP binding for {{ linux_gosc_spec['hostname'] }} in /etc/hosts"
+  when: not etc_hosts_success
+- name: "Print /etc/hosts check result"
+  debug: var=etc_hosts_success

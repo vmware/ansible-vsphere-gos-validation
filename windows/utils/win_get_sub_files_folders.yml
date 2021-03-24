@@ -1,0 +1,30 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get files or folders list in spceified path in Windows guest OS
+# Parameters:
+#   win_get_files_folders_folder: the parent directory
+# Return:
+#   win_get_files_folders_list
+#
+- debug:
+    msg: "Specified folder path in guest OS: {{ win_get_files_folders_folder }}"
+
+- name: Initialize the fact of sub folder and file list
+  set_fact:
+    win_get_files_folders_list: []
+
+# Get child items in specified folder
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-ChildItem -Path '{{ win_get_files_folders_folder }}').Name"
+
+- name: Get files or folder from powershell output
+  set_fact:
+    win_get_files_folders_list: "{% for item in win_powershell_cmd_output.stdout_lines %}{{ win_get_files_folders_folder }}\\{{ item }} {% endfor %}"
+
+- name: Set fact of the files or folder list
+  set_fact:
+    win_get_files_folders_list: "{{ win_get_files_folders_list.split() }}"
+- name: Display the files or folders list
+  debug: var=win_get_files_folders_list

@@ -1,0 +1,32 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: Get auto Admin logon value after gosc
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(get-itemproperty -path 'HKLM:\\software\\microsoft\\Windows NT\\CurrentVersion\\Winlogon').AutoAdminLogon"
+- name: Set fact of the Admin auto logon
+  set_fact:
+    auto_admin_logon: "{{ win_powershell_cmd_output.stdout_lines[0] if not win_powershell_cmd_output.failed else 'NA' }}"
+- debug:
+    msg: "Get auto Admin logon enabled value: {{ auto_admin_logon }}"
+  when: enable_debug is defined and enable_debug
+
+- name: Get auto admin logon count value after gosc
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(get-itemproperty -path 'HKLM:\\software\\microsoft\\Windows NT\\CurrentVersion\\Winlogon').AutoLogonCount"
+- name: Set fact of the Admin auto logon count
+  set_fact:
+    auto_logon_count: "{{ win_powershell_cmd_output.stdout_lines[0] if not win_powershell_cmd_output.failed else 'NA' }}"
+- debug:
+    msg: "Get remain auto logon count: {{ auto_logon_count }}"
+  when: enable_debug is defined and enable_debug
+
+- name: Check auto admin logon enabled and count is accurate
+  assert:
+    that:
+      - "{{ auto_admin_logon | int == 1 }}"
+      - "{{ auto_logon_count | int == customize_autologon_count | int - 1 }}"
+    success_msg: "Auto Admin logon is enabled and customized auto logon count is accurate."
+    fail_msg: "Auto Admin logon is not enabled, or customized auto logon count is not accurate."

@@ -1,0 +1,64 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VM memory size before memory hotadd
+- include_tasks: ../../common/vm_get_guest_facts.yml
+
+- name: "Set fact of the memory size before hotadd"
+  set_fact:
+    mem_before_hotadd: "{{ vm_guest_facts.instance.hw_memtotal_mb }}"
+
+- name: "Set fact of the memory size after hotadd"
+  set_fact:
+    mem_after_hotadd: "{{ (mem_before_hotadd | int) + (hotadd_mb | int) }}"
+    wait_for_timeout: 20
+
+- debug:
+    msg: "After memory hotadd {{ hotadd_mb }} MB, VM memory size would exceeds {{ max_memory_mb }} MB. Skip hotadd {{ hotadd_mb }} MB memory test."
+  when: mem_after_hotadd | int > max_memory_mb | int
+
+- name: "Hotadd {{ hotadd_mb }} MB memory to VM '{{ vm_name }}'"
+  block:
+    # Shutdown VM when VM memory size is not greater than 3072 MB,
+    # while it will exceed 3072 MB after memory hotadd. This requires cold add.
+    - include_tasks: ../utils/shutdown.yml
+      when:
+        - mem_before_hotadd | int <= 3072
+        - mem_after_hotadd | int > 3072
+
+    - include_tasks: ../../common/vm_set_memory_size.yml
+      vars:
+        memory_mb: "{{ mem_after_hotadd }}"
+
+    # Power on VM when performing memory cold add
+    - block:
+        - include_tasks: ../../common/vm_set_power_state.yml
+          vars:
+            vm_power_state_set: 'powered-on'
+        - name: "Set fact of the timeout value to 900 seconds"
+          set_fact:
+            wait_for_timeout: 900
+      when: vm_guest_facts.instance.hw_power_status != "poweredOn"
+
+    # Check VM connection is not broken and ensure guest not crash after hotadd
+    # or VM boots up after cold add
+    - name: "Pause 5 seconds then check VM connection status"
+      pause:
+        seconds: 5
+    - include_tasks: ../../common/vm_wait_connection.yml
+      vars:
+        vm_wait_connection_timeout: "{{ wait_for_timeout }}"
+
+    # Get VM's memory size in guest OS
+    - include_tasks: ../utils/wait_for_memory_blocks.yml
+      vars:
+        memory_size_mb: "{{ vm_guest_facts.instance.hw_memtotal_mb | int }}"
+    - include_tasks: ../utils/memory_size_in_guest.yml
+
+    - name: "Check VM memory size is equal to the one got in guest OS"
+      assert:
+        that:
+          - vm_guest_facts.instance.hw_memtotal_mb | int == memtotal_mb_in_guest | int
+        fail_msg: "Hotadd {{ hotadd_mb }} MB memory failed. VM memory size increased from {{ mem_before_hotadd }} MB to {{ mem_after_hotadd }} MB, but got {{ memtotal_mb_in_guest }} MB in guest OS"
+        success_msg: "Hotadd {{ hotadd_mb }} MB memory succeeded. VM memory size increased from {{ mem_before_hotadd }} MB to {{ mem_after_hotadd }} MB."
+  when: mem_after_hotadd | int <= max_memory_mb | int

@@ -1,0 +1,39 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Set VM CPU cores per socket
+# Parameters:
+#   num_cores_per_socket (optional): the number of cores per socket.
+#   num_cpus: the number of vCPU, which must be multiple of cores per socket.
+#
+- name: Set VM CPU number
+  vmware_guest:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    hardware:
+      num_cpu_cores_per_socket: "{{ num_cores_per_socket | default(omit) }}"
+      num_cpus: "{{ num_cpus }}"
+  register: vm_guest_facts
+- name: Display the VM CPU configure result
+  debug: var=vm_guest_facts
+  when: enable_debug is defined and enable_debug
+
+- name: Check CPU cores per socket is set correctly
+  assert:
+    that:
+      - vm_guest_facts.instance.hw_cores_per_socket | int == num_cores_per_socket | int
+    fail_msg: "Failed to set CPU cores per socket to '{{ num_cores_per_socket }}'"
+    success_msg: "CPU cores per socket is set to {{ num_cores_per_socket }}"
+  when: num_cores_per_socket is defined and num_cores_per_socket
+
+- name: Check CPU number is set correctly
+  assert:
+    that:
+      - vm_guest_facts.instance.hw_processor_count | int == num_cpus | int
+    fail_msg: "Failed to set CPU number to '{{ num_cpus }}'"
+    success_msg: "CPU number is set to {{ num_cpus }}"

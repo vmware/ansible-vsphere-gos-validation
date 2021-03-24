@@ -1,0 +1,72 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of the timestamp"
+  set_fact:
+    iso_timestamp: "{{ lookup('pipe','date +%s') }}"
+
+- name: "Set fact of the unattend install ISO file name"
+  set_fact:
+    unattend_iso_file_name: "{{ guest_id }}{{ '_'.join(''.join(unattend_install_conf.split('.')[:-1]).split('/')) }}-{{ iso_timestamp }}.iso"
+- name: "Set fact of the temp path of generated unattend install ISO file"
+  set_fact:
+    generated_unattend_iso: "/tmp/{{ unattend_iso_file_name }}"
+- debug:
+    msg: "Will generate unattend install ISO file in: {{ generated_unattend_iso }}"
+
+- name: "Set fact of the absolute path of unattend install config file"
+  set_fact:
+    unattend_install_conf: "{{ main_playbook_path }}/autoinstall/{{ unattend_install_conf }}"
+- name: "Display the path of unattend install config file"
+  debug: var=unattend_install_conf
+
+- block:
+  # For nvme boot disk, boot device name shoule be nvme0n1 instead of sda
+    - name: "Get the configured unattend install control file name"
+      set_fact:
+        unattend_file: "{{ unattend_install_conf.split('/')[-1] }}"
+    - name: "Copy original unattend file to /tmp"
+      copy:
+        src: "{{ unattend_install_conf }}"
+        dest: "/tmp/{{ unattend_file }}"
+        mode: 0644
+
+    - name: "Set new unattend install control file"
+      set_fact:
+        unattend_install_conf: "/tmp/{{ unattend_file }}"
+    - name: "Replace =sda with nvme device name"
+      replace:
+        path: "{{ unattend_install_conf }}"
+        regexp: "=sda"
+        replace: "=nvme0n1"
+    - name: "Replace /dev/sda with nvme device name"
+      replace:
+        path: "{{ unattend_install_conf }}"
+        regexp: "/dev/sda"
+        replace: "/dev/nvme0n1"
+  when: boot_disk_controller == 'nvme'
+
+- name: Create a guest OS unattend install iso file
+  include_tasks: ../../common/create_iso.yml
+  vars:
+    create_iso_src: ["{{ unattend_install_conf }}"]
+    create_iso_dest: "{{ generated_unattend_iso }}"
+    create_iso_vol_ident: 'OEMDRV'
+
+- name: Set fact of the dest path of unattend install iso on ESXi host
+  set_fact:
+    transferred_unattend_iso: "/vmfs/volumes/{{ datastore }}/{{ unattend_iso_file_name }}"
+- name: Print debug message
+  debug:
+    msg: "Will transfer unattend install iso to: {{ transferred_unattend_iso }}"
+
+- name: Copy generated unattend install iso to ESXi host
+  include_tasks: ../../common/transfer_file_remote.yml
+  vars:
+    transfer_file_remote_src: "{{ generated_unattend_iso }}"
+    transfer_file_remote_dest: "{{ transferred_unattend_iso }}"
+    transfer_file_remote_server: "{{ esxi_hostname }}"
+
+- name: Produce unattended ISO path
+  set_fact:
+    transferred_unattend_iso: "[{{ datastore }}] {{ unattend_iso_file_name }}"

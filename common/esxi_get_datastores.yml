@@ -1,0 +1,40 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get ESXi datastores using vmware_datastore_info module
+- name: Get ESXi datastores info
+  vmware_datastore_info:
+    validate_certs: "{{ validate_certs | default(False) }}"
+    hostname: "{{ esxi_hostname }}"
+    username: "{{ esxi_username }}"
+    password: "{{ esxi_password }}"
+    datacenter_name: "ha-datacenter"
+  register: server_get_datastores_result
+
+- name: Display the result of datastore info
+  debug: var=server_get_datastores_result
+  when: enable_debug is defined and enable_debug
+
+- name: Initialize the fact of ESXi server vmfs and nfs datastore list
+  set_fact:
+    server_get_datastores_vmfs: []
+    server_get_datastores_nfs: []
+
+- name: Set fact of the ESXi server vmfs datastore list
+  set_fact:
+    server_get_datastores_vmfs: "{{ (server_get_datastores_vmfs + [ item.name ]) if item['type']|lower == 'vmfs' else server_get_datastores_vmfs }}"
+  no_log: True
+  with_items: "{{ server_get_datastores_result.datastores }}"
+
+- name: Set fact of the ESXi server nfs datastore list
+  set_fact:
+    server_get_datastores_nfs: "{{ server_get_datastores_nfs + [ item.name ] if item.type|lower == 'nfs' else server_get_datastores_nfs }}"
+  no_log: True
+  with_items: "{{ server_get_datastores_result.datastores }}"
+
+- name: Set fact of the ESXi server vmfs and nfs datatore dict
+  set_fact:
+    server_get_datastores_list: {'vmfs': "{{ server_get_datastores_vmfs }}", 'nfs': "{{ server_get_datastores_nfs }}"}
+
+- debug:
+    msg: "Get ESXi '{{ esxi_hostname }}' datastores list: {{ server_get_datastores_list }}"

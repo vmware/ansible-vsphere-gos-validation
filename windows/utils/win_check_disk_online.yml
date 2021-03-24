@@ -1,0 +1,26 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check disk is online in Windows guest OS
+# Parameters:
+#   win_check_disk_online_num: disk number
+# Return:
+#   win_check_disk_online_result: True or False
+#
+- name: Initialize the disk online status
+  set_fact:
+    win_check_disk_online_result: False
+
+- name: Get disk online status in Windows guest
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-disk -Number {{ win_check_disk_online_num | int }}).OperationalStatus"
+
+- name: Set fact of the disk online status
+  set_fact:
+    win_check_disk_online_result: True
+  when:
+    - win_powershell_cmd_output.stdout_lines | length != 0
+    - win_powershell_cmd_output.stdout_lines[0] | lower == 'online'
+- debug:
+    msg: "Get disk online status in Windows guest is: {{ win_check_disk_online_result }}"

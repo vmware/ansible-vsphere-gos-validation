@@ -1,0 +1,56 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VMware Tools installation and running status in VM
+# Return:
+#   vmtools_is_installed: True or False. VMware Tools is installed or not.
+#   vmtools_is_running: True or False. VMware Tools is running or not.
+#   vmtools_is_ovt: True or False. VMware Tools is open-vm-tools or not.
+#
+- name: Get VMware Tools installed information first
+  vmware_guest_tools_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+  register: get_vmtools_info
+  ignore_errors: yes
+- name: Display the result of getting VMware tools info
+  debug: var=get_vmtools_info
+  when: enable_debug is defined and enable_debug
+
+- name: Set fact of VMware Tools installed status
+  set_fact:
+    vmtools_is_installed: "{{ get_vmtools_info.vmtools_info.vm_tools_install_status != 'toolsNotInstalled' }}"
+    vmtools_is_running: "{{ get_vmtools_info.vmtools_info.vm_tools_running_status == 'guestToolsRunning' }}"
+    vmtools_not_ready: "{{ (get_vmtools_info.vmtools_info.vm_tools_running_status == 'guestToolsExecutingScripts') or (get_vmtools_info.vmtools_info.vm_tools_running_status == 'guestToolsNotRunning') }}"
+    vmtools_is_ovt: "{{ (get_vmtools_info.vmtools_info.vm_tools_install_type == 'guestToolsTypeOpenVMTools') or (get_vmtools_info.vmtools_info.vm_tools_version_status == 'guestToolsUnmanaged') }}"
+
+- block:
+    - name: Wait for VMware Tools running when it's executing scripts or not running
+      vmware_guest_tools_info:
+        hostname: "{{ vsphere_host_name }}"
+        username: "{{ vsphere_host_user }}"
+        password: "{{ vsphere_host_user_password }}"
+        validate_certs: "{{ validate_certs | default(False) }}"
+        datacenter: "{{ vsphere_host_datacenter }}"
+        folder: "{{ vm_folder }}"
+        name: "{{ vm_name }}"
+      register: get_vmtools_info_retry
+      ignore_errors: yes
+      until: get_vmtools_info_retry.vmtools_info.vm_tools_running_status == 'guestToolsRunning'
+      retries: "{{ get_vmtools_status_retries | default(100) }}"
+      delay: 3
+    - name: Set fact of VMware Tools running status
+      set_fact:
+        vmtools_is_running: "{{ get_vmtools_info_retry.vmtools_info.vm_tools_running_status == 'guestToolsRunning' }}"
+  when: vmtools_is_installed and vmtools_not_ready
+
+- debug:
+    msg:
+      - "VMware tools is installed in guest: {{ vmtools_is_installed }}"
+      - "VMware tools is running in guest: {{ vmtools_is_running }}"
+      - "VMware tools is installed as open-vm-tools: {{ vmtools_is_ovt }}"

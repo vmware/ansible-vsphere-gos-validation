@@ -1,0 +1,24 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Reconfigure network adapter's connection status to VM
+- name: "Reconfigure network adapter to {{ vm_name }}"
+  vmware_guest_network:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    label: "{{ netadapter_label | default(omit) }}"
+    mac_address: "{{ netadapter_mac_addr | default(omit) }}"
+    state: present
+    connected: "{{ netadapter_connect }}"
+    start_connected: "{{ netadapter_start_connect | default(true) }}"
+  register: reconfig_result
+
+- name: Display the result of changing network adapter connection
+  debug: var=reconfig_result
+  when: enable_debug is defined and enable_debug

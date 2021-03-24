@@ -1,0 +1,52 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of SCSI controller type name mapping"
+  set_fact:
+    scsi_name_map:
+      paravirtual: 'VMware paravirtual SCSI'
+      lsilogic: 'LSI Logic'
+      lsilogicsas: 'LSI Logic SAS'
+- name: "Print the target controller type name"
+  debug: var=scsi_name_map[scsi_type]
+
+- name: "Initialize the disk node info on existing '{{ scsi_type }}' controller"
+  set_fact:
+    found_new_disk: False
+    found_existing_ctrl_number: "0"
+    found_new_disk_number: "0"
+
+- name: "Loop to get existing '{{ scsi_type }}' controller number"
+  set_fact:
+    found_existing_ctrl_number: "{{ item.key }}"
+    device_key: "{{ item.value['controller_disks_devicekey'] }}"
+    found_existing_ctrl: True
+  with_dict: "{{ scsi_facts }}"
+  when:
+    - found_existing_ctrl is defined and not found_existing_ctrl
+    - scsi_name_map[scsi_type] == item.value['controller_summary']
+- name: "Print the result of finding '{{ scsi_type }}' controller"
+  debug: var=found_existing_ctrl
+
+- block:
+    - name: "Get total number of existing disk"
+      set_fact:
+        total_existing_disks: "{{ device_key | length }}"
+        new_unit_number: "0"
+        new_ctrl_number: "{{ found_existing_ctrl_number }}"
+    - block:
+        - name: "Loop to get new disk number not assigned"
+          set_fact:
+            new_unit_number: "{{ item }}"
+            found_new_disk: True
+          loop: "{{ range(0, 16) | list }}"
+          when:
+            - total_existing_disks | int >= 1
+            - "(item + 16 * new_ctrl_number|int + 2000) not in device_key"
+            - not found_new_disk
+        - debug:
+            msg:
+              - "Set new_ctrl_number: {{ new_ctrl_number }}"
+              - "Set new_unit_number: {{ new_unit_number }}"
+      when: total_existing_disks | int < 16
+  when: found_existing_ctrl

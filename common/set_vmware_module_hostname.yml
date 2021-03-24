@@ -1,0 +1,41 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Set hostname of Ansible VMware modules to connect
+# When vcenter_hostname defined then use it, else use esxi_hostname
+# as the host name when using Ansible VMware modules
+#
+# Check ESXi host variables
+- name: "Check ESXi host information is provided"
+  assert:
+    that:
+      - esxi_hostname is defined and esxi_hostname
+      - esxi_username is defined and esxi_username
+      - esxi_password is defined and esxi_password
+    fail_msg: "Please set esxi_hostname, esxi_username and esxi_password in varables file"
+
+- name: "Set vCenter hostname for Ansible VMware modules to connect"
+  set_fact:
+    vsphere_host_name: "{{ vcenter_hostname }}"
+    vsphere_host_user: "{{ vcenter_username }}"
+    vsphere_host_user_password: "{{ vcenter_password }}"
+    vsphere_host_datacenter: "{{ datacenter }}"
+    vcenter_is_defined: True
+  when:
+    - vcenter_hostname is defined and vcenter_hostname
+    - vcenter_username is defined and vcenter_username
+    - vcenter_password is defined and vcenter_password
+    - datacenter is defined and datacenter
+
+- name: "Set ESXi hostname for Ansible VMware modules to connect"
+  set_fact:
+    vsphere_host_name: "{{ esxi_hostname }}"
+    vsphere_host_user: "{{ esxi_username }}"
+    vsphere_host_user_password: "{{ esxi_password }}"
+    vsphere_host_datacenter: "ha-datacenter"
+  when: vcenter_is_defined is undefined
+
+- name: "Set default VM folder when it's undefined"
+  set_fact:
+    vm_folder: "{{ '/' ~ vsphere_host_datacenter ~ '/vm'}}"
+  when: vm_folder is undefined or not vm_folder

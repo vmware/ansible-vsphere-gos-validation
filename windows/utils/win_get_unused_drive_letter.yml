@@ -1,0 +1,30 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the assigned drive letter in Windows guest OS and return an
+# unused one randamly
+# Return:
+#   drive_letter_new: an unassigned driver letter
+#
+- name: Set fact of the available driver letter list
+  set_fact:
+    valid_drive_letter_list: ['Z', 'Y', 'X', 'W', 'V', 'U', 'T', 'S']
+- name: get assigned drive letter list in Windows guest
+  win_shell: "(get-volume | where-object {$_.DriveType -eq 'Fixed'}).DriveLetter"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: get_drive_letter_list
+- name: Display the powershell command result
+  debug: var=get_drive_letter_list
+  when: enable_debug is defined and enable_debug
+
+- name: Set fact of the assigned driver letter
+  set_fact:
+    assigned_drive_letter: "{{ get_drive_letter_list.stdout_lines | list }}"
+- debug:
+    msg: "Get assigned drive letters: {{ assigned_drive_letter }}"
+
+- name: Set fact of the unassigned driver letter
+  set_fact:
+    drive_letter_new: "{{ valid_drive_letter_list | difference(assigned_drive_letter) | random }}"
+- debug:
+    msg: "Drive letter can be used: {{ drive_letter_new }}"

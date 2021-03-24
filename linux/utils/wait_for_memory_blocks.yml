@@ -1,0 +1,19 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Wait for all memory blocks present
+# Parameters
+## memory_size_mb: VM's memory size in MB
+- include_tasks: memory_blocks_get.yml
+
+- name: "Wait for {{ mem_block_num }} memory blocks present under /sys/devices/system/memory/"
+  shell: ls -1 -d /sys/devices/system/memory/memory*
+  register: present_blocks_num
+  until:
+    - present_blocks_num is defined
+    - present_blocks_num.stdout_lines is defined
+    - present_blocks_num.stdout_lines | length  == mem_block_num | int
+  delay: 5
+  retries: 10
+  delegate_to: "{{ vm_guest_ip }}"
+  changed_when: false

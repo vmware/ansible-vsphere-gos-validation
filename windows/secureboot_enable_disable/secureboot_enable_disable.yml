@@ -1,0 +1,41 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for test enable and disable secure boot of VM
+# when VM firmware is EFI and VM hardware version >= 13. The test result
+# will be 'No Run' if VM firmware is BIOS or VM hardware version < 13.
+# Note: For Windows 10 guest OS, if there is non WHQL signed driver installed,
+# enable secure boot will cause OS BSOD.
+#
+- name: secureboot_enable_disable
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+        # Get VM firmware info
+        - include_tasks: ../../common/vm_get_boot_info.yml
+        # Enable, disable secure boot test if VM uses EFI firmware
+        - block:
+            - include_tasks: change_secureboot_config.yml
+              vars:
+                change_secureboot: 'enable'
+            - include_tasks: change_secureboot_config.yml
+              vars:
+                change_secureboot: 'disable'
+          when:
+            - vm_firmware is defined and vm_firmware | lower == 'efi'
+            - vm_hardware_version.split('-')[-1] | int >= 13
+
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip test case due to VM firmware is not EFI: {{ vm_firmware | default('NA') }}"
+          when: >
+            (vm_firmware is undefined or vm_firmware | lower != 'efi') or
+            (vm_hardware_version.split('-')[-1] | int < 13)
+      rescue:
+        - include_tasks: ../setup/rescue_cleanup.yml
+          vars:
+            current_testcase_name: "{{ ansible_play_name }}"

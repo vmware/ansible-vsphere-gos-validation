@@ -1,0 +1,30 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Initialize the fact of cloud-init version"
+  set_fact:
+    cloudinit_version: ""
+
+- name: "Get cloud-init version"
+  command: cloud-init --version
+  register: cloudinit_version_result
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Set the fact of cloud-init version"
+  set_fact:
+    cloudinit_version: "{{ cloudinit_version_result.stdout.split()[-1] }}"
+  when:
+    - cloudinit_version_result.stdout is defined
+    - cloudinit_version_result.stdout
+
+# Some OS release return cloud-init version to stderr not stdout
+- name: "Set the fact of cloud-init version"
+  set_fact:
+    cloudinit_version: "{{ cloudinit_version_result.stderr.split()[-1] }}"
+  when:
+    - cloudinit_version_result.stdout is undefined or not cloudinit_version_result.stdout
+    - cloudinit_version_result.stderr is defined
+    - cloudinit_version_result.stderr
+
+- name: "Print cloud-init version"
+  debug: var=cloudinit_version

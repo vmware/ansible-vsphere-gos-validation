@@ -1,0 +1,72 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get command about install or uninstall open-vm-tools
+
+- name: "Initialize variables for installing or uninstall packages with OS commands"
+  set_fact:
+    package_install_cmd: ""
+    package_uninstall_cmd: ""
+    check_update_cmd: ""
+    clean_cache_cmd: ""
+
+- name: "Set OS commands for installing or uninstalling packages on {{ guest_os_ansible_distribution }}"
+  set_fact:
+    package_install_cmd: "tdnf --enablerepo=photon --enablerepo=photon-updates -y install"
+    package_uninstall_cmd: "tdnf --enablerepo=photon --enablerepo=photon-updates -y remove"
+    check_update_cmd: "tdnf --enablerepo=photon --enablerepo=photon-updates makecache"
+    clean_cache_cmd: "tdnf clean all"
+  when: guest_os_ansible_distribution == "VMware Photon OS"
+
+- name: "Set OS commands for installing or uninstalling packages on {{ guest_os_ansible_distribution }}"
+  set_fact:
+    package_install_cmd: "dnf install -y"
+    package_uninstall_cmd: "dnf remove -y"
+    check_update_cmd: "dnf check-update"
+    clean_cache_cmd: "dnf clean all"
+  when:
+    - guest_os_ansible_distribution in ['RedHat', 'CentOS', 'OracleLinux']
+    - guest_os_ansible_distribution_major_ver | int > 7
+
+- name: "Set OS commands for installing or uninstalling packages on {{ guest_os_ansible_distribution }}"
+  set_fact:
+    package_install_cmd: "yum install -y"
+    package_uninstall_cmd: "yum remove -y"
+    check_update_cmd: "yum check-update"
+    clean_cache_cmd: "yum clean all"
+  when:
+    - guest_os_ansible_distribution in ['RedHat', 'CentOS', 'OracleLinux']
+    - guest_os_ansible_distribution_major_ver | int <= 7
+
+- name: "Set OS commands for installing or uninstalling packages on {{ guest_os_ansible_distribution }}"
+  set_fact:
+    package_install_cmd: "yum install -y"
+    package_uninstall_cmd: "yum remove -y"
+    check_update_cmd: "yum check-update"
+    clean_cache_cmd: "yum clean all"
+  when: guest_os_ansible_distribution == "Amazon"
+
+- name: "Set OS commands for installing or uninstalling packages on {{ guest_os_ansible_distribution }}"
+  set_fact:
+    package_install_cmd: "zypper install -y"
+    package_uninstall_cmd: "zypper remove -y"
+    check_update_cmd: "zypper ref"
+    clean_cache_cmd: "zypper clean -a"
+  when: guest_os_ansible_distribution in ['SLES', 'SLED']
+
+- name: "Set OS commands for installing or uninstalling packages on {{ guest_os_ansible_distribution }}"
+  set_fact:
+    package_install_cmd: "apt-get install -y"
+    package_uninstall_cmd: "apt-get purge -y"
+    check_update_cmd: "apt-get update"
+    clean_cache_cmd: "apt-get clean"
+  when: guest_os_ansible_distribution in ['Ubuntu', 'Debian']
+
+- name: "Check OS commands are valid"
+  assert:
+    that:
+      - package_install_cmd
+      - package_uninstall_cmd
+      - check_update_cmd
+      - clean_cache_cmd
+    fail_msg: "No valid commands for installing or uninstalling packages on {{ guest_os_ansible_distribution }}"

@@ -1,0 +1,63 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Initialize hostname and domain check result"
+  set_fact:
+    hostname_success: ""
+    dns_domain_success: ""
+
+# Get hostname FQDN
+- include_tasks: ../../common/vm_shell_in_guest.yml
+  vars:
+    vm_shell_cmd: "/usr/bin/hostname"
+    vm_shell_args: "-f"
+    vm_shell_out: "/tmp/hostname_f"
+
+- include_tasks: ../../common/vm_shell_in_guest.yml
+  vars:
+    vm_shell_cmd: "/bin/hostname"
+    vm_shell_args: "-f"
+    vm_shell_out: "/tmp/hostname_f"
+  when: vm_shell_result.exit_code is undefined
+
+- include_tasks: ../../common/vm_guest_file_operation.yml
+  vars:
+    operation: "fetch_file"
+    src_path: "/tmp/hostname_f"
+    dest_path: "{{ testcase_info_collect_path }}/hostname_f"
+
+- name: "Get guest FQDN"
+  command: cat "{{ testcase_info_collect_path }}/hostname_f"
+  changed_when: False
+  register: result
+
+- name: "Save hostname and domain check result"
+  set_fact:
+    guest_hostname: "{{ result.stdout.split('.')[0] }}"
+    guest_dns_domain: "{{ result.stdout.split('.')[1:] | join('.') }}"
+
+# Check hostname
+- name: Check guest hostname is customized
+  set_fact:
+    hostname_success: "{{ guest_hostname == linux_gosc_spec['hostname'] }}"
+
+- name: "Print hostname check result"
+  debug: var=hostname_success
+
+- include_tasks: ../../common/print_error_msg.yml
+  vars:
+    error_msg: "VM hostname is {{ guest_hostname }}, expected hostname is {{ linux_gosc_spec['hostname'] }}"
+  when: not hostname_success
+
+# Check domain name
+- name: Check DNS domain name is customized
+  set_fact:
+    dns_domain_success: "{{ guest_dns_domain == linux_gosc_spec['domain'] }}"
+
+- name: "Print dns domain check result"
+  debug: var=dns_domain_success
+
+- include_tasks: ../../common/print_error_msg.yml
+  vars:
+    error_msg: "VM DNS domain name is {{ guest_dns_domain }}, expected domain name is {{ linux_gosc_spec['domain'] }}"
+  when: not dns_domain_success

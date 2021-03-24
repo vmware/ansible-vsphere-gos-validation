@@ -1,0 +1,36 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check 'VMwareToolboxCmd.exe' command can display
+# the amount of memory that is currently reclaimed from the VM through ballooning.
+# Here the checked value is 0 MB, but it can be the real value according to specific situation.
+# If VMware Tools is not installed or not running, then this test case result will be "No Run".
+#
+- name: stat_balloon
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+        - block:
+            - include_tasks: ../utils/win_execute_cmd.yml
+              vars:
+                win_powershell_cmd: "& 'C:\\Program Files\\VMware\\VMware Tools\\VMwareToolboxCmd.exe' stat balloon"
+            - name: Check balloon status is 0 MB
+              assert:
+                that:
+                  - not win_powershell_cmd_output.failed
+                  - win_powershell_cmd_output.stdout_lines[0] == '0 MB'
+                fail_msg: "stat_balloon test failed"
+                success_msg: "stat_balloon test passed"
+          when: vmtools_is_installed and vmtools_is_running
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed }}, running: {{ vmtools_is_running }}"
+          when: not vmtools_is_installed or not vmtools_is_running
+      rescue:
+        - include_tasks: ../setup/rescue_cleanup.yml
+          vars:
+            current_testcase_name: "{{ ansible_play_name }}"

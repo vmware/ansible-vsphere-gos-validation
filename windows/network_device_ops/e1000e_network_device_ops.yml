@@ -1,0 +1,23 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check hotadd and hot remove e1000e
+# network adapter to VM.
+#
+- name: e1000e_network_device_ops
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - name: Set fact of the network adapter type
+      set_fact:
+        nic_type: 'E1000E'
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+        - name: Add e1000e network adapter to VM and verify status
+          include_tasks: network_adapter_deviceops.yml
+      rescue:
+        - include_tasks: ../setup/rescue_cleanup.yml
+          vars:
+            current_testcase_name: "{{ ansible_play_name }}"

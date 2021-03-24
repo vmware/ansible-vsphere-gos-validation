@@ -1,0 +1,22 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get ethernet links
+- name: "Initialize the fact of Ethernet links in guest"
+  set_fact:
+    guest_network_interfaces: []
+
+- include_tasks: ../../common/get_system_info.yml
+  vars:
+    filter: "ansible_interfaces"
+
+- name: "Set the fact of Ethernet links in guest"
+  set_fact:
+    guest_network_interfaces: "{{ guest_system_info.ansible_interfaces | difference(['lo', 'virbr']) }}"
+  when:
+    - guest_system_info is defined
+    - guest_system_info.ansible_interfaces is defined
+    - guest_system_info.ansible_interfaces | length >= 1
+
+- debug:
+    msg: "Get Ethernet links in guest OS: {{ guest_network_interfaces }}"

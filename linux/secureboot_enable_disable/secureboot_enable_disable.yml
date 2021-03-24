@@ -1,0 +1,89 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check VM secure boot can be enabled
+# and disabled successfully when VM firmware is UEFI and VM hardware
+# version >= 13. After secure boot enabled below line will be added
+# into vmx file:
+#   uefi.secureBoot.enabled = "TRUE"
+# Note: This test case will not check if target guest OS supports
+# secure boot before enable it, please refer to VMware KB article for
+# secure boot support matrix.
+#
+- name: secureboot_enable_disable
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../utils/test_setup.yml
+          vars:
+            vmtools_check: "False"
+
+        - include_tasks: ../../common/vm_get_boot_info.yml
+
+        - block:
+            - name: "Initialize test result variables"
+              set_fact:
+                secureboot_enabled_pass: False
+                secureboot_disabled_pass: False
+            - include_tasks: ../utils/shutdown.yml
+            # Enable secureboot when secureboot is not enabled
+            - include_tasks: ../../common/vm_set_boot_options.yml
+              vars:
+                secure_boot_enabled_set: True
+              when: not vm_secureboot_enabled
+            - include_tasks: ../../common/vm_set_power_state.yml
+              vars:
+                vm_power_state_set: 'powered-on'
+            - include_tasks: ../../common/update_inventory.yml
+            - include_tasks: ../../common/vm_search_vmware_log.yml
+              vars:
+                keyword: "Image APPROVED"
+
+            - include_tasks: ../utils/get_system_firmware.yml
+
+            - name: "Set fact of secure boot enable test result"
+              set_fact:
+                secureboot_enabled_pass: True
+              when:
+                - vmware_log_search
+                - guest_firmware == "EFI"
+            # Disable secureboot
+            - include_tasks: ../utils/shutdown.yml
+            - include_tasks: ../../common/vm_set_boot_options.yml
+              vars:
+                secure_boot_enabled_set: False
+            - include_tasks: ../../common/vm_set_power_state.yml
+              vars:
+                vm_power_state_set: 'powered-on'
+            - include_tasks: ../../common/update_inventory.yml
+
+            - include_tasks: ../utils/get_system_firmware.yml
+            - name: "Set fact of secure boot disable test result"
+              set_fact:
+                secureboot_disabled_pass: True
+              when: guest_firmware == "EFI"
+            - name: "Check secure boot enable and disable test results"
+              assert:
+                that:
+                  - secureboot_enabled_pass and secureboot_disabled_pass
+                fail_msg: "Enable secureboot result: {{ secureboot_enabled_pass }}, disable secureboot result: {{ secureboot_disabled_pass }}"
+                success_msg: "Enable secureboot result: {{ secureboot_enabled_pass }}, disable secureboot result: {{ secureboot_disabled_pass }}"
+            - include_tasks: ../../common/print_test_result.yml
+              vars:
+                test_result: "Passed"
+          when:
+            - vm_firmware | lower == "efi"
+            - vm_hardware_version.split('-')[-1] | int >= 13
+
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "No Run"
+          when: >
+            (vm_firmware | lower != "efi") or
+            (vm_hardware_version.split('-')[-1] | int < 13)
+
+      rescue:
+        - include_tasks: ../utils/test_rescue.yml

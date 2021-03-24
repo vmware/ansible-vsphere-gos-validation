@@ -1,0 +1,76 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get or set the status of specified network adapter in Windows guest OS
+# Parameters:
+#   win_set_netadapter_name: the network adapter name
+#   win_set_netadapter_operation: the valid value is "Disabled", or "Up"
+#
+- name: Check the required parameter
+  fail:
+    msg: "Network adatper name (e.g., Ethernet1) in Windows guest should be specified"
+  when: win_set_netadapter_name is undefined or not win_set_netadapter_name
+- name: Check the parameter value
+  fail:
+    msg: "Expected Network adapter operation should be 'Disabled' or 'Up'"
+  when: win_set_netadapter_operation is defined and win_set_netadapter_operation not in ['Disabled', 'Up']
+
+- name: Set fact of getting network adapter status command
+  set_fact:
+    get_netadapter_status: "(Get-NetAdapter -Name '{{ win_set_netadapter_name }}').Status"
+
+- name: Set fact of disable network adapter command
+  set_fact:
+    netadapter_ops_cmd: "Disable-NetAdapter -Name '{{ win_set_netadapter_name }}' -Confirm:$False"
+  when: win_set_netadapter_operation is defined and win_set_netadapter_operation == "Disabled"
+
+- name: Set fact of enable network adapter command
+  set_fact:
+    netadapter_ops_cmd: "Enable-NetAdapter -Name '{{ win_set_netadapter_name }}'"
+  when: win_set_netadapter_operation is defined and win_set_netadapter_operation == "Up"
+
+- name: "Get specified network adapter '{{ win_set_netadapter_name }}' current status firstly"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ get_netadapter_status }}"
+- name: Set fact of the network adapter status
+  set_fact:
+    current_netadapter_status: "{{ win_powershell_cmd_output }}"
+- debug:
+    msg: "Network adapter: {{ win_set_netadapter_name }} status is already: {{ win_set_netadapter_operation }}"
+  when:
+    - current_netadapter_status.stdout_lines | length != 0
+    - current_netadapter_status.stdout_lines[0] == win_set_netadapter_operation
+
+# If network adapter is not in the status desired, change it
+- block:
+    - name: "'{{ win_set_netadapter_operation }}' network adapter '{{ win_set_netadapter_name }}'"
+      include_tasks: win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "{{ netadapter_ops_cmd }}"
+    - name: Set fact of the change network adapter status result
+      set_fact:
+        netadapter_ops: "{{ win_powershell_cmd_output }}"
+    - name: Wait for 5 seconds after changing network adapter status
+      pause:
+        seconds: 5
+    - name: "Get network adapter '{{ win_set_netadapter_name }}' status after changing in guest OS"
+      include_tasks: win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "{{ get_netadapter_status }}"
+    - name: Set fact of the network adapter status after changing
+      set_fact:
+        get_netadapter_status: "{{ win_powershell_cmd_output }}"
+    - name: Check network adatper status is expected
+      fail:
+        msg: "Set network adapter '{{ win_set_netadapter_name }}' to '{{ win_set_netadapter_operation }}' failed"
+      when: netadapter_ops.rc != 0 or get_netadapter_status.stdout_lines[0] != win_set_netadapter_operation
+  when: >
+    (current_netadapter_status.rc != 0) or
+    (current_netadapter_status.stdout_lines | length != 0 and current_netadapter_status.stdout_lines[0] != win_set_netadapter_operation)
+
+# Fail when can not get network adapter current status
+- name: Check the result of getting network adapter status command
+  fail:
+    msg: "Get network adapter current status in guest OS failed"
+  when: current_netadapter_status.rc != 0

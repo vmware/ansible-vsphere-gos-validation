@@ -1,0 +1,34 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Reconfigure VM CDROM
+# Parameters:
+#   cdrom_type: 'iso', 'client' or 'none'.
+#   cdrom_iso_file: must be set to the ISO file path in datastore when
+#     'cdrom_type' set to 'iso.' in this format '[datastore] file_path/file.iso'
+#   cdrom_controller_type: the CDROM controller type 'ide' or 'sata'.
+#   cdrom_controller_num: the bus number of the controller CDROM attachs.
+#   cdrom_unit_num: the unit number of CDROM device.
+#   cdrom_state: 'present' or 'absent'.
+#
+- name: "Configure VM CDROM to '{{ cdrom_type }}'"
+  vmware_guest:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    cdrom:
+      - type: "{{ cdrom_type | default(omit) }}"
+        iso_path: "{{ cdrom_iso_file | default(omit) }}"
+        controller_type: "{{ cdrom_controller_type | default('sata') }}"
+        controller_number: "{{ cdrom_controller_num }}"
+        unit_number: "{{ cdrom_unit_num }}"
+        state: "{{ cdrom_state | default(omit) }}"
+  register: vm_config_cdrom_result
+
+- name: Display the result of reconfiguring VM CDROM
+  debug: var=vm_config_cdrom_result
+  when: enable_debug is defined and enable_debug

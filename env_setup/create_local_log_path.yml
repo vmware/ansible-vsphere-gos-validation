@@ -1,0 +1,24 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Create the current test run log files path in specified dir or in default dir.
+- name: "Set the log files path of this test run"
+  set_fact:
+    testrun_log_path: "{{ local_log_path | default(main_playbook_path) }}/logs/{{ vm_name }}/{{ testrun_timestamp }}"
+
+- name: "Create the log files directory locally with mode '0755'"
+  file:
+    path: "{{ testrun_log_path }}"
+    state: directory
+    mode: '0755'
+  register: create_log_path
+- debug: var=create_log_path
+  when: enable_debug is defined and enable_debug
+
+- name: "Set error log file path and test result file path"
+  set_fact:
+    error_msg_path: "{{ testrun_log_path }}/errors.log"
+    test_result_file: "{{ testrun_log_path }}/test_result.yml"
+
+- name: "Print the path to test run logs"
+  debug: var=testrun_log_path

@@ -1,0 +1,67 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# Eject CDROM device in Linux guest OS
+# Parameters:
+#   guest_cdrom_device_num: If defined, the specified cdrom device will be ejected.
+#                           Otherwise, all cdrom devices will be ejected.
+#
+- name: "Initialize the fact of guest CDROM devices with ISO connected"
+  set_fact:
+    guest_cdroms: []
+
+- name: "Set CDROM device to be ejected"
+  set_fact:
+    eject_cdrom_name: "sr{{ guest_cdrom_device_num | int }}"
+  when:
+    - guest_cdrom_device_num is defined
+    - guest_cdrom_device_num is match('^[0-9]$')
+
+- name: "All CDROM connected to ISO will be ejected"
+  set_fact:
+    eject_cdrom_name: ""
+  when: >
+    guest_cdrom_device_num is undefined or
+    guest_cdrom_device_num is not match('^[0-9]$')
+
+- name: "Get the fact of all block devices"
+  command: "lsblk -o NAME,TYPE,FSTYPE"
+  register: lsblk_result
+  delegate_to: "{{ vm_guest_ip }}"
+
+- block:
+    - name: "Set the fact of guest CDROM devices with ISO connected"
+      set_fact:
+        guest_cdroms: "{{ guest_cdroms | union([lsblk_item.split()[0]]) }}"
+      when:
+        - lsblk_item.split() | length == 3
+        - lsblk_item.split()[1] | lower == 'rom'
+        - lsblk_item.split()[-1] | lower == 'iso9660'
+      with_items: "{{ lsblk_result.stdout_lines }}"
+      loop_control:
+        loop_var: lsblk_item
+
+    - name: "Print the CDROM devices connecting to ISO"
+      debug: var=guest_cdroms
+  when:
+    - lsblk_result is defined
+    - lsblk_result.stdout_lines is defined
+    - lsblk_result.stdout_lines | length > 0
+
+- block:
+    # Eject connected CDROM
+    - block:
+        - name: "Eject CDROM device '/dev/{{ guest_cdrom }}'"
+          command: "eject -v /dev/{{ guest_cdrom }}"
+          delegate_to: "{{ vm_guest_ip }}"
+          register: eject_cdrom_result
+          when: >
+            not eject_cdrom_name or
+            guest_cdrom == eject_cdrom_name
+          with_items: "{{ guest_cdroms }}"
+          loop_control:
+            loop_var: guest_cdrom
+
+    - name: "Print CDROM eject result"
+      debug: var=eject_cdrom_result
+  when: guest_cdroms | length > 0

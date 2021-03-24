@@ -1,0 +1,106 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check VM vCPU hotadd works as expected. When calculated
+# vCPU hotadd number list from ESXi supported CPU number or configured maximum CPU
+# number(default 16) is empty, this test case result is 'No Run'.
+# Note: before hotadd vCPU, VM vCPU number will be set to 2 and cores per socket will be
+# set to 1 firstly.
+#
+- name: cpu_hot_add_basic
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        # Get ESXi host logical processors number
+        - include_tasks: ../../common/esxi_get_property.yml
+          vars:
+            esxi_host_property_list:
+              - summary.hardware.numCpuThreads
+        # Set hotadd test CPU number to the minimum of supported CPU number and configured
+        # maximum hotadd CPU number by default in vars/test.yml
+        - name: Set fact of the maximum vCPU number to do hotadd test
+          set_fact:
+            max_num_cpus: "{{ [esxi_host_property_results.ansible_facts.summary.hardware.numCpuThreads | int, vm_cpu_hotadd_max | default(16) | int] | min }}"
+        - name: Print the maximum CPU number of hotadd test
+          debug:
+            msg: "Maximum CPU number to be test: {{ max_num_cpus }}"
+
+        # Hotadd 1, 2, 3, ..., 16 CPUs and VM CPU number should not exceed max_num_cpus.
+        # Assume we are going to do N times CPU hotadd, then
+        # 1 + 2 + 3 + ... + N = max_num_cpus - 2, which means N = root((max_num_cpus - 2) * 2)
+        - name: Set fact of the vCPU hotadd number list
+          set_fact:
+            cpu_hotadd_num_list: "{{ range(1, (((max_num_cpus | int - 2) * 2) | root | int)) | list }}"
+        - name: Print vCPU hotadd number list
+          debug:
+            msg: "Under test vCPU hotadd number list: {{ cpu_hotadd_num_list }}"
+        - block:
+            - include_tasks: ../utils/test_setup.yml
+              vars:
+                vmtools_check: "False"
+
+            # Check VM CPU hotadd is enabled
+            - include_tasks: ../../common/vm_get_config.yml
+              vars:
+                property_list: ['config.cpuHotAddEnabled', 'config.hardware.numCPU', 'config.hardware.numCoresPerSocket']
+            - name: Set fact of the VM CPU hotadd status and vCPU number
+              set_fact:
+                cpu_hotadd_enabled: "{{ vm_config.config.cpuHotAddEnabled }}"
+                cpu_num: "{{ vm_config.config.hardware.numCPU }}"
+                cpu_cores_per_socket: "{{ vm_config.config.hardware.numCoresPerSocket }}"
+
+            - debug:
+                msg:
+                  - "VM vCPU number: {{ cpu_num }}"
+                  - "VM vCPU hotadd enabled: {{ cpu_hotadd_enabled }}"
+
+            # Shutdown VM if either CPU hotadd is not enabled
+            # or CPU number is not 2 or CPU cores per socket is not 1
+            - block:
+                - include_tasks: ../utils/shutdown.yml
+                - include_tasks: ../../common/vm_enable_cpu_hotadd.yml
+                  when: not cpu_hotadd_enabled
+                # Reset VM's CPU number to 2 and cores per socket to 1
+                - include_tasks: ../../common/vm_set_cpu_number.yml
+                  vars:
+                    num_cpus: 2
+                    num_cores_per_socket: 1
+                  when: (cpu_num | int != 2) or (cpu_cores_per_socket | int != 1)
+                - include_tasks: ../../common/vm_set_power_state.yml
+                  vars:
+                    vm_power_state_set: 'powered-on'
+                - include_tasks: ../../common/update_inventory.yml
+              when: >
+                (not cpu_hotadd_enabled) or
+                (cpu_num | int != 2) or
+                (cpu_cores_per_socket | int != 1)
+
+            # Validate VM's CPU number is 2 and cores per socket is 1 in guest
+            - include_tasks: ../utils/get_cpu_info.yml
+            - name: Assert guest detects 2 CPUs
+              assert:
+                that:
+                  - guest_cpu_num | int == 2
+                  - guest_cpu_cores | int == 1
+                fail_msg: "VM '{{ vm_name }}' vCPU number is: {{ guest_cpu_num }} (not 2), cores per socket: {{ guest_cpu_cores }} (not 1)."
+                success_msg: "VM '{{ vm_name }}' vCPU number is: {{ guest_cpu_num }}, cores per socket: {{ guest_cpu_cores }}."
+
+            - include_tasks: cpu_hot_add_validate.yml
+              loop: "{{ cpu_hotadd_num_list }}"
+              loop_control:
+                loop_var: hotadd_num
+            - include_tasks: ../../common/print_test_result.yml
+              vars:
+                test_result: "Passed"
+          when: cpu_hotadd_num_list|length != 0
+
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "No Run"
+          when: cpu_hotadd_num_list|length == 0
+
+      rescue:
+        - include_tasks: ../utils/test_rescue.yml

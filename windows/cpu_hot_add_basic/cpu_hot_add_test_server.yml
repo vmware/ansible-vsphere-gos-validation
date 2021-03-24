@@ -1,0 +1,19 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Windows Server supports 64 sockets
+- name: Set fact of the CPU hotadd number list
+  set_fact:
+    hotadd_num_list: "{{ range(1, (((max_num_cpus | int - 2) * 2) | root | int)) | list }}"
+- debug:
+    msg: "Hotadd vCPU on Windows Server test value list: {{ hotadd_num_list | to_yaml }}"
+
+- include_tasks: cpu_hot_add_validate.yml
+  loop: "{{ hotadd_num_list }}"
+  loop_control:
+    loop_var: hotadd_num
+  when: hotadd_num_list | length != 0
+
+- debug:
+    msg: "Skip hotadd vCPU test on Windows Server VM due to test value list is empty"
+  when: hotadd_num_list | length == 0

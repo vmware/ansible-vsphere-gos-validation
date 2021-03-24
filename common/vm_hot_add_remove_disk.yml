@@ -1,0 +1,68 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Add a new disk to VM in the VM's datastore or remove disk from VM
+# Parameters:
+#   disk_operation: valid value is 'present' or 'absent'.
+#   disk_size_gb (optional): the new disk size in GB, only support 'size_gb'
+#     parameter for 'vmware_guest_disk' module here. Default value is 1.
+#   disk_provision_type (optional): the type of disk, valid value is 'thin',
+#     'eagerzeroedthick', or 'thick'.
+#   scsi_controller_type: the disk controller type, valid value is 'buslogic',
+#     'lsilogic', 'lsilogicsas', or 'paravirtual'.
+#   ctrl_number: the disk controller bus number.
+#   unit_number: the disk unit number.
+#   delete_disk_file: True or False. If 'disk_operation' is 'absent', whether
+#     delete disk file in datastore or not.
+#
+- name: Check required parameter
+  assert:
+    that:
+      - disk_operation is defined and disk_operation
+      - disk_operation | lower in ['present', 'absent']
+      - scsi_controller_type is defined and scsi_controller_type
+      - scsi_controller_type | lower in ['buslogic', 'lsilogic', 'lsilogicsas', 'paravirtual']
+      - ctrl_number is defined
+      - unit_number is defined
+    fail_msg:
+      - "disk_operation is required and valid value is 'present' or 'absent'."
+      - "scsi_controller_type is required and valid value is 'buslogic', 'lsilogic', 'lsilogicsas', 'paravirtual'."
+      - "ctrl_number and unit_number are also required."
+
+- block:
+    - name: Set default disk size to 1 GB
+      set_fact:
+        disk_size_gb: 1
+      when: disk_size_gb is undefined or disk_size_gb|int == 0
+    - name: Set default disk provision type to 'thin'
+      set_fact:
+        disk_provision_type: 'thin'
+      when: disk_provision_type is undefined or not disk_provision_type
+    - include_tasks: vm_get_guest_facts.yml
+    - name: Get VM datastore name
+      set_fact:
+        vm_datastore: "{{ vm_guest_facts.instance.hw_files[0].split(' ')[0].strip('['']') }}"
+  when: disk_operation | lower == 'present'
+
+- name: "{{ disk_operation }} disk to VM"
+  vmware_guest_disk:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    disk:
+      - size_gb: "{{ disk_size_gb | default(omit) }}"
+        type: "{{ disk_provision_type | default(omit) }}"
+        state: "{{ disk_operation }}"
+        scsi_type: "{{ scsi_controller_type }}"
+        datastore: "{{ vm_datastore | default(omit) }}"
+        scsi_controller: "{{ ctrl_number }}"
+        unit_number: "{{ unit_number }}"
+        destroy: "{{ delete_disk_file | default(omit) }}"
+  register: disk_add_facts
+- name: Display the VM disk operation result
+  debug: var=disk_add_facts
+  when: enable_debug

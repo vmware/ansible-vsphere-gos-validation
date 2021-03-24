@@ -1,0 +1,38 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get total memory size in MB
+- name: Copy rescan_memory.sh into guest
+  copy:
+    src:  scripts/rescan_memory.sh
+    dest: /tmp/rescan_memory.sh
+    mode: 0755
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: Rescan all memory in guest
+  shell: /bin/sh /tmp/rescan_memory.sh 2>/dev/null
+  failed_when: False
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: Copy calculate_total_memory.sh into guest
+  copy:
+    src:  scripts/calculate_total_memory.sh
+    dest: /tmp/calculate_total_memory.sh
+    mode: 0755
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: Check total memory in guest
+  shell: /bin/bash /tmp/calculate_total_memory.sh
+  register: total_memory
+  until:
+    - total_memory.stdout | int > 0
+  retries: 2
+  delay: 1
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: Set fact of the total memory size in guest OS
+  set_fact:
+    memtotal_mb_in_guest: "{{ total_memory.stdout | int }}"
+
+- debug:
+    msg: "Guest has detected {{ memtotal_mb_in_guest }} MB"

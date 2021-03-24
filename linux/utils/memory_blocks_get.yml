@@ -1,0 +1,20 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+#Get expected memory blocks number in guest
+#Parameters
+#  memory_size_mb: VM's memory size in MB
+#
+- name: Get memory block size in bytes
+  shell: echo $((0x$(cat /sys/devices/system/memory/block_size_bytes)))
+  register: block_size_bytes
+  changed_when: false
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Get the number of memory blocks in VM with {{ memory_size_mb }} MB memory"
+  set_fact:
+    block_size_mb: "{{ ((block_size_bytes.stdout | int) / 1024 /1024) | int }}"
+    mem_block_num: "{{ ((memory_size_mb | int) * 1024 * 1024 / (block_size_bytes.stdout | int)) | round(0, 'ceil') | int }}"
+
+- debug:
+    msg: "The VM should have {{ mem_block_num }} memory blocks of size {{ block_size_mb }} MB per block"

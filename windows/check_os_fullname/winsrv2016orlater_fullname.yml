@@ -1,0 +1,35 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# VM guest ID "Windows9Server64Guest" on ESXi version
+# >= 6.5U3 or 6.7U2 and < 7.0.0, the guest OS fullname is
+# "Microsoft Windows Server 2016 or later (64-bit)".
+# On ESXi version < 6.5U3, or 6.7U2 and > 6.5GA, the guest OS
+# fullname is "Microsoft Windows Server 2016 (64-bit)". 
+#
+- block:
+    - block:
+        - name: "Set fact of expected guest fullname for Windows Server 2016 on ESXi < 6.5U3 or 6.7U2"
+          set_fact:
+            expected_guest_fullname: "Microsoft Windows Server 2016 (64-bit)"
+          when: >
+            (esxi_version is version('6.5.0', '=') and esxi_update_version | int < 3) or
+            (esxi_version is version('6.7.0', '=') and esxi_update_version | int < 2)
+        - name: "Set fact of expected guest fullname for Windows Server 2016 on ESXi >= 6.5U3 or 6.7U2"
+          set_fact:
+            expected_guest_fullname: "Microsoft Windows Server 2016 or later (64-bit)"
+          when: >
+            (esxi_version is version('6.5.0', '=') and esxi_update_version | int >= 3) or
+            (esxi_version is version('6.7.0', '=') and esxi_update_version | int >= 2)
+        - debug:
+            msg: "Expected guest fullname for Windows Server 2016 on ESXi '{{ esxi_version }}': {{ expected_guest_fullname }}"
+      when: esxi_version is version('7.0.0', '<')
+
+    - block:
+        - name: "Set fact of expected guest fullname for Windows Server 2016 on ESXi >= 7.0.0"
+          set_fact:
+            expected_guest_fullname: "Microsoft Windows Server 2016 (64-bit)"
+        - debug:
+            msg: "Expected guest fullname for Windows Server 2016 on ESXi '{{ esxi_version }}': {{ expected_guest_fullname }}"
+      when: esxi_version is version('7.0.0', '>=')
+  when: vm_guest_id == "windows9Server64Guest"

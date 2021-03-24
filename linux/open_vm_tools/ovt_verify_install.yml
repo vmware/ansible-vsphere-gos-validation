@@ -1,0 +1,91 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is to verify open-vm-tools installation. If VM doesn't install open-vm-tools, this case will install open-vm-tools from
+# OS ISO image (RHEL/SLES/SLED) or official online repository (Ubuntu/Photon OS/CentOS/OracleLinux). Or if it already has open-vm-tools
+# installed and updat_tools is set True in vars/test.yml, it will reinstall open-vm-tools. And then check the install or reinstall output.
+#
+- name: ovt_verify_install
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../utils/test_setup.yml
+          vars:
+            vmtools_check: "True"
+        - name: "Set update VMware tools by default"
+          set_fact:
+            update_vmtools: True
+          when: update_vmtools is undefined
+        
+        # VM has open-vm-tools installed and update_vmtools is set false
+        - block:
+            - include_tasks: ../../common/print_test_result.yml
+              vars:
+                test_result: "No Run"
+            - meta: end_play
+          when: >
+            (guest_os_ansible_distribution == 'Flatcar') or
+            (vmtools_is_installed is defined and
+            vmtools_is_installed and
+            not update_vmtools)
+
+        # Initialize variables
+        - name: "Initialize variables for installing open-vm-tools"
+          set_fact:
+            uninstall_tools: False
+            install_tools: False
+
+        - name: "Set the fact for uninstalling open-vm-tools"
+          set_fact:
+            uninstall_tools: True
+          when:
+            - vmtools_is_installed is defined
+            - vmtools_is_installed
+            - update_vmtools
+
+        # Set the fact of open-vm-tools packages
+        - include_tasks: set_ovt_facts.yml
+
+        # Uninstall open-vm-tools for reinstallation
+        - include_tasks: uninstall_ovt.yml
+          when:
+            - uninstall_tools is defined
+            - uninstall_tools
+
+        # Initialize the variable for installing tools
+        - name: "Set the fact for installing tools"
+          set_fact:
+            install_tools: True
+          when: >
+            (vmtools_is_installed is undefined) or
+            (not vmtools_is_installed) or
+            (vmtools_is_removed is defined and vmtools_is_removed)
+
+        # Install open-vm-tools
+        - block:
+            # Install open-vm-tools packages
+            - include_tasks: install_ovt.yml
+
+            # Reboot and Wait for tools running
+            - include_tasks: ../utils/vm_reboot.yml
+
+            # Get VMware Tools version and build
+            - include_tasks: ../utils/get_guest_ovt_version_build.yml
+          when:
+            - install_tools is defined
+            - install_tools
+
+        # Take a new snapshot and set it as base snapshot when test passes
+        - include_tasks: set_base_snapshot.yml
+          when:
+            - install_tools is defined
+            - install_tools
+
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "Passed"
+      rescue:
+        - include_tasks: ../utils/test_rescue.yml

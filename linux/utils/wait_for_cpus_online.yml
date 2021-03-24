@@ -1,0 +1,37 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Parameters
+## num_cpus: expected number of cpus in guest
+
+- name: "Wait for {{ num_cpus }} CPUs present under /sys/devices/system/cpu/"
+  shell: "ls -1 -d /sys/devices/system/cpu/cpu[0-9]*"
+  register: present_cpu_num
+  changed_when: false
+  until:
+    - present_cpu_num is defined
+    - present_cpu_num.stdout_lines is defined
+    - present_cpu_num.stdout_lines | length  == num_cpus | int
+  delay: 5
+  retries: 10
+  delegate_to: "{{ vm_guest_ip }}"
+
+# Cpu0 of some OS doesn't have online. So we only check the other CPUs.
+- name: "Wait for {{ num_cpus }} CPUs ready"
+  wait_for:
+    path: /sys/devices/system/cpu/cpu{{ cpu_index }}/online
+    state: present
+  loop: "{{ range(1, num_cpus | int) | list }}"
+  loop_control:
+    loop_var: cpu_index
+  when: num_cpus | int >= 2
+  delegate_to: "{{ vm_guest_ip }}"
+
+# Rescan CPUs
+- name: "Rescan CPUs and online them"
+  shell: "echo '1' >/sys/devices/system/cpu/cpu{{ cpu_index }}/online"
+  loop: "{{ range(1, num_cpus | int) | list }}"
+  loop_control:
+    loop_var: cpu_index
+  when: num_cpus | int >= 2
+  delegate_to: "{{ vm_guest_ip }}"

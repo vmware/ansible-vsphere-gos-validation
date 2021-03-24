@@ -1,0 +1,22 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: Deploy VM from ovf template
+  vmware_deploy_ovf:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    datastore: "{{ datastore }}"
+    networks: "{{ ovf_networks | default({'VM Network': 'VM Network'}) }}"
+    ovf: "{{ ovf_path }}"
+    name: "{{ ovf_vm_name }}"
+    allow_duplicates: False
+    disk_provisioning: "thin"
+    power_on: False
+    wait_for_ip_address: False
+  register: ovf_deploy
+- name: Display the result of ovf template deploy
+  debug: var=ovf_deploy
+  when: enable_debug is defined and enable_debug

@@ -1,0 +1,30 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Download file from the given URL in Windows guest OS
+# Parameters:
+#   file_url: URL path of the file
+#   dst_file: destination file path
+#
+- name: Download file from specified URL in Windows guest
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(new-object system.net.webclient).DownloadFile('{{ file_url }}', '{{ dst_file }}')"
+    win_execute_cmd_ignore_error: True
+
+- name: Check download file result
+  fail:
+    msg: "Download file from specified URL failed, due to '{{ win_powershell_cmd_output.stdout }}'"
+  when: win_powershell_cmd_output.rc != 0
+
+- block:
+    - include_tasks: win_check_file_exist.yml
+      vars:
+        win_check_file_exist_file: "{{ dst_file }}"
+    - name: Check file is downloaded
+      assert:
+        that:
+          - win_check_file_exist_result
+        fail_msg: "Can not locate the file downloaded: {{ dst_file }}"
+        success_msg: "Downloaded file exists: {{ dst_file }}"
+  when: win_powershell_cmd_output.rc == 0

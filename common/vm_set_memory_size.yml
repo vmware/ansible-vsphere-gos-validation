@@ -1,0 +1,25 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set memory size to {{ memory_mb }} MB"
+  vmware_guest:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    hardware:
+      memory_mb: "{{ memory_mb }}"
+  register: vm_guest_facts
+- name: Display the memory set result
+  debug: var=vm_guest_facts
+  when: enable_debug is defined and enable_debug
+
+- name: "Check VM memory size after setting"
+  assert:
+    that:
+      - vm_guest_facts.instance.hw_memtotal_mb | int == memory_mb | int
+    fail_msg: "Failed to set memory to {{ memory_mb }} MB. VM's memory size is {{ vm_guest_facts.instance.hw_memtotal_mb }} MB"
+    success_msg: "Memory size is set to {{ memory_mb }} MB"

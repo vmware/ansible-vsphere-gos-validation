@@ -1,0 +1,56 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get datastore file status or delete file in datastore on vSphere host
+# Parameters:
+#   file_in_datastore: the datastore name of the file
+#   file_in_datastore_path: the file path in datastore
+#   file_in_datastore_ops: the operation for the datastore file, valid values: "file", "absent"
+#   file_in_datastore_ops_timeout (optional): the timeout of get file status, default is 300s
+#   file_in_datastore_failed_ignore (optional): whether ignore errors or not when check file
+#     existence or delete file in datastore
+#
+- name: Check required parameters
+  assert:
+    that:
+      - file_in_datastore_ops is defined
+      - file_in_datastore_ops|lower in ['absent', 'file']
+      - file_in_datastore is defined and file_in_datastore
+      - file_in_datastore_path is defined and file_in_datastore_path
+    fail_msg:
+      - "'file_in_datastore', 'file_in_datastore_path', 'file_in_datastore_ops' are required parameters."
+      - "This task supports datastore file operation: 'absent' or 'file'."
+
+- name: Datastore file operation
+  vsphere_file:
+    validate_certs: "{{ validate_certs | default(False) }}"
+    host: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    datastore: "{{ file_in_datastore }}"
+    path: "{{ file_in_datastore_path }}"
+    state: "{{ file_in_datastore_ops }}"
+    timeout: "{{ file_in_datastore_ops_timeout | default(300) }}"
+  ignore_errors: "{{ file_in_datastore_failed_ignore | default(False) }}"
+  register: ds_file_result
+
+- name: Display the datastore file operation result
+  debug: var=ds_file_result
+  when: enable_debug is defined and enable_debug
+
+- block:
+    - name: Set fact of the datastore file existence
+      set_fact:
+        file_in_datastore_result: "{{ 'Success' if ('status' in ds_file_result and ds_file_result.status == 200) else 'Fail' }}"
+    - debug:
+        msg: "File '{{ file_in_datastore_path }}' in datastore '{{ file_in_datastore }}': {{ file_in_datastore_result }}"
+  when: file_in_datastore_ops == 'file'
+
+- block:
+    - name: Set fact of the result of datastore file remove
+      set_fact:
+        file_in_datastore_result: "{{ 'Success' if not ds_file_result.failed else 'Fail' }}"
+    - debug:
+        msg: "Remove file '{{ file_in_datastore_path }}' in datastore '{{ file_in_datastore }}': {{ file_in_datastore_result }}"
+  when: file_in_datastore_ops == 'absent'

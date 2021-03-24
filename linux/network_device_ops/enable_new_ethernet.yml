@@ -1,0 +1,99 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Set fact of network config file in guest OSes except Photon OS
+- block:
+    - name: "Set fact of the network configure file for RedHat"
+      set_fact:
+        network_conf_template: rhel_network_conf.j2
+        network_conf_path: "/etc/sysconfig/network-scripts/ifcfg-{{ eth_dev }}"
+      when: guest_os_ansible_distribution in ["RedHat", "CentOS", "Amazon", "OracleLinux"]
+
+    - name: "Set fact of the network configure file for Ubuntu desktop"
+      set_fact:
+        network_conf_template: debian_network_conf.j2
+        network_conf_path: "/etc/network/interfaces"
+      when: >
+        (guest_os_ansible_distribution == "Debian") or
+        (guest_os_ansible_distribution == "Ubuntu" and guest_os_with_gui is defined and guest_os_with_gui)
+
+    - block:
+        # Get netplan config file in Ubuntu server
+        - include_tasks: ../utils/get_netplan_config_file.yml
+        - name: "Set fact of the network configure file for Ubuntu server"
+          set_fact:
+            network_conf_template: ubuntu_netplan_conf.j2
+            network_conf_path: "{{ netplan_config_file }}"
+          when: netplan_config_file is defined
+      when:
+        - guest_os_ansible_distribution == "Ubuntu"
+        - guest_os_with_gui is defined and not guest_os_with_gui
+
+    - name: "Set fact of the network configure file for SLE"
+      set_fact:
+        network_conf_template: sles_network_conf.j2
+        network_conf_path: "/etc/sysconfig/network/ifcfg-{{ eth_dev }}"
+      when: guest_os_ansible_distribution in ["SLES", "SLED"]
+
+    - name: "Set fact of the network configure file for Flatcar"
+      set_fact:
+        network_conf_template: flatcar_network_conf.j2
+        network_conf_path: "/etc/systemd/network/{{ eth_dev }}"
+      when: guest_os_ansible_distribution == "Flatcar"
+
+    # Create the network config file for new network interface
+    - name: "Create/Update network configure file '{{ network_conf_path }}'"
+      template:
+        src: "{{ network_conf_template }}"
+        dest: "{{ network_conf_path }}"
+        mode: "0666"
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Print content of network configure file '{{ network_conf_path }}'"
+      command: "cat {{ network_conf_path }}"
+      register: network_config
+      changed_when: False
+      delegate_to: "{{ vm_guest_ip }}"
+    - debug: var=network_config.stdout_lines
+  when: guest_os_ansible_distribution != "VMware Photon OS"
+
+# Apply netplan network config changes in Ubuntu server
+- block:
+    - name: "Apply netplan configuration file for new added nic {{ eth_dev }}"
+      command: "netplan apply"
+      delegate_to: "{{ vm_guest_ip }}"
+      become: yes
+    - include_tasks: ../../common/vm_wait_connection.yml
+  when:
+    - guest_os_ansible_distribution == "Ubuntu"
+    - guest_os_with_gui is defined and not guest_os_with_gui
+
+# Bring up the new network interface
+- name: "Bring link '{{ eth_dev }}' up"
+  shell: "ip link set {{ eth_dev }} down; ip link set {{ eth_dev }} up"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: set_link_down_up
+  when: >
+    (guest_os_ansible_distribution in ["VMware Photon OS", "Flatcar"]) or
+    (guest_os_ansible_distribution == "Ubuntu" and guest_os_with_gui is defined and guest_os_with_gui)
+
+- name: "Bring link '{{ eth_dev }}' up"
+  shell: "ifdown {{ eth_dev }}; ifup {{ eth_dev }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: set_link_down_up
+  when: guest_os_ansible_distribution not in ["VMware Photon OS", "Ubuntu", "Flatcar"]
+
+# Get IP address of new interface
+- name: "Get link '{{ eth_dev }}' status"
+  shell: "ip -br addr show {{ eth_dev }} | awk '{print $3}'"
+  register: link_status
+  changed_when: False
+  until: '"192.168" in link_status.stdout'
+  retries: 20
+  delay: 5
+  delegate_to: "{{ vm_guest_ip }}"
+- debug: var=link_status
+
+- include_tasks: ../utils/ethernet_ip_get.yml
+- debug:
+    msg: "Get IPv4 address of '{{ eth_dev }}': {{ ethernets[eth_dev] }}"

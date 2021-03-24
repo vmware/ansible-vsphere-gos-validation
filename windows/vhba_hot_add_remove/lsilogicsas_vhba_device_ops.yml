@@ -1,0 +1,25 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check hotadd, hot remove disk on existing LSILogicSAS
+# controller, and hotadd, hot remove new LSILogicSAS controller and disk.
+#
+- name: lsilogicsas_vhba_device_ops
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+        - include_tasks: hotadd_remove_vhba_test.yml
+          vars:
+            test_disk_controller_type: "lsilogicsas"
+        - debug:
+            msg:
+              - "Test on adding new disk to existing LSILogic SAS controller: {{ new_disk_existing_ctl }}"
+              - "Test on adding new disk controller LSILogic SAS and new disk: {{ new_disk_new_ctl }}"
+      rescue:
+        - include_tasks: ../setup/rescue_cleanup.yml
+          vars:
+            current_testcase_name: "{{ ansible_play_name }}"

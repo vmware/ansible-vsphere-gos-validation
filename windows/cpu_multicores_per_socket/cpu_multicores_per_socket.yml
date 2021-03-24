@@ -1,0 +1,45 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for test multiple cores per socket configuration
+# of VM vCPU.
+#
+- name: cpu_multicores_per_socket
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+
+        - include_tasks: ../../common/esxi_get_property.yml
+          vars:
+            esxi_host_property_list:
+              - summary.hardware.numCpuThreads
+        - name: Set fact of the ESXi host logical processor number
+          set_fact:
+            host_logical_processor: "{{ esxi_host_property_results.ansible_facts.summary.hardware.numCpuThreads }}"
+        - name: The number of ESXi host logical processor
+          debug: var=host_logical_processor
+
+        - name: Set fact of the maximum CPU set
+          set_fact:
+            max_num_set: "{{ [vm_cpu_cores_per_socket_max | default(8) | int, host_logical_processor | int] | min }}"
+
+        - name: Set fact of the cores per socket list
+          set_fact:
+            cores_per_socket_loop_list: "{{ range(4, max_num_set | int) | list if max_num_set | int > 5 else range(4, 5) | list }}"
+        - name: The cores per socket test value loop list
+          debug: var=cores_per_socket_loop_list
+
+        # Test cores per socket value set on VM
+        - name: Test multiple cores per socket configuration
+          include_tasks: cores_per_socket_test.yml
+          loop: "{{ cores_per_socket_loop_list }}"
+          loop_control:
+            loop_var: cores_per_socket_set
+      rescue:
+        - include_tasks: ../setup/rescue_cleanup.yml
+          vars:
+            current_testcase_name: "{{ ansible_play_name }}"

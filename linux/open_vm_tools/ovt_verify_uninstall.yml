@@ -1,0 +1,49 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is to test open-vm-tools can be uninstalled with OS package manager commands successfully without any error.
+# After open-vm-tools is uninstalled, open-vm-tools status should be not installed and not running, process should not running, and
+# services should be absent.
+#
+- name: ovt_verify_uninstall
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        #Set up VM for testing
+        - include_tasks: ../utils/test_setup.yml
+          vars:
+            vmtools_check: "True"
+
+        - name: "Set the fact to uninstall open-vm-tools"
+          set_fact:
+            uninstall_tools: |-
+              {%- if vmtools_is_installed is defined and vmtools_is_installed -%}True
+              {%- else %}False{%- endif -%}
+
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "No Run"
+          when: >
+            (guest_os_ansible_distribution == 'Flatcar') or
+            (uninstall_tools is undefined) or
+            (not uninstall_tools)
+
+        - block:
+            # Set the fact of open-vm-tools packages
+            - include_tasks: set_ovt_facts.yml
+
+            # Uninstall open-vm-tools for reinstallation
+            - include_tasks: uninstall_ovt.yml
+
+            - include_tasks: ../../common/print_test_result.yml
+              vars:
+                test_result: "Passed"
+          when:
+            - guest_os_ansible_distribution != 'Flatcar'
+            - uninstall_tools is defined
+            - uninstall_tools
+      rescue:
+        - include_tasks: ../utils/test_rescue.yml

@@ -1,0 +1,31 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check specified file info in Windows guest
+# Parameters:
+#   win_check_file_exist_file: the file path
+# Return:
+#   win_check_file_exist_result: True or False
+#
+- name: Initialize the file status
+  set_fact:
+    win_check_file_exist_result: False
+
+- name: Check if specified file exists in Windows guest OS
+  win_stat:
+    path: "{{ win_check_file_exist_file }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: file_info
+- name: Display the returned file info
+  debug: var=file_info
+  when: enable_debug is defined and enable_debug
+
+- name: Set fact of file existence
+  set_fact:
+    win_check_file_exist_result: True
+  when:
+    - "'stat' in file_info"
+    - "'exists' in file_info.stat"
+    - file_info.stat.exists
+- debug:
+    msg: "File '{{ win_check_file_exist_file }}' is in guest OS: {{ win_check_file_exist_result }}"

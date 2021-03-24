@@ -1,0 +1,27 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VM network adapters using vmware_guest_network module
+- name: "Initialize VM network adapters info"
+  set_fact:
+    vm_network_adapters: {}
+
+- name: "Get VM network adapters info"
+  vmware_guest_network:
+    validate_certs: "{{ validate_certs | default(False) }}"
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    gather_network_info: yes
+  register: gather_network_facts
+
+- name: "Set fact of VM network adapters info"
+  set_fact:
+    vm_network_adapters: "{{ gather_network_facts.network_data }}"
+
+- name: "Print the VM network adapters info"
+  debug: var=vm_network_adapters
+  when: enable_debug is defined and enable_debug

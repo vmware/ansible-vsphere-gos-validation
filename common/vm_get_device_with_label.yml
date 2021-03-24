@@ -1,0 +1,26 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VM device with the specified device label
+# Parameters:
+#   device_label: the device label
+# Return:
+#   device_info_with_label: the info of device with specified device label
+#
+
+- include_tasks: vm_get_config.yml
+  vars:
+    property_list: ['config.hardware.device']
+
+- name: "Initialize device list"
+  set_fact:
+    device_info_with_label: ""
+    device_list_with_label: "{{ vm_config.config.hardware.device | selectattr('deviceInfo.label', 'equalto', device_label) }}"
+
+- name: "Get device info with device label '{{ device_label }}'"
+  set_fact:
+    device_info_with_label: "{{ device_list_with_label[0] }}"
+  when: device_list_with_label and device_list_with_label | length > 0
+
+- name: "Print device info"
+  debug: var=device_info_with_label

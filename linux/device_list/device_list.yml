@@ -1,0 +1,63 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check VM device status is reported
+# correctly by VMware tools. Enable device list by adding below
+# lines into vmx file:
+#   isolation.device.connectable.disable = "FALSE"
+#   isolation.device.edit.disable = "FALSE"
+# If VMware Tools is not installed or not running, then this test
+# case result will be "No Run".
+#
+- name: device_list
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../utils/test_setup.yml
+          vars:
+            vmtools_check: "True"
+
+        - block:
+            - include_tasks: ../utils/device_connectable_enable.yml
+            - include_tasks: ../../common/vm_set_power_state.yml
+              vars:
+                vm_power_state_set: 'powered-on'
+            - include_tasks: ../../common/vm_wait_guest_ip.yml
+            - include_tasks: ../../common/update_inventory.yml
+
+            - include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
+
+            - name: "List devices in guest OS"
+              command: "{{ vmware_toolbox_cmd_path }} device list"
+              register: device_list
+              delegate_to: "{{ vm_guest_ip }}"
+
+            - debug:
+                msg: "Devices detected by VMware Tools in guest OS: {{ device_list.stdout_lines }}"
+
+            # Get VM's hardware devices
+            - include_tasks: ../../common/vm_get_config.yml
+              vars:
+                property_list: ['config.hardware.device']
+            # Check devices connection status
+            - include_tasks: device_connection_validate.yml
+              with_items: "{{ device_list.stdout_lines }}"
+              loop_control:
+                loop_var: device_status
+
+            - include_tasks: ../../common/print_test_result.yml
+              vars:
+                test_result: "Passed"
+          when: vmtools_is_running is defined and vmtools_is_running
+
+        # Skip this test case if VMware tools is not running
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "No Run"
+          when: vmtools_is_running is defined and not vmtools_is_running
+
+      rescue:
+        - include_tasks: ../utils/test_rescue.yml

@@ -1,0 +1,30 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Collect guest system info using Ansible setup module
+# Parameters:
+#   filter (optional): if the filter is set, getting the filtered
+#     guest system info, if not set, will get the whole ansible facts.
+# Return:
+#   guest_system_info: the filtered guest system info
+#
+- block:
+    - name: "Collect guest information for '{{ vm_guest_ip }}'"
+      setup:
+      register: get_system_info_result
+      delegate_to: "{{ vm_guest_ip }}"
+    - name: "Set guest system info to ansible_facts when filter is not given"
+      set_fact:
+        guest_system_info: "{{ get_system_info_result.ansible_facts }}"
+  when: filter is undefined or not filter
+
+- block:
+    - name: "Collect filtered guest information for '{{ vm_guest_ip }}'"
+      setup:
+        filter: "{{ filter }}"
+      register: get_system_info_result
+      delegate_to: "{{ vm_guest_ip }}"
+    - name: "Set guest system info when filter is given"
+      set_fact:
+        guest_system_info: "{{ get_system_info_result.ansible_facts }}"
+  when: filter is defined and filter

@@ -1,0 +1,19 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Change CDROM type from iso to client
+- include_tasks: ../../common/vm_configure_cdrom.yml
+  vars:
+    cdrom_type: 'client'
+    cdrom_controller_num: 0
+    cdrom_unit_num: 0
+    cdrom_state: present
+
+# Delete downloaded VMware tools iso on ESXi datastore
+- include_tasks: ../../common/esxi_check_delete_datastore_file.yml
+  vars:
+    file_in_datastore: "{{ datastore }}"
+    file_in_datastore_path: "{{ win_vmtools_iso_download }}"
+    file_in_datastore_ops: "absent"
+    file_in_datastore_failed_ignore: True
+  when: win_vmtools_iso_download is defined and win_vmtools_iso_download

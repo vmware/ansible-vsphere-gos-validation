@@ -1,0 +1,23 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get installed VMware tools version and build number in Windows guest OS
+# Return:
+#   vmtools_version: VMware tools version
+#   vmtools_build_number: VMware tools build number
+#
+- name: Get VMware tools version and build number in guest OS
+  win_shell: "& 'C:\\Program Files\\VMware\\VMware Tools\\VMwareToolboxCmd.exe' -v"
+  register: get_tools_version_output
+  delegate_to: "{{ vm_guest_ip }}"
+- name: Display the command result
+  debug: var=get_tools_version_output
+  when: enable_debug is defined and enable_debug
+
+- name: Set fact of tools version and build number
+  set_fact:
+    vmtools_info_from_vmtoolsd: "{{ get_tools_version_output['stdout_lines'][0] }}"
+    vmtools_version: "{{ get_tools_version_output['stdout_lines'][0].split(' ')[0].rsplit('.', 1)[0] }}"
+    vmtools_build_number: "{{ get_tools_version_output['stdout_lines'][0].split(' ')[1][1:-1].split('-')[1] }}"
+- debug:
+    msg: "Get VMware tools version: {{ vmtools_version }}, build number: {{ vmtools_build_number }}"

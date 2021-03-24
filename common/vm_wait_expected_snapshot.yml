@@ -1,0 +1,26 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Retry to get VM snapshot info until the current snapshot is the expected one.
+# Parameters:
+#   expected_snapshot_name: the name of the snapshot expected
+#   expected_snapshot_wait_time (optional): the time in seconds to wait for
+#     expected snapshot, default value is 30.
+#
+- name: "Get snapshot facts until current is '{{ snapshot_name }}'"
+  vmware_guest_snapshot_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+  register: vm_snapshot_facts
+  until: vm_snapshot_facts.guest_snapshots.current_snapshot.name == expected_snapshot_name
+  retries: "{{ (expected_snapshot_wait_time | default(30) | int / 3) | int }}"
+  delay: 3
+
+- name: Display the snapshot facts
+  debug: var=vm_snapshot_facts
+  when: enable_debug is defined and enable_debug

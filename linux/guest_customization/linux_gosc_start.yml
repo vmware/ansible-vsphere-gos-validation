@@ -1,0 +1,59 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get expected IP and FQDN hostname bindings from cloudinit "/etc/hosts" template file
+- block:
+    - name: "Initialize the fact of hosts template file"
+      set_fact:
+        hosts_template_file: ""
+    - name: "Set fact of the hosts template file hosts.debian.tmpl"
+      set_fact:
+        hosts_template_file: "/etc/cloud/templates/hosts.debian.tmpl"
+      when: guest_os_ansible_distribution in ["Ubuntu", "Debian"]
+    - name: "Set fact of the hosts template file hosts.redhat.tmpl"
+      set_fact:
+        hosts_template_file: "/etc/cloud/templates/hosts.redhat.tmpl"
+      when: guest_os_ansible_distribution in ["RedHat", "OracleLinux", "CentOS"]
+    - name: "Set fact of the hosts template file hosts.suse.tmpl"
+      set_fact:
+        hosts_template_file: "/etc/cloud/templates/hosts.suse.tmpl"
+      when: guest_os_ansible_distribution in ["SLES", "SLED"]
+    - name: "Set fact of the hosts template file hosts.photon.tmpl"
+      set_fact:
+        hosts_template_file: "/etc/cloud/templates/hosts.photon.tmpl"
+      when: guest_os_ansible_distribution == "VMware Photon OS"
+    - debug:
+        msg: "For guest '{{ guest_os_ansible_distribution }}', set /etc/hosts template file: {{ hosts_template_file }}"
+    - block:
+        - name: "Get FQDN and hostname bound IP address list from hosts template"
+          shell: cat "{{ hosts_template_file }}" | grep '.*fqdn}} .*hostname}}.*' | awk '{ print $1 }'
+          delegate_to: "{{ vm_guest_ip }}"
+          register: fqdn_hostname_bind_ip
+          failed_when: fqdn_hostname_bind_ip.stderr
+        - name: "Print the IP address list to be binding with FQDN and hostname from hosts template file"
+          debug: var=fqdn_hostname_bind_ip
+      when: hosts_template_file
+  when: enable_cloudinit_gosc
+
+- include_tasks: ../utils/shutdown.yml
+- include_tasks: linux_gosc_execution.yml
+  vars:
+    type: "{{ ip_assignment }}"
+    timeout: 900
+
+# Wait for GOSC completed
+- include_tasks: ../../common/vm_wait_gosc_completed.yml
+
+- block:
+    - include_tasks: ../../common/vm_wait_guest_ip.yml
+    # In case VM get new DHCP IP address after GOSC
+    - include_tasks: ../../common/update_inventory.yml
+  when: ip_assignment == "dhcp"
+
+- include_tasks: ../../common/vm_wait_guest_ip.yml
+  vars:
+    wait_ipv4: "{{ linux_gosc_spec.ip }}"
+  when: ip_assignment == "static"
+
+# Wait GOSC completes OS rebooting
+- include_tasks: wait_deploypkg_success.yml

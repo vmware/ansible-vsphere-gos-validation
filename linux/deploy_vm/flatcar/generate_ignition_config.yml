@@ -1,0 +1,49 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Generate ignition_config.json file and its base64 encoding
+# Parameters: None
+# Return: ignition_config_data
+- name: "Create a temporary file as Ignition config file"
+  include_tasks: ../../../common/create_temp_file_dir.yml
+  vars:
+    tmp_state: "file"
+    tmp_prefix: "ignition_"
+    tmp_suffix: ".json"
+
+- name: "Set variables for Ignition config"
+  set_fact:
+    ignition_config_file: "{{ tmp_path }}"
+
+# Get/Generate ssh public key
+- include_tasks: ../../utils/get_local_ssh_public_key.yml
+
+# Put SSH public key into ignition config file
+- name: "Generation ignition config file {{ ignition_config_file }}"
+  template:
+    src: ignition_config.j2
+    dest: "{{ ignition_config_file }}"
+    mode: "0644"
+  vars:
+    ssh_public_key: "{{ lookup('file', ssh_public_key_file) }}"
+  register: generate_ignition
+
+- name: "Assert {{ ignition_config_file }} is generated"
+  assert:
+    that:
+      - generate_ignition.changed
+    fail_msg: "Failed to generate {{ ignition_config_file }}"
+    success_msg: "Successfully generated {{ ignition_config_file }}"
+
+- block:
+    - name: "Generate base64 encoded string for {{ ignition_config_file }}"
+      set_fact:
+        ignition_config_data: "{{ lookup('file', ignition_config_file) | b64encode }}"
+
+    - debug: var=ignition_config_data
+
+    - name: "Remove {{ ignition_config_file }}"
+      include_tasks: ../../../common/delete_local_file.yml
+      vars:
+        local_path: "{{ ignition_config_file }}"
+  when: generate_ignition.changed

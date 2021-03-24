@@ -1,0 +1,60 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check 'VGAuth' service status in guest OS.
+# If VMware Tools is not installed or not running, then this test case
+# result will be "No Run".
+#
+- name: vgauth_check_service
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../utils/test_setup.yml
+          vars:
+            vmtools_check: "True"
+
+        - name: "Skip this test case on Flatcar due to no VGAuth service"
+          block:
+            - include_tasks: ../../common/print_test_result.yml
+              vars:
+                test_result: "No Run"
+            - meta: end_play
+          when: >
+             (vmtools_is_running is undefined) or
+             (not vmtools_is_running) or
+             ((guest_os_ansible_distribution is defined) and
+             (guest_os_ansible_distribution == "Flatcar"))
+
+        - block:
+            - name: "Initialize the variable for VGAuth process and service"
+              set_fact:
+                vgauth_process: "VGAuthService"
+                vgauth_service: "vgauthd"
+
+            - name: "Set the vgauth service name for Ubuntu/Debian"
+              set_fact:
+                vgauth_service: "vgauth"
+              when: guest_os_ansible_distribution in ['Ubuntu', 'Debian']
+
+            # Check VGAuth processe is running
+            - include_tasks: ../utils/check_process_status.yml
+              vars:
+                process_name: "{{ vgauth_process }}"
+                expected_process_state: "present"
+
+            # Check VGAuth service is active and enabled
+            - include_tasks: ../utils/check_service_status.yml
+              vars:
+                service_name: "{{ vgauth_service }}"
+                expected_service_state: "running"
+                expected_service_status: "enabled"
+
+            - include_tasks: ../../common/print_test_result.yml
+              vars:
+                test_result: "Passed"
+          when: vmtools_is_running is defined and vmtools_is_running
+      rescue:
+        - include: ../utils/test_rescue.yml

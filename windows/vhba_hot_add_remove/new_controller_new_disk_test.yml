@@ -1,0 +1,29 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Test add new disk controller and new disk
+- include_tasks: ../../common/vm_get_new_vhba_bus_number.yml
+  vars:
+    disk_controller_facts_data: "{{ disk_controller_facts.disk_controller_data }}"
+    new_vhba_type: "{{ disk_controller }}"
+- debug:
+    msg: "Will add a new disk on a new disk contorller: bus number {{ new_vhba_bus_number }}, unit number 0"
+  when: new_vhba_bus_found
+
+- block:
+    # hot add and verify new disk
+    - include_tasks: hotadd_vm_controller_disk.yml
+    # hot remove and verify new disk
+    - include_tasks: hotremove_vm_controller_disk.yml
+    - name: Set fact of test on new disk and new disk controller
+      set_fact:
+        new_disk_new_ctl: True
+  when: new_vhba_bus_found
+
+- block:
+    - name: Set fact of not test on new disk and new disk controller
+      set_fact:
+        new_disk_new_ctl: False
+    - debug:
+        msg: "Will not add new controller, due to not get controller bus number: {{ test_disk_controller_type }}"
+  when: not new_vhba_bus_found

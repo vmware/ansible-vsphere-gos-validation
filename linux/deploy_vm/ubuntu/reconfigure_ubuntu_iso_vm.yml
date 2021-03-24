@@ -1,0 +1,74 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Include variables file 'vars_ubuntu_install.yml'"
+  include_vars: vars_ubuntu_install.yml
+
+- debug: var=os_installation_iso_list
+
+- name: "Set fact of the OS install ISO file"
+  set_fact:
+    ubuntu_os_image: "{{ os_installation_iso_list[0].split('/')[-1] }}"
+
+- debug: var=ubuntu_os_image
+
+- name: "get ubuntu install method from config file"
+  template:
+    src: ubuntu_install_method.j2
+    dest: ubuntu_install_method.yml
+    mode: '0644'
+
+- name: Include vars from files
+  include_vars: ubuntu_install_method.yml
+
+- debug: var=ubuntu_install_method
+- debug: var=ubuntu_install_file
+
+- block:
+    # Get VM path on ESXi datastore
+    - include_tasks: ../../../common/vm_get_config.yml
+      vars:
+          property_list: ['config.files.logDirectory']
+
+    - name: "Set fact of the VM file path"
+      set_fact:
+        vm_path: "{{ vm_config.config.files.logDirectory | replace('[', '/vmfs/volumes/') | replace('] ', '/') }}"
+
+    - debug: var=vm_path
+
+    # Remove proxy setting in cloud-init user data file if http_proxy_vm is not set
+    - name: "No proxy setting for Ubuntu autoinstall"
+      lineinfile:
+        path: "../templates/{{ ubuntu_install_file }}"
+        regexp: "^ *proxy:"
+        state: absent
+      when: http_proxy_vm is undefined or not http_proxy_vm
+
+    # Create the seed.iso to modify login information
+    - include_tasks: ../../utils/create_seed_iso.yml
+      vars:
+        user_data_template: "{{ ubuntu_install_file }}"
+        local_hostname: "ubuntu-{{ ansible_date_time.epoch }}"
+
+    # Upload seed.iso to VM path on ESXi server
+    - name: "Copy {{ seed_iso_path }} to VM folder"
+      copy:
+        src: "{{ seed_iso_path }}"
+        dest: "{{ vm_path }}/{{ seed_iso_path | basename }}"
+        force: yes
+        mode: 0755
+      delegate_to: "{{ esxi_hostname }}"
+
+    # Attach seed.iso to Ubuntu Linux VM
+    - name: "Set fact of the seed ISO file path"
+      set_fact:
+        cdrom_seed_iso: "{{ vm_config.config.files.logDirectory }}/{{ seed_iso_path | basename }}"
+
+    #unit 0 is the image iso
+    - include_tasks: ../../../common/vm_configure_cdrom.yml
+      vars:
+        cdrom_type: iso
+        cdrom_iso_file: "{{ cdrom_seed_iso }}"
+        cdrom_controller_num: 0
+        cdrom_unit_num: 1
+  when: ubuntu_install_method == "cloud-init"

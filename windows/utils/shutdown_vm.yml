@@ -1,0 +1,21 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# For Windows VM, if VMware tools installed, then use vmware_guest module to
+# shutdown VM softly, if VMware tools not installed, then use command in guest
+# OS to shutdown it.
+#
+- include_tasks: ../../common/vm_get_vmtools_status.yml
+
+- include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'shutdown-guest'
+  when:
+    - vmtools_is_installed is defined and vmtools_is_installed
+    - vmtools_is_running is defined and vmtools_is_running
+
+- include_tasks: win_shutdown_restart.yml
+  vars:
+    set_win_power_state: 'shutdown'
+  when:
+    - vmtools_is_installed is undefined or not vmtools_is_installed

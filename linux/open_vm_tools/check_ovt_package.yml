@@ -1,0 +1,40 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check open-vm-tools package is installed or not installed
+# Parameter:
+#   package_name: the package name
+#   expected_package_state: ['present', 'installed', 'absent', 'removed']
+
+- name: "Validate the value of 'expected_package_state'"
+  assert:
+    that:
+      - expected_package_state is defined
+      - expected_package_state in ['present', 'installed', 'absent', 'removed']
+    fail_msg: "Invalid parameter: expected_package_state = {{ expected_package_state | default('undefined') }}'"
+
+- include_tasks: ../utils/get_installed_package_info.yml
+
+- name: "Check package {{ package_name }} is {{ expected_package_state }}"
+  assert:
+    that:
+      - package_info is defined
+      - package_info | length >= 1
+      - package_info.name is defined
+      - package_info.name == package_name
+    fail_msg: "Package '{{ package_name }}' is not installed"
+    success_msg: "Package '{{ package_name }}' is {{ expected_package_state }}"
+  when:
+    - expected_package_state is defined
+    - expected_package_state in [ 'present', 'installed' ]
+
+- name: "Check package {{ package_name }} is {{ expected_package_state }}"
+  assert:
+    that:
+      - package_info is defined
+      - package_info | length == 0
+    fail_msg: "Package '{{ package_name }}' is installed"
+    success_msg: "Package '{{ package_name }}' is {{ expected_package_state }}"
+  when:
+    - expected_package_state is defined
+    - expected_package_state in [ 'absent', 'removed' ]

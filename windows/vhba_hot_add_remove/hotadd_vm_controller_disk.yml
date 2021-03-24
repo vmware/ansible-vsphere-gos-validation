@@ -1,0 +1,57 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Hot add disk controller
+- include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
+  vars:
+    disk_controller_ops: "present"
+    disk_controller_type: "{{ test_disk_controller_type }}"
+    disk_controller_number: "{{ new_vhba_bus_number }}"
+  when: not in_adding_disk_existing_ctl
+
+# Hot add disk
+- name: Set fact of the new disk controller number and unit number
+  set_fact:
+    new_disk_ctl_num: "{{ existing_vhba_bus_number if in_adding_disk_existing_ctl else new_vhba_bus_number }}"
+    new_disk_unit_num: "{{ new_disk_unit_number if in_adding_disk_existing_ctl else 0 }}"
+- include_tasks: ../../common/vm_hot_add_remove_disk.yml
+  vars:
+    disk_operation: 'present'
+    scsi_controller_type: "{{ test_disk_controller_type }}"
+    ctrl_number: "{{ new_disk_ctl_num }}"
+    unit_number: "{{ new_disk_unit_num }}"
+
+# Check added disk controller in guest OS
+- block:
+    - include_tasks: ../utils/win_get_disk_ctl.yml
+    - name: Set fact of the number of controller
+      set_fact:
+        ctl_number: "{{ ctls_in_guest_dict[test_disk_controller_type] }}"
+    - debug:
+        msg: "Get the number of '{{ disk_controller }}' controller in guest OS after hotadd: {{ ctl_number }}"
+    - name: Verify disk controller number increases in guest OS
+      assert:
+        that:
+          - "{{ ctl_number|int == ctl_num_guest_before_hotadd|int + 1 }}"
+        success_msg: "Disk controller number in guest increases 1"
+        fail_msg: "Disk controller number not increase 1 in guest, before hotadd: {{ ctl_num_guest_before_hotadd }}, after hotadd: {{ ctl_number }}"
+  when: not in_adding_disk_existing_ctl and test_disk_controller_type in ['pvscsi', 'nvme', 'sata', 'lsilogicsas', 'paravirtual']
+
+# Check added disk in guest OS
+- name: Get the number of disks in guest OS
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(get-disk | measure).Count"
+- name: Set fact of the number of disk
+  set_fact:
+    disk_num: "{{ win_powershell_cmd_output.stdout_lines[0] if not win_powershell_cmd_output.failed else 0 }}"
+- name: Verify disk number increases in guest
+  assert:
+    that:
+      - "{{ disk_num|int == disk_num_guest_before_hotadd|int + 1 }}"
+    success_msg: "Disk number increases 1 in guest OS"
+    fail_msg: "Disk number not increase 1 in guest OS, before hotadd: {{ disk_num_guest_before_hotadd }}, after hotadd: {{ disk_num }}"
+  when: disk_num_guest_before_hotadd|int != 0
+
+# Initialize new disk and create disk partition in guest OS
+- include_tasks: create_partition_raw_disk.yml

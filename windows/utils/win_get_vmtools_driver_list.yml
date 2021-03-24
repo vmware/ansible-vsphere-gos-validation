@@ -1,0 +1,21 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the driver list installed via VMware tools in Windows guest OS
+#
+- name: Get VMware tools driver list in Windows guest OS
+  win_shell: 'get-wmiobject win32_pnpsigneddriver | where-object {$_.Manufacturer -match "VMware"} | select DeviceName, DriverVersion, IsSigned'
+  register: vmtools_driver_list_output
+  delegate_to: "{{ vm_guest_ip }}"
+- name: Display the powershell command result
+  debug: var=vmtools_driver_list_output
+  when: enable_debug is defined and enable_debug
+
+- name: Set fact of the driver list length
+  set_fact:
+    vmtools_driver_list_length: "{{ vmtools_driver_list_output|length|int - 3 }}"
+- name: Set fact of the driver list
+  set_fact:
+    vmtools_driver_list: "{{ vmtools_driver_list_output.stdout_lines[3:vmtools_driver_list_length | int] }}"
+- debug:
+    msg: "Get VMware driver list: {{ vmtools_driver_list }}"

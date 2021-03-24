@@ -1,0 +1,33 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Retry to get VM power status from guestinfo until it's the expected
+# status before timeout.
+# Parameters:
+#   expected_power_status: expected VM power status
+#   wait_power_state_timeout (optional): the timeout to wait for the expected power
+#     status, the default value is 120 seconds.
+#
+- name: "Wait for VM power status to '{{ expected_power_status }}'"
+  vmware_guest_info:
+    validate_certs: "{{ validate_certs | default(False) }}"
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+  register: vm_power_gather_facts
+  until: vm_power_gather_facts.instance.hw_power_status == expected_power_status
+  retries: "{{ ((wait_power_state_timeout | default(120)) | int / 5) | int }}"
+  delay: 5
+
+- name: Display gathered VM facts
+  debug: var=vm_power_gather_facts
+  when: enable_debug is defined and enable_debug
+
+# Pause 10 seconds after get expected VM power state to avoid power state
+# conflict issues
+- name: Wait 10 seconds after getting expected VM power state
+  pause:
+    seconds: 10

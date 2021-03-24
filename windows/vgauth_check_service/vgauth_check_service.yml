@@ -1,0 +1,35 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is ued for check VGAuth service status in guest OS when
+# VMware tools is installed and running. Test case result will be 'No Run'
+# if VMware tools is not installed or not running.
+#
+- name: vgauth_check_service
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+        - block:
+            - name: Get VGAuthService status in Windows guest OS
+              include_tasks: ../utils/win_get_service_status.yml
+              vars:
+                win_service_name: "VGAuthService"
+            - name: Verify VGAuthService is running
+              assert:
+                that:
+                  - service_status == "Running"
+                fail_msg: "VGAuth Service is not running in guest OS."
+                success_msg: "VGAuth service is running in guest OS."
+          when: vmtools_is_installed and vmtools_is_running
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed }}, running: {{ vmtools_is_running }}"
+          when: not vmtools_is_installed or not vmtools_is_running
+      rescue:
+        - include_tasks: ../setup/rescue_cleanup.yml
+          vars:
+            current_testcase_name: "{{ ansible_play_name }}"

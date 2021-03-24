@@ -1,0 +1,34 @@
+#cloud-config
+autoinstall:
+  version: 1
+  early-commands:
+    - ping -c 10 127.0.0.1
+  refresh-installer:
+    update: yes
+  locale: en_US
+  keyboard:
+    layout: en
+    variant: uk
+  storage:
+    layout:
+      name: lvm
+  identity:
+    hostname: ubuntu
+    username: {{ vm_username }}
+    password: {{ vm_password_hash }}
+  ssh:
+    install-server: true
+    allow-pw: yes
+    authorized-keys:
+      - {{ ssh_public_key }}
+  proxy: {{ http_proxy_vm }}
+  user-data:
+    chpasswd:
+      list: |
+        root:{{ vm_password_hash }}
+      expire: false
+    disable_root: false
+  late-commands:
+    - sed -ie 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /target/etc/ssh/sshd_config
+    - rm -f /etc/cloud/cloud.cfg.d/*-installer.cfg 2>/dev/null
+    - echo 'Ubuntu autoinstall is completed' >/target/var/log/autoinstall.log

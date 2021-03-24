@@ -1,0 +1,15 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Revert back to the snapshot taken before doing GOSC
+- block:
+    - include_tasks: ../../common/vm_revert_snapshot.yml
+      vars:
+        snapshot_name: "{{ snapshot_before_gosc }}"
+    - name: Wait 10 seconds before removing VM snapshot taken before GOSC
+      pause:
+        seconds: 10
+    - include_tasks: ../../common/vm_remove_snapshot.yml
+      vars:
+        snapshot_name: "{{ snapshot_before_gosc }}"
+  when: revert_base_snapshot is undefined or not revert_base_snapshot | bool

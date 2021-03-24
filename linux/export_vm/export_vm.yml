@@ -1,0 +1,22 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This playbook is used for exporting VM to OVF
+# template, by default the exported template files
+# will be saved in '/tmp/' folder.
+#
+- name: export_ovf
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    # Check VM power status
+    - include_tasks: ../../common/vm_get_power_state.yml
+    # Power off VM if it's not in poweredOff state
+    - include_tasks: ../utils/shutdown.yml
+      when: vm_power_state_get != 'poweredOff'
+    # Export VM to ovf template to '/tmp/'
+    - include_tasks: ../../common/ovf_export.yml
+      vars:
+        ovf_export_dst_path: "/tmp/"

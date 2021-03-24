@@ -1,0 +1,29 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Wait for VM IP become connectable
+# Note:
+# Not use 'wait_for_connection' module in this task due to it does
+# not support 'delegate_to', refer to this issue:
+# https://github.com/ansible/ansible/issues/36519
+# Parameters:
+#   vm_wait_connection_timeout (optional): the timeout for trying
+#     to connect, default is 900 seconds
+#
+- name: Check VM IP address is specified and not empty
+  assert:
+    that:
+      - vm_guest_ip is defined
+      - vm_guest_ip
+    fail_msg: "IP address variable 'vm_guest_ip' is not defined or empty"
+    success_msg: "IP address variable 'vm_guest_ip' is defined: {{ vm_guest_ip }}"
+
+- include_tasks: vm_wait_ping.yml
+  vars:
+    vm_wait_ping_ip: "{{ vm_guest_ip }}"
+    vm_wait_ping_timeout: "{{ vm_wait_connection_timeout | default(900) }}"
+
+- include_tasks: vm_wait_ssh.yml
+  vars:
+    vm_wait_ssh_ip: "{{ vm_guest_ip }}"
+    vm_wait_ssh_timeout: "{{ vm_wait_connection_timeout | default(900) }}"

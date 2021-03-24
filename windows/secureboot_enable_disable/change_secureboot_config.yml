@@ -1,0 +1,49 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Shutdown guest OS
+- include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "shutdown"
+
+# Enable VM secure boot
+- include_tasks: ../../common/vm_set_boot_options.yml
+  vars:
+    secure_boot_enabled_set: True
+  when: change_secureboot == 'enable'
+
+# Disable VM secure boot
+- include_tasks: ../../common/vm_set_boot_options.yml
+  vars:
+    secure_boot_enabled_set: False
+  when: change_secureboot == 'disable'
+
+# Power on VM after secure boot enabled
+- include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+
+- include_tasks: ../utils/win_check_winbsod.yml
+# Check guest still connectable
+- include_tasks: ../utils/win_check_winrm.yml
+
+# Get secure boot status in guest OS
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Confirm-SecureBootUEFI"
+
+- name: Check secure boot is enabled in guest OS
+  assert:
+    that:
+      - "{{ not win_powershell_cmd_output.failed }}"
+      - "{{ win_powershell_cmd_output.stdout_lines[0] == 'True' }}"
+    msg: "Secure boot enabled status in guest OS: {{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when: change_secureboot == 'enable'
+
+- name: Check secure boot is not enabled in guest OS
+  assert:
+    that:
+      - "{{ not win_powershell_cmd_output.failed }}"
+      - "{{ win_powershell_cmd_output.stdout_lines[0] == 'False' }}"
+    msg: "Secure boot enabled status in guest OS: {{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when: change_secureboot == 'disable'

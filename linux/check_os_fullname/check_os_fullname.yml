@@ -1,0 +1,98 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check VM guest OS fullname is reported correctly
+# in guest info through VMware tools. When VMware tools is not installed or not
+# running in VM, this test case result is 'No Run'.
+#
+- name: check_os_fullname
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../utils/test_setup.yml
+          vars:
+            vmtools_check: "True"
+
+        # Run this test when VMware tools is running
+        - block:
+            - include_tasks: ../../common/esxi_get_version_build.yml
+              when: >
+                esxi_version is undefined or esxi_version == 'N/A' or
+                esxi_update_version is undefined or esxi_update_version == 'N/A'
+
+            - name: Set fact of ESXi version
+              set_fact:
+                esxi_version_num: "{{ esxi_version | regex_replace('\\.','') }}"
+
+            - name: Get OS fullname in guest OS
+              debug:
+                msg: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+
+            # Map OS architecture to bitness
+            - name: Set fact of guest OS bitness
+              set_fact:
+                bitness: "{% if guest_os_ansible_architecture == 'x86_64' or guest_os_ansible_architecture == 'amd64' %}(64-bit){% else %}(32-bit){% endif %}"
+
+            - name: "Initalize guest_fullnane to 'guest fullname not defined in test case'"
+              set_fact:
+                guest_fullname: "guest fullname not defined in test case"
+
+            # Map Ubuntu
+            - name: Set guest_fullname variable for Ubuntu
+              set_fact:
+                guest_fullname: "Ubuntu Linux {{ bitness }}"
+              when: guest_os_ansible_distribution == "Ubuntu"
+
+            # Map Flatcar full name
+            - include_tasks: flatcar_fullname_map.yml
+              when: guest_os_ansible_distribution == "Flatcar"
+
+            # Map RHEL full name
+            - include_tasks: rhel_fullname_map.yml
+              when: guest_os_ansible_distribution == "RedHat"
+
+            # Map SLES full name
+            - include_tasks: sles_fullname_map.yml
+              when: guest_os_ansible_distribution == "SLES" or guest_os_ansible_distribution == "SLED"
+
+            # Map VMware Photon OS guest full name
+            - include_tasks: photon_fullname_map.yml
+              when: guest_os_ansible_distribution == "VMware Photon OS"
+
+            # Map Amazon Linux guest full name
+            - include_tasks: amazonlinux_fullname_map.yml
+              when: guest_os_ansible_distribution == "Amazon"
+
+            # Map CentOS guest full name
+            - include_tasks: centos_fullname_map.yml
+              when: guest_os_ansible_distribution == "CentOS"
+
+            # Map Oracle Linux guest full name
+            - include_tasks: oraclelinux_fullname_map.yml
+              when: guest_os_ansible_distribution == "OracleLinux"
+
+            # Map Debian guest full name
+            - include_tasks: debian_fullname_map.yml
+              when: guest_os_ansible_distribution == "Debian"
+
+            # Map FreeBSD guest full name
+            - name: Set guest_fullname variable for FreeBSD
+              set_fact:
+                guest_fullname: "FreeBSD {{ guest_os_ansible_distribution_major_ver }} {{ bitness }}"
+              when: guest_os_ansible_distribution == "FreeBSD"
+
+            # Validate guest OS fullname in guestinfo
+            - include_tasks: validate_os_fullname.yml
+          when: vmtools_is_running
+
+        # Skip this test case when VMware tools is not running
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "No Run"
+          when: not vmtools_is_running
+
+      rescue:
+        - include_tasks: ../utils/test_rescue.yml

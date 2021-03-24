@@ -1,0 +1,61 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Revert to snapshot of VM
+# Parameters:
+#   snapshot_name: the name of snapshot to revert
+#   skip_if_not_exist: skip reverting snapshot if the snapshot doesn't exist. Default is False.
+#
+- name: Set fact of skip revert of snapshot not exist
+  set_fact:
+    skip_if_not_exist: False
+  when: skip_if_not_exist is undefined
+
+- name: "Revert {{ vm_name }} to snapshot {{ snapshot_name }}"
+  vmware_guest_snapshot:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    state: revert
+    snapshot_name: "{{ snapshot_name }}"
+  ignore_errors: yes
+  register: revert_result
+
+- debug: var=revert_result
+  when: enable_debug is defined and enable_debug
+
+# Handle revert snasphot failure
+- block:
+    - name: "Get snasphot nonexistent message"
+      set_fact:
+        msg_no_snapshots: "{{ revert_result.msg|regex_search('does not have any snapshots to revert') }}"
+        msg_not_find_snapshot: "{{ revert_result.msg|regex_search('Couldn.t find any snapshots with specified name') }}"
+    - name: "Get snasphot nonexistent status"
+      set_fact:
+        error_of_snapshot_nonexistent: "{{ msg_no_snapshots or msg_not_find_snapshot }}"
+    - block:
+        - name: "Snapshot {{ snapshot_name }} doesn't exist"
+          debug:
+            msg: "Snapshot {{ snapshot_name }} doesn't exist"
+        - name: "Revert to nonexistent snapshot {{ snapshot_name }} failed"
+          fail:
+            msg: "Revert to nonexistent snapshot {{ snapshot_name }} failed"
+          when: not skip_if_not_exist
+      when: error_of_snapshot_nonexistent
+    - name: "Revert to {{ snapshot_name }} failed"
+      fail:
+        msg: "Revert to {{ snapshot_name }} failed"
+      when: not error_of_snapshot_nonexistent
+  when:
+    - "'msg' in revert_result"
+
+# Get snapshot facts until current snapshot is the expected one
+# after revert to snapshot
+- include_tasks: vm_wait_expected_snapshot.yml
+  vars:
+    expected_snapshot_name: "{{ snapshot_name }}"
+  when: revert_result.changed

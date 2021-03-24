@@ -1,0 +1,26 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check if specified path is a directory in Windows guest OS
+# Parameters:
+#   win_is_folder_path: the file path
+# Return:
+#   win_is_folder_result: True or False
+#
+- name: Initialize the check result
+  set_fact:
+    win_is_folder_result: False
+
+# Check if specified path is a directory in Windows guest OS
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-Item -Path '{{ win_is_folder_path }}') -is [System.IO.DirectoryInfo]"
+
+- name: Set fact of the check result
+  set_fact:
+    win_is_folder_result: True
+  when:
+    - win_powershell_cmd_output.stdout_lines | length != 0
+    - win_powershell_cmd_output.stdout_lines[0] == 'True'
+- debug:
+    msg: "Specified path in guest OS {{ win_is_folder_path }} is folder: {{ win_is_folder_result }}"

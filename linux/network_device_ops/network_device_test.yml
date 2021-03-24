@@ -1,0 +1,41 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- block:
+    - include_tasks: ../utils/test_setup.yml
+      vars:
+        vmtools_check: "False"
+
+    # Install required packages and kernel modules
+    - include_tasks: ../utils/install_uninstall_package.yml
+      vars:
+        package_name: "distrib-compat"
+        package_state: "present"
+        update_cache: True
+      when:
+        - guest_os_ansible_distribution == "VMware Photon OS"
+        - guest_os_ansible_distribution_major_ver | int < 4
+
+    - include_tasks: ../utils/kernel_module_install.yml
+      vars:
+        kernel_module_name: "8021q"
+      when:
+        - guest_os_ansible_distribution in ["SLES", "SLED"]
+        - guest_os_ansible_distribution_major_ver | int == 12
+
+    # Get eth0 device name in guest. Sometimes it is not 'eth0', e.g., 'ens192', 'ens33', etc.
+    - include_tasks: ../utils/ethernet_link_get.yml
+    - name: "Set fact of the first Ethernet name in guest OS"
+      set_fact:
+        eth0_name: "{{ guest_network_interfaces[0] }}"
+
+    - include_tasks: network_status_validate.yml
+      vars:
+        adapter_type: "{{ nic_type }}"
+
+    - include_tasks: ../../common/print_test_result.yml
+      vars:
+        test_result: "Passed"
+
+  rescue:
+    - include_tasks: ../utils/test_rescue.yml

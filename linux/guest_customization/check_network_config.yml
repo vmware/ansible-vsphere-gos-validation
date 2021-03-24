@@ -1,0 +1,185 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Initialize GOSC network check result"
+  set_fact:
+    guest_ipv4_success: ""
+    guest_netmask_success: ""
+    guest_gateway_success: ""
+    ip_command: "/usr/sbin/ip"
+
+- name: "Set fact of ip command when guest OS is Ubuntu"
+  set_fact:
+    ip_command: "/sbin/ip"
+  when: guest_os_ansible_distribution in ["Ubuntu"]
+
+# Get IP address and netmask
+- include_tasks: ../../common/vm_shell_in_guest.yml
+  vars:
+    vm_shell_cmd: "{{ ip_command }}"
+    vm_shell_args: "-br addr show"
+    vm_shell_out: "/tmp/ip_addr_show"
+
+- include_tasks: ../../common/vm_guest_file_operation.yml
+  vars:
+    operation: "fetch_file"
+    src_path: "/tmp/ip_addr_show"
+    dest_path: "{{ testcase_info_collect_path }}/ip_addr_show"
+
+- name: "Get IPv4 address"
+  shell: cat "{{ testcase_info_collect_path }}/ip_addr_show" | grep -v lo | grep -v virbr | awk '{print $1, $2, $3}'
+  changed_when: False
+  register: result
+
+- name: "Save GOSC network facts from command output"
+  set_fact:
+    guest_iface_name: "{{ result.stdout.split(' ')[0] }}"
+    guest_ipv4_address: "{{ result.stdout.split(' ')[-1] | ipaddr('address') }}"
+    guest_ipv4_netmask: "{{ result.stdout.split(' ')[-1] | ipaddr('netmask') }}"
+
+# Get default gateway
+- include_tasks: ../../common/vm_shell_in_guest.yml
+  vars:
+    vm_shell_cmd: "{{ ip_command }}"
+    vm_shell_args: "-4 route show"
+    vm_shell_out: "/tmp/ip_route_show"
+
+- include_tasks: ../../common/vm_guest_file_operation.yml
+  vars:
+    operation: "fetch_file"
+    src_path: "/tmp/ip_route_show"
+    dest_path: "{{ testcase_info_collect_path }}/ip_route_show"
+
+- name: "Get default gateway"
+  shell: cat "{{ testcase_info_collect_path }}/ip_route_show" | grep "^default"
+  changed_when: False
+  register: result
+- name: "Save GOSC network gateway"
+  set_fact:
+    guest_ipv4_gateway: "{{ result.stdout.split(' ')[2] }}"
+
+# Check IP address, netmaks, gateway settings for GOSC with DHCP IP
+- block:
+    - name: "Save DHCP GOSC network check result"
+      set_fact:
+        guest_ipv4_success: "{{ guest_ipv4_address != '' }}"
+        guest_netmask_success: "{{ guest_ipv4_netmask != '' }}"
+        guest_gateway_success: "{{ guest_ipv4_gateway != '' }}"
+
+    - include_tasks: ../../common/print_error_msg.yml
+      vars:
+        error_msg: "GOSC failed to set DHCP IP on {{ vm_name }}"
+      when: >
+        (not guest_ipv4_success) or
+        (not guest_netmask_success) or
+        (not guest_gateway_success)
+  when: ip_assignment == "dhcp"
+
+# Check static IP address, netmaks, gateway settings for GOSC with static IP
+- block:
+    - name: "Save static GOSC network facts check result"
+      set_fact:
+        guest_ipv4_success: "{{ guest_ipv4_address == linux_gosc_spec['ip'] }}"
+        guest_netmask_success: "{{ guest_ipv4_netmask == linux_gosc_spec['netmask'] }}"
+        guest_gateway_success: "{{ guest_ipv4_gateway == linux_gosc_spec['gateway'] }}"
+
+    - include_tasks: ../../common/print_error_msg.yml
+      vars:
+        error_msg: "VM static IP is {{ guest_ipv4_address }}, expected static IP is {{ linux_gosc_spec['ip'] }}"
+      when: not guest_ipv4_success
+
+    - include_tasks: ../../common/print_error_msg.yml
+      vars:
+        error_msg: "VM static IP is {{ guest_ipv4_netmask }}, expected static IP is {{ linux_gosc_spec['netmask'] }}"
+      when: not guest_netmask_success
+
+    - include_tasks: ../../common/print_error_msg.yml
+      vars:
+        error_msg: "VM static IP is {{ guest_ipv4_gateway }}, expected static IP is {{ linux_gosc_spec['gateway'] }}"
+      when: not guest_gateway_success
+  when: ip_assignment == "static"
+
+- name: "Print GOSC network IP address check result"
+  debug: var=guest_ipv4_success
+- name: "Print GOSC network mask check result"
+  debug: var=guest_netmask_success
+- name: "Print GOSC network gateway check result"
+  debug: var=guest_gateway_success
+
+# Collect network config files for non-Photon Linux
+- block:
+    - name: "Set fact of the network configure file for Ubuntu server"
+      set_fact:
+        src_network_file: "{{ netplan_config_file }}"
+      when:
+        - guest_os_ansible_distribution == "Ubuntu"
+        - guest_os_with_gui is defined and not guest_os_with_gui
+        - netplan_config_file is defined
+    - block:
+        - name: "Set traditional GOSC network configuration files on Ubuntu Desktop/Debian OS"
+          set_fact:
+            src_network_file: "/etc/network/interfaces"
+          when: "gosc_workflow == 'perl'"
+
+        - name: "Set cloud-init GOSC network configuration files on Ubuntu/Debian OS"
+          set_fact:
+            src_network_file: "/etc/network/interfaces.d/50-cloud-init.cfg"
+          when: "gosc_workflow == 'cloud-init'"
+      when: >
+        (guest_os_ansible_distribution == "Ubuntu" and guest_os_with_gui is defined and guest_os_with_gui) or
+        (guest_os_ansible_distribution != "Ubuntu")
+  when: guest_os_ansible_distribution in ["Ubuntu", "Debian"]
+
+- name: "Set GOSC network configuration files on RedHat"
+  set_fact:
+    src_network_file: "/etc/sysconfig/network-scripts/ifcfg-{{ guest_iface_name }}"
+  when: guest_os_ansible_distribution in ["RedHat", "CentOS", "Amazon", "OracleLinux"]
+
+- name: "Set GOSC network configuration files on SLE"
+  set_fact:
+    src_network_file: "/etc/sysconfig/network/ifcfg-{{ guest_iface_name }}"
+  when: guest_os_ansible_distribution in ["SLES", "SLED"]
+
+- block:
+    - name: "Print the network configuration file on {{ guest_os_ansible_distribution }}"
+      debug: var=src_network_file
+
+    - name: "Set GOSC network configuration files on Photon OS"
+      set_fact:
+        network_config_path: "{{ testcase_info_collect_path }}{{ src_network_file }}"
+    - include_tasks: ../../common/vm_guest_file_operation.yml
+      vars:
+        operation: "fetch_file"
+        src_path: "{{ src_network_file }}"
+        dest_path: "{{ network_config_path }}"
+  when:
+    - guest_os_ansible_distribution != "VMware Photon OS"
+    - src_network_file is defined and not src_network_file
+
+# Collect network config files for Photon OS
+- block:
+    - include_tasks: ../../common/vm_shell_in_guest.yml
+      vars:
+        vm_shell_cmd: "/usr/bin/ls"
+        vm_shell_args: "/etc/systemd/network/*.network"
+        vm_shell_out: "/tmp/list_network_files"
+
+    - include_tasks: ../../common/vm_guest_file_operation.yml
+      vars:
+        operation: "fetch_file"
+        src_path: "/tmp/list_network_files"
+        dest_path: "{{ testcase_info_collect_path }}/list_network_files"
+
+    - name: "Look for network file on Photon OS"
+      command: cat "{{ testcase_info_collect_path }}/list_network_files"
+      register: network_files
+
+    - include_tasks: ../../common/vm_guest_file_operation.yml
+      vars:
+        operation: "fetch_file"
+        src_path: "{{ src_network_file }}"
+        dest_path: "{{ testcase_info_collect_path }}{{ src_network_file }}"
+      with_items: "{{ network_files.stdout_lines }}"
+      loop_control:
+        loop_var: "src_network_file"
+  when: guest_os_ansible_distribution == "VMware Photon OS"

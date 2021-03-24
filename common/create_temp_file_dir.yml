@@ -1,0 +1,39 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Create a temporary file or directory
+# Parameters:
+#   tmp_state: file or directory. By default, temporary file will be created
+#   tmp_prefix: the prefix of temporary file or directory
+#   tmp_suffix: the suffix of temporar file or directory
+# Return:
+#   tmp_path: the path to temporary file or directory
+#
+- name: "Set default tmp_state to file"
+  set_fact:
+    tmp_state: "file"
+  when: tmp_state is undefined or not tmp_state
+
+- name: "Create temporary {{ tmp_state }}"
+  tempfile:
+    state: "{{ tmp_state }}"
+    prefix: "{{ tmp_prefix | default(omit) }}"
+    suffix: "{{ tmp_suffix | default(omit) }}"
+  register: tmp_file_dir
+  failed_when: not tmp_file_dir.changed
+
+- name: "Set fact of created temp dir path"
+  set_fact:
+    tmp_path: "{{ tmp_file_dir.path }}"
+
+- name: "Modify the mode of temporary file"
+  file:
+    path: "{{ tmp_path }}"
+    mode: "0644"
+  when: tmp_state == "file"
+
+- name: "Modify the mode of temporary directory"
+  file:
+    path: "{{ tmp_path }}"
+    mode: "0755"
+  when: tmp_state == "directory"

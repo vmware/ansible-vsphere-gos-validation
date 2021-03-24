@@ -1,0 +1,21 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Transfer iozone tool to remote guest OS from local machine
+- include_tasks: ../../common/transfer_file_remote.yml
+  vars:
+    transfer_file_remote_src: "{{ iozone_tools_path }}"
+    transfer_file_remote_dest: "/tmp/iozone"
+    transfer_file_remote_server: "{{ vm_guest_ip }}"
+    transfer_file_remote_mode: "0777"
+
+- debug:
+    msg: "Will run iozone on device: {{ device_name }}"
+- name: "Run iozone test on new added disk"
+  script: "./run_iozone_test.sh {{ device_name }}"
+  args:
+    executable: /bin/bash
+  register: iozone_result
+  delegate_to: "{{ vm_guest_ip }}"
+- debug: var=iozone_result.stdout_lines
+  when: enable_debug is defined and enable_debug

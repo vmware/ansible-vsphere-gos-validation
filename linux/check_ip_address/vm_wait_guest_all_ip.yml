@@ -1,0 +1,20 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Initialize guest IP address list"
+  set_fact:
+    all_ip_by_tools: []
+# Get all guest IP addresses reported by VMware tools
+- name: "Get VM guest info"
+  include_tasks: ../../common/vm_get_guest_facts.yml
+- name: "Get all IP addresses in VM guest info"
+  set_fact:
+    all_ip_by_tools: "{{ all_ip_by_tools | union(vm_guest_facts['instance']['hw_%s'|format(hw_interface)].ipaddresses) }}"
+  when:
+    - "'instance' in vm_guest_facts"
+    - vm_guest_facts['instance']['hw_%s'|format(hw_interface)].ipaddresses != None
+  with_items: "{{ vm_guest_facts.instance.hw_interfaces }}"
+  loop_control:
+    loop_var: hw_interface
+- debug:
+    msg: "Get VM '{{ vm_name }}' IP address in guest info: {{ vm_guest_ip }}, all IP addresses: {{ all_ip_by_tools }}"

@@ -1,0 +1,44 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for test VM memory hotadd with different VM vCPUs,
+# the VM vCPU number will be set to 2, 4, 8 separately, then with each
+# vCPU number, VM memory size will be added 1GB, 2GB, 3GB for 32 bit guest,
+# or 2GB, 4GB, 6GB for 64 bit guest from initial 2GB for 32 bit guest, 4GB
+# for 64 bit guest.   
+#
+- name: memory_hot_add_basic
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+        - include_tasks: ../utils/win_get_guest_type.yml
+
+        - name: "Set fact of the initial memory size 2GB for 32bit client"
+          set_fact:
+            initial_memory_size: 2
+          when: win_guest_bitness == "32-bit" and win_guest_type == "client"
+        - name: "Set fact of the initial memory size 4GB for 64bit guest"
+          set_fact:
+            initial_memory_size: 4
+          when: win_guest_bitness == "64-bit"
+
+        - include_tasks: ../utils/shutdown_vm.yml
+        # Enable memory hotadd if it's disabled
+        - include_tasks: ../../common/vm_enable_memory_hotadd.yml
+
+        # Do memory hotadd with different vCPU 1, 2, 4, 8
+        - include_tasks: hotadd_memory_for_vcpu.yml
+          loop:
+            - 2
+            - 4
+            - 8
+          loop_control:
+            loop_var: vcpu_number
+      rescue:
+        - include_tasks: ../setup/rescue_cleanup.yml
+          vars:
+            current_testcase_name: "{{ ansible_play_name }}"

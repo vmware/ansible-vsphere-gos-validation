@@ -1,0 +1,35 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Record test case result in test_result.yml  
+# Parameters:
+#   test_name: the test case name, default is the play name
+#   test_result: valid test case result is in this list ['Passed', 'Failed', 'No Run']
+#
+- name: Set test case name with play name
+  set_fact:
+    testcase: "{{ ansible_play_name }}"
+  when: test_name is undefined or not test_name
+
+- name: Set test case name the one specified
+  set_fact:
+    testcase: "{{ test_name }}"
+  when: test_name is defined and test_name
+
+- name: Set test result to 'No Run' if not specified
+  set_fact:
+    test_result: "No Run"
+  when: test_result is undefined or not test_result
+
+- name: Print test case result to test_result.yml
+  lineinfile:
+    path: "{{ test_result_file }}"
+    regexp: "^{{ testcase }}:"
+    line: "{{ testcase }}: {{ test_result }}"
+    create: True
+    mode: '644'
+  ignore_errors: yes
+  register: print_test_result
+- name: Display the result of print test result to test_result.yml
+  debug: var=print_test_result
+  when: enable_debug

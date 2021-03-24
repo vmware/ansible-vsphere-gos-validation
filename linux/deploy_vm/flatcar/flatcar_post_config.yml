@@ -1,0 +1,62 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Flatcar doesn't have python installed, so we need to install ActivePython3 at first
+- name: "Installing python3 on Flatcar VM {{ vm_name }}"
+  script: "./install_python3.sh '{{ flatcar_python3_download_url }}'"
+  register: ap3_install_result
+  delegate_to: "{{ vm_guest_ip }}"
+
+- debug: var=ap3_install_result
+
+- block:
+    # Overwrite vm_python in inventory
+    - name: "Reset vm_python to /opt/bin/python"
+      set_fact:
+        vm_python: "/opt/bin/python"
+
+    - name: "Update host variable ansible_python_interpreter"
+      add_host:
+        hostname: "{{ vm_guest_ip }}"
+        groups: "target_vm"
+        ansible_python_interpreter: "{{ vm_python }}"
+      when:
+        - vm_guest_ip is defined
+        - groups.target_vm is defined
+        - vm_guest_ip in groups.target_vm
+  when: (vm_python != "/opt/bin/python") or (vm_python != "/opt/bin/python3")
+
+- name: "Check /etc/ssh/sshd_config status"
+  stat:
+    path: "/etc/ssh/sshd_config"
+  register: sshd_config_stat
+  delegate_to: "{{ vm_guest_ip }}"
+
+# If /etc/ssh/sshd_config is a symbolic link
+# it means the file has not been changed
+- block:
+    - name: "Permit root login through ssh"
+      shell: sed -i '' /etc/ssh/sshd_config
+      become: true
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - include_tasks: ../../utils/replace_or_add_line_in_file.yml
+      vars:
+        file: "/etc/ssh/sshd_config"
+        reg_exp: "^#?PermitRootLogin"
+        line_content: "PermitRootLogin yes"
+  when: sshd_config_stat.stat.islnk
+
+# Change user password
+- name: "Get user names for password changing"
+  set_fact:
+    usernames: "{{ [vm_username] | union(['core']) }}"
+
+- name: "Change password for user {{ vm_username }}"
+  user:
+    name: "{{ username }}"
+    password: "{{ vm_password | password_hash('sha512') }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  with_items: "{{ usernames }}"
+  loop_control:
+    loop_var: username

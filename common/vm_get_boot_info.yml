@@ -1,0 +1,28 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: Get VM boot info
+  vmware_guest_boot_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    name: "{{ vm_name }}"
+  register: get_boot_info_result
+- name: Display the result of VM boot info
+  debug: var=get_boot_info_result
+  when: enable_debug is defined and enable_debug
+
+- name: Set fact of VM boot info
+  set_fact:
+    vm_boot_info: "{{ get_boot_info_result.vm_boot_info | default({}) }}"
+- name: Set fact of VM firmware
+  set_fact:
+    vm_firmware: "{{ vm_boot_info.current_boot_firmware | default('') }}"
+- name: Set fact of VM secureboot enablement status
+  set_fact:
+    vm_secureboot_enabled: "{{ vm_boot_info.current_secure_boot_enabled | default(False) }}"
+- debug:
+    msg:
+      - "{{ vm_name }} firmware is: {{ vm_firmware }}"
+      - "secureboot is enabled: {{ vm_secureboot_enabled }}"

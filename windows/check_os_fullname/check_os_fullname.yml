@@ -1,0 +1,99 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check VM guest OS fullname is reported correctly
+# in guest info through VMware tools. When VMware tools is not installed or not
+# running in VM, this test case result is 'No Run'.
+#
+- name: check_os_fullname
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+        - name: Set fact of the supported guest IDs in this test case
+          set_fact:
+            support_client_guest: ['windows9Guest', 'windows9_64Guest']
+            support_server_guest: ['windows9Server64Guest', 'windows2019srv_64Guest', 'windows2019srvNext_64Guest']
+        - block:
+            # Get guest OS info inside guest OS 
+            - include_tasks: ../utils/win_get_fullname.yml
+            - debug:
+                msg:
+                  - "Get guest fullname in guest OS: {{ os_fullname_guest }}"
+                  - "Get OS architecture in guest OS: {{ win_guest_bitness }}"
+                  - "VM guest ID is: {{ vm_guest_id }}"
+            
+            # Get ESXi version info if not defined
+            - include_tasks: ../../common/esxi_get_version_build.yml
+              when: >
+                (esxi_version is undefined) or
+                (esxi_version == 'N/A') or
+                (esxi_update_version is undefined) or
+                (esxi_update_version == 'N/A')
+
+            # Get guest fullname from VM guest info
+            - include_tasks: ../../common/vm_get_config.yml
+              vars:
+                property_list: ['guest.guestFullName']
+            - name: Set guest fullname got from VM guest info
+              set_fact:
+                os_fullname_guestinfo: "{{ vm_config.guest.guestFullName }}"
+            - debug:
+                msg: "Get guest fullname from VM guest info: {{ os_fullname_guestinfo }}"
+            
+            - name: Initialize the expected guest fullname
+              set_fact:
+                expected_guest_fullname: ""
+            # Set expected guest fullname for Windows client
+            - name: "Set fact of expected guest fullname for Windows 10"
+              set_fact:
+                expected_guest_fullname: "{{ 'Microsoft Windows 10 (' ~ win_guest_bitness ~ ')' }}"
+                os_fullname_guest: "{{ (' ').join(os_fullname_guest.split(' ')[0:3]) ~ ' (' ~ win_guest_bitness ~ ')' }}"
+              when: vm_guest_id in support_client_guest
+
+            # Set expected guest fullname for Windows Server
+            - block:
+                # Check if guest OS is Windows Server Core
+                - include_tasks: ../utils/win_is_servercore.yml
+                - include_tasks: winsrv2016orlater_fullname.yml
+                - include_tasks: winsrv2019_fullname.yml
+                - include_tasks: winsrv2022_fullname.yml
+                - name: "Set fact of the guest fullname from guest OS for Windows Server"
+                  set_fact:
+                    os_fullname_guest: "{{ (' ').join(os_fullname_guest.split(' ')[0:-1]) ~ ' (' ~ win_guest_bitness ~ ')' }}"
+                  when: not win_guest_is_servercore
+              when: vm_guest_id in support_server_guest 
+            
+            - name: "Verify guest fullname in guest info is expected"
+              assert:
+                that:
+                  - os_fullname_guestinfo == expected_guest_fullname
+                fail_msg: "Guest fullname in guest info: {{ os_fullname_guestinfo }}, is not the same as expected one: {{ expected_guest_fullname }}."
+                success_msg: "Guest fullname in guest info: {{ os_fullname_guestinfo }} is the same as expected one."
+            
+            # This check is used for reference, what is the actual guest OS inside VM,
+            # what is the guest fullname reported by VMware tools. This check will fail
+            # if ESXi host does not support this guest OS type yet. 
+            - name: "Check if guest fullname in guest info is the same as got from guest OS"
+              assert:
+                that:
+                  - os_fullname_guestinfo == os_fullname_guest
+                fail_msg: "Guest fullname in guest info: {{ os_fullname_guestinfo }}, got from guest OS: {{ os_fullname_guest }}."
+                success_msg: "Guest fullname in guest info: {{ os_fullname_guestinfo }} is the same as the one got from guest OS."
+              ignore_errors: True
+          when: vmtools_is_installed and vmtools_is_running
+
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip test case '{{ ansible_play_name }}', VMware tools installed: {{ vmtools_is_installed }}, running: {{ vmtools_is_running }}, guest ID: {{ vm_guest_id }}"
+          when: >
+            (not vmtools_is_installed) or
+            (not vmtools_is_running) or
+            (vm_guest_id not in support_client_guest and vm_guest_id not in support_server_guest)
+      rescue:
+        - include_tasks: ../setup/rescue_cleanup.yml
+          vars:
+            current_testcase_name: "{{ ansible_play_name }}"

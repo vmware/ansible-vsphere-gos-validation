@@ -1,0 +1,20 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Wait service status as expected
+# Parameter:
+#   service_name: the name of the service
+#   wait_service_status: ['activating', 'running']
+#   wait_service_timeout: The timeout for waiting service status
+#
+- name: "Wait {{ service_name }} is {{ wait_service_status }} on {{ vm_name }}"
+  command: "systemctl status {{ service_name }}"
+  register: guest_service_status
+  delay: "5"
+  retries: "{{ ((wait_service_timeout | default(300) | int) / 5) | int }}"
+  ignore_errors: True
+  until:
+    - guest_service_status is defined
+    - guest_service_status.stdout is defined
+    - wait_service_status in guest_service_status.stdout
+  delegate_to: "{{ vm_guest_ip }}"

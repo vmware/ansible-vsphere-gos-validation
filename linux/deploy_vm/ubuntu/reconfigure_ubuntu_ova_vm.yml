@@ -1,0 +1,102 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Reset deploy_casename in case user doesn't provide correct guest_id
+- name: "Set fact of the deploy VM test case name"
+  set_fact:
+    deploy_casename: "deploy_ubuntu_ova"
+
+ # We need to add serial port for Ubuntu OVA when hardware_version > 10. Or else, it hangs when during booting
+- name: "Set serial port for ubuntu cloud image"
+  vmware_guest_serial_port:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    name: "{{ vm_name }}"
+    backings:
+      - type: "pipe"
+        pipe_name: "serial_pipe"
+        endpoint: 'client'
+  when:
+    - vm_hw_version is defined
+    - vm_hw_version | int > 10
+
+# Get VM path on ESXi datastore
+- include_tasks: ../../../common/vm_get_config.yml
+  vars:
+    property_list: ['config.files.logDirectory']
+
+- name: "Set fact of the VM file path"
+  set_fact:
+    vm_path: "{{ vm_config.config.files.logDirectory | replace('[', '/vmfs/volumes/') | replace('] ', '/') }}"
+
+- debug: var=vm_path
+
+# Create the seed.iso to modify login information
+- include_tasks: ../../utils/create_seed_iso.yml
+  vars:
+    user_data_template: "ubuntu-ova-user-data.j2"
+    local_hostname: "ubuntu-{{ ansible_date_time.epoch }}"
+    mode: '0644'
+
+# Upload seed.iso to VM path on ESXi server
+- name: "Copy {{ seed_iso_path }} to VM folder"
+  copy:
+    src: "{{ seed_iso_path }}"
+    dest: "{{ vm_path }}/{{ seed_iso_path | basename }}"
+    force: yes
+    mode: 0755
+  delegate_to: "{{ esxi_hostname }}"
+
+# Attach seed.iso to Ubuntu Linux VM
+- name: "Set fact of the seed ISO path"
+  set_fact:
+    cdrom_seed_iso: "{{ vm_config.config.files.logDirectory }}/{{ seed_iso_path | basename }}"
+
+- include_tasks: ../../../common/vm_configure_cdrom.yml
+  vars:
+    cdrom_type: iso
+    cdrom_iso_file: "{{ cdrom_seed_iso }}"
+    cdrom_controller_num: 0
+    cdrom_unit_num: 0
+
+# Power on VM to update login information
+- include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-on'
+- name: "Wait 120 seconds for system booting"
+  pause:
+    seconds: 120
+
+# Skip to check guest full name here because we will check it
+# in TD1 case
+- include_tasks: ../../../common/vm_wait_guest_fullname.yml
+  vars:
+    wait_guest_fullname: "Ubuntu Linux (64-bit)"
+
+# Get guest ip
+- include_tasks: ../../../common/update_inventory.yml
+  vars:
+    update_inventory_timeout: 300
+
+# Eject seed.iso from guest
+- name: "Eject seed.iso from Ubuntu Linux"
+  include_tasks: ../../utils/eject_cdrom_in_guest.yml
+  vars:
+    guest_cdrom_device_num: 0
+
+# Disconnect seed.iso from Ubuntu Linux VM
+- name: "Change VM's CD/DVD Drive 1 to client device"
+  include_tasks: ../../../common/vm_configure_cdrom.yml
+  vars:
+    cdrom_type: client
+    cdrom_controller_num: 0
+    cdrom_unit_num: 0
+
+# Remove temporary folders
+- name: "Remove temporary directory {{ tmp_seed_dir }}"
+  include_tasks: ../../../common/delete_local_file.yml
+  vars:
+    local_path: "{{ tmp_seed_dir }}"
+

@@ -1,0 +1,15 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get raw disk number in Windows guest OS
+- name: Get raw disk number in Windows guest OS
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(get-disk | where-object -FilterScript {$_.PartitionStyle -eq 'RAW'}).Number"
+
+- name: Set fact of the raw disk number got in Window guest OS
+  set_fact:
+    win_get_raw_disk_num_num: "{{ win_powershell_cmd_output.stdout_lines[0] if win_powershell_cmd_output.stdout_lines | length != 0 else 0 }}"
+
+- debug:
+    msg: "Get raw disk number in Windows guest OS: {{ win_get_raw_disk_num_num }}"

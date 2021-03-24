@@ -1,0 +1,46 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Install open-vm-tools with OS commands
+# Parameters
+#   ovt_packages: open-vm-tools package names
+
+# Add a local repo from ISO image for RHEL/SLES/SLED
+- include_tasks: ../utils/add_local_dvd_repo.yml
+  when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat']
+
+# Add online repo for CentOS, OracleLinux, Ubuntu, Debian and Photon
+- include_tasks: ../utils/add_online_repo.yml
+  when: guest_os_ansible_distribution in ['CentOS', 'OracleLinux', 'Ubuntu', 'Debian', 'VMware Photon OS']
+
+# Get OS commands to install open-vm-tools
+- include_tasks: get_install_uninstall_cmd.yml
+
+# Update package metadata
+- include_tasks: ../utils/repo_update.yml
+
+# Install open-vm-tools packages
+- name: "Install packages {{ ovt_packages }}"
+  command: "{{ package_install_cmd }} {{' '.join(ovt_packages) }}"
+  args:
+    warn: False
+  register: ovt_install_result
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: Display the packages install output
+  debug: var=ovt_install_result
+  when: enable_debug | bool
+
+- name: "Assert command is executed successfully"
+  assert:
+    that:
+      - ovt_install_result is defined
+      - ovt_install_result.stdout is defined
+      - ovt_install_result.stdout
+      - ovt_install_result.rc is defined
+      - ovt_install_result.rc | int == 0
+    fail_msg: "Failed to execute command: {{ ' '.join(ovt_install_result.cmd) }}"
+
+# Eject CDROM /dev/sr0 from guest
+- include_tasks: ../utils/eject_cdrom_in_guest.yml
+  when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat']

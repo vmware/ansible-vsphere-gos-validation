@@ -1,0 +1,85 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check guest customization with static
+# network configuration. If VMware tools is not installed, the test
+# result is 'No Run'.
+# Note: VM guest customization requires vCenter server.
+#
+- name: gosc_sanity_staticip
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+        - block:
+            - include_tasks: win_gosc_prepare.yml
+
+            # Use router VM as the default gateway hardcoded to 192.168.1.1,
+            # use configured static IP address in this subnet
+            - name: Set fact of customize static network
+              set_fact:
+                customize_network_type: 'static'
+            
+            - include_tasks: win_gosc_execution.yml
+              vars:
+                customize_ip: '192.168.1.10'
+                customize_gateway: "{{ vlan_gateway }}"
+                customize_netmask: '255.255.255.0'
+                customize_network: "{{ portgroup_name }}"
+                timeout: 1800
+            # Wait guest customization state is completed
+            - include_tasks: ../../common/vm_wait_gosc_completed.yml
+
+            # Wait guest get the customized static IP
+            - include_tasks: ../../common/vm_wait_guest_ip.yml
+              vars:
+                wait_ipv4: "192.168.1.10"
+
+            # Get guest IP after customization from guestinfo
+            - include_tasks: ../../common/vm_get_ip_from_vmtools.yml
+            - name: Set fact of the VM guest IP after GOSC
+              set_fact:
+                guest_ip_after_gosc: "{{ vm_guest_ip }}"
+            
+            # Get guest hostname after customization from guestinfo
+            - include_tasks: ../../common/vm_wait_guest_hostname.yml
+              vars:
+                wait_guest_hostname: "{{ customize_gos_hostname }}"
+            
+            # Get GOSC log files 
+            - include_tasks: get_gosc_logs_no_network.yml
+
+            - include_tasks: ../../common/vm_get_config.yml
+              vars:
+                property_list: ['guest.hostName'] 
+            - name: Set fact of the hostname after GOSC
+              set_fact:
+                hostname_after_gosc: "{{ vm_config.guest.hostName }}"
+            - debug:
+                msg: "Get guest OS hostname/IP after customization: {{ hostname_after_gosc }}/{{ guest_ip_after_gosc }}"
+
+            - name: Check IP and hostname changed after customization
+              assert:
+                that:
+                  - "{{ guest_ip_before_gosc != guest_ip_after_gosc }}"
+                  - "{{ hostname_before_gosc != hostname_after_gosc }}"
+                  - "{{ hostname_after_gosc == customize_gos_hostname }}"
+                  - "{{ guest_ip_after_gosc == '192.168.1.10' }}"
+                success_msg: "Check guest IP address, hostname after GOSC succeed."
+                fail_msg: "Check guest IP address, hostname after GOSC failed."
+
+            - include_tasks: win_gosc_cleanup.yml
+          when:
+            - vmtools_is_installed and vmtools_is_running
+            - vcenter_is_defined is defined and vcenter_is_defined
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip test case '{{ ansible_play_name }}', VMware tools installed: {{ vmtools_is_installed }}, running: {{ vmtools_is_running }}, or vCenter configured: {{ vcenter_is_defined | default('NA') }}"
+          when: not vmtools_is_installed or not vmtools_is_running or vcenter_is_defined is undefined
+      rescue:
+        - include_tasks: ../setup/rescue_cleanup.yml
+          vars:
+            current_testcase_name: "{{ ansible_play_name }}"

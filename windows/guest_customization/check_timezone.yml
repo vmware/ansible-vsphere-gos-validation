@@ -1,0 +1,23 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check timezone name after gos customization
+- debug:
+    msg: "Configured timezone: {{ customize_timezone_name }}"
+  when: enable_debug is defined and enable_debug
+- name: Check timezone in guest OS
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "tzutil /g"
+- name: Set fact of the timezone in guest OS
+  set_fact:
+    timezone_after_customize: "{{ win_powershell_cmd_output.stdout_lines[0] if not win_powershell_cmd_output.failed else 'NA'}}"
+- debug:
+    msg: "Get timezone after customize: {{ timezone_after_customize }}"
+- name: Check returned timezone name is the specified one
+  assert:
+    that:
+      - "{{ not win_powershell_cmd_output.failed }}"
+      - "{{ win_powershell_cmd_output.stdout_lines[0] == customize_timezone_name }}"
+    success_msg: "Check customized timezone in guest OS succeed."
+    fail_msg: "Check customized timezone in guest OS failed."

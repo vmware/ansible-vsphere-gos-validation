@@ -1,0 +1,58 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get current vCPU number from guest facts
+- include_tasks: ../../common/vm_get_guest_facts.yml
+- name: Set fact of vCPU number before hotadd
+  set_fact:
+    vcpu_before_hotadd: "{{ vm_guest_facts.instance.hw_processor_count }}"
+
+# Set hotadded vCPU number 
+- name: Set fact of hotadd CPU number
+  set_fact:
+    vcpu_after_hotadd: "{{( vcpu_before_hotadd | int) + (hotadd_num | int) }}"
+- debug:
+    msg: "Hotadd vCPU from {{ vcpu_before_hotadd }} to {{ vcpu_after_hotadd }}"
+
+- block:
+    - include_tasks: ../../common/vm_set_cpu_number.yml
+      vars:
+        num_cpus: "{{ vcpu_after_hotadd }}"
+        num_cores_per_socket: "{{ initial_cores_num }}"
+
+    - include_tasks: ../utils/win_check_winbsod.yml
+    - include_tasks: ../../common/vm_take_screenshot.yml
+      vars:
+        vm_take_screenshot_local_path: "{{ current_test_log_folder }}" 
+    - include_tasks: ../utils/win_check_winrm.yml
+    
+    # In Windows 10 guest OS, use devcon to detect CPU
+    - block:
+        - include_tasks: ../utils/win_get_physical_cpu_devcon.yml
+          vars:
+            target_guest_os_bitness: "{{ win_guest_bitness }}"
+        - name: Set fact of the CPU detected by devcon
+          set_fact:
+            win_cpu_number: "{{ processor_number_devcon }}" 
+      when: win_guest_type == "client" 
+    
+    # In Windows Server get CPU number in guest OS directly
+    - include_tasks: ../utils/win_get_cpu_cores_sockets.yml
+      when: win_guest_type == "server"
+
+    # Get CPU number from guest info
+    - include_tasks: ../../common/vm_get_guest_facts.yml
+    
+    # Validate CPU number after hotadd
+    - name: "Verify hotadded vCPU can be detected in guest OS"
+      assert:
+        that:
+          - win_cpu_number | int == vcpu_after_hotadd | int
+          - vm_guest_facts.instance.hw_processor_count | int == win_cpu_number | int
+        fail_msg: "Hotadd vCPU ({{ vcpu_before_hotadd }}->{{ vcpu_after_hotadd }}) failed"
+        success_msg: "Hotadd vCPU ({{ vcpu_before_hotadd }}->{{ vcpu_after_hotadd }}) passed"
+
+    - name: Set fact of the CPU hotadd results
+      set_fact:
+        cpu_hotadd_results: "{{ cpu_hotadd_results + ['Hotadd vCPU (vcpu_before_hotadd -> vcpu_after_hotadd) passed'] }}"
+  when: vcpu_after_hotadd | int <= max_num_cpus | int

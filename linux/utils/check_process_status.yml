@@ -1,0 +1,51 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check processe is running or not
+# Parameters:
+#   process_uid: The user id of the running process. By default it is root
+#   process_name: The process name in the command
+#   expected_process_state: ['present', 'absent']
+#     present: process is running
+#     absent: process is not running
+
+- name: "Validate the value of 'expected_process_state'"
+  assert:
+    that:
+      - expected_process_state is defined
+      - expected_process_state in ['present', 'absent']
+    fail_msg: "Invalid parameter: expected_process_state={{ expected_process_state | default('undefined') }}"
+
+- include_tasks: get_process_info.yml
+
+- name: "Set default process uid to root"
+  set_fact:
+    process_uid: "root"
+  when: process_uid is undefined or not process_uid
+
+- block:
+    - name: "Get user '{{ process_uid }}' process '{{ process_name }}' }}"
+      set_fact:
+        running_process_info: "{{ process_list | selectattr('uid', 'equalto', process_uid) | selectattr('cmd', 'match', '.*/' + process_name) }}"
+      when: process_list is defined
+
+    - debug: var=running_process_info
+
+    - name: "Check process '{{ process_name }}' is running"
+      assert:
+        that:
+          - process_list is defined
+          - running_process_info is defined
+          - running_process_info | length >= 1
+        fail_msg: "User '{{ process_uid }}' doesn't have running process '{{ process_name }}'"
+        success_msg: "User '{{ process_uid }}' has running process '{{ process_name }}'"
+  when: expected_process_state == 'present'
+
+- name: "Check process '{{ process_name }}' is not running"
+  assert:
+    that:
+      - process_list is defined
+      - process_list | length == 0
+    fail_msg: "The '{{ process_name }}' process is running"
+    success_msg: "The '{{ process_name }}' process is not running"
+  when: expected_process_state == 'absent'

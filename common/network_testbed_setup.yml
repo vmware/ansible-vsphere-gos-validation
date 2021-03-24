@@ -1,0 +1,35 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Add new vSwitch and portgroup to ESXi host and deploy a router VM
+# Parameters:
+#   router_vm_name: the name of router VM which is used to assign
+#     DHCP IP to new network interface.
+#   vswitch_name: the name of vSwitch to be added for new network
+#     interface testing or GOSC testing.
+#   portgroup_name: the name of vSwitch portgroup to be added for
+#     new network interface testing or GOSC testing.
+#
+# Add a new standard vSwitch without physical network adapters
+- include_tasks: esxi_add_vswitch.yml
+
+# Create a new portgroup for VM network
+- include_tasks: esxi_add_portgroup.yml
+
+# Deploy a router VM
+- include_tasks: router_vm_deploy.yml
+
+# Hotadd a new e1000 network adapter to router VM
+- include_tasks: vm_add_network_adapter.yml
+  vars:
+    adapter_type: e1000
+    vm_name: "{{ router_vm_name }}"
+
+# Power on the router VM
+- include_tasks: vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-on'
+    vm_name: "{{ router_vm_name }}"
+- name: "Wait 10 seconds to let router VM start up"
+  pause:
+    seconds: 10

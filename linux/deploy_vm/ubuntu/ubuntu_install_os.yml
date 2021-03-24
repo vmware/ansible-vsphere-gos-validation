@@ -1,0 +1,59 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Start to Ubuntu OS install
+- include_tasks: ./ubuntu_autoinstall.yml
+  when: ubuntu_install_method == "simulation"
+
+- block:
+    - name: Sleep 300 seconds to wait confirm message for ubuntu
+      pause:
+        seconds: 300
+    - include_tasks: ../../../common/vm_guest_send_key.yml
+      vars:
+        keys_send:
+          - ENTER
+        string_send: 'yes'
+    - include_tasks: ../../../common/vm_guest_send_key.yml
+      vars:
+        keys_send:
+          - ENTER
+    - name: sleep 360 seconds to wait installation and rebooting
+      pause:
+        seconds: 360
+  when: ubuntu_install_method == "cloud-init"
+
+- include_tasks: ../../../common/vm_wait_guest_fullname.yml
+  vars:
+    wait_guest_fullname: "Ubuntu Linux (64-bit)"
+
+# Wait for cloud-init configs taking effect
+- include_tasks: wait_ubuntu_autoinstall_completed.yml
+
+# Get guest ip
+- include_tasks: ../../../common/update_inventory.yml
+  vars:
+    update_inventory_timeout: 300
+
+- name: "Eject all ISO connected CDROMs"
+  include_tasks: ../../utils/eject_cdrom_in_guest.yml
+
+# Disconnect OS image from Ubuntu Linux VM and change to client device
+- name: "Change VM's CD/DVD Drive 1 to client device"
+  include_tasks: ../../../common/vm_configure_cdrom.yml
+  vars:
+    cdrom_type: client
+    cdrom_controller_num: 0
+    cdrom_unit_num: 0
+
+- block:
+    # Disconnect seed.iso from Ubuntu Linux VM and change it to client device
+    - include_tasks: ../../../common/vm_configure_cdrom.yml
+      vars:
+        cdrom_type: client
+        # there is Ansible issue filed here, so hardcode to cdrom 0:1,
+        # will change this after fix merged
+        # cdrom_unit_num: "{{ unattend_iso_cdrom_unit_num | int }}"
+        cdrom_controller_num: 0
+        cdrom_unit_num: 1
+  when: ubuntu_install_method == "cloud-init"

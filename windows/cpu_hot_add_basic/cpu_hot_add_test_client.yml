@@ -1,0 +1,24 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get ESXi version number if not set before
+- include_tasks: ../../common/esxi_get_version_build.yml
+  when: esxi_version is undefined or esxi_version == 'N/A'
+
+# On ESXi version < 7.0.2, Windows 10 VM max socket is 2,
+# on ESXi version >= 7.0.2, Windows 10 VM max socket is 4     
+- name: Set fact of the hotadd CPU test list
+  set_fact:
+    hotadd_num_list: ["{{ initial_cores_num }}"]
+
+- name: Set fact of the hotadd CPU test list
+  set_fact:
+    hotadd_num_list: ["{{ hotadd_num_list * 3 }}"]
+  when: esxi_version is version('7.0.2', '>=')
+- debug:
+    msg: "Hotadd vCPU test value list: {{ hotadd_num_list | to_yaml }}"
+
+- include_tasks: cpu_hot_add_validate.yml
+  loop: "{{ hotadd_num_list }}"
+  loop_control:
+    loop_var: hotadd_num

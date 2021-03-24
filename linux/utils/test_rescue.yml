@@ -1,0 +1,64 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Parameters:
+# take_fail_snapshot: If set to True, will take snapshot. Default is True.
+# revert_to_base: If this parameter and deploy_router_vm are both True,
+#                 will revert Guest VM to base snapshot. Default is True.
+# exit_testing_when_fail: This parameter is defined in vars/test.yml. We can
+#                 set it True once necessary, like deploy_vm fail or
+#                 ovt_install_verify_status fail
+#
+- name: "By default take failed snapshot"
+  set_fact:
+    take_fail_snapshot: True
+  when: take_fail_snapshot is undefined
+
+- name: "By default revert to base snapshot"
+  set_fact:
+    revert_to_base: True
+  when: revert_to_base is undefined
+
+# Print fail test result
+- block:
+    - include_tasks: ../../common/print_test_result.yml
+      vars:
+        test_result: "Failed"
+    # Note: Ansible issue when using ansible_failed_task
+    # https://github.com/ansible/ansible/issues/57399 
+    # - include_tasks: ../../common/print_error_msg.yml
+    #   vars:
+    #     error_msg: "Failed at task {{ ansible_failed_task.name }}"
+    #   when: ansible_failed_task is defined and ansible_failed_task.name is defined
+
+# Take snapshot for failed case
+- block:
+    - name: "Save current time"
+      set_fact:
+        timestamp: "{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
+    - include_tasks: ../../common/vm_take_snapshot.yml
+      vars:
+        snapshot_name: "fail-{{ testcase }}-{{ timestamp }}"
+        dump_memory: "yes"
+  when: take_fail_snapshot
+
+# Clean router VM, vSwitch and port group
+- block:
+    - block:
+        - include_tasks: ../../common/vm_revert_snapshot.yml
+          vars:
+            snapshot_name: "{{ base_snapshot_name }}"
+            skip_if_not_exist: True
+      when: revert_to_base
+    - include_tasks: ../../common/network_testbed_cleanup.yml
+  when:
+    - deploy_router_vm is defined and deploy_router_vm
+    - exit_testing_when_fail is defined and exit_testing_when_fail
+
+# Exit ansible run if exit_testing_when_fail is True
+- block:
+    - name: "Exit testing when exit_testing_when_fail is set True"
+      fail:
+        msg: "Failed to run test case {{ testcase }}"
+  when:
+    - exit_testing_when_fail is defined and exit_testing_when_fail

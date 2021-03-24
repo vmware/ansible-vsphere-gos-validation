@@ -1,0 +1,41 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Wait until guest hostname is the one specified by parameter 'wait_guest_hostname'.
+# If this parameter is not defined, this task will wait for guest hostname is reported
+# by VMware tools.
+# Parameters:
+#   wait_guest_hostname (optional): the guest OS hostname to be reported in guest info
+#   vm_get_hostname_timeout (optional): timeout for retrying get guest hostname in guest
+# info, the default value is 300 seconds.
+#
+- name: "Initialize the guest hostname to empty string if not defined"
+  set_fact:
+    wait_guest_hostname: ""
+  when: wait_guest_hostname is undefined
+
+- name: Wait for VMware Tools collecting guest OS hostname
+  vmware_guest_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    schema: "vsphere"
+    properties: ['guest.toolsRunningStatus', 'guest.hostName']
+  delay: 5
+  retries: "{{ ((vm_get_hostname_timeout | default(300) | int) / 5) | int }}"
+  register: vm_guest_facts
+  until:
+    - "'instance' in vm_guest_facts"
+    - vm_guest_facts.instance.guest.toolsRunningStatus == "guestToolsRunning"
+    - vm_guest_facts.instance.guest.hostName
+    - (not wait_guest_hostname) or (wait_guest_hostname and wait_guest_hostname == vm_guest_facts.instance.guest.hostName)
+
+- name: Display the retrieved guest info
+  debug: var=vm_guest_facts
+  when: enable_debug | bool
+- debug:
+    msg: "Get VM guest OS hostname: {{ vm_guest_facts.instance.guest.hostName }}"

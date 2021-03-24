@@ -1,0 +1,26 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Delete VM from datastore on ESXi host
+- name: "Remove VM '{{ vm_name }}' on host '{{ vsphere_host_name }}'"
+  vmware_guest:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    state: "absent"
+  register: vm_remove_result
+- name: Display the VM remove result
+  debug: var=vm_remove_result
+  when: enable_debug is defined and enable_debug
+
+- name: Check VM remove operation result
+  assert:
+    that:
+      - "'changed' in vm_remove_result"
+      - "vm_remove_result.changed"
+    fail_msg: "Remove VM '{{ vm_name }}' on '{{ vsphere_host_name }}' failed."
+    success_msg: "VM '{{ vm_name }}' on '{{ vsphere_host_name }}' is removed successfully."

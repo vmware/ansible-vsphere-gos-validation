@@ -1,0 +1,32 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: Check the CDROM mounted path folder info
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-childitem -path D:\\ -name"
+- name: Check VMware tools install files
+  assert:
+    that:
+      - "'setup.exe' in win_powershell_cmd_output['stdout_lines']"
+      - "'setup64.exe' in win_powershell_cmd_output['stdout_lines']"
+      - "'VMwareToolsUpgrader.exe' in win_powershell_cmd_output['stdout_lines']"
+    fail_msg: "VMware tools installation setup files are not in D:\\"
+    success_msg: "VMware tools installation setup files are in D:\\"
+
+- name: Execute VMware tools install in 32bit guest OS
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "D:\\setup.exe /s /v ADDLOCAL=ALL /qn REBOOT=R"
+  when: win_guest_bitness == "32-bit"
+
+- name: Execute VMware tools install in 64bit guest OS
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "D:\\setup64.exe /s /v ADDLOCAL=ALL /qn REBOOT=R"
+  when: win_guest_bitness == "64-bit"
+
+- include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+- include_tasks: ../utils/win_check_winbsod.yml

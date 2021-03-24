@@ -1,0 +1,61 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check VM IP addresses are all reported correctly
+# in guest info through VMware tools. When VMware tools is not installed or not
+# running in VM, this test case result is 'No Run'.
+#
+- name: cpu_multicores_per_socket
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        # Get ESXi host logical processors number
+        - include_tasks: ../../common/esxi_get_property.yml
+          vars:
+            esxi_host_property_list:
+              - summary.hardware.numCpuThreads
+        # Set the max cores per socket number to test is the smaller one:
+        # ESXi server logical processor number and the configured max number by default in vars/test.yml
+        - name: Set fact of the maximum cores per socket value to test
+          set_fact:
+            max_cores_test: "{{ [esxi_host_property_results.ansible_facts.summary.hardware.numCpuThreads | int, vm_cpu_cores_per_socket_max | default(8) | int] | min }}"
+        - name: Print the maximun cores per socket to test
+          debug:
+            msg: "Get the maximum cores per socket value to test: {{ max_cores_test }}"
+
+        - name: Set fact of the cores per socket value list for full testing
+          set_fact:
+            cores_per_socket_list: "{{ range(2, (max_cores_test|int + 1)) | list }}"
+          when: max_cores_test | int <= 5
+        
+        - name: Initialize the cores per socket value list to test
+          set_fact:
+            cores_per_socket_list: "{{ range(2, (max_cores_test|int + 1), 3) | list }}"
+          when: max_cores_test | int > 5
+
+        - name: Print the cores per socket test list
+          debug:
+            msg: "Under test cores per socket list: {{ cores_per_socket_list }}"
+        - block:
+            - include_tasks: ../utils/test_setup.yml
+              vars:
+                vmtools_check: "False"
+            - include_tasks: multicores_validate.yml
+              loop: "{{ cores_per_socket_list }}"
+              loop_control:
+                loop_var: cores_per_socket_set
+            - include_tasks: ../../common/print_test_result.yml
+              vars:
+                test_result: "Passed"
+          when: cores_per_socket_list|length != 0
+        # Skip this test when cores per socket test list is empty
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "No Run"
+          when: cores_per_socket_list|length == 0
+
+      rescue:
+        - include_tasks: ../utils/test_rescue.yml

@@ -1,0 +1,123 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for deploying new Windows VM and installing
+# guest OS in VM automatically using Autounattend.xml file when
+# 'new_vm' is set to True.
+#
+- name: deploy_vm
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip test case due to new_vm is set to '{{ new_vm | default(False) }}'"
+        - meta: end_play
+      when: new_vm is undefined or not new_vm|bool
+
+    - block:
+        # Initialize undefined variables
+        - name: "Initialize variables for new VM settings"
+          set_fact:
+            boot_disk_controller: "{{ boot_disk_controller if (boot_disk_controller is defined and boot_disk_controller) else 'lsilogicsas' }}"
+            secureboot_enabled: "{{ secureboot_enabled if (secureboot_enabled is defined and secureboot_enabled) else False }}"
+            network_adapter_type: "e1000e"
+            cdrom_controller_type: "{{ cdrom_controller_type if (cdrom_controller_type is defined and cdrom_controller_type) else 'ide' }}"
+            firmware: "{{ firmware if (firmware is defined and firmware) else 'efi' }}"
+
+        - name: "Set fact of the deploy VM test case name"
+          set_fact:
+            deploy_casename: "deploy_vm_{{ firmware }}_{{ boot_disk_controller }}_{{ network_adapter_type }}"
+
+        - name: "Set current test case log path on local machine"
+          set_fact:
+            current_test_log_folder: "{{ testrun_log_path }}/{{ ansible_play_name }}"
+        - name: "Create the current test case log folder with mode '0755'"
+          file:
+            path: "{{ current_test_log_folder }}"
+            state: directory
+            mode: '0755'
+          register: create_log_path
+        - debug: var=create_log_path
+          when: enable_debug is defined and enable_debug
+
+        # Check configured VM CPU number and cores per socket number
+        - include_tasks: check_cpu_socket.yml
+
+        # Generate unattend install iso file
+        - include_tasks: create_unattend_install_iso.yml
+          when: unattend_install_conf is defined and unattend_install_conf
+        - debug:
+            msg: "unattend_install_conf is not defined or set to a file path, will not generate unattend iso file"
+          when: unattend_install_conf is undefined or not unattend_install_conf
+
+        # Compose VM CDROMs with ISO files
+        - include_tasks: ../../linux/deploy_vm/compose_vm_cdroms.yml
+        # Check configured OS install ISO file and unattend ISO file exist
+        - include_tasks: ../../linux/deploy_vm/check_configured_cdrom_iso.yml
+
+        # Created VM is in power off state
+        - include_tasks: ../../common/vm_create.yml
+        # When firmware is EFI, configure force EFI setup once
+        - name: Enable force setup once when VM firmware is EFI and send keys to VM
+          block:
+            # Enable secureboot
+            - include_tasks: ../../common/vm_set_boot_options.yml
+              vars:
+                secure_boot_enabled_set: True
+              when: secureboot_enabled is defined and secureboot_enabled
+            - include_tasks: ../../common/vm_set_boot_options.yml
+              vars:
+                enter_bios_setup: True
+            - include_tasks: ../../common/vm_set_power_state.yml
+              vars:
+                vm_power_state_set: "powered-on"
+            - include_tasks: ../../common/vm_guest_send_key.yml
+              vars:
+                keys_send:
+                  - DOWNARROW
+                  - DOWNARROW
+                  - ENTER
+                  - ENTER
+          when: firmware is defined and firmware|lower == "efi"
+
+        # Power on VM directly when VM firmware is BIOS
+        - include_tasks: ../../common/vm_set_power_state.yml
+          vars:
+            vm_power_state_set: "powered-on"
+          when: firmware is defined and firmware|lower == "bios"
+        - name: Wait 3 minutes while OS install
+          pause:
+            minutes: 3
+
+        - include_tasks: ../../common/vm_wait_network_connected.yml
+        - include_tasks: ../../common/vm_get_ip.yml
+          vars:
+            vm_get_ip_timeout: 600
+        - include_tasks: ../utils/win_check_winrm.yml
+          vars:
+            win_check_winrm_timeout: 600
+        - name: Wait another 1 minute after OS becomes connectable
+          pause:
+            minutes: 1
+        - name: "Print VM guest IP address"
+          debug: var=vm_guest_ip
+
+        # Take screenshot of VM after guest OS install
+        - include_tasks: ../../common/vm_take_screenshot.yml
+          vars:
+            vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
+        - include_tasks: remove_unattend_install_iso.yml
+      rescue:
+        - name: "Set fact of rescue tasks required parameter"
+          set_fact:
+            rescue_take_failed_snapshot: False
+            rescue_revert_base_snapshot: False
+          when: vm_create_result is undefined or vm_create_result.failed or not vm_create_result.changed
+        - include_tasks: ../setup/rescue_cleanup.yml
+          vars:
+            current_testcase_name: "{{ ansible_play_name }}"
+            exit_testing_when_fail: True

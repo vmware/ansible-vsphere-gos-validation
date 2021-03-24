@@ -1,0 +1,59 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# This task is used for getting VMware PVSCSI driver from the
+# downloaded VMware tools installation package from this path:
+# https://packages.vmware.com/tools/releases/latest/windows
+#
+- name: Set fact of the guest OS bitness
+  set_fact:
+    win_vmtools_bit: "{{ 'amd64' if guest_id is search('64') else 'i386' }}"
+- name: Set fact of the latest VMware tools download URL
+  set_fact:
+    win_vmtools_url: "https://packages.vmware.com/tools/releases/latest/windows"
+- name: Get VMware tools ISO file URL for Windows
+  get_url:
+    url: "{{ win_vmtools_url }}"
+    dest: "{{ main_playbook_path }}/cache/windows_iso_page"
+    validate_certs: False
+  environment:
+    HTTPS_PROXY: "{{ http_proxy_localhost | default(omit) }}"
+
+- name: Get the VMware tools ISO file name
+  command: "cat {{ main_playbook_path }}/cache/windows_iso_page"
+  register: get_vmtools_iso_file_result
+- name: Set fact of the full path of VMware tools ISO URL
+  set_fact:
+    win_vmtools_iso: "{{ ((get_vmtools_iso_file_result.stdout | regex_findall('<A HREF=.*.iso'))[0].split('/')[1]) }}"
+- debug:
+    msg: "Will download VMware tools install ISO file from: {{ win_vmtools_url }}/{{ win_vmtools_iso }}, for '{{ win_vmtools_bit }}' guest"
+
+- name: Download latest VMware tools
+  get_url:
+    url: "{{ win_vmtools_url }}/{{ win_vmtools_iso }}"
+    dest: "{{ main_playbook_path }}/cache/{{ win_vmtools_iso }}"
+    validate_certs: False
+  environment:
+    HTTPS_PROXY: "{{ http_proxy_localhost | default(omit) }}"
+
+- name: Extract ISO file to get PVSCSI driver
+  iso_extract:
+    image: "{{ main_playbook_path }}/cache/{{ win_vmtools_iso }}"
+    dest: "{{ main_playbook_path }}/cache/"
+    files:
+      - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/pvscsi.cat"
+      - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/pvscsi.inf"
+      - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/pvscsi.sys"
+      - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/txtsetup.oem"
+  register: vmtools_iso_extract
+- name: Display the VMware tools ISO file extract result
+  debug: var=vmtools_iso_extract
+  when: enable_debug is defined and enable_debug
+
+- name: Set fact of the PVSCSI file path list
+  set_fact:
+    pvscsi_file_path_list:
+      - "{{ main_playbook_path }}/cache/pvscsi.cat"
+      - "{{ main_playbook_path }}/cache/pvscsi.inf"
+      - "{{ main_playbook_path }}/cache/pvscsi.sys"
+      - "{{ main_playbook_path }}/cache/txtsetup.oem"

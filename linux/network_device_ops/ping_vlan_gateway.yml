@@ -1,0 +1,17 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Ping VLAN gateway {{ vlan_gateway }}"
+  command: ping -c 1 "{{ vlan_gateway }}"
+  register: ping_gateway_result
+  failed_when: False
+  changed_when: False
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: Display the ping gateway result
+  debug: var=ping_gateway_result
+  when: enable_debug is defined and enable_debug
+
+- name: "Set fact of ping result"
+  set_fact:
+    success_ping: "{{ ping_gateway_result.rc == 0 }}"

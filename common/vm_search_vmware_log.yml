@@ -1,0 +1,47 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of default case sensitive False"
+  set_fact:
+    case_insensitive: True
+  when: case_insensitive is undefined
+
+- include_tasks: vm_get_guest_facts.yml
+
+- name: Initialize VM log path
+  set_fact:
+    vmware_log_path: ""
+
+- name: Set fact of the VM files path
+  set_fact:
+    vm_files_path: "{{ '/'.join((vm_guest_facts.instance.hw_files[0] | replace('[', '/vmfs/volumes/') | replace('] ', '/')).split('/')[:-1]) }}"
+
+- name: Set fact of the vmware.log file path
+  set_fact:
+    vmware_log_path: "{{ vm_files_path }}/vmware.log"
+- name: Display the VM vmware.log file path
+  debug: var=vmware_log_path
+
+- name: Case insensitive search
+  block:
+    - name: "Case insensitive search '{{ keyword }}' in vmware.log"
+      command: "grep -i '{{ keyword }}' {{ vmware_log_path }}"
+      delegate_to: "{{ esxi_hostname }}"
+      register: result
+
+    - name: Set fact of VM log search result
+      set_fact:
+        vmware_log_search: "{{ result.stdout }}"
+  when: case_insensitive
+
+- name: Case sensitive search
+  block:
+    - name: "Case sensitive search '{{ keyword }}' in vmware.log"
+      command: "grep '{{ keyword }}' {{ vmware_log_path }}"
+      delegate_to: "{{ esxi_hostname }}"
+      register: result
+
+    - name: Set fact of VM log search result
+      set_fact:
+        vmware_log_search: "{{ result.stdout }}"
+  when: not case_insensitive

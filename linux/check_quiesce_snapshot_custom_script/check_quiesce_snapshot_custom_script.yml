@@ -1,0 +1,197 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check taking quiesce snapshot on VM through VMware tools.
+# When VMware tools is not installed or not running in VM, this test case result is 'No Run'.
+#
+- name: check_quiesce_snapshot_custom_script
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../utils/test_setup.yml
+          vars:
+            vmtools_check: "True"
+
+        - name: "Check quiesce snapshot with custom scripts"
+          block:
+            # Copy vss_script_sh.sh to /etc/vmware-tools/backupScripts.d/vss_script_sh.sh
+            - name: Create backup script dir under /etc/vmware-tools
+              file:
+                path: /etc/vmware-tools/backupScripts.d
+                state: directory
+                mode: 0755
+              delegate_to: "{{ vm_guest_ip }}"
+
+            - name: Copy custom script vss_script_sh.sh
+              copy:
+                src: vss_script_sh.sh
+                dest: /etc/vmware-tools/backupScripts.d/vss_script_sh.sh
+                mode: 0755
+              delegate_to: "{{ vm_guest_ip }}"
+
+            # Copy pre-freeze-script and post-thaw-script to /usr/sbin/
+            - name: Copy custom script pre-freeze-script and post-thaw-script to /usr/sbin
+              copy:
+                src: "{{ item }}"
+                dest: "/usr/sbin/{{ item }}"
+                mode: 0755
+              with_items:
+                - pre-freeze-script
+                - post-thaw-script
+              delegate_to: "{{ vm_guest_ip }}"
+              when:
+                - guest_os_ansible_distribution != 'Flatcar'
+
+            # Ensure /vss.log is absent
+            - name: Remove /vss.log if it exists
+              file:
+                path: /vss.log
+                state: absent
+              delegate_to: "{{ vm_guest_ip }}"
+
+            # Take quiesce snapshot
+            - name: Set quiesce snapshot variables
+              set_fact:
+                qs_snapshot_name: "quiesce_snapshot_{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
+                vss_stat: ""
+                vss_content: ""
+
+            - include_tasks: ../../common/vm_take_snapshot.yml
+              vars:
+                snapshot_name: "{{ qs_snapshot_name }}"
+                is_quiesce: "yes"
+                dump_memory: "no"
+
+            # After snapshot is taken, check log file /vss.log in guest, which should have below contents:
+            # /usr/sbin/pre-freeze-script freeze
+            # /etc/vmware-tools/backupScripts.d/vss_script_sh.sh freeze
+            # /etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw
+            # /usr/sbin/post-thaw-script thaw
+            - name: Check /vss.log existence
+              stat:
+                path: /vss.log
+              register: vss_stat
+              delegate_to: "{{ vm_guest_ip }}"
+
+            - name: Get file content in /vss.log
+              shell: cat /vss.log
+              register: vss_content
+              delegate_to: "{{ vm_guest_ip }}"
+              when:
+                - "'exists' in vss_stat.stat"
+                - vss_stat.stat.exists
+
+            # Remove quiesce snapshot
+            - include_tasks: ../../common/vm_remove_snapshot.yml
+              vars:
+                snapshot_name: "{{ qs_snapshot_name }}"
+
+            # Test case passed for non-Flatcar guest
+            - include_tasks: ../../common/print_test_result.yml
+              vars:
+                test_result: "Passed"
+              when:
+                - guest_os_ansible_distribution != 'Flatcar'
+                - vss_content
+                - vss_content.stdout_lines is defined
+                - vss_content.stdout_lines | length == 4
+                - vss_content.stdout_lines[0] == "/usr/sbin/pre-freeze-script freeze"
+                - vss_content.stdout_lines[1] == "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh freeze"
+                - vss_content.stdout_lines[2] == "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw"
+                - vss_content.stdout_lines[3] == "/usr/sbin/post-thaw-script thaw"
+
+            # Test passed for Flatcar guest
+            - include_tasks: ../../common/print_test_result.yml
+              vars:
+                test_result: "Passed"
+              when:
+                - guest_os_ansible_distribution == 'Flatcar'
+                - vss_content
+                - vss_content.stdout_lines is defined
+                - vss_content.stdout_lines | length == 2
+                - vss_content.stdout_lines[0] == "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh freeze"
+                - vss_content.stdout_lines[1] == "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw"
+
+            # Test failed for non-Flatcar guest
+            - block:
+                - include_tasks: ../../common/print_test_result.yml
+                  vars:
+                    test_result: "Failed"
+                - include_tasks: ../../common/print_error_msg.yml
+                  vars:
+                    error_msg: "/vss.log doesn't exist after quiesce snapshot"
+                  when:
+                    - "'exists' in vss_stat.stat"
+                    - not vss_stat.stat.exists
+
+                - include_tasks: ../../common/print_error_msg.yml
+                  vars:
+                    error_msg: "/vss.log has incorrect content"
+                  when:
+                    - "'exists' in vss_stat.stat"
+                    - vss_stat.stat.exists
+
+                - include_tasks: ../../common/vm_guest_file_operation.yml
+                  vars:
+                    operation: "fetch_file"
+                    src_path: "/vss.log"
+                    dest_path: "{{ testcase_info_collect_path }}/vss.log"
+                  when:
+                    - "'exists' in vss_stat.stat"
+                    - vss_stat.stat.exists
+              when: guest_os_ansible_distribution != 'Flatcar' and
+                  (( not vss_content ) or
+                  ( vss_content.stdout_lines is undefined ) or
+                  ( vss_content.stdout_lines | length != 4 ) or
+                  ( vss_content.stdout_lines[0] != "/usr/sbin/pre-freeze-script freeze" ) or
+                  ( vss_content.stdout_lines[1] != "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh freeze" ) or
+                  ( vss_content.stdout_lines[2] != "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw" ) or
+                  ( vss_content.stdout_lines[3] != "/usr/sbin/post-thaw-script thaw" ))
+
+            # Test failed for Flatcar guest
+            - block:
+                - include_tasks: ../../common/print_test_result.yml
+                  vars:
+                    test_result: "Failed"
+
+                - include_tasks: ../../common/print_error_msg.yml
+                  vars:
+                    error_msg: "/vss.log doesn't exist after quiesce snapshot"
+                  when:
+                    - "'exists' in vss_stat.stat"
+                    - not vss_stat.stat.exists
+
+                - include_tasks: ../../common/print_error_msg.yml
+                  vars:
+                    error_msg: "/vss.log has incorrect content"
+                  when:
+                    - "'exists' in vss_stat.stat"
+                    - vss_stat.stat.exists
+
+                - include_tasks: ../../common/vm_guest_file_operation.yml
+                  vars:
+                    operation: "fetch_file"
+                    src_path: "/vss.log"
+                    dest_path: "{{ testcase_info_collect_path }}/vss.log"
+                  when:
+                    - "'exists' in vss_stat.stat"
+                    - vss_stat.stat.exists
+              when: guest_os_ansible_distribution == 'Flatcar' and
+                 (( not vss_content ) or
+                 ( vss_content.stdout_lines is undefined ) or
+                 ( vss_content.stdout_lines | length != 2 ) or
+                 ( vss_content.stdout_lines[0] != "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh freeze") or
+                 ( vss_content.stdout_lines[1] != "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw" ))
+          when: vmtools_is_running is defined and vmtools_is_running
+
+        # Skip this case when VMware tools is not running
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "No Run"
+          when: not vmtools_is_running
+
+      rescue:
+        - include_tasks: ../utils/test_rescue.yml

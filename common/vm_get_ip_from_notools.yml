@@ -1,0 +1,40 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VM IP address when there is no VMware tools installed in VM
+- name: "Initialize VM world ID and VM IP address for '{{ vm_name }}'"
+  set_fact:
+    vm_world_id: ""
+    vm_guest_ip: ""
+    vm_guest_all_ipv4: []
+
+# Enable guest IP hack on ESXi server
+- name: "Enable VM IP hack on ESXi host"
+  include_tasks: esxi_enable_guest_ip_hack.yml
+
+- name: "Get VM world ID firstly"
+  include_tasks: vm_get_world_id.yml
+
+# When not get vm_world_id and VM original power status is power on,
+# power off and power on VM to try again
+- block:
+    - include_tasks: vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-off'
+    - include_tasks: vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-on'
+    - include_tasks: vm_get_world_id.yml
+  when: not vm_world_id
+
+# Fail after VM power off and power on still not get vm world ID
+- name: "Fail when not get VM world ID on ESXi host"
+  assert:
+    that:
+      - vm_world_id
+    fail_msg: "Failed to get VM world ID after power off and power on VM."
+
+# Get VM IP address via esxcli command by VM world ID
+- include_tasks: vm_get_ip_esxcli.yml
+- name: Display the VM IP address got via esxcli command
+  debug: var=vm_guest_ip

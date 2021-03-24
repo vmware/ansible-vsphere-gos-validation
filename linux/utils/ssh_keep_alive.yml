@@ -1,0 +1,22 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+#Parameter:
+# Modify sshd config to keep connection alive
+- name: Set TCPKeepAlive=yes in /etc/ssh/sshd_config
+  replace:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?TCPKeepAlive .*"
+    replace: "TCPKeepAlive yes"
+  register: replacement
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Restart sshd service"
+  service:
+    name: sshd
+    state: restarted
+  register: restart_sshd_result
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Service restart result"
+  debug: var=restart_sshd_result

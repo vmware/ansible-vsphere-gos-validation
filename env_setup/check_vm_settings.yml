@@ -1,0 +1,27 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check VM's settings which shall be supported by newgos_testing
+# All VM network adapters should be in different vswitch port groups.
+- include_tasks: ../common/vm_get_guest_facts.yml
+
+# Check existing VM network settings
+- block:
+    - name: "Get all VM network adapters"
+      set_fact:
+        vm_hw_interfaces: "{{ vm_guest_facts.instance.hw_interfaces }}"
+
+    - name: "Initialize VM port groups"
+      set_fact:
+        vm_portgroups: []
+
+    - name: "Get VM port groups"
+      set_fact:
+        vm_portgroups: "{{ vm_portgroups | union([vm_guest_facts['instance']['hw_%s'|format(item)].summary]) }}"
+      with_items: "{{ vm_guest_facts.instance.hw_interfaces }}"
+
+    - name: "Assert VM network adapters are in different port groups"
+      assert:
+        that:
+          - vm_hw_interfaces | length == vm_portgroups | length
+        fail_msg: "Two or more VM network adapters are in same port group, which is not supported."

@@ -1,0 +1,33 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get Ethernet IP address info dict in Windows guest OS
+- name: Get Ethernet name list in Windows guest
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-NetAdapter | where-object {$_.Name -notmatch 'vEthernet'}).Name"
+
+- name: Set fact of the Ethernet name list
+  set_fact:
+    ethernet_name_list: "{{ win_powershell_cmd_output.stdout_lines }}"
+- debug:
+    msg: "Get Ethernet name list in guest OS: {{ ethernet_name_list }}"
+
+- block:
+    - name: Initialize the Ethernet IP dict
+      set_fact:
+        ethernet_ip_dict: {}
+    - include_tasks: win_get_ethernet_ip.yml
+      vars:
+        win_get_ethernet_guest_ip: "{{ win_get_ethernet_dict_guest_ip }}"
+      with_items: "{{ ethernet_name_list }}"
+      loop_control:
+        loop_var: ethernet_name
+    - debug:
+        msg: "Get Ethernet info dict in guest OS: {{ ethernet_ip_dict | to_yaml }}"
+  when: ethernet_name_list | length != 0
+
+- name: Check Ethernet name list
+  fail:
+    msg: "Not get network adapter name in guest OS"
+  when: ethernet_name_list | length == 0

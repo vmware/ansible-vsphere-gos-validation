@@ -1,0 +1,25 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Replace matched line or insert line in the file
+# Parameter:
+#   file: The file path on VM
+#   reg_exp: The regular expression to look for and replace in every line
+#   line_content: The line content
+#   insert_before (optional): The line will be inserted before the first match of this regular expression
+#   insert_after (optional): The line will be inserted after the last match of this regular expression
+#
+- name: "Set '{{ line_content }}' in '{{ file }}'"
+  lineinfile:
+    path: "{{ file }}"
+    regexp: "{{ reg_exp | default(omit) }}"
+    line: "{{ line_content }}"
+    insertbefore: "{{ insert_before | default(omit) }}"
+    insertafter: "{{ insert_after | default(omit) }}"
+    state: present
+  delegate_to: "{{ vm_guest_ip }}"
+  register: replace_line_result
+
+- name: Display the result of line in file changing
+  debug: var=replace_line_result
+  when: enable_debug is defined and enable_debug

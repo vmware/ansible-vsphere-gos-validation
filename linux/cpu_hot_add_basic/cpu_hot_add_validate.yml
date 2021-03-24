@@ -1,0 +1,44 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VM vCPU number
+- include_tasks: ../../common/vm_get_guest_facts.yml
+
+- name: Set fact of the vCPU number before hotadd
+  set_fact:
+    vcpu_before_hotadd: "{{ vm_guest_facts.instance.hw_processor_count }}"
+
+- name: Set fact of the vCPU number after hotadd
+  set_fact:
+    vcpu_after_hotadd: "{{ (vcpu_before_hotadd | int) + ( hotadd_num | int) }}"
+
+- debug:
+    msg: "After hotadd {{ hotadd_num }} vCPU, VM vCPU number would exceeds {{ max_num_cpus }} vCPU, so end test"
+  when: vcpu_after_hotadd | int > max_num_cpus | int
+
+- name: "Hotadd '{{ hotadd_num }}' vCPUs to {{ vm_name }}"
+  block:
+    # Set VM vCPU number
+    - include_tasks: ../../common/vm_set_cpu_number.yml
+      vars:
+        num_cpus: "{{ vcpu_after_hotadd }}"
+    # Check VM connection is not broken and ensure guest not crash after hotadd
+    - name: "Pause 5 seconds then check VM connection"
+      pause:
+        seconds: 5
+    - include_tasks: ../../common/vm_wait_connection.yml
+      vars:
+        vm_wait_connection_timeout: 20
+    # Get CPU number in guest OS
+    - include_tasks: ../utils/wait_for_cpus_online.yml
+      vars:
+        num_cpus: "{{ vcpu_after_hotadd }}"
+    - include_tasks: ../utils/get_cpu_info.yml
+    # Valiate CPU number in guest is equal to VM config
+    - name: Assert CPU number in guest OS is equal to VM config
+      assert:
+        that:
+          - vm_guest_facts.instance.hw_processor_count | int == guest_cpu_num | int
+        fail_msg: "Hot adding {{ hotadd_num }} CPU failed on {{ vm_name }}. VM vCPU number increased from {{ vcpu_before_hotadd }} to {{ vcpu_after_hotadd }}. But {{ guest_cpu_num }} was detected in guest"
+        success_msg: "VM vCPU number increased from '{{ vcpu_before_hotadd }}' to '{{ vcpu_after_hotadd }}' after hotadd operation"
+  when: vcpu_after_hotadd | int <= max_num_cpus | int

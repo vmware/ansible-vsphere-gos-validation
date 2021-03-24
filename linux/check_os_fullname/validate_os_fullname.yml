@@ -1,0 +1,29 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Wait VMware tools to report Guest OS fullname
+- include_tasks: ../../common/vm_wait_guest_fullname.yml
+
+- block:
+    - name: "Assert Guest OS fullname is either {{ guest_fullname[0] }} or {{ guest_fullname[1] }}"
+      assert:
+        that:
+          - vm_guest_facts.instance.hw_guest_full_name in guest_fullname
+        fail_msg: >
+                "VM '{{ vm_name }}' guest OS fullname is: '{{ vm_guest_facts.instance.hw_guest_full_name }}',
+                not expected '{{ guest_fullname[0] }}' or '{{ guest_fullname[1] }}'"
+  when:
+    - guest_fullname is sequence
+    - guest_fullname | length == 2
+
+- block:
+    - name: "Assert Guest OS fullname is {{ guest_fullname }}"
+      assert:
+        that:
+          - vm_guest_facts.instance.hw_guest_full_name == guest_fullname
+        fail_msg: "VM '{{ vm_name }}' guest OS fullname is: '{{ vm_guest_facts.instance.hw_guest_full_name }}', not expected '{{ guest_fullname }}'"
+  when: guest_fullname is string
+
+- include_tasks: ../../common/print_test_result.yml
+  vars:
+    test_result: "Passed"

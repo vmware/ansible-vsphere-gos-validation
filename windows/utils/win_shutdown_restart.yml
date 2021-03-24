@@ -1,0 +1,43 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Shutdown or restart Windows guest OS
+# Parameters:
+#   set_win_power_state: specify the power operation, "shutdown" or "restart"
+#
+- name: Shutdown guest OS inside OS
+  raw: 'stop-computer -Force'
+  when: set_win_power_state == "shutdown"
+  ignore_errors: yes
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: Restart guest OS inside OS
+  win_reboot:
+  when: set_win_power_state == "restart"
+  register: restart_guest_os
+  ignore_errors: yes
+  delegate_to: "{{ vm_guest_ip }}"
+- name: Display the win_reboot result
+  debug: var=restart_guest_os
+  when: enable_debug is defined and enable_debug
+
+- name: Set fact of the expected status
+  set_fact:
+    expected_power_state: "poweredOff"
+  when: set_win_power_state == "shutdown"
+- name: Set fact of the expected status
+  set_fact:
+    expected_power_state: "poweredOn"
+  when: set_win_power_state == "restart"
+
+- name: "Wait 10 seconds to before checking power status"
+  pause:
+    seconds: 10
+
+- include_tasks: ../../common/vm_wait_power_state.yml
+  vars:
+    expected_power_status: "{{ expected_power_state }}"
+
+- name: Check winrm connectable after OS restart
+  include_tasks: win_check_winrm.yml
+  when: set_win_power_state == "restart"

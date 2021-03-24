@@ -1,0 +1,120 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Add official online package repository
+- block:
+    - name: "Set BaseOS repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
+      set_fact:
+        online_repos:
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}"
+            baseurl: "http://mirror.centos.org/$contentdir/$releasever/os/$basearch"
+            mirrorlist: "http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=os&infra=$infra"
+            gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7"
+      when: guest_os_ansible_distribution_major_ver | int < 8
+
+    - name: "Set BaseOS and AppStream repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
+      set_fact:
+        online_repos:
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
+            baseurl: "http://mirror.centos.org/$contentdir/$releasever/BaseOS/$basearch/os/"
+            mirrorlist: "http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=BaseOS&infra=$infra"
+            gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
+            baseurl: "http://mirror.centos.org/$contentdir/$releasever/AppStream/$basearch/os/"
+            mirrorlist: "http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=AppStream&infra=$infra"
+            gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
+      when: guest_os_ansible_distribution_major_ver | int >= 8
+
+    - include_tasks: add_repo_from_baseurl.yml
+      vars:
+        repo_name: "{{ online_repo.name }}"
+        repo_baseurl: "{{ online_repo.baseurl }}"
+        repo_mirrorlist: "{{ online_repo.mirrorlist }}"
+        gpg_check: True
+        gpg_key_path: "{{ online_repo.gpg_key_path }}"
+      with_list: "{{ online_repos }}"
+      loop_control:
+        loop_var: "online_repo"
+  when: guest_os_ansible_distribution == "CentOS"
+
+- block:
+    - name: "Set default online repository for OracleLinux {{ guest_os_ansible_distribution_ver }}"
+      set_fact:
+        online_repos:
+          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_u{{ guest_os_ansible_distribution_minor_ver }}_base"
+            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL7/{{ guest_os_ansible_distribution_minor_ver | int }}/base/$basearch/"
+          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_UEKR3"
+            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL7/UEKR3/$basearch/"
+          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_UEKR4"
+            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL7/UEKR4/$basearch/"
+          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_UEKR5"
+            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL7/UEKR5/$basearch/"
+          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_UEKR6"
+            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL7/UEKR6/$basearch/"
+      when: guest_os_ansible_distribution_major_ver | int < 8
+
+    - name: "Set default online repository for OracleLinux {{ guest_os_ansible_distribution_ver }}"
+      set_fact:
+        online_repos:
+          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_u{{ guest_os_ansible_distribution_minor_ver }}_BaseOS"
+            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL8/{{ guest_os_ansible_distribution_minor_ver | int }}/baseos/base//$basearch/"
+          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_AppStream"
+            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL8/appstream/$basearch/"
+          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_UEKR6"
+            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL8/UEKR6/$basearch/"
+      when: guest_os_ansible_distribution_major_ver | int >= 8
+
+    - include_tasks: add_repo_from_baseurl.yml
+      vars:
+        repo_name: "{{ online_repo.name }}"
+        repo_baseurl: "{{ online_repo.baseurl }}"
+        gpg_check: True
+      with_list: "{{ online_repos }}"
+      loop_control:
+        loop_var: "online_repo"
+  when: guest_os_ansible_distribution == "OracleLinux"
+
+- block:
+    - name: "Set the APT source for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_release }}"
+      set_fact:
+        apt_sources:
+          - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }} main restricted"
+          - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }}-updates main restricted"
+      when: guest_os_ansible_distribution == "Ubuntu"
+
+    - name: "Set the APT source for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_release }}"
+      set_fact:
+        apt_sources:
+          - "deb http://deb.debian.org/debian/ {{ guest_os_ansible_distribution_release }} main contrib"
+      when: guest_os_ansible_distribution == "Debian"
+
+    - include_tasks: replace_or_add_line_in_file.yml
+      vars:
+        file: "/etc/apt/sources.list"
+        reg_exp: "{{ apt_source }}"
+        line_content: "{{ apt_source }}"
+      with_list: "{{ apt_sources }}"
+      loop_control:
+        loop_var: "apt_source"
+  when: guest_os_ansible_distribution in ["Ubuntu", "Debian"]
+
+# Enable photon.repo, photon-release.repo and photon-updates.repo
+- block:
+    - name: "Set the fact of Photon OS {{ guest_os_ansible_distribution_major_ver }} online repos"
+      set_fact:
+        photon_online_repos: ["photon", "photon-updates"]
+      when: guest_os_ansible_distribution_major_ver | int < 4
+
+    - name: "Set the fact of Photon OS {{ guest_os_ansible_distribution_major_ver }} online repos"
+      set_fact:
+        photon_online_repos: ["photon", "photon-release", "photon-updates"]
+      when: guest_os_ansible_distribution_major_ver | int >= 4
+
+    - include_tasks: ../../common/update_ini_style_file.yml
+      vars:
+        file_path: "/etc/yum.repos.d/{{ item }}.repo"
+        section_name: "{{ item }}"
+        option_name: "enabled"
+        option_value: 1
+      with_items: "{{ photon_online_repos }}"
+  when: guest_os_ansible_distribution == 'VMware Photon OS'

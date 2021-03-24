@@ -1,0 +1,109 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Reset deploy_casename in case user doesn't provide correct guest_id
+- name: "Set fact of the deploy VM test case name"
+  set_fact:
+    deploy_casename: "deploy_amazonlinux_ova"
+
+# Get ESXi version
+- include_tasks: ../../../common/esxi_get_version_build.yml
+  when: esxi_version is undefined or esxi_version == 'N/A'
+
+- name: "Set fact of the ESXi version"
+  set_fact:
+    esxi_version_num: "{{ esxi_version | regex_replace('\\.','') | int }}"
+
+# Amazon Linux OVA is using other3xlinux64 as guest id
+# amazonlinux2_64 is added in 6.7U1 (HWv14)
+# amazonlinux3_64 is added in 7.0U1 (HWv18)
+- include_tasks: ../../../common/vm_set_guest_id.yml
+  vars:
+    vm_guest_id: "{{ guest_id }}"
+  when:
+    - guest_id == 'amazonlinux2_64Guest'
+    - ova_hw_guest_id != guest_id
+    - esxi_version_num | int > 670 or (esxi_version_num | int == 670 and esxi_update_version | int > 0)
+    - vm_hw_version | int >= 14
+
+- include_tasks: ../../../common/vm_set_guest_id.yml
+  vars:
+    vm_guest_id: "{{ guest_id }}"
+  when:
+    - guest_id == 'amazonlinux3_64Guest'
+    - ova_hw_guest_id != guest_id
+    - vm_hw_version | int >= 18
+
+# Get VM path on ESXi datastore
+- include_tasks: ../../../common/vm_get_config.yml
+  vars:
+      property_list: ['config.files.logDirectory']
+
+- name: "Set VM file path"
+  set_fact:
+    vm_path: "{{ vm_config.config.files.logDirectory | replace('[', '/vmfs/volumes/') | replace('] ', '/') }}"
+
+- debug: var=vm_path
+
+# Create the seed.iso to modify login information
+- include_tasks: ../../utils/create_seed_iso.yml
+  vars:
+    user_data_template: "amazon-user-data.j2"
+    local_hostname: "amazon-{{ ansible_date_time.epoch }}"
+
+# Upload seed.iso to VM path on ESXi server
+- name: "Copy {{ seed_iso_path }} to VM folder"
+  copy:
+    src: "{{ seed_iso_path }}"
+    dest: "{{ vm_path }}/{{ seed_iso_path | basename }}"
+    force: yes
+    mode: 0755
+  delegate_to: "{{ esxi_hostname }}"
+
+# Attach seed.iso to Amazon Linux VM
+- name: "Set fact of seed ISO path"
+  set_fact:
+    cdrom_seed_iso: "{{ vm_config.config.files.logDirectory }}/{{ seed_iso_path | basename }}"
+
+- include_tasks: ../../../common/vm_configure_cdrom.yml
+  vars:
+    cdrom_type: iso
+    cdrom_iso_file: "{{ cdrom_seed_iso }}"
+    cdrom_controller_num: 0
+    cdrom_unit_num: 0
+
+# Power on VM to update login information
+- include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-on'
+# Skip to check guest full name here because we will check it
+# in TD1 case
+- include_tasks: ../../../common/vm_wait_guest_fullname.yml
+
+# Get guest ip
+- include_tasks: ../../../common/update_inventory.yml
+  vars:
+    update_inventory_timeout: 300
+
+# Post configuration for ssh, cloud-init and vmtools
+- include_tasks: amazon_post_config.yml
+
+# Eject seed.iso from guest
+- name: "Eject seed.iso from Amazon Linux"
+  include_tasks: ../../utils/eject_cdrom_in_guest.yml
+  vars:
+    guest_cdrom_device_num: 0
+
+# Disconnect seed.iso from Amazon Linux VM
+- name: "Change VM's CD/DVD Drive 1 to client device"
+  include_tasks: ../../../common/vm_configure_cdrom.yml
+  vars:
+    cdrom_type: client
+    cdrom_controller_num: 0
+    cdrom_unit_num: 0
+
+# Remove temporary folders
+- name: "Remove temporary directory {{ tmp_seed_dir }}"
+  include_tasks: ../../../common/delete_local_file.yml
+  vars:
+    local_path: "{{ tmp_seed_dir }}"

@@ -1,0 +1,22 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Eject CDROM of unattend install ISO in guest OS
+- include_tasks: ../utils/eject_cdrom_in_guest.yml
+  vars:
+    guest_cdrom_device_num: "{{ os_install_iso_list_len|int -1 }}"
+# Change CDROM type from iso to client
+- include_tasks: ../../common/vm_configure_cdrom.yml
+  vars:
+    cdrom_type: client
+    cdrom_controller_type: "{{ new_vm_cdrom_ctl_type }}"
+    cdrom_controller_num: "{{ unattend_iso_cdrom_ctl_num | int }}"
+    cdrom_unit_num: "{{ unattend_iso_cdrom_unit_num | int }}"
+    cdrom_state: present
+# Delete unattend install iso on ESXi datastore
+- include_tasks: ../../common/esxi_check_delete_datastore_file.yml
+  vars:
+    file_in_datastore: "{{ datastore }}"
+    file_in_datastore_path: "{{ unattend_iso_file_name }}"
+    file_in_datastore_ops: "absent"
+    file_in_datastore_ignore_failed: False

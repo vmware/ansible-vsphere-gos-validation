@@ -1,0 +1,30 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check hotadd and hot remove vmxnet3
+# network adapter to VM. The test result will be 'No Run' if VMware
+# tools is not installed or not running.
+#
+- name: vmxnet3_network_device_ops
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - name: Set fact of the network adapter type
+      set_fact:
+        nic_type: 'VMXNET3'
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+        - name: Add vmxnet3 network adapter to VM and verify status
+          include_tasks: network_adapter_deviceops.yml
+          when: vmtools_is_installed and vmtools_is_running
+
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed }}, and running: {{ vmtools_is_running }}"
+          when: not vmtools_is_installed or not vmtools_is_running
+      rescue:
+        - include_tasks: ../setup/rescue_cleanup.yml
+          vars:
+            current_testcase_name: "{{ ansible_play_name }}"

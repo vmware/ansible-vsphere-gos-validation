@@ -1,0 +1,150 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Will skip this test case when below requirements not meet:
+# 1. vCenter server is configured, by default in vars/test.yml,
+# 2. VMware tools is installed and running in VM, for cloud-init GOSC VMware tools is installed as open-vm-tools,
+# 3. For cloud-init GOSC, cloud-init is installed or can be installed in guest OS with version higher than 18.5,
+# 4. Guest OS is not in the not support GOSC list.
+#
+- block:
+    - name: "Set cloud-init workflow flag"
+      set_fact:
+        enable_cloudinit_gosc: "{% if gosc_workflow  == 'cloud-init' %}True{% else %}False{% endif %}"
+
+    - name: "Set default guest OS list not support GOSC"
+      set_fact:
+        gos_not_support_gosc: ["FreeBSD", "Flatcar", "Debian", "SLED"]
+
+    - include_tasks: ../utils/test_setup.yml
+      vars:
+        vmtools_check: "True"
+
+    - name: "Skip test case if guest OS status not meet GOSC requirements"
+      block:
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "No Run"
+        - meta: end_play
+      when: >
+        (vcenter_is_defined is undefined) or
+        (not vcenter_is_defined) or
+        (not vmtools_is_running) or
+        (enable_cloudinit_gosc and not vmtools_is_ovt) or
+        ((guest_os_ansible_distribution is defined) and
+        (guest_os_ansible_distribution in gos_not_support_gosc))
+
+    # Traditional GOSC in Photon OS is implemented with cloud-init,
+    # so will upgrade cloud-init to the latest version in Photon OS
+    - include_tasks: ../utils/install_uninstall_package.yml
+      vars:
+        package_name: "cloud-init"
+        package_state: "latest"
+        update_cache: True
+      when: guest_os_ansible_distribution == "VMware Photon OS"
+
+    # Install perl if guest OS doesn't have it
+    - block:
+        - name: "Check perl existence"
+          command: "which perl"
+          failed_when: False
+          register: which_perl_result
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - include_tasks: ../utils/install_uninstall_package.yml
+          vars:
+            package_name: "perl"
+            package_state: "latest"
+            update_cache: True
+          when:
+            - which_perl_result.rc is undefined or which_perl_result.rc != 0
+            - guest_os_ansible_distribution_major_ver | int == 7
+
+        - include_tasks: ../utils/install_uninstall_package.yml
+          vars:
+            package_name: "perl-interpreter"
+            package_state: "latest"
+            update_cache: True
+          when:
+            - which_perl_result.rc is undefined or which_perl_result.rc != 0
+            - guest_os_ansible_distribution_major_ver | int >= 8
+      when:
+        - not enable_cloudinit_gosc | bool
+        - guest_os_ansible_distribution in ['RedHat', 'CentOS', 'OracleLinux']
+
+    # Check cloud-init version for cloud-init gosc workflow
+    - include_tasks: ../utils/cloudinit_pkg_check.yml
+
+    # Skip cloud-init GOSC if cloud-init version is lower than 18.5
+    - block:
+        - include_tasks: ../../common/print_error_msg.yml
+          vars:
+            error_msg: >
+              "The guest OS doesn't have cloud-init (> 18.5) installed.
+              Skip to run this test case."
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "No Run"
+        - meta: end_play
+      when:
+        - enable_cloudinit_gosc
+        - (not cloudinit_version) or (cloudinit_version is version('18.5', '<='))
+
+    # Initialize the GOSC spec
+    - name: Initialize the GOS customization spec
+      set_fact:
+        linux_gosc_spec: {'domain': 'gosc.test.com', 'timezone': "Europe/Berlin", 'dns_suffix': ["test.com", "gosc.test.com"]}
+
+    # Add network settings for static IP guest customization
+    - name: "Set GOS customization spec of static IP"
+      set_fact:
+        linux_gosc_spec: "{{ linux_gosc_spec | combine(item) }}"
+      loop:
+        - {'network': "{{ portgroup_name }}"}
+        - {'ip': "192.168.1.101"}
+        - {'netmask': "255.255.255.0"}
+        - {'gateway': "192.168.1.1"}
+        - {'dns_servers': ["192.168.1.1", "192.168.1.2"]}
+        - {'hostname': "gosc-static-vm-01"}
+        - {'hwclockUTC': False}
+      when: ip_assignment == "static"
+
+    # Add network settings for DHCP guest customization
+    - name: "Set GOS customization spec of DHCP IP"
+      set_fact:
+        linux_gosc_spec: "{{ linux_gosc_spec | combine(item) }}"
+      loop:
+        - {'network': "{{ gosc_dhcp_network | default('VM Network') }}"}
+        - {'dns_servers': ["10.10.1.1", "10.10.1.2"]}
+        - {'hostname': "gosc-dhcp-vm-01"}
+        - {'hwclockUTC': True}
+      when: ip_assignment == "dhcp"
+
+    # Get the linked file name in guest OS,
+    # e.g., in SLES 15 /etc/resolv.conf is a link file
+    - include_tasks: ../utils/get_file_real_path.yml
+      vars:
+        src_file: "/etc/resolv.conf"
+    - name: "Save the real path and file name of /etc/resolv.conf"
+      set_fact:
+        resolv_conf_file: "{{ file_real_path }}"
+
+    # Get DNS server info before GOSC
+    - include_tasks: ../utils/get_system_dns.yml
+    - name: "Set fact of the DNS servers in /etc/resolv.conf before GOSC"
+      set_fact:
+        dns_servers_before_gosc: "{{ dns_servers }}"
+    - debug:
+        msg: "DNS servers before GOSC: {{ dns_servers_before_gosc }}"
+
+    # Modify cloud-init GOSC config in guest OS
+    - include_tasks: ../utils/enable_disable_cloudinit_cfg.yml
+    # Get netplan config file for Ubuntu server
+    - include_tasks: ../utils/get_netplan_config_file.yml
+    # Execute guest customization on VM
+    - include_tasks: linux_gosc_start.yml
+    # Check guest customization results
+    - include_tasks: linux_gosc_verify.yml
+
+  rescue:
+    - include_tasks: ../utils/test_rescue.yml

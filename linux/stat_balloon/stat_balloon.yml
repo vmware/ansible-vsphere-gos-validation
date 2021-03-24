@@ -1,0 +1,50 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check 'vmware-toolbox-cmd' command can display
+# the amount of memory that is currently reclaimed from the VM through ballooning.
+# Here the checked value is 0 MB, but it can be the real value according to specific situation.
+# If VMware Tools is not installed or not running, then this test case result will be "No Run".
+#
+- name: stat_balloon
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../utils/test_setup.yml
+          vars:
+            vmtools_check: "True"
+
+        - block:
+            - include_tasks: ../../common/print_error_msg.yml
+              vars:
+                error_msg: "VMware tools is not installed or not running."
+            - include_tasks: ../../common/print_test_result.yml
+              vars:
+                test_result: "No Run"
+          when: not vmtools_is_running
+
+        - block:
+            - include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
+            - name: "Stat balloon on {{ vm_name }}"
+              shell: "{{ vmware_toolbox_cmd_path }} stat balloon"
+              register: stat_balloon_result
+              delegate_to: "{{ vm_guest_ip }}"
+            - debug:
+                msg: "Got balloon size: {{ stat_balloon_result.stdout }}"
+
+            - name: "Check balloon size is 0 MB"
+              assert:
+                that:
+                  - stat_balloon_result.stdout == "0 MB"
+                fail_msg: "Balloon size got from vmware-toolbox-cmd is not 0 MB."
+                success_msg: "Balloon size got from vmware-toolbox-cmd is 0 MB."
+            - include_tasks: ../../common/print_test_result.yml
+              vars:
+                test_result: "Passed"
+          when: vmtools_is_running
+
+      rescue:
+        - include_tasks: ../utils/test_rescue.yml

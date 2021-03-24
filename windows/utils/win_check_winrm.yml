@@ -1,0 +1,28 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check winrm connectable in given guest OS
+- block:
+    - name: Check winrm connectable in guest OS
+      wait_for:
+        host: "{{ vm_guest_ip }}"
+        port: "{{ guest_os_winrm_port | default(5986) }}"
+        delay: 1
+        sleep: 5
+        timeout: "{{ win_check_winrm_timeout | default(300) }}"
+      register: check_winrm_result
+      ignore_errors: True
+    
+    - name: Display the check winrm result
+      debug: var=check_winrm_result
+      when: enable_debug is defined and enable_debug
+  when: vm_guest_ip is defined and vm_guest_ip
+
+- block:
+    - include_tasks: ../../common/vm_take_screenshot.yml
+      vars:
+        vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
+    - name: Check VM guest IP and winrm connectable result
+      fail:
+        msg: "vm_guest_ip is not defined or vm_guest_ip is empty, or not winrm not connectable."
+  when: vm_guest_ip is undefined or not vm_guest_ip or check_winrm_result.failed

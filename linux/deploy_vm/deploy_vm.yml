@@ -1,0 +1,32 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: deploy_vm
+  hosts: localhost
+  collections:
+    - community.general
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - name: "Check variable new_vm is set to True"
+          debug:
+            msg: "The variable new_vm is not defined or is set to False, so set test result to 'No Run'"
+
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "No Run"
+        - meta: end_play
+      when: new_vm is undefined or (new_vm is defined and not new_vm|bool)
+
+    # Deploy VM by creating a new VM and install OS from ISO image on it
+    - include_tasks: deploy_vm_from_iso.yml
+      when: (vm_deploy_method is undefined) or (vm_deploy_method == "iso")
+
+    # Deploy VM from an OVA or OVF template, like AmazonLinux, Flatcar and Photon OS
+    - include_tasks: deploy_vm_from_ova.yml
+      when: (vm_deploy_method is defined) and (vm_deploy_method == "ova")
+
+    - name: "Print VM guest IP address"
+      debug: var=vm_guest_ip
+      when: vm_guest_ip is defined and vm_guest_ip

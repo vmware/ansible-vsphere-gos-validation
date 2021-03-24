@@ -1,0 +1,33 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Run command in guest OS without ssh connection
+# Parameters:
+#   vm_shell_cmd: command to be run in guest OS
+#   vm_shell_args: command arguments
+#   vm_shell_out: the output file path
+#
+- name: Run command in guest OS
+  vmware_vm_shell:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    vm_id: "{{ vm_name }}"
+    vm_username: "{{ vm_username }}"
+    vm_password: "{{ vm_password }}"
+    vm_shell: "{{ vm_shell_cmd }}"
+    vm_shell_args: "{% if vm_shell_out is defined and vm_shell_out %}{{ vm_shell_args | default('') }} > {{ vm_shell_out }}{% else %}{{ vm_shell_args | default('') }}{% endif %}"
+    vm_shell_env:
+      - "PATH=/usr/local/bin:/usr/bin:/sbin/bin:/bin"
+      - "LC_ALL=en_US.UTF-8"
+    vm_shell_cwd: "/tmp"
+    wait_for_process: True
+  failed_when: False
+  register: vm_shell_result
+
+- name: Display the result of running command in guest OS
+  debug: var=vm_shell_result
+  when: enable_debug is defined and enable_debug

@@ -1,0 +1,30 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Transfer specified file to remote server if the destination does not exist.
+# Note: 'force' parameter is set to 'no' here since if the destination file
+# exists and is used/attached by other VMs, this task will fail with error
+# 'Device or resource busy'.
+# Paramters:
+#   transfer_file_remote_src: the source file path
+#   transfer_file_remote_dest: the destination file path
+#   transfer_file_remote_owner(optional): name of the user that should own the file
+#   transfer_file_remote_gp(optional): name of the group that should own the file
+#   transfer_file_remote_mode(optional): the permissions of the destination file
+#
+- name: Transfer file to remote server
+  copy:
+    src: "{{ transfer_file_remote_src }}"
+    dest: "{{ transfer_file_remote_dest }}"
+    owner: "{{ transfer_file_remote_owner | default(omit) }}"
+    group: "{{ transfer_file_remote_gp | default(omit) }}"
+    mode: "{{ transfer_file_remote_mode | default('0666') }}"
+    force: False
+  register: transfer_file_remote_result
+  delegate_to: "{{ transfer_file_remote_server }}"
+
+- name: Display the result of file transfer
+  debug: var=transfer_file_remote_result
+  when: enable_debug is defined and enable_debug
+- debug:
+    msg: "File: '{{ transfer_file_remote_src }}' transferred to server: '{{ transfer_file_remote_server }}', in this path: '{{ transfer_file_remote_dest }}'"

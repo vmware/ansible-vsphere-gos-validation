@@ -1,0 +1,135 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Valid Guest file operation is: create_dir, delete_dir, fetch_file, copy_file
+# Common parameters for file operation:
+#   tools_ready_in_guest_file_ops: default value is True. Set it to False if
+# VMware tools is not running when do guest file operation, will wait for
+# VMware tools status is running.
+#
+- name: "By default VMware tools status is running"
+  set_fact:
+    tools_ready_in_guest_file_ops: True
+  when: tools_ready_in_guest_file_ops is undefined
+
+# Wait for VMware Tools in running status
+- include_tasks: vm_wait_vmtools_status.yml
+  vars:
+    vm_wait_vmtools_running: True
+  when: not tools_ready_in_guest_file_ops
+
+# Parameters for create_dir:
+# dir_path: The directory path to be created
+# recurse: Whether to create the directory path recursively or not
+- block:
+    - name: "Create directory {{ dir_path }} in VM guest"
+      vmware_guest_file_operation:
+        hostname: "{{ vsphere_host_name }}"
+        username: "{{ vsphere_host_user }}"
+        password: "{{ vsphere_host_user_password }}"
+        datacenter: "{{ vsphere_host_datacenter }}"
+        validate_certs: "{{ validate_certs | default(False) }}"
+        vm_id: "{{ vm_name }}"
+        vm_username: "{{ vm_username }}"
+        vm_password: "{{ vm_password }}"
+        directory:
+          path: "{{ dir_path }}"
+          operation: "create"
+          recurse: "{{ recurse }}"
+      register: create_dir_op
+      ignore_errors: true
+    - name: "Print the result of create directory"
+      debug: var=create_dir_op
+      when: enable_debug is defined and enable_debug
+    - name: "Only ignore directory exists error"
+      fail:
+        msg: "Failed to create diretory: '{{ dir_path }}', due to {{ create_dir_op.msg }}"
+      when:
+        - create_dir_op is defined
+        - not create_dir_op.changed
+        - ('msg' in create_dir_op) and (create_dir_op.msg.count('already exists') == 0)
+  when: operation == "create_dir"
+
+# Parameters for delete_dir:
+# dir_path: The directory path to be deleted
+# recurse: Delete the directory path recursively or not
+- block:
+    - name: "Delete directory {{ dir_path }} in VM guest"
+      vmware_guest_file_operation:
+        hostname: "{{ vsphere_host_name }}"
+        username: "{{ vsphere_host_user }}"
+        password: "{{ vsphere_host_user_password }}"
+        datacenter: "{{ vsphere_host_datacenter }}"
+        validate_certs: "{{ validate_certs | default(False) }}"
+        vm_id: "{{ vm_name }}"
+        vm_username: "{{ vm_username }}"
+        vm_password: "{{ vm_password }}"
+        directory:
+          path: "{{ dir_path }}"
+          operation: "delete"
+          recurse: "{{ recurse }}"
+      register: delete_dir_op
+    - name: "Print result of delete directory"
+      debug: var=delete_dir_op
+      when: enable_debug is defined and enable_debug
+  when: operation == "delete_dir"
+
+# Parameters for fetch_file:
+# src_path: The source file path in guest
+# dest_path: The dest file path on localhost
+- block:
+    - name: "Check If the destination base directory exist"
+      stat:
+        path: "{{ dest_path | dirname }}"
+      ignore_errors: true
+      register: fetch_dir_stat
+    - name: "Destination base directory doesn't exist, create it"
+      file:
+        path: "{{ dest_path | dirname }}"
+        state: "directory"
+        mode: "777"
+        recurse: True
+      when: not fetch_dir_stat.stat.exists
+    - name: "Fetch file {{ src_path }} from VM guest"
+      vmware_guest_file_operation:
+        hostname: "{{ vsphere_host_name }}"
+        username: "{{ vsphere_host_user }}"
+        password: "{{ vsphere_host_user_password }}"
+        datacenter: "{{ vsphere_host_datacenter }}"
+        validate_certs: "{{ validate_certs | default(False) }}"
+        vm_id: "{{ vm_name }}"
+        vm_username: "{{ vm_username }}"
+        vm_password: "{{ vm_password }}"
+        fetch:
+          src: "{{ src_path }}"
+          dest: "{{ dest_path }}"
+      register: fetch_file_op
+    - name: "Print result of fetch file from Guest OS"
+      debug: var=fetch_file_op
+      when: enable_debug is defined and enable_debug
+  when: operation == "fetch_file"
+
+# Parameters for copy_file:
+# src_path: The source file path localhost
+# dest_path: The dest file path in guest
+# overwrite: If the dest file exists, overwrite it or not
+- block:
+    - name: "Copy file {{ src_path }} to VM guest"
+      vmware_guest_file_operation:
+        hostname: "{{ vsphere_host_name }}"
+        username: "{{ vsphere_host_user }}"
+        password: "{{ vsphere_host_user_password }}"
+        datacenter: "{{ vsphere_host_datacenter }}"
+        validate_certs: "{{ validate_certs | default(False) }}"
+        vm_id: "{{ vm_name }}"
+        vm_username: "{{ vm_username }}"
+        vm_password: "{{ vm_password }}"
+        copy:
+          src: "{{ src_path }}"
+          dest: "{{ dest_path }}"
+          overwrite: "{{ overwrite | default(True) }}"
+      register: copy_file_op
+    - name: "Print result of copy file to Guest OS"
+      debug: var=copy_file_op
+      when: enable_debug is defined and enable_debug
+  when: operation == "copy_file"

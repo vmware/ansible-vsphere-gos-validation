@@ -1,0 +1,50 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check VM EFI firmware is reported correctly
+# in "vmware.log". The test case result will be 'No Run' when VM firmware
+# is BIOS.
+#
+- name: check_efi_firmware
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+        - name: Check VM configured firmware type
+          include_tasks: ../../common/vm_get_config.yml
+          vars:
+            property_list: ['config.firmware']
+
+        - block:
+            - name: Set searching keyword in vmware.log
+              set_fact:
+                vmware_log_keyword: "The EFI ROM is {{ win_guest_bitness }}"
+
+            - name: Get firmware info in guest OS
+              include_tasks: ../utils/win_get_firmware.yml
+
+            - name: Search EFI ROM keyword in vmware.log
+              include_tasks: ../../common/vm_search_vmware_log.yml
+              vars:
+                keyword: "{{ vmware_log_keyword }}"
+
+            - name: "Verify EFI firmware info in guest OS and vmware.log"
+              assert:
+                that:
+                  - firmware_os == "efi"
+                  - vmware_log_search
+                fail_msg: "Firmware got in guest OS is not EFI, or EFI info not found in vmware.log."
+                success_msg: "Firmware got in guest OS is EFI, and EFI info got in vmware.log."
+          when: vm_config.config.firmware == "efi"
+
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip test case '{{ ansible_play_name }}', VM firmware is not EFI: {{ vm_config.config.firmware }}"
+          when: vm_config.config.firmware == "bios"
+      rescue:
+        - include_tasks: ../setup/rescue_cleanup.yml
+          vars:
+            current_testcase_name: "{{ ansible_play_name }}"

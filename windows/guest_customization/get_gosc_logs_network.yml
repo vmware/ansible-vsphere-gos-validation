@@ -1,0 +1,29 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Fetch log files from Windows guest OS to local
+- name: Initialize the absolute path of GOSC log folders
+  set_fact:
+    gosc_win_log_folders_src: []
+    separator: '\'
+
+- name: Set fact of the GOSC log paths
+  set_fact:
+    gosc_win_log_folders:
+      - 'Temp\vmware-imc\'
+      - 'System32\Sysprep\Panther\'
+      - 'Panther\'
+      - 'Debug\'
+- name: Set fact of the absolute path of GOSC log folders
+  set_fact:
+    gosc_win_log_folders_src: "{{ gosc_win_log_folders_src + [win_dir ~ separator ~ item] }}"
+  with_items: "{{ gosc_win_log_folders }}"
+- name: Display the GOSC log paths
+  debug: var=gosc_win_log_folders_src
+
+- include_tasks: ../utils/win_get_folder.yml
+  vars:
+    win_get_folder_dst_path: "{{ current_test_log_folder }}"
+  with_items: "{{ gosc_win_log_folders_src }}"
+  loop_control:
+    loop_var: win_get_folder_src_path

@@ -1,0 +1,33 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VM devices with specific label
+# Parameters:
+#   vm_config: VM config info returned from vm_get_config.yml
+#   device_label: the label of virtual devices. Common labels could be:
+#     Hard disk N (N = 1, 2, ..., etc)
+#     Network adapter N (N = 1, 2, ..., etc)
+#     CD/DVD drive N (N = 1, 2, ..., etc)
+#     Floppy drive  N (N = 1, 2, ..., etc)
+#     SCSI controller M (M = 0, 1, 2, ..., etc)
+#     NVME controller M (M = 0, 1, 2, ..., etc)
+#     SATA controller M (M = 0, 1, 2, ..., etc)
+#     IDE M (M = 0, 1, 2, ..., etc)
+#     Video Card
+# Return:
+#   vm_devices_with_label: devices with specific label
+#
+- name: "Get all devices with label '{{ device_label }}' on VM '{{ vm_name }}'"
+  block:
+    - name: "Initialize VM device with label list"
+      set_fact:
+        vm_devices_with_label: []
+
+    - name: "Search all devices with label {{ device_label }}"
+      set_fact:
+        vm_devices_with_label: "{{ vm_devices_with_label }} + [{{ item }}]"
+      with_items: "{{ vm_config.config.hardware.device }}"
+      when: "device_label in item.deviceInfo.label"
+
+    - debug: var=vm_devices_with_label
+  when: device_label is defined

@@ -1,0 +1,16 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check disk controller facts is not changed after hot remove disk
+- include_tasks: ../../common/vm_get_disk_controller_facts.yml
+- name: "Set fact of disk controller facts of VM '{{ vm_name }}'"
+  set_fact:
+    new_scsi_facts: "{{ disk_controller_facts['disk_controller_data']['scsi'] }}"
+- debug:
+    msg: "Get VM disk controller facts: {{ new_scsi_facts }}"
+- name: "Check saved disk controller facts is the same as the one got above"
+  assert:
+    that:
+      - old_scsi_facts == new_scsi_facts
+    fail_msg: "Got VM disk controller facts: {{ new_scsi_facts }}, while before it's: {{ old_scsi_facts }}"
+    success_msg: "Got VM disk controller facts is the same as got before."

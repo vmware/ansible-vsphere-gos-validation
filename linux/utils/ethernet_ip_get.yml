@@ -1,0 +1,61 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Parameters:
+## all_ip: True or False. If True, return all IP addresses; otherwise, only IPv4 addresses
+
+#Return:
+##ethernets: each ethernet status and IPv4
+    #    "ethernets": {
+    #        "eth0": {
+    #            "ipv4": "10.117.16.58",
+    #            "prefixlen": "23",
+    #            "status": "UP"
+    #        },
+    #        "eth1": {
+    #            "ipv4": "192.168.1.184",
+    #            "prefixlen": "24",
+    #            "status": "UP"
+    #        }
+    #    }
+
+##all_ip_in_guest: all IPv4 and IPv6 addresses
+
+# Get ethernet devices' status(up or down) and IPv4 address
+- block:
+    - name: "Initialize empty for ethernets"
+      set_fact:
+        ethernets: {}
+
+    - name: "Get IPv4 address of {{ eth_dev | default('all ethernet interfaces') }}"
+      shell: ip -br addr show {{ eth_dev | default('') }} | grep -v lo | grep -v virbr | awk 'BEGIN { FS="[ |/]+" } {print $1,$2,$3,$4}'
+      register: result
+      delegate_to: "{{ vm_guest_ip }}"
+
+    # Output would look like
+    #eth0 UP 10.117.16.58 23
+    #eth1 UP 192.168.1.184 24
+
+    #Map results to a dictionary
+    - name: "Map results to a dictionary"
+      set_fact:
+        ethernets: "{{ ethernets | combine({item.split(' ')[0]:(dict(['status', 'ipv4', 'prefixlen'] | zip_longest(item.split(' ')[1:])))}) }}"
+      with_items: "{{ result.stdout_lines }}"
+
+    - debug: var=ethernets
+  when: all_ip is undefined or not all_ip
+
+#Get IP address in guest
+- block:
+    - name: Get IP in guest
+      shell: ip -br addr show | grep -v lo  | grep -v virbr | awk '{OFS="\n";i=3; while (i<=NF) {print $i; i++}}' | cut -d '/' -f 1
+      register: result
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Save IP got from Guest"
+      set_fact:
+        all_ip_in_guest: "{{ result.stdout_lines }}"
+
+    - debug: var=all_ip_in_guest
+      when: enable_debug
+  when: all_ip is defined and all_ip

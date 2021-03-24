@@ -1,0 +1,100 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get network adapter info of VM and in guest OS before network
+# adapter hotadd operation
+- name: Get network adapter number before hotadd
+  include_tasks: network_adapter_number_check.yml
+- name: Set fact of the NIC info before hotadd
+  set_fact:
+    nic_num_before_hotadd: "{{ vm_nic_num_get }}"
+    nic_mac_addr_list_before_hotadd: "{{ vm_nic_mac_addr_list_get }}"
+    nic_num_before_hotadd_guest: "{{ guest_nic_num_get }}"
+
+# Execute network adapter hotadd
+- name: "Hotadd a new '{{ nic_type }}' network adapter to VM"
+  include_tasks: ../../common/vm_add_network_adapter.yml
+  vars:
+    adapter_type: "{{ nic_type | lower }}"
+- name: Verify new network adapter hotadd operation succeed
+  assert:
+    that:
+      - "{{ not add_adapter.failed }}"
+      - "{{ 'changed' in add_adapter }}"
+      - "{{ add_adapter.changed }}"
+- name: Wait 10 seconds after network adapter hotadd
+  pause:
+    seconds: 10
+
+# Check network adapter info after hotadd
+- name: Get network adapter number after hotadd
+  include_tasks: network_adapter_number_check.yml
+- name: Set fact of the NIC info after hotadd
+  set_fact:
+    nic_num_after_hotadd: "{{ vm_nic_num_get }}"
+    nic_mac_addr_list_after_hotadd: "{{ vm_nic_mac_addr_list_get }}"
+    nic_num_after_hotadd_guest: "{{ guest_nic_num_get }}"
+
+- name: Ping vlan gateway after network adapter hotadd
+  include_tasks: ../utils/win_ping_target.yml
+  vars:
+    win_ping_target_ip: "{{ vlan_gateway }}"
+- name: Set fact of the ping vlan gateway result
+  set_fact:
+    ping_result_after_hotadd: "{{ win_ping_target_result }}"
+
+- name: Get MAC address of new added network adapter
+  set_fact:
+    new_nic_mac_address: "{{ nic_mac_addr_list_after_hotadd | difference(nic_mac_addr_list_before_hotadd) }}"
+- name: Set fact of MAC address of new added network adapter
+  set_fact:
+    new_nic_mac_address: "{{ new_nic_mac_address[0] if new_nic_mac_address|length == 1 else 'NA' }}"
+- debug:
+    msg: "The new added '{{ nic_type }}' MAC address: {{ new_nic_mac_address }}"
+- name: Check result
+  fail:
+    msg: "Not get the MAC address of the new added network adapter"
+  when: new_nic_mac_address == 'NA'
+
+# Check disconnect and reconnect of newwork adapter
+- include_tasks: network_adapter_status_check.yml
+
+# Hot remove added network adapter
+- name: Remove new added network adapter of VM
+  include_tasks: ../../common/vm_remove_network_adapter.yml
+  vars:
+    netadapter_mac_addr: "{{ new_nic_mac_address }}"
+- name: Check remove network adapter to VM succeed
+  assert:
+    that:
+      - "{{ not remove_result.failed }}"
+      - "{{ 'changed' in remove_result }}"
+      - "{{ remove_result.changed }}"
+- name: Wait 10 seconds after network adapter hot remove
+  pause:
+    seconds: 10
+
+# Check network adapter after hot remove
+- name: Get the number of VM network adapter after hot remove
+  include_tasks: network_adapter_number_check.yml
+- name: Set fact of the NIC info after hot remove
+  set_fact:
+    nic_num_after_hotremove: "{{ vm_nic_num_get }}"
+    nic_num_after_hotremove_guest: "{{ guest_nic_num_get }}"
+
+- name: Verify network adapter numbers and connect status to VLAN gateway
+  assert:
+    that:
+      - "{{ nic_num_before_hotadd|int == nic_num_before_hotadd_guest|int }}"
+      - "{{ nic_num_after_hotadd|int == nic_num_after_hotadd_guest|int }}"
+      - "{{ nic_num_before_hotadd|int == nic_num_after_hotadd|int - 1 }}"
+      - "{{ nic_num_after_hotadd_guest|int == nic_num_before_hotadd_guest|int + 1 }}"
+      - "{{ nic_num_after_hotremove == nic_num_before_hotadd }}"
+      - "{{ nic_num_after_hotremove_guest == nic_num_before_hotadd_guest }}"
+      - "{{ ping_result_after_hotadd }}"
+      - "{{ not ping_result_after_disable }}"
+      - "{{ ping_result_after_enable }}"
+      - "{{ not ping_result_after_disconnect }}"
+      - "{{ ping_result_after_reconnect }}"
+    success_msg: "Testcase {{ ansible_play_name }}: passed"
+    fail_msg: "Testcase {{ ansible_play_name }}: failed"

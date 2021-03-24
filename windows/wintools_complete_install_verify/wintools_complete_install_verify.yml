@@ -1,0 +1,61 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for test VMware tools installation in Windows
+# guest OS. The VMware tools installation ISO file can be an existing file
+# in ESXi datastore, ESXi host bundled VMware tools, or the URL, ISO file
+# will be downloaded before testing.
+# 
+- name: wintools_complete_install_verify
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+        - name: "Set update VMware tools by default"
+          set_fact:
+            update_vmtools: True
+          when: update_vmtools is undefined
+        - name: "Set not install from ESXi bundled VMware tools by default"
+          set_fact:
+            vmtools_esxi_bundled: False
+          when: vmtools_esxi_bundled is undefined
+
+        - block:
+            # Get ESXi host bundled VMware tools ISO path
+            - block:
+                - include_tasks: ../../common/esxi_get_bundled_tools_path.yml
+                  vars:
+                    server_get_bundled_tools_path_os: 'windows'
+                - name: Set fact of the bundled VMware tools path
+                  set_fact:
+                    vmtools_iso_path: "[] {{ server_get_bundled_tools_path }}"
+              when: vmtools_esxi_bundled
+
+            # Or download VMware tools ISO from URL
+            - include_tasks: download_vmtools_and_transfer.yml
+              when:
+                - not vmtools_esxi_bundled
+                - vmtools_url_path is defined
+                - vmtools_url_path
+            # Mount VMware tools ISO file to VM
+            - include_tasks: vm_mount_vmtools_iso.yml
+            # Execute VMware tools installation
+            - include_tasks: install_vmtools.yml
+            - include_tasks: verify_vmtools.yml
+            # Reset base snapshot
+            - include_tasks: ../../linux/open_vm_tools/set_base_snapshot.yml
+            - include_tasks: detach_vmtools_and_remove.yml
+          when: >
+            (vmtools_is_installed and update_vmtools) or
+            (not vmtools_is_installed)
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip test case due to VMware tools is installed, update VMware tools is set to: {{ update_vmtools }}"
+          when: vmtools_is_installed and not update_vmtools
+      rescue:
+        - include_tasks: ../setup/rescue_cleanup.yml
+          vars:
+            current_testcase_name: "{{ ansible_play_name }}"

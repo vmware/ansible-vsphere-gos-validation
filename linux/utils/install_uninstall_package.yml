@@ -1,0 +1,141 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+#Install or uninstall packages in guest
+#Parameters
+#  package_name: one or a list of packages to be installed or removed
+#  package_state: [absent, installed, latest, present, removed]. Default is present.
+#  update_cache: True to update cache or no before installing packages. Default is False.
+# Return:
+#  package_manage_output: The output of installing or uninstalling package
+
+- name: "Validate the value of variable 'package_state'"
+  assert:
+    that:
+      - package_state in ['absent', 'installed', 'latest', 'present', 'removed']
+    fail_msg: "Invalide parameter: package_state={{ package_state }}"
+  when: package_state is defined
+
+- name: "Initialize variables for installing or uninstalling package"
+  set_fact:
+    package_state: "{% if package_state is undefined %}present{% endif %}"
+    update_cache: "{% if update_cache is undefined %}False{% endif %}"
+    package_manage_output: ""
+    local_task_name: |-
+      {%- if package_state in [ 'installed', 'present' ] -%}
+      Install package
+      {%- elif package_state == 'latest' -%}
+      Update package
+      {%- else -%}Uninstall package{%- endif -%}
+
+# Set proxy for installing package
+- debug: var=vm_guest_ip
+- include_tasks: set_proxy.yml
+  when: package_state == "present"
+
+# Add a local repo from ISO image for RHEL/SLES/SLED
+- include_tasks: ../utils/add_local_dvd_repo.yml
+  when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat']
+
+# Add online repo for CentOS, OracleLinux, Ubuntu, Debian and Photon
+- include_tasks: ../utils/add_online_repo.yml
+  when: guest_os_ansible_distribution in ['CentOS', 'OracleLinux', 'Ubuntu', 'Debian', 'VMware Photon OS']
+
+- block:
+    - block:
+       - name: "Set the fact that tdnf has not made cache"
+         set_fact:
+           tdnf_makecache: False
+
+       # When networking or dns is not ready, tdnf commands would fail
+       # So here we add retries for tndf makecache
+       - include_tasks: repo_update.yml
+         vars:
+           check_update_cmd: "tdnf makecache"
+
+       - name: "Set the fact that tdnf has finished making cache"
+         set_fact:
+           tdnf_makecache: True
+         when:
+           - repo_update_output is defined
+           - repo_update_output.stderr is defined
+           - not repo_update_output.stderr
+      when: >
+        (tdnf_makecache is undefined) or
+        (not tdnf_makecache) or
+        (update_cache is defined and update_cache)
+
+    - name: "Convert packages name list to a string"
+      set_fact:
+        package_name_str: |-
+          {%- if package_name is sequence and package_name is not string -%}{{ ' '.join(package_name) }}
+          {%- elif package_name is string -%}{{ package_name }}
+          {%- else -%}{%- endif -%}
+
+    - block:
+        - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+          command: "tdnf install -y {{ package_name_str }}"
+          delegate_to: "{{ vm_guest_ip }}"
+          register: package_install_output
+
+        - name: "Get the output of installing package"
+          set_fact:
+            package_manage_output: "{{ package_install_output.stdout }}"
+          when: package_install_output.stdout is defined
+      when: package_state in [ "installed", "latest", "present" ]
+
+    - block:
+        - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+          command: "tdnf update -y {{ package_name_str }}"
+          delegate_to: "{{ vm_guest_ip }}"
+          register: package_update_output
+          when: package_state == "latest"
+
+        - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+          command: "tdnf remove -y {{ package_name_str }}"
+          delegate_to: "{{ vm_guest_ip }}"
+          register: package_uninstall_output
+      when: package_state in [ "absent", "removed" ]
+  when: guest_os_ansible_distribution == "VMware Photon OS"
+
+- block:
+    - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+      yum:
+        name: "{{ package_name }}"
+        allow_downgrade: yes
+        state: "{{ package_state }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      when: guest_os_ansible_distribution_major_ver | int <= 7
+
+    - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+      dnf:
+        name: "{{ package_name }}"
+        allow_downgrade: yes
+        state: "{{ package_state }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      when: guest_os_ansible_distribution_major_ver | int >= 8
+  when: guest_os_ansible_distribution in ["RedHat", "CentOS", "OracleLinux"]
+
+- name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+  yum:
+    name: "{{ package_name }}"
+    state: "{{ package_state }}"
+    update_cache: "{{ update_cache | default(True) }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  when: guest_os_ansible_distribution == "Amazon"
+
+- name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+  zypper:
+    name: "{{ package_name }}"
+    state: "{{ package_state }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  when: guest_os_ansible_distribution in ["SLES", "SLED"]
+
+- block:
+    - include_tasks: remove_dpkg_lock_file.yml
+    - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+      apt:
+        name: "{{ package_name }}"
+        state: "{{ package_state }}"
+      delegate_to: "{{ vm_guest_ip }}"
+  when: guest_os_ansible_distribution in ["Ubuntu", "Debian"]

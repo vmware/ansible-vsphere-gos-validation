@@ -1,0 +1,21 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Mount NFS storage on local machine
+# Parameters:
+#   nfs_server: remote NFS server hostname/IP address to connect
+#   nfs_share_folder: remote NFS server mount folder
+#   nfs_mount_path: local mount point
+#
+- name: "Mount {{ nfs_server }}:{{ nfs_share_folder }} to {{ nfs_mount_path }} on localhost"
+  mount:
+    path: "{{ nfs_mount_path }}"
+    src: "{{ nfs_server }}:{{ nfs_share_folder }}"
+    opts: ro,nolock
+    fstype: nfs
+    state: mounted
+  register: nfs_mount_result
+  become: yes
+- name: Display the NFS mount result
+  debug: var=nfs_mount_result
+  when: enable_debug is defined and enable_debug

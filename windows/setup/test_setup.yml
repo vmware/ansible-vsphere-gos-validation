@@ -1,0 +1,121 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Below tasks will be executed at the beginning of each test case, to check
+# if base snapshot exists. If 'revert_base_snapshot' parameter is set to True,
+# then revert to the a base snapshot firstly.
+# If base snapshot does not exist, then take a snapshot of VM as the base snapshot.
+#
+- name: "Set current test case log path on local machine"
+  set_fact:
+    current_test_log_folder: "{{ testrun_log_path }}/{{ ansible_play_name }}"
+
+- name: "Set not revert to base snapshot by default"
+  set_fact:
+    revert_base_snapshot: False
+  when: revert_base_snapshot is undefined
+
+# Check if base snapshot exists
+- name: Initialize the base snapshot existence status
+  set_fact:
+    base_snapshot_exists: False
+- include_tasks: ../../common/vm_check_snapshot_exist.yml
+  vars:
+    snapshot_name: "{{ base_snapshot_name }}"
+- name: Set fact of base snapshot existence
+  set_fact:
+    base_snapshot_exists: True
+  when: snapshot_exist is defined and snapshot_exist | bool
+
+# Revert to base snapshot when it exists and revert to base set to True
+- block:
+    - include_tasks: ../../common/vm_revert_snapshot.yml
+      vars:
+        snapshot_name: "{{ base_snapshot_name }}"
+    - debug:
+        msg: "Revert to base snapshot '{{ base_snapshot_name }}' firstly"
+  when:
+    - base_snapshot_exists
+    - revert_base_snapshot | bool
+
+# Power on VM if it's not powered on
+- include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+
+# Get VM IP address and check winrm connection
+- include_tasks: ../../common/vm_get_ip.yml
+  vars:
+    vm_get_ip_timeout: 600
+- include_tasks: ../utils/win_check_winrm.yml
+# Add VM IP to the hosts inventory
+- include_tasks: ../utils/add_windows_host.yml
+- name: "Print VM guest IP address"
+  debug: var=vm_guest_ip
+
+# Get VM guest ID and hardware version when they're not defined
+# while testing on existing VM 
+- block:
+    - include_tasks: ../../common/vm_get_config.yml
+      vars:
+        property_list: ['config.guestId', 'config.version']
+    - name: Set fact of guest ID and hardware version of VM
+      set_fact:
+        vm_guest_id: "{{ vm_config.config.guestId }}"
+        vm_hardware_version: "{{ vm_config.config.version }}"
+  when: >
+    (vm_guest_id is undefined) or
+    (vm_hardware_version is undefined)
+- name: "Print VM guest id"
+  debug: var=vm_guest_id
+- name: "Print VM hardware version"
+  debug: var=vm_hardware_version
+
+# Check VMware tools status
+- name: "Get VMware tools status in VM"
+  include_tasks: ../../common/vm_get_vmtools_status.yml
+# Get VMware tools version and build number
+- name: Initialize VMware tools version info
+  set_fact:
+    vmtools_info_from_vmtoolsd: ''
+  when: vmtools_info_from_vmtoolsd is undefined
+- include_tasks: ../utils/win_get_vmtools_version_build.yml
+  when:
+    - vmtools_is_installed
+    - not vmtools_info_from_vmtoolsd
+- name: "Print VMware Tools version and build"
+  debug: var=vmtools_info_from_vmtoolsd
+
+# Get guest system info once
+- include_tasks: ../../common/get_guest_system_info.yml
+# Get guest OS bitness
+- include_tasks: ../utils/win_get_bitness.yml
+  when: win_guest_bitness is undefined or not win_guest_bitness
+
+# If base snapshot not exist, take base snapshot
+- block:
+    # Disable firewall in guest OS
+    - include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "netsh advfirewall set allprofiles state off"
+    # By default, Windows guest OS will restart automatically
+    # when BSOD, this task is used for diable this automatic reboot
+    - include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "wmic RecoverOs set AutoReboot=False"
+    - include_tasks: ../utils/win_shutdown_restart.yml
+      vars:
+        set_win_power_state: "restart" 
+    - include_tasks: ../../common/vm_take_snapshot.yml
+      vars:
+        snapshot_name: "{{ base_snapshot_name }}"
+        dump_memory: yes
+  when: not base_snapshot_exists
+
+# Get VM files path on ESXi host
+- include_tasks: ../../common/vm_get_guest_facts.yml
+- name: Set fact of the VM files path
+  set_fact:
+    vm_files_path: "/vmfs/volumes/{{ vm_guest_facts.instance.hw_files[0].split(' ')[0].strip('[]') }}/{{ ('/').join(vm_guest_facts.instance.hw_files[0].split(' ')[1].split('/')[:-1]) }}"
+- debug:
+    msg: "VM files path: {{ vm_files_path }}"

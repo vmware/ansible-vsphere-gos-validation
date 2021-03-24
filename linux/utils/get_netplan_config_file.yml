@@ -1,0 +1,28 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# Get network config files for Ubuntu Server,
+# different distributions have different network config files
+- block:
+    - name: Get all files of dir /etc/netplan
+      command: ls /etc/netplan/
+      register: all_config_files_for_netplan
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - debug: var=all_config_files_for_netplan
+
+    - name: Set fact of the network configure file for ubuntu server
+      set_fact:
+        netplan_config_file: "/etc/netplan/{{ netplan_config_file_item }}"
+      when: all_config_files_for_netplan.stdout.find(netplan_config_file_item) != -1
+      with_items:
+        - 00-installer-config.yaml
+        - 50-cloud-init.yaml
+        - 01-netcfg.yaml
+      loop_control:
+        loop_var: netplan_config_file_item
+
+    - debug: var=netplan_config_file
+  when:
+    - guest_os_ansible_distribution == "Ubuntu"
+    - guest_os_with_gui is defined and not guest_os_with_gui

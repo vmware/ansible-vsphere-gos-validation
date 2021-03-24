@@ -1,0 +1,178 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Initialize undefined variables
+- name: "Initialize variables for new VM settings"
+  set_fact:
+    boot_disk_controller: "{{ boot_disk_controller if (boot_disk_controller is defined and boot_disk_controller) else 'paravirtual' }}"
+    firmware: "{{ firmware if (firmware is defined and firmware) else 'efi' }}"
+    network_adapter_type: "{{ network_adapter_type if (network_adapter_type is defined and network_adapter_type) else 'vmxnet3' }}"
+
+- name: "Set CPU number to {{ cpu_cores_per_socket }}"
+  set_fact:
+    cpu_number: "{{ cpu_cores_per_socket }}"
+  when:
+    - cpu_number is undefined or not cpu_number
+    - cpu_cores_per_socket is defined and cpu_cores_per_socket
+
+- name: "Set fact of the deploy VM test case name"
+  set_fact:
+    deploy_casename: "deploy_vm_{{ firmware }}_{{ boot_disk_controller }}_{{ network_adapter_type }}"
+
+- block:
+    # Generate unattend install iso file
+    - include_tasks: create_unattend_install_iso.yml
+      when: unattend_install_conf is defined and unattend_install_conf
+    - debug:
+        msg: "unattend_install_conf is not defined or set to a file path, will not generate unattend iso file"
+      when: unattend_install_conf is undefined or not unattend_install_conf
+
+    # Compose VM CDROMs to mount OS install ISO files
+    - include_tasks: compose_vm_cdroms.yml
+    # Check configured OS install ISO file and unattend ISO file exist
+    - include_tasks: check_configured_cdrom_iso.yml
+    # Create a new VM
+    - include_tasks: ../../common/vm_create.yml
+
+    - include_tasks: ubuntu/reconfigure_ubuntu_iso_vm.yml
+      when: guest_id == 'ubuntu64Guest'
+
+    # Enable secureboot
+    - include_tasks: ../../common/vm_set_boot_options.yml
+      vars:
+        secure_boot_enabled_set: True
+      when: secureboot_enabled is defined and secureboot_enabled
+
+    - include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-on'
+    - name: Sleep 5 seconds to wait boot screen display
+      pause:
+        seconds: 5
+
+    - include_tasks: ubuntu/ubuntu_install_os.yml
+      when: guest_id == 'ubuntu64Guest'
+
+    # For SLES, OS installation with BIOS firmware, sendkey to boot
+    # screen to start new installation instead of booting from local
+    - block:
+        - include_tasks: ../../common/vm_guest_send_key.yml
+          vars:
+            keys_send:
+              - DOWNARROW
+              - ENTER
+      when:
+        - "'sle' in guest_id"
+        - firmware is defined and firmware|lower == "bios"
+
+    # For RHEL, CentOS, OracleLinux, sendkey to boot screen to not do
+    # disk check and start installation directly
+    - block:
+        - include_tasks: ../../common/vm_guest_send_key.yml
+          vars:
+            keys_send:
+              - UPARROW
+              - ENTER
+      when:
+        - ('rhel' in guest_id) or ('centos' in guest_id) or ('oracleLinux' in guest_id)
+
+    # For Photon OS installation
+    - block:
+        - include_tasks: photon/install_photon_os.yml
+        - include_tasks: ../../common/vm_wait_guest_fullname.yml
+          vars:
+            wait_guest_fullname: "VMware Photon OS (64-bit)"
+
+        # Config SSH to permit root login and password authentication
+        - include_tasks: ../utils/permit_root_login.yml
+
+        - include_tasks: ../utils/disable_iptables.yml
+      when:
+        - "'Photon' in guest_id"
+
+    # For RedHat, OracleLinux, CentOS, SLED, SLES, Ubuntu installation
+    # Wait Guest OS is installed and connectable
+    - block:
+        - include_tasks: ../../common/update_inventory.yml
+          vars:
+            update_inventory_timeout: 3600
+        - include_tasks: ../../common/vm_wait_vmtools_status.yml
+          vars:
+            vm_wait_vmtools_running: True
+            vm_wait_vmtools_ignore_error: True
+
+        # Config SSH to permit root login and password authentication
+        - include_tasks: ../utils/permit_root_login.yml
+
+        - include_tasks: ../../common/get_guest_system_info.yml
+        - include_tasks: ../utils/check_guest_os_gui.yml
+      when:
+        - "'Photon' not in guest_id"
+
+    - block:
+        # OS with desktop:
+        # For RHEL7/CentOS7/OracleLinux7 with desktop: initial-setup service
+        # running at the end of installation, after click 'FINISH CONFIGURATION',
+        # display-manager service running to wait user login.
+        # For SLE, RHEL8/CentOS8/OracleLinux8 with desktop: display-manager
+        # service running at the end of installation to wait user login.
+        - block:
+            - include_tasks: ../utils/wait_for_service_status.yml
+              vars:
+                - service_name: "initial-setup"
+                - wait_service_status: "activating"
+            - include_tasks: ../../common/vm_guest_send_key.yml
+              vars:
+                keys_send:
+                  - DOWNARROW
+                  - DOWNARROW
+                  - DOWNARROW
+                  - RIGHTARROW
+                  - ENTER
+            - name: Sleep 5 seconds to wait service running
+              pause:
+                seconds: 5
+          when:
+            - guest_os_ansible_distribution_major_ver|int == 7
+            - guest_os_with_gui is defined and guest_os_with_gui
+            - guest_os_ansible_distribution in ["RedHat", "OracleLinux", "CentOS"]
+        - block:
+            - include_tasks: ../utils/wait_for_service_status.yml
+              vars:
+                - service_name: "display-manager"
+                - wait_service_status: "running"
+          when: guest_os_with_gui is defined and guest_os_with_gui
+
+        # OS without desktop:
+        # systemd-logind service running at the end of installaiton
+        # to wait user login.
+        - block:
+            - include_tasks: ../utils/wait_for_service_status.yml
+              vars:
+                - service_name: "systemd-logind"
+                - wait_service_status: "running"
+          when: guest_os_with_gui is defined and not guest_os_with_gui
+
+        # Eject unattend iso and delete it from datastore
+        - include_tasks: eject_del_unattend_install_iso.yml
+          when: unattend_install_conf is defined and unattend_install_conf
+      when:
+        - "'Photon' not in guest_id"
+        - guest_os_ansible_distribution in ["RedHat", "OracleLinux", "CentOS", "SLED", "SLES"]
+
+    - include_tasks: ../../common/print_test_result.yml
+      vars:
+        test_result: "Passed"
+        test_name: "{{ deploy_casename }}"
+  rescue:
+    - name: "Set not take snapshot if vm create failed"
+      set_fact:
+        take_fail_snapshot: False
+      when: not(vm_create_result is defined and vm_create_result.changed)
+    - name: "Set rescue step flags"
+      set_fact:
+        revert_to_base: False
+        exit_testing_when_fail: True
+    - include_tasks: ../utils/test_rescue.yml
+      vars:
+        test_name: "{{ deploy_casename }}"

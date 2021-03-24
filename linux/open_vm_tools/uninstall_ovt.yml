@@ -1,0 +1,69 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Uninstall open-vm-tools
+# Parameters:
+#   ovt_packages: a list of open-vm-tools packages
+
+# Get OS commands to install open-vm-tools
+- include_tasks: get_install_uninstall_cmd.yml
+
+# Uninstall open-vm-tools packages
+- name: "Uninstall packages {{ ovt_packages }}"
+  command: "{{ package_uninstall_cmd }} {{' '.join(ovt_packages) }}"
+  args:
+    warn: False
+  register: ovt_uninstall_result
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: Display the packages uninstall output
+  debug: var=ovt_uninstall_result
+  when: enable_debug | bool
+
+- name: "Assert command is executed successfully"
+  assert:
+    that:
+      - ovt_uninstall_result is defined
+      - ovt_uninstall_result.stdout is defined
+      - ovt_uninstall_result.stdout
+      - ovt_uninstall_result.rc is defined
+      - ovt_uninstall_result.rc | int == 0
+    fail_msg: "Failed to execute command: {{ ' '.join(ovt_uninstall_result.cmd) }}"
+
+# Reboot VM to make changes take effect
+- include_tasks: ../utils/vm_reboot.yml
+
+- include_tasks: check_ovt_package.yml
+  vars:
+    expected_package_state: "absent"
+  with_items: "{{ ovt_packages }}"
+  loop_control:
+    loop_var: package_name
+
+# Check VMware Tools status is not installed
+- include_tasks: check_vmtools_status.yml
+  vars:
+    expected_vmtools_status: "notInstalled"
+
+# Check open-vm-tools processes are not running
+- include_tasks: ../utils/check_process_status.yml
+  vars:
+    expected_process_state: "absent"
+    process_uid: "{{ ovt_process.uid }}"
+    process_name: "{{ ovt_process.cmd }}"
+  with_items: "{{ ovt_processes | union([vgauth_process]) }}"
+  loop_control:
+    loop_var: ovt_process
+
+# Check open-vm-tools services doesn't exist
+- include_tasks: ../utils/check_service_status.yml
+  vars:
+    service_name: "{{ item }}"
+    expected_service_state: "absent"
+  with_items:
+    - "{{ ovt_service }}"
+    - "{{ vgauth_service }}"
+
+- name: "Set the fact that open-vm-tools is removed"
+  set_fact:
+    vmtools_is_removed: True

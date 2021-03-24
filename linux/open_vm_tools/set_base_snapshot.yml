@@ -1,0 +1,29 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Set new base snapshot after VMware tools installed
+# Check old base snapshot exists or not
+- include_tasks: ../../common/vm_check_snapshot_exist.yml
+  vars:
+    snapshot_name: "{{ base_snapshot_name }}"
+
+- name: "Set fact of snapshot '{{ base_snapshot_name }}' existence"
+  set_fact:
+    old_base_snapshot_exist: "{{ snapshot_exist }}"
+    old_snapshot_new_name: "{{ base_snapshot_name }}-{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
+
+# Rename old snapshot with a timestamp
+- include_tasks: ../../common/vm_rename_snapshot.yml
+  vars:
+    current_snapshot_name: "{{ base_snapshot_name }}"
+    new_snapshot_name: "{{ old_snapshot_new_name }}"
+  when: old_base_snapshot_exist
+
+# Take a new snapshot as base snapshot
+- include_tasks: ../../common/vm_take_snapshot.yml
+  vars:
+    snapshot_name: "{{ base_snapshot_name }}"
+
+- name: "Refresh base snapshot status variable"
+  set_fact:
+    base_snapshot_exist: True

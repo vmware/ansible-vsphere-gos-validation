@@ -1,0 +1,64 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Set the common parameters in static and dhcp
+# GOSC specification
+# Note: refer to this page to set time zone id and name:
+# https://msdn.microsoft.com/en-us/library/ms912391.aspx 
+- name: Set fact of the common parameters in static and dhcp GOSC spec
+  set_fact:
+    customize_gos_hostname: 'gosc-test-win'
+    customize_domain: "autotest.com"
+    customize_autologon: True
+    customize_autologon_count: 10
+    customize_logon_password: 'B1gd3m0z!'
+    customize_timezone_id: '2'
+    customize_timezone_name: "Hawaiian Standard Time"
+    gosc_dns_servers: ['192.168.0.1', '192.168.0.2']
+    customize_runonce_echo_string: 'Windows gosc automation test'
+- name: Set fact of the run once command
+  set_fact:
+    customize_runonce: "cmd.exe /c echo {{ customize_runonce_echo_string }} > C:\\gosc_runonce.txt"
+
+# Take a snapshot before doing GOSC
+- block:
+    - name: Set fact of the snapshot name taken before doing GOSC
+      set_fact:
+        snapshot_before_gosc: "beforeGOSC-{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
+    - include_tasks: ../../common/vm_take_snapshot.yml
+      vars:
+        snapshot_name: "{{ snapshot_before_gosc }}"
+        dump_memory: yes
+  when: revert_base_snapshot is undefined or not revert_base_snapshot | bool
+
+- name: Set fact of the VM guest IP before GOSC
+  set_fact:
+    guest_ip_before_gosc: "{{ vm_guest_ip }}"
+
+# Get guest OS hostname from VM guestinfo
+- include_tasks: ../../common/vm_get_config.yml
+  vars:
+    property_list: ['guest.hostName']
+
+- name: Set fact of the hostname before GOSC
+  set_fact:
+    hostname_before_gosc: "{{ vm_config.guest.hostName }}"
+- debug:
+    msg: "Get guest OS hostname/IP before customization: {{ hostname_before_gosc }}/{{ guest_ip_before_gosc }}"
+
+- name: Set fact of default Windows dir
+  set_fact:
+    win_dir: '$env:windir'
+- include_tasks: ../utils/win_get_path.yml
+  vars:
+    win_get_path_specified: "{{ win_dir }}"
+- name: Set fact of the absolute path of Windows dir
+  set_fact:
+    win_dir: "{{ win_get_path_absolute }}"
+- debug:
+    msg: "Windows GOSC log files in Windows dir: {{ win_dir }}"
+
+# Shutdown guest OS before execute guest customization
+- include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "shutdown"

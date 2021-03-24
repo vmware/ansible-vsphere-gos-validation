@@ -1,0 +1,23 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Main playbook for launching guest OS validation testing on vSphere
+- hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Set fact of the current main playbook directory"
+      set_fact:
+        main_playbook_path: "{{ playbook_dir }}"
+    - debug:
+        msg: "Current main playbook directory: {{ main_playbook_path }}"
+    - name: "Create cache directory for downloaded/generated files"
+      file:
+        path: "{{ main_playbook_path }}/cache"
+        state: "directory"
+        mode: "777"
+# Prepare testing environment 
+- import_playbook: env_setup/env_setup.yml
+# Execute test case one by one
+- import_playbook: "{{ testing_testcase_file | default('linux/gosv_testcase_list.yml') }}"
+# Cleanup testing environment
+- import_playbook: env_setup/env_cleanup.yml

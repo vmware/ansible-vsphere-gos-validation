@@ -1,0 +1,26 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VM device with the device key
+# Parameters:
+#   device_key: the device key
+# Return:
+#   device_info_with_key: the info of device with specified device key
+# 
+
+- include_tasks: vm_get_config.yml
+  vars:
+    property_list: ['config.hardware.device']
+
+- name: "Look for device with key '{{ device_key }}'"
+  set_fact:
+    device_info_with_key: ""
+    device_list_with_key: "{{ vm_config.config.hardware.device | selectattr('key', 'equalto', device_key | int) }}"
+
+- name: "Get device info with device key '{{ device_key }}'"
+  set_fact:
+    device_info_with_key: "{{ device_list_with_key[0] }}"
+  when: device_list_with_key and device_list_with_key | length > 0
+
+- name: "Print device info"
+  debug: var=device_info_with_key

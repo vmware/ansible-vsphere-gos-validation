@@ -1,0 +1,65 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# This file is used to hotadd and hot remove disk controller and disk of VM.
+# Disk controller types:
+# - paravirtual: require pvscsi driver installed or VMware tools installed.
+# - lsilogicsas: the default disk controller type of VM.
+# - lsilogic: no driver inbox in Windows guest OS.
+# - nvme: use the version of community.vmware collection which contains this controller type support.
+# - sata: use the version of community.vmware collection which contains this controller type support.
+# - buslogic: not supported in 64bit Windows guest OS.
+#
+- name: Set fact of the valid SCSI controller types list
+  set_fact:
+    valid_scsi_controller_list: ['buslogic', 'paravirtual', 'lsilogicsas', 'lsilogic']
+- name: Set disk controller type to scsi, sata or nvme
+  set_fact:
+    disk_controller: "{{ 'scsi' if test_disk_controller_type in valid_scsi_controller_list else test_disk_controller_type }}"
+- debug:
+    msg: "Specified disk controller type: {{ disk_controller }}"
+
+# Get the total number of disk controllers with type: scsi, sata or nvme
+- include_tasks: get_vm_disk_ctl_num.yml
+- name: Set disk controller number before hotadd
+  set_fact:
+    vhba_number_before_hotadd: "{{ vhba_number }}"
+- debug:
+    msg: "Get the number of {{ disk_controller }} controller before hotadd: {{ vhba_number }}"
+
+# New disk controller can be added when existing controller number is not 4
+- name: "Set fact of run add new disk controller test when the number < 4"
+  set_fact:
+    add_new_controller: "{{ True if vhba_number|int < 4 else False }}"
+- debug:
+    msg: "Add new disk controller when there is no 4 {{ disk_controller }} controllers: {{ add_new_controller }}"
+
+# Get the number of disk controllers and disks in guest OS
+- include_tasks: ../utils/win_get_disk_ctl.yml
+- name: Set fact of the disk controller number got in guest OS before hotadd
+  set_fact:
+    ctl_num_guest_before_hotadd: "{{ ctls_in_guest_dict[test_disk_controller_type] }}"
+- debug:
+    msg: "Get the number of '{{ test_disk_controller_type }}' controller in guest OS before hotadd: {{ ctl_num_guest_before_hotadd }}"
+
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(get-disk | measure).Count"
+- name: Set fact of the number of disk got in guest OS before hotadd
+  set_fact:
+    disk_num_guest_before_hotadd: "{{ win_powershell_cmd_output.stdout_lines[0] if not win_powershell_cmd_output.failed else 0 }}"
+- debug:
+    msg: "Get the number of disk in guest OS before hotadd: {{ disk_num_guest_before_hotadd }}"
+
+- name: Set fact of the adding disk to existing controller
+  set_fact:
+    in_adding_disk_existing_ctl: True
+# First, run test of adding new disk to the same type exiting controller
+- include_tasks: existing_controller_new_disk_test.yml
+
+- name: Set fact of not adding disk to existing controller
+  set_fact:
+    in_adding_disk_existing_ctl: False
+# Second, run test of adding new disk controller and new disk to it when there is no 4 existing controllers
+- include_tasks: new_controller_new_disk_test.yml
+  when: add_new_controller

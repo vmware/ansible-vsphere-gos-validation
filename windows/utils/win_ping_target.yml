@@ -1,0 +1,27 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Ping specified IP address on Windows guest OS
+# Parameters:
+#   win_ping_target_ip: the target IP address to ping
+# Return:
+#   win_ping_target_result
+#
+- name: Check ping target IP address is defined
+  fail:
+    msg: "Please specify ping target IP address"
+  when: win_ping_target_ip is undefined or not win_ping_target_ip
+- debug:
+    msg: "Will ping this target IP address: {{ win_ping_target_ip }}"
+
+- name: "Ping target IP address in Windows guest OS"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "ping -n 3 {{ win_ping_target_ip }}"
+    win_execute_cmd_ignore_error: True
+
+- name: Set fact of the ping result
+  set_fact:
+    win_ping_target_result: "{{ True if win_powershell_cmd_output.rc == 0 else False }}"
+- debug:
+    msg: "Ping target IP address result: {{ win_ping_target_result }}"

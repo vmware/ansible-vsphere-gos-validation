@@ -1,0 +1,46 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# On nimbus testbed, it takes much longer time to enter install process
+# So here extend sleep time to 60s
+- name: Sleep for 60 seconds to wait for license agreement
+  wait_for:
+    timeout: 60
+
+- include_tasks: ../../../common/vm_guest_send_key.yml
+  vars:
+    keys_send:
+      - ENTER
+      - ENTER
+      - DOWNARROW
+      - ENTER
+      - ENTER
+      - ENTER
+      - ENTER
+    string_send: '{{ vm_password }}'
+
+- include_tasks: ../../../common/vm_guest_send_key.yml
+  vars:
+    keys_send:
+      - ENTER
+    string_send: '{{ vm_password }}'
+
+- include_tasks: ../../../common/vm_guest_send_key.yml
+  vars:
+    keys_send:
+      - ENTER
+      - ENTER
+    string_send: ''
+
+# The installation takes up to 200+s to finish the installation on
+# nimbus testbed, so here extend waiting time to 300s
+- name: Sleep for 300 seconds to wait for installation complete
+  wait_for:
+    timeout: 300
+
+# Press ENTER to reboot
+- include_tasks: ../../../common/vm_guest_send_key.yml
+  vars:
+    keys_send:
+      - ENTER
+    string_send: ''

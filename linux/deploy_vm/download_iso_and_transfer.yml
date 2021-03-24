@@ -1,0 +1,44 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# This task will download OS installation ISO file from given URL
+# locally, and transfer to ESXi host datastore for guest OS installation.
+#
+- name: Set fact of the OS installation ISO file name
+  set_fact:
+    os_installation_iso_file: "{{ os_installation_iso_url.split('/')[-1] }}"
+- name: Display the OS installation ISO file name
+  debug: var=os_installation_iso_file
+
+- name: Download OS installation ISO file from URL
+  get_url:
+    url: "{{ os_installation_iso_url }}"
+    dest: "{{ main_playbook_path }}/cache/{{ os_installation_iso_file }}"
+    mode: "0666"
+    checksum: "{{ os_installation_iso_checksum | default(omit) }}"
+    validate_certs: False
+  environment:
+    HTTPS_PROXY: "{{ http_proxy_localhost | default(omit) }}"
+    HTTP_PROXY: "{{ http_proxy_localhost | default(omit) }}"
+    FTP_PROXY: "{{ http_proxy_localhost | default(omit) }}"
+  register: download_os_iso_result
+- name: Display the result of OS ISO file downloading
+  debug: var=download_os_iso_result
+
+- name: Set fact of the dest path of OS installation ISO file on ESXi host
+  set_fact:
+    transferred_install_iso: "/vmfs/volumes/{{ datastore }}/{{ os_installation_iso_file }}"
+- name: Print the dest path of OS installation ISO file on ESXi host
+  debug: var=transferred_install_iso
+
+- name: Copy downloaded OS installation ISO file to ESXi host
+  include_tasks: ../../common/transfer_file_remote.yml
+  vars:
+    transfer_file_remote_src: "{{ main_playbook_path }}/cache/{{ os_installation_iso_file }}"
+    transfer_file_remote_dest: "{{ transferred_install_iso }}"
+    transfer_file_remote_server: "{{ esxi_hostname }}"
+    ansible_remote_tmp: "/vmfs/volumes/{{ datastore }}"
+
+- name: Set fact of the transferred ISO file datastore path
+  set_fact:
+    transferred_install_iso: "[{{ datastore }}] {{ os_installation_iso_file }}"

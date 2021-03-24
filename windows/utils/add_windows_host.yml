@@ -1,0 +1,19 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Add Windows guest IP address to in-memory host inventory
+- name: "Add specified Windows IP to the hosts"
+  add_host:
+    hostname: "{{ vm_guest_ip }}"
+    groups:
+      - "{{ vm_guest_group | default('target_vm') }}"
+    ansible_user: "{{ vm_username }}"
+    ansible_password: "{{ vm_password }}"
+    ansible_port: "{{ guest_os_winrm_port | default(5986) }}"
+    ansible_connection: winrm
+    ansible_winrm_server_cert_validation: ignore
+    ansible_ssh_pipelining: False
+    ansible_winrm_transport: basic
+  register: add_host_result
+- debug: var=add_host_result
+  when: enable_debug is defined and enable_debug

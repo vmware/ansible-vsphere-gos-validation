@@ -1,0 +1,44 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check VMware tools service is running and display the installed VMware tools
+# version, get VMware tools installation log file.
+#
+- include_tasks: ../utils/win_get_path.yml
+  vars:
+    win_get_path_specified: '$env:temp\vminst.log'
+- include_tasks: ../utils/win_get_file.yml
+  vars:
+    win_get_file_src_path: "{{ win_get_path_absolute }}"
+    win_get_file_dst_path: "{{ current_test_log_folder }}"
+
+# Check VMware tools service status
+- include_tasks: ../utils/win_get_service_status.yml
+  vars:
+    win_service_name: "VMTools"
+- name: Verify VMware tools service status is running
+  assert:
+    that:
+      - service_status == "Running"
+    fail_msg: "VMTools service status is not Running"
+    success_msg: "VMTools service status is Running"
+
+# Get VMware tools version and build number
+- include_tasks: ../utils/win_get_vmtools_version_build.yml
+- name: "Print VMware Tools version and build"
+  debug: var=vmtools_info_from_vmtoolsd
+
+# Get VMware drivers list
+- include_tasks: ../utils/win_get_vmtools_driver_list.yml
+# Get VMware services list
+- include_tasks: ../utils/win_get_vmtools_service_list.yml
+# Not all services are running, e.g., vmvss
+- name: Display all services running status in guest OS
+  debug:
+    msg: "Service '{{ item.key }}' status is: {{ item.value }}"
+  # assert:
+  #   that:
+  #     - "{{ item.value == 'Running' }}"
+  #   success_msg: "Service '{{ item.key }}' status is: {{ item.value }}"
+  #   fail_msg: "Service '{{ item.key }}' status is: {{ item.value }}"
+  with_dict: "{{ vmtools_service_dict }}"

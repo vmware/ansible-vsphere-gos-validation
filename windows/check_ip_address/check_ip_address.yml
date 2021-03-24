@@ -1,0 +1,46 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check VM IP addresses are all reported correctly
+# in guest info through VMware tools. When VMware tools is not installed or not
+# running in VM, this test case result is 'No Run'.
+#
+- name: check_ip_address
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+        - block:
+            - name: Get VM IP address from guest info
+              include_tasks: ../../common/vm_get_ip_from_vmtools.yml
+              vars:
+                all_ip: True
+            - name: Set fact of the all IP addresses got from guest info
+              set_fact:
+                ip_from_guestinfo: "{{ vm_guest_all_ip }}"
+            - debug:
+                msg: "Get all IP addresses from guest info: {{ ip_from_guestinfo }}"
+
+            - name: Get VM IP address from guest OS
+              include_tasks: ../utils/win_get_ethernet_dict.yml
+              vars:
+                win_get_ethernet_dict_guest_ip: "{{ vm_guest_ip }}"
+
+            - name: Check IP addresses got in guest OS are all in guestinfo
+              include_tasks: check_ip_in_guestinfo.yml
+              loop: "{{ ethernet_ip_dict | dict2items }}"
+              loop_control:
+                loop_var: ip_list
+          when: vmtools_is_installed and vmtools_is_running
+
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip test case '{{ ansible_play_name }}', VMware tools installed: {{ vmtools_is_installed }}, and running: {{ vmtools_is_running }}"
+          when: not vmtools_is_installed or not vmtools_is_running
+      rescue:
+        - include_tasks: ../setup/rescue_cleanup.yml
+          vars:
+            current_testcase_name: "{{ ansible_play_name }}"

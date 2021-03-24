@@ -1,0 +1,29 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Test add new disk on existing disk controller
+- include_tasks: ../../common/vm_get_new_disk_node_info.yml
+  vars:
+    disk_controller_facts_data: "{{ disk_controller_facts.disk_controller_data }}"
+    existing_vhba_type: "{{ test_disk_controller_type }}"
+- debug:
+    msg: "Will add a new disk on existing contorller: bus number {{ existing_vhba_bus_number }}, unit number {{ new_disk_unit_number }}"
+  when: existing_vbha_found and new_disk_unit_number_got and not disk_full_existing_vhba
+
+- block:
+    # Hot add and verify new disk
+    - include_tasks: hotadd_vm_controller_disk.yml
+    # Hot remove and verify new disk
+    - include_tasks: hotremove_vm_controller_disk.yml
+    - name: Set fact of test on new disk and existing controller
+      set_fact:
+        new_disk_existing_ctl: True
+  when: existing_vbha_found and new_disk_unit_number_got and not disk_full_existing_vhba
+
+- block:
+    - name: Set fact of test on new disk and existing controller
+      set_fact:
+        new_disk_existing_ctl: False
+    - debug:
+        msg: "Will not add new disk on existing controller, due to existing controller found: {{ existing_vbha_found }}, disk unit number got: {{ new_disk_unit_number_got }}, or disk full on exsiting controller: {{ disk_full_existing_vhba }}"
+  when: not existing_vbha_found or not new_disk_unit_number_got or disk_full_existing_vhba

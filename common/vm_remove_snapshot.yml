@@ -1,0 +1,36 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Remove specified VM snapshot or remove all snapshots of VM
+# Parameters:
+#   snapshot_remove_state: can be set to 'remove_all' or 'absent' (default)
+#   snapshot_name:
+#     if snapshot_remove_state is set to 'remove_all', then it's not required,
+#     if snapshot_remove_state is set to 'absent', then it's required to pass an existing snapshot name
+#
+- name: "Remove snapshot on '{{ vm_name }}'"
+  vmware_guest_snapshot:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    state: "{{ snapshot_remove_state | default('absent') }}"
+    snapshot_name: "{{ snapshot_name | default(omit) }}"
+  register: task_result
+- name: Display the result of remove snapshot
+  debug: var=task_result
+  when: enable_debug is defined and enable_debug
+
+- block:
+    - include_tasks: vm_get_snapshot_facts.yml
+
+    - name: "Assert snapshot '{{ snapshot_name }}' not exist"
+      assert:
+        that:
+          - item.name != snapshot_name
+        fail_msg: "Failed to remove snapshot {{ snapshot_name }}"
+      with_items: "{{ vm_snapshot_facts.guest_snapshots.snapshots }}"
+  when: snapshot_remove_state | default('absent') == 'absent'

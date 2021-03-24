@@ -1,0 +1,35 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- include_tasks: ../../common/vm_set_memory_size.yml
+  vars:
+    memory_mb: "{{ memory_hotadd_to_size|int * 1024 }}"
+- include_tasks: ../utils/win_check_winbsod.yml
+
+# Add check guest OS winrm can be connected after memory size change
+- include_tasks: ../utils/win_check_winrm.yml
+
+- name: Get memory size in guest OS
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "[int]((Get-WmiObject win32_OperatingSystem | % {$_.TotalVisibleMemorySize}) / 1MB)"
+- name: Set fact of the memory size got in guest
+  set_fact:
+    get_os_memory: "{{ win_powershell_cmd_output.stdout_lines[0] if not win_powershell_cmd_output.failed else 0 }}"
+
+- name: Check memory size got from guest
+  assert:
+    that:
+      - "{{ memory_hotadd_to_size|int }} == {{ get_os_memory|int }}"
+      - "{{ get_os_memory|int != 0 }}"
+    success_msg: "Get memory size in guest is the same as configured memory: {{ get_os_memory|int }}GB"
+    fail_msg: "Get memory size in guest: {{ get_os_memory|int }}, not same as the configured memory: {{ memory_hotadd_to_size|int }}GB"
+  when: win_guest_bitness == "64-bit" or (win_guest_bitness == "32-bit" and memory_hotadd_to_size|int < 4)
+
+- name: Check memory size recognized in 32-bit guest when hotadd memory larger than 4GB
+  assert:
+    that:
+      - "{{ get_os_memory|int }} == 3"
+    success_msg: "Get memory size in 32-bit guest is: {{ get_os_memory|int }}GB, when hotadd memory size >= 4GB"
+    fail_msg: "Get memory size in 32-bit guest: {{ get_os_memory|int }}GB, when hotadd memory size >= 4GB"
+  when: win_guest_bitness == "32-bit" and memory_hotadd_to_size|int >= 4

@@ -1,0 +1,55 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Wait VM guest IP address in guest info is the one specified by parameter 'wait_ipv4'.
+# If 'wait_ipv4' is not defined, this task will wait for VM IP addresses are reported
+# in guest info.
+# Note:
+# vm_guest_facts.instance.ipv4 may give the IP address of virbr0 on
+# RHEL/CentOS/OracleLinux 7.x and later, which is not the real guest IP address of
+# Ethernet. So, here we do not use vm_guest_facts.instance.ipv4 to check guest IP
+# address. This issue has been fixed in VMware Tools 10.3.5.
+# Parameters:
+#   wait_ipv4: the IP address to wait for in guest info
+#   vm_get_ip_timeout(optional): timeout for retrying get VM IP addresses in guest info,
+# the default value is 300 seconds.
+# 
+- name: Initialize the wait for IP address
+  set_fact:
+    wait_ipv4: ""
+  when: wait_ipv4 is undefined
+
+- name: Wait for VMware Tools collecting guest info
+  vmware_guest_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+  delay: 5
+  retries: "{{ ((vm_get_ip_timeout | default(300) | int) / 5) | int }}"
+  register: vm_guest_facts
+  until:
+    - "'instance' in vm_guest_facts"
+    - "'hw_eth0' in vm_guest_facts.instance"
+    - "'ipaddresses' in vm_guest_facts.instance.hw_eth0"
+    - vm_guest_facts.instance.guest_tools_status == "guestToolsRunning"
+    - vm_guest_facts.instance.hw_eth0.ipaddresses
+    - vm_guest_facts.instance.hw_eth0.ipaddresses | ipv4
+    - ( not wait_ipv4 ) or ( wait_ipv4 and wait_ipv4 in vm_guest_facts.instance.hw_eth0.ipaddresses | ipv4)
+
+# Retrieve IPv4 from eth0 ipaddresses to avoid getting virbr0 IP on RHEL-like guests
+- debug:
+    msg: "VM guest IP addresses in VM guest facts: {{ vm_guest_facts.instance.hw_eth0.ipaddresses | ipv4 }}"
+  when:
+    - vm_guest_facts.instance.hw_eth0.ipaddresses
+    - vm_guest_facts.instance.hw_eth0.ipaddresses | ipv4
+
+# When retrieving IPv4 from eth0 ipaddresses fails, we can retrieve ipv4 instead
+- debug:
+    msg: "Found VM guest IP address: {{ vm_guest_facts.instance.ipv4 }}"
+  when:
+    - (not vm_guest_facts.instance.hw_eth0.ipaddresses) or (not vm_guest_facts.instance.hw_eth0.ipaddresses | ipv4)
+    - vm_guest_facts.instance.ipv4

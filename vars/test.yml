@@ -1,0 +1,329 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+#####################################
+# Testing parameters
+#####################################
+
+# Enable printing debug information during testing
+# Default value is True.
+#
+# enable_debug: True
+
+# Whether to exit the testing when fail or not.
+# If set to True, the testing will stop when there is failed task in test case.
+# If set to False, the testing will continue to run the next test case when
+# there is failed task.
+# Please note that if 'Fatal' error occurs, the testing will exit.
+# Default value is False.
+#
+# exit_testing_when_fail: False
+
+# Enable Linux VM or ESXi server SSH pipelining.
+# If set to True, Ansible does not save the module to a temporary file on the VM
+# or the ESXi server, instead it pipes the module to the remote Python interpreter's stdin.
+# Default value is False.
+# Note:
+# Pipeling does not work for modules involving file transfer, e.g., copy, fetch, template,
+# or for non-python modules.
+#
+# vm_ssh_pipeline_enable: False
+# esxi_ssh_pipeline_enable: False
+
+# Before run testing on existing VM, whether to remove all snapshots of the VM or before remove
+# all snapshots revert to specified snapshot firstly.
+# If 'cleanup_old_snapshots' is set to True, and
+# (1) 'revert_to_snapshot' is set to an existing snapshot of VM, then before remove all snapshots
+# will revert to the specified snapshot firstly.
+# (2) 'revert_to_snapshot' is not set, then will remove all snapshots directly at the current state.
+# (3) 'revert_to_snapshot' is set to an absent snapshot, then test will fail.
+# If 'cleanup_old_snapshots' is set to False, then will not remove old snapshots of the VM.
+# Default value is False.
+#
+# cleanup_old_snapshots: False
+# revert_to_snapshot: ''
+
+# If set to True, a snapshot will be taken when test case failed,
+# if set to False, then will not take a test case failure state snapshot of VM.
+# Default value is True.
+#
+# take_fail_snapshot: True
+
+# The name of the VM base snapshot, which will be taken at the beginning of the testing if not exist,
+# and will be reverted to at the setup stage of each test case.
+# Default value is 'BaseSnapshot'.
+#
+# base_snapshot_name: "BaseSnapshot"
+
+# For Windows testing only.
+# Whether revert to the VM base snapshot at the beginning of each test case or not.
+# If set to False, test case will be executed one by one and will not revert to base snapshot,
+# if set to True, at the beginning of each test case will check if base snapshot defined by
+# 'base_snapshot_name' exists, revert to it when exists.
+#
+# revert_base_snapshot: False
+
+# If set to True, will get VM IP address only once at the beginning of the testing,
+# the following test cases will use this saved VM IP address without got it again.
+# If set to False, in each test case will try to get VM IP address.
+# Default value is False.
+#
+# use_saved_base_ip: False
+
+# The path to contain testing result file, log file and file collected in test case.
+# If not set, the default path is "logs/vm_name/date_timestamp/"
+#
+# local_log_path: '/tmp/testing/'
+
+# If set to True and there is no failed test case, newly created VM will be removed.
+# If set to False, will do nothing when the testing completes.
+# Default value is False.
+#
+# cleanup_vm: False
+
+# http/https/ftp proxy for downloading files from URL on local machine,
+# e.g., if your control machine is behind a proxy server, please set it here in the
+# format of 'proxy_server:port'.
+#
+# http_proxy_localhost: myproxy.company.com:8080
+
+#####################################
+# Testbed parameters
+#####################################
+
+# vCenter Server information
+vcenter_hostname: "vc.test.com"
+vcenter_username: "Administrator@vsphere.local"
+vcenter_password: "CHANGEME"
+datacenter: "MyDatacenter"
+
+# ESXi Server information
+esxi_hostname: "esxi.test.com"
+esxi_username: "root"
+esxi_password: "CHANGEME"
+
+validate_certs: False
+
+#####################################
+# VM parameters
+#####################################
+
+# In OS automatic install configuration files in this folder 'autoinstall',
+# default user account info is as below:
+# For Linux: user name is 'root',
+# For Windows client: user name is 'test', 
+# For Windows Server: user name is 'Administrator',
+# user password is 'B1gd3m0z'.
+# Or please enable 'root' user before testing on the existing VM.
+# Note: 'root' user here for login/SSH to VM here is required due to file privilege issue in test
+# case.
+vm_name: "CentOS_82_ansible_test"
+vm_username: "root"
+vm_password: "B1gd3m0z"
+# vm_folder: ''
+
+# For Windows testing only.
+# The port Windows WinRM will run over, valid value is '5986' or '5985'.
+# Default value is 5986.
+# guest_os_winrm_port: 5986
+
+# For Linux testing only.
+# If Python interpreter can not be discovered automatically in VM, please set the right
+# Python interpreter path here.
+# Default value is 'auto'.
+# vm_python: "auto"
+
+# If 'vm_username' is a not 'root' or privileged user, please set these privilege escalation parameters.
+# Note: since using 'root' user is a requirement now, below paramters will be deprecated in next release.
+#
+# vm_enable_become: no
+# vm_become_method: sudo
+# vm_become_user: root
+# vm_become_password: "B1gd3m0z"
+
+#####################################
+# Test cases parameters
+#####################################
+
+# 1. deploy_vm
+# If set to True, 'deploy_vm' test case will be executed to create a new VM and install
+# guest OS with specified OS installation ISO file, or deploy a new VM from specified
+# OVA template.
+# If set to False, 'deploy_vm' test case will be 'No Run', testing will run on the specified
+# VM with 'vm_name'.
+# Default value is False.
+#
+new_vm: False
+
+# Only used in Linux test case.
+# Now valid Linux VM deploy methods are: 'iso' or 'ova'.
+# Set this parameter when 'new_vm' is set to True and will create Linux VM.
+# Default value is 'iso'.
+#
+vm_deploy_method: "iso"
+
+# In Linux test case, when 'vm_deploy_method' is set to 'ova' and this parameter is set to
+# a valid hardware version, VM will be upgraded, if not set, VM will be deployed with the
+# hardware version set in ova template.
+# When 'vm_deploy_method' is set to 'iso', or in Windows test case, VM will be deployed with
+# this hardware version, if not set, VM will be deployed with the latest hardware version
+# the ESXi host supports.
+# Default is not set.
+#
+# hardware_version: ''
+
+# The name of the ESXi datastore in which the VM will be deployed, this parameter is required
+# when 'new_vm' is set to True.
+#
+datastore: "test-ds"
+
+# This parameter is required when 'new_vm' is set to True in Windows test case and
+# 'vm_deploy_method' is set to 'iso' in Linux test case.
+# For guest ID, please refer to:
+# https://code.vmware.com/apis/358/vsphere/doc/vim.vm.GuestOsDescriptor.GuestOsIdentifier.html
+# For Linux testing, when 'new_vm' is set to True and 'vm_deploy_method' is set to 'ova', if this
+# parameter is set, VM guest ID will be changed after deployment.
+# For Windows testing, supported guest OS IDs are:
+# Windows 10 32bit: Windows9Guest,
+# Windows 10 64bit: Windows9_64Guest,
+# Windows Server 2016: Windows9Server64Guest,
+# Windows Server 2019: Windows2019srv_64Guest,
+# Windows Server 2022: Windows2019srvNext_64Guest
+#
+guest_id: "centos8_64Guest"
+
+# Set below parameters when 'new_vm' is True in Windows testing and 'vm_deploy_method' is set
+# to 'iso' in Linux testing.
+secureboot_enabled: False
+memory_mb: 4096
+cpu_number: 2
+cpu_cores_per_socket: 1
+# Firmware valid value 'bios' or 'efi'.
+firmware: "efi"
+# Boot disk controller type valid value 'paravirtual', 'lsilogic', 'buslogic', 'lsilogicsas', or 'nvme'.
+boot_disk_controller: "paravirtual"
+boot_disk_size_gb: 40
+# For Linux VM valid value is 'vmxnet3' or 'e1000e'.
+# For Windows VM, will use 'e1000e' by default.
+network_adapter_type: "vmxnet3"
+# CDROM controller type valid value is 'ide' or 'sata'.
+cdrom_controller_type: "ide"
+# vm_network_name: "VM Network"
+
+# There are 2 methods to set the source of guest OS installation ISO file as below.
+# The first one takes precedence over the second one.
+# (1) If 'os_installation_iso_url' and/or 'os_installation_iso_checksum' is set, then guest
+# OS installation ISO file will be downloaded from the URL to local machine and transfer to the ESXi
+# datastore. 'os_installation_iso_checksum' is the checksum of the ISO file, please set in the format
+# 'md5:xxxxxxxxx', 'sha256:xxxxxxxxxx', etc.
+#
+# os_installation_iso_url: "https://mirrors.edge.kernel.org/centos/7.9.2009/isos/x86_64/CentOS-7-x86_64-Minimal-2009.iso"
+# os_installation_iso_checksum: "md5:xxxxxxxxxx"
+
+# (2) Or set the path of OS installation ISO files on ESXi host datastore in this format:
+# '[datastore_name] ISO_image_path/ISO_image_file', ISO files in this list will be attached to VM CDROMs orderly.
+#
+os_installation_iso_list:
+  - "[ISO-Images] OS/Linux/CentOS/8/8.2/GA/CentOS-8.2.2004-x86_64-dvd1.iso"
+
+# The path of OS automatic install configuration file used for guest OS installation from
+# ISO image specified above. This configuration file will be contained in a new created ISO file, which will be
+# attached to the VM's CDROM along with OS installation ISO.
+# Pre-created unattend configuration files are in this folder 'autoinstall', please find the
+# file in this path according to the OS type and version, and put your new created or customized
+# files in this path.
+#
+unattend_install_conf: "RHEL/8/server_with_GUI/ks.cfg"
+
+# For Windows testing only.
+# The product key in the pre-created Autounattend.xml file is the KMS client setup key got in
+# this page: https://docs.microsoft.com/en-us/windows-server/get-started/kmsclientkeys
+# Please set the correct product key for Windows edition to replace the one in
+# Autounattend.xml file, or Windows setup may be stuck due to incompatible product key.
+#  
+# windows_product_key: XXXXX-XXXXX-XXXXX-XXXXX-XXXXX
+
+# For Linux testing only.
+# If 'vm_deploy_method' is set to 'ova', set the path of the OVA file in local control machine or on a NFS server.
+# Example 1, if OVA is at localhost, 'ova_path' could be set to its absolute path or relative path.
+# ova_path: "/Images/Linux/Photon/3.0/Rev3/photon-hw13_uefi-3.0-a383732.ova
+# Example 2, if OVA is on NFS server, set 'ova_path' to the relative path under the NFS volume, and
+# 'ova_nfs_server_path' must be set in format of <nfs_server>:<nfs_volume>.
+#
+# ova_nfs_server_path: "192.168.1.10:/Images"
+# ova_path: "OS/Linux/Photon/3.0/Rev3/photon-hw13_uefi-3.0-a383732.ova"
+
+# 2. Linux: ovt_verify_install
+#    Windows: wintools_complete_install_verify
+# If set to True, VMware tools will be installed when there is no VMware tools in VM or
+# reinstalled if there is VMware tools in VM already.
+# In Linux test case, a repository will be added from the first ISO image specified in
+# parameter 'os_installation_iso_list' for RHEL/SLES/SLED, if 'os_installation_iso_list'
+# is not configured, this test case result will be 'Failed'.
+# For CentOS/OracleLinux/Photon OS/Ubuntu/Debian, open-vm-tools will be installed from
+# official online repositories.
+# Default value is True.
+#
+# update_vmtools: True
+
+# In Windows test case, there are 3 methods to configure the source of VMware tools.
+# (1) ESXi host bundled:
+# set 'vmtools_esxi_bundled' to True, 'vmtools_url_path' and 'vmtools_iso_path' will be ignored,
+# (2) download from URL:
+# set 'vmtools_esxi_bundled' to False and set 'vmtools_url_path' to the correct URL path,
+# (3) ESXi host datastore:
+# set 'vmtools_esxi_bundled' to False and set 'vmtools_iso_path' to the file path in datastore,
+# 'vmtools_url_path' takes precedence over 'vmtools_iso_path'.
+#
+vmtools_esxi_bundled: False
+vmtools_url_path: "https://packages.vmware.com/tools/releases/latest/windows/VMware-tools-windows-11.2.5-17337674.iso"
+# vmtools_iso_path: "[datastore1] VMware/VMTools/11.1.5/VMware-tools-windows-11.1.5-16596746.iso"
+
+# 3. memory_hot_add_basic
+# Maximum memory size in MB of VM when doing memory hotadd test. Used in Linux testing
+# only for now.
+# In Linux test case, the initial memory size of VM will be reset to 2048 MB
+# before hotadd. If the free memory size of ESXi server < 4096 MB, then this
+# test case result will be 'No Run'.
+# Default value is 16384 MB.
+#
+# vm_memory_hotadd_max: 16384
+
+# 4. cpu_hot_add_basic
+# Maximum vCPU number of VM when doing CPU hotadd test.
+# The initial vCPU number will be reset to 2 before hotadd.
+# When this prameter is set to 2, then this test case result will be 'No Run'.
+# Default value is 16.
+#
+# vm_cpu_hotadd_max: 16
+
+# 5. cpu_multicores_per_socket
+# Maximum vCPU cores per socket number of VM when doing vCPU cores pre socket test.
+# When this parameter is set to 1, this test case result will be 'No Run'.
+# Default value is 8.
+#
+# vm_cpu_cores_per_socket_max: 8
+
+# 6. gosc_perl_dhcp, gosc_cloudinit_dhcp
+# By default, VM network will be set to the new created portgroup in test case
+# 'gosc_perl_staticip' or 'gosc_cloudinit_staticip' during GOS customization.
+# While in test case 'gosc_perl_dhcp', 'gosc_cloudinit_dhcp', VM network will
+# be set to the network name defined here, default value is 'VM Network'.
+#
+# gosc_dhcp_network: "VM Network"
+
+#####################################
+# GOS related parameters
+#####################################
+
+# Flatcar:
+# In Flatcar there is no Python installed by default. This parameter is the URL
+# path of 'ActivePython3', in test case will download and install it firstly.
+#
+flatcar_python3_download_url: "https://downloads.activestate.com/ActivePython/releases/3.6.0.3600/ActivePython-3.6.0.3600-linux-x86_64-glibc-2.3.6-401834.tar.gz"
+
+# RedHat, CentOS, OracleLinux:
+# If this parameter is set, it will be used to enable yum to use this proxy
+# server in VM to get packages.
+#
+# http_proxy_vm: "http://myproxy.company.com:8080"

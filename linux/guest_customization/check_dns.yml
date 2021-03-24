@@ -1,0 +1,208 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Initilize DNS configuration check results"
+  set_fact:
+    dns_servers_success: False
+    dns_suffix_success: False
+    guest_dns_servers: []
+    guest_dns_search: []
+
+# Try to use command 'resolvectl' to get DNS status
+- include_tasks: ../../common/vm_shell_in_guest.yml
+  vars:
+    vm_shell_cmd: "/usr/bin/resolvectl"
+    vm_shell_args: "status"
+    vm_shell_out: "/tmp/resolvectl_status"
+- name: "Set fact of the 'resolvectl status' command result"
+  set_fact:
+    resolvectl_status_result: "{{ false if vm_shell_result.exit_code is undefined or vm_shell_result.exit_code != 0 else true }}"
+
+# If 'resolvectl' command succeed
+- block:
+    - include_tasks: ../../common/vm_guest_file_operation.yml
+      vars:
+        operation: "fetch_file"
+        src_path: "/tmp/resolvectl_status"
+        dest_path: "{{ testcase_info_collect_path }}/resolvectl_status"
+
+    # Run command 'resolvectl dns' to get DNS servers
+    - include_tasks: ../../common/vm_shell_in_guest.yml
+      vars:
+        vm_shell_cmd: "/usr/bin/resolvectl"
+        vm_shell_args: "dns"
+        vm_shell_out: "/tmp/resolvectl_dns"
+
+    - name: "Set fact of the 'resolvectl dns' command result"
+      set_fact:
+        resolvectl_dns_result: "{{ false if vm_shell_result.exit_code is undefined or vm_shell_result.exit_code != 0 else true }}"
+
+    - block:
+        - include_tasks: ../../common/vm_guest_file_operation.yml
+          vars:
+            operation: "fetch_file"
+            src_path: "/tmp/resolvectl_dns"
+            dest_path: "{{ testcase_info_collect_path }}/resolvectl_dns"
+
+        - name: "Get output of 'resolvectl dns'"
+          command: cat "{{ testcase_info_collect_path }}/resolvectl_dns"
+          register: dns_servers
+
+        - name: "Set fact of guest DNS servers"
+          set_fact:
+            guest_dns_servers: "{{ dns_servers.stdout_lines | select('match', '^Link') |
+                               regex_findall('\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b') }}"
+      when: resolvectl_dns_result | bool
+
+    # Run command 'resolvectl domain' to get DNS servers
+    - include_tasks: ../../common/vm_shell_in_guest.yml
+      vars:
+        vm_shell_cmd: "/usr/bin/resolvectl"
+        vm_shell_args: "domain"
+        vm_shell_out: "/tmp/resolvectl_domain"
+
+    - name: "Set fact of the 'resolvectl domain' command result"
+      set_fact:
+        resolvectl_domain_result: "{{ false if vm_shell_result.exit_code is undefined or vm_shell_result.exit_code != 0 else true }}"
+
+    - block:
+        - include_tasks: ../../common/vm_guest_file_operation.yml
+          vars:
+            operation: "fetch_file"
+            src_path: "/tmp/resolvectl_domain"
+            dest_path: "{{ testcase_info_collect_path }}/resolvectl_domain"
+
+        - name: "Get output of 'resolvectl domain'"
+          command: cat "{{ testcase_info_collect_path }}/resolvectl_domain"
+          register: dns_domains
+
+        - name: "Set fact of guest DNS searching domains"
+          set_fact:
+            guest_dns_search: "{{ dns_domains.stdout_lines | select('match', '^Link') |
+                              regex_findall('\\b(?:[a-zA-Z0-9-]{1,}\\.){1,}[a-zA-Z0-9-]{1,}\\b') }}"
+      when: resolvectl_domain_result | bool
+  when: resolvectl_status_result
+
+# If 'resolvectl' command failed and guest OS is not Ubuntu
+# Try to get DNS servers and DNS search domains from /etc/resolv.conf
+- block:
+    - include_tasks: ../../common/vm_guest_file_operation.yml
+      vars:
+        operation: "fetch_file"
+        src_path: "{{ resolv_conf_file }}"
+        dest_path: "{{ testcase_info_collect_path }}/etc/resolv.conf"
+
+    - name: "Get DNS servers from /etc/resolv.conf"
+      shell: cat "{{ testcase_info_collect_path }}/etc/resolv.conf" | grep -i "^nameserver\s*" | awk '{print $2}'
+      register: dns_servers
+
+    - name: "Get guest DNS servers from shell command output"
+      set_fact:
+        guest_dns_servers: "{{ dns_servers.stdout_lines }}"
+
+    - name: "Get DNS search domains from /etc/resolv.conf"
+      shell: cat "{{ testcase_info_collect_path }}/etc/resolv.conf" | grep -i "^search" | awk '{i=2;while(i<=NF) {print $i; i++ }}'
+      register: dns_search
+
+    - name: "Save guest DNS search list to tmp variable"
+      set_fact:
+        tmp_dns_search: "{{ dns_search.stdout_lines }}"
+
+    # In Amazon Linux 2 guest, a period after each DNS search domain would be added, so remove it
+    - name: "Get guest DNS search list"
+      set_fact:
+        guest_dns_search: "{{ guest_dns_search + [item | regex_replace('\\.$','')] }}"
+      with_items: "{{ tmp_dns_search }}"
+  when:
+    - not resolvectl_status_result
+    - guest_os_ansible_distribution != 'Ubuntu'
+
+# If 'resolvectl' command failed and guest OS is Ubuntu
+# For Ubuntu 18.04.4 or later guest, try to use systemd-resolve command
+- block:
+    - include_tasks: ../../common/vm_shell_in_guest.yml
+      vars:
+        vm_shell_cmd: "/usr/bin/systemd-resolve"
+        vm_shell_args: "--status"
+        vm_shell_out: "/tmp/systemd_resolve_status"
+    - name: "Set fact of the systemd-resolve command result"
+      set_fact:
+        systemd_resolve_result: "{{ false if vm_shell_result.exit_code is undefined or vm_shell_result.exit_code != 0 else true }}"
+    - block:
+        - include_tasks: ../../common/vm_guest_file_operation.yml
+          vars:
+            operation: "fetch_file"
+            src_path: "/tmp/systemd_resolve_status"
+            dest_path: "{{ testcase_info_collect_path }}/systemd_resolve_status"
+        - name: "Get DNS servers from command systemd-resolve"
+          shell: cat "{{ testcase_info_collect_path }}/systemd_resolve_status" | sed -n '/DNS Servers/,/DNS Domain/p' | head -n -1
+          register: dns_servers
+        - name: "Set fact of DNS servers from shell command output"
+          set_fact:
+            guest_dns_servers: "{{ (guest_dns_servers + [item.strip().split(':')[1].strip()]) if 'DNS Servers' in item else (guest_dns_servers + [item.strip()]) }}"
+          with_items: "{{ dns_servers.stdout_lines }}"
+
+        - name: "Get DNS search domains from command systemd-resolve"
+          shell: cat "{{ testcase_info_collect_path }}/systemd_resolve_status" | sed -n '/DNS Domain/,/DNSSEC NTA/p' | head -n -1
+          register: dns_domains
+        - name: "Set fact of DNS search domains from shell command output"
+          set_fact:
+            guest_dns_search: "{{ (guest_dns_search + [item.strip().split(':')[1].strip()]) if 'DNS Domain' in item else (guest_dns_search + [item.strip()]) }}"
+          with_items: "{{ dns_domains.stdout_lines }}"
+      when: systemd_resolve_result
+  when:
+    - not resolvectl_status_result
+    - guest_os_ansible_distribution == 'Ubuntu'
+
+- name: "Set fact of the expected DNS servers after GOSC"
+  set_fact:
+    expected_dns_servers: "{{ linux_gosc_spec['dns_servers'] }}"
+
+# In cloudint GOSC, the configured DNS servers will be appended to the former DNS servers.
+# So if there are already 3 DNS servers before doing cloudinit GOSC, the configured DNS servers will not be set.
+# Please refer to this issue: https://bugs.launchpad.net/ubuntu/+source/cloud-init/+bug/1892447
+# File: https://github.com/canonical/cloud-init/blob/master/cloudinit/distros/parsers/resolv_conf.py
+#
+- block:
+    - name: "Set fact of the combination of DNS servers list before GOSC and the configured list"
+      set_fact:
+        tmp_dns_server_list: "{{ (dns_servers_before_gosc + linux_gosc_spec['dns_servers']) | unique }}"
+    - name: "Set fact of the expected DNS servers"
+      set_fact:
+        expected_dns_servers: "{{ dns_servers_before_gosc }}"
+      when: tmp_dns_server_list | length == dns_servers_before_gosc | length
+    - name: "Set fact of the expected DNS servers"
+      set_fact:
+        expected_dns_servers: "{{ tmp_dns_server_list[:3] if tmp_dns_server_list | length > 3 else tmp_dns_server_list }}"
+      when: tmp_dns_server_list | length > dns_servers_before_gosc | length
+  when:
+    - dns_servers_before_gosc is defined
+    - enable_cloudinit_gosc is defined and enable_cloudinit_gosc
+    - linux_gosc_spec['dns_servers'] | difference(guest_dns_servers) | length != 0
+
+- debug:
+    msg:
+      - "The expected DNS servers: {{ expected_dns_servers }}"
+      - "The actual DNS servers got in guest: {{ guest_dns_servers }}"
+
+# Check guest DNS servers
+- name: "Check guest DNS servers are customized"
+  set_fact:
+    dns_servers_success: "{{ expected_dns_servers | difference(guest_dns_servers) | length == 0 }}"
+- name: "Print DNS servers check result"
+  debug: var=dns_servers_success
+- include_tasks: ../../common/print_error_msg.yml
+  vars:
+    error_msg: "VM DNS servers are {{ guest_dns_servers }}, not expected DNS servers {{ linux_gosc_spec['dns_servers'] }}"
+  when: not dns_servers_success
+
+# Check guest DNS search domains
+- name: "Check DNS search domains are customized"
+  set_fact:
+    dns_suffix_success: "{{ linux_gosc_spec['dns_suffix'] | difference(guest_dns_search) | length == 0 }}"
+- name: "Print DNS suffix check result"
+  debug: var=dns_suffix_success
+- include_tasks: ../../common/print_error_msg.yml
+  vars:
+    error_msg: "VM DNS domain search domains are {{ guest_dns_search }}, not expected search domains {{ linux_gosc_spec['dns_suffix'] }}"
+  when: not dns_suffix_success

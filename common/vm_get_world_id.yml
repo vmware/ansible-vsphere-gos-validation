@@ -1,0 +1,33 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VM world ID on ESXi host
+# Parameters:
+#   vm_get_world_id_timeout: default value is 300 seconds
+# Return:
+#   vm_world_id
+#
+- name: Set fact of the getting VM world ID retry time
+  set_fact:
+    vm_get_world_id_timeout: "{{ vm_get_world_id_timeout | default(300) }}"
+- debug:
+    msg: "Getting VM world id in {{ vm_get_world_id_timeout }} seconds, will retry with an interval of 5 seconds"
+
+- name: "Get VM '{{ vm_name }}' world id on ESXi host '{{ esxi_hostname }}'"
+  shell: "esxcli network vm list | awk '/ {{ vm_name }} / {print $1}'"
+  delegate_to: "{{ esxi_hostname }}"
+  register: get_vm_world_id
+  changed_when: False
+  until: get_vm_world_id.stdout
+  retries: "{{ ((vm_get_world_id_timeout | int) / 5) | int }}"
+  delay: 5
+
+- name: Display the result of getting VM world ID
+  debug: var=get_vm_world_id
+  when: enable_debug is defined and enable_debug
+
+- name: "Set fact of VM '{{ vm_name }}' world ID"
+  set_fact:
+    vm_world_id: "{{ get_vm_world_id.stdout_lines[0] }}"
+- debug:
+    msg: "Get VM '{{ vm_name }}' world ID: {{ vm_world_id }}"

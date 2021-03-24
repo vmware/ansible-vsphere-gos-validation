@@ -1,0 +1,24 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Update INI-stle file
+# Parameters:
+#   file_path: (Required)The path to the INI-style file
+#   section_name: (Required)The section name in INI-style files
+#   option_name: (Optional)The option name under a section
+#   option_value: (Optional)The option value
+#   ini_state: (Optional)If set to absent, the option or section will be removed; Otherwise it will be created or udpated
+#
+
+- name: "Update section {{ section_name }}"
+  ini_file:
+    path: "{{ file_path }}"
+    section: "{{ section_name }}"
+    option: "{{ option_name | default(omit) }}"
+    value: "{{ option_value | default(omit) }}"
+    state: "{{ ini_state | default('present') }}"
+    no_extra_spaces: True
+    backup: True
+    mode: "0644"
+  become: True
+  delegate_to: "{{ vm_guest_ip }}"

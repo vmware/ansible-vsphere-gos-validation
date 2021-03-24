@@ -1,0 +1,37 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Update package metadata by checking repo update
+# Parameters:
+#   check_update_cmd: The command to check repo update
+#   clean_cache_cmd: The command to clean all cache and metadata
+
+- block:
+    # Clean all cache and metadata if necessary
+    - name: "Clean all cache and metadata"
+      command: "{{ clean_cache_cmd }}"
+      args:
+        warn: False
+      delegate_to: "{{ vm_guest_ip }}"
+      when: clean_cache_cmd is defined and clean_cache_cmd
+
+    - name: "Print check update command"
+      debug: var=check_update_cmd
+
+    # Maybe failed to update part of repos due to network issue.
+    # This issue may cause open-vm-tools installation fail.
+    - name: "Check OS packages updates"
+      command: "{{ check_update_cmd }}"
+      args:
+        warn: False
+      failed_when: False
+      register: repo_update_output
+      until: "repo_update_output.stderr is defined and not repo_update_output.stderr"
+      retries: 10
+      delay: 5
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Print check update result"
+      debug: var=repo_update_output
+      when: enable_debug is defined and enable_debug
+  when: check_update_cmd is defined and check_update_cmd

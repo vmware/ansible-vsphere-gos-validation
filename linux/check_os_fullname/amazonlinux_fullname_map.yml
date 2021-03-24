@@ -1,0 +1,46 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Amazon Linux guestid was overwritten to other3xlinux-64
+# with short-name in /etc/vmware-tools/tools.conf, which will map to "Other 3.x Linux (64-bit)" ( on ESXi 6.7 and later) or
+# "Other 3.x or later Linux (64-bit)" (on ESXi 6.5 and earlier)
+
+- name: "Read /etc/vmware-tools/tools.conf"
+  shell: cat /etc/vmware-tools/tools.conf | grep '^ *short-name *='
+  register: result
+  failed_when: False
+  changed_when: False
+  delegate_to: "{{ vm_guest_ip }}"
+
+- block:
+    - name: "Initilize shortname"
+      set_fact:
+        short_name: "{{ result.stdout.split(' = ')[1] }}"
+    - debug:
+        msg: "Guest short name is overwritten to {{ short_name }}"
+  when: result.stdout
+
+# short-name is not in tools.conf
+- block:
+    # Map Amazon Linux when ESXi <= 6.5.0
+    - name: "Set guest_fullname variable for Amazon Linux on ESXi <= 6.5.0"
+      set_fact:
+        guest_fullname: ["Other 3.x or later Linux {{ bitness }}", "Other 3.x Linux {{ bitness }}"]
+      when:
+        - (esxi_version_num | int <= 650) or ((esxi_version_num | int == 670) and (esxi_update_version | int == 0))
+
+    # Map Amazon Linux when ESXi > 6.7.0 GA
+    - name: "Set guest_fullname variable for Amazon Linux on ESXi >= 6.7.0"
+      set_fact:
+        guest_fullname: "Amazon Linux {{ guest_os_ansible_distribution_major_ver }} {{ bitness }}"
+      when:
+        - (esxi_version_num | int > 670) or ((esxi_version_num | int == 670) and (esxi_update_version | int > 0))
+  when:
+    - short_name is undefined or not short_name
+
+# short-name = other3xlinux-64 in tools.conf
+- name: "Set guest_fullname variable for Amazon Linux on ESXi <= 6.5.0"
+  set_fact:
+    guest_fullname: ["Other 3.x or later Linux {{ bitness }}", "Other 3.x Linux {{ bitness }}"]
+  when:
+    - short_name is defined and short_name == "other3xlinux-64"

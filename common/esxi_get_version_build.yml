@@ -1,0 +1,54 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get ESXi server major version and update version, build bumber info by vmware_host_facts module
+- name: "Initialize ESXi version info to N/A"
+  set_fact:
+    esxi_version: 'N/A'
+    esxi_build: 'N/A'
+    esxi_update_version: 'N/A'
+- name: "Get ESXi server product info"
+  vmware_host_facts:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+    schema: vsphere
+    properties:
+      - config.product
+      - config.option
+  register: gather_host_facts_result
+  ignore_errors: yes
+
+- block:
+    - name: "Set fact of the ESXi server version and build number"
+      set_fact:
+        esxi_version: "{{ gather_host_facts_result.ansible_facts.config.product.version }}"
+        esxi_build: "{{ gather_host_facts_result.ansible_facts.config.product.build }}"
+
+    - block:
+        - name: "Looking for ESXi update level in host config options"
+          set_fact:
+            esxi_update_level: "{{ gather_host_facts_result.ansible_facts.config.option | selectattr('key', 'equalto', 'Misc.HostAgentUpdateLevel') }}"
+
+        - name: "Set fact of the ESXi server update version"
+          set_fact:
+            esxi_update_version: "{{ esxi_update_level[0]['value'] }}"
+          when: esxi_update_level | length > 0
+      when: esxi_version is version('7.0.0', '<')
+  when: not gather_host_facts_result.failed
+
+- debug:
+    msg: "Get ESXi server '{{ esxi_hostname }}' config.product, config.option properties failed"
+  when: gather_host_facts_result.failed
+
+# For log plugin to gather ESXi info in result file
+- name: "Print ESXi server hostname"
+  debug: var=esxi_hostname
+- name: "Print ESXi server version"
+  debug: var=esxi_version
+- name: "Print ESXi server build"
+  debug: var=esxi_build
+- name: "Print ESXi server update version"
+  debug: var=esxi_update_version

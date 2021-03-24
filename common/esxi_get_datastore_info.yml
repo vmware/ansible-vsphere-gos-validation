@@ -1,0 +1,30 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get specified datastore mount status on specified server.
+# Please make sure the named datastore exists on the server.
+# "esxi_get_datastores.yml" can be used to get all NFS and VMFS datastores
+# Parameters:
+#   server_get_datastore_name: the name of datastore.
+# Return:
+#   server_get_datastore_info: the specified properties info of sepcified
+#     datastore.
+#
+- name: Get specified datastore property info
+  vmware_datastore_info:
+    validate_certs: "{{ validate_certs | default(False) }}"
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    datacenter_name: "{{ vsphere_host_datacenter }}"
+    name: "{{ server_get_datastore_name }}"
+    schema: vsphere
+    properties: "{{ server_get_datastore_properties | default(['name', 'summary.accessible']) }}"
+  register: server_get_datastore_result
+- name: Set fact of the required datastore info
+  set_fact:
+    server_get_datastore_info: "{{ server_get_datastore_result.datastores[0] if server_get_datastore_result.datastores != [] else {} }}"
+
+- name: Get specified datastore property info
+  debug: var=server_get_datastore_info
+  when: enable_debug is defined and enable_debug

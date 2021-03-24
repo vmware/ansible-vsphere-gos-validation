@@ -1,0 +1,73 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- block:
+  - name: "Check if guest OS has desktop environment"
+    stat:
+      path: /etc/X11/default-display-manager
+    register: result
+    delegate_to: "{{ vm_guest_ip }}"
+  - name: "Set fact of guest OS with/without desktop experience"
+    set_fact:
+      guest_os_with_gui: "{% if not result.stat.exists %}False{% else %}True{% endif %}"
+  when: guest_os_ansible_distribution in ["Ubuntu", "Debian"]
+
+# For SLES/SLED, if runlevel is 5, means OS has Desktop
+- block:
+    - name: "Check if guest OS has desktop environment"
+      command: runlevel
+      register: runlevel_output
+      delegate_to: "{{ vm_guest_ip }}"
+      delay: "{{ delay | default(2) }}"
+      retries: "{{ retries | default(60) }}"
+      until:
+        - runlevel_output.rc == 0
+    - name: "Set fact of guest OS with/without desktop experience"
+      set_fact:
+        guest_os_with_gui: "{% if runlevel_output.stdout.find('5') != -1 %}True{% else %}False{% endif %}"
+  when: guest_os_ansible_distribution in ["SLES", "SLED"]
+
+# Photon, Amazon and Flatcar have no desktop
+- block:
+    - name: "Set fact of guest OS without desktop experience"
+      set_fact:
+        guest_os_with_gui: False
+  when: guest_os_ansible_distribution in ["VMware Photon OS", "Amazon", "Flatcar"]
+
+# For RHEL, if /usr/bin/X exists, OS has Desktop
+- block:
+    - name: "Check if guest OS has desktop environment"
+      stat:
+        path: /usr/bin/X
+      register: X_output
+      delegate_to: "{{ vm_guest_ip }}"
+    - name: "Set fact of guest OS with/without desktop experience"
+      set_fact:
+        guest_os_with_gui: "{% if not X_output.stat.exists %}False{% else %}True{% endif %}"
+  when:
+    guest_os_ansible_distribution in ["RedHat", "OracleLinux", "CentOS", "Fedora"]
+
+- block:
+    - name: "Check if guest OS has desktop environment"
+      stat:
+        path: /etc/X11/xorg.conf
+      register: X11_result
+      delegate_to: "{{ vm_guest_ip }}"
+    - name: "Set fact of guest OS with/without desktop experience"
+      set_fact:
+        guest_os_with_gui: "{% if not X11_result.stat.exists %}False{% else %}True{% endif %}"
+  when: guest_os_ansible_distribution == "FreeBSD"
+
+- block:
+    - name: "Check if guest OS has desktop environment"
+      stat:
+        path: /etc/X11/xdm/Xservers
+      register: result
+      delegate_to: "{{ vm_guest_ip }}"
+    - name: "Set fact of guest OS with/without desktop experience"
+      set_fact:
+        guest_os_with_gui: "{% if not result.stat.exists %}False{% else %}True{% endif %}"
+  when: guest_os_ansible_distribution == "Solaris"
+
+- debug:
+    msg: "Guest OS has desktop environment: {{ guest_os_with_gui }}"

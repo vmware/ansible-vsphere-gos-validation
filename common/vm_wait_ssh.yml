@@ -1,0 +1,29 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Wait for port 22 to become open and contain specific keyword
+# Parameters:
+#   vm_wait_ssh_ip: IP address of the remote machine to connect to
+#   vm_wait_ssh_timeout (optional): wait for timeout in seconds,
+#     the default value is 900.
+#   vm_wait_ssh_keyword (optional): wait for keyword in connection,
+#     the default value is 'OpenSSH'.
+#
+- name: Check required parameter
+  assert:
+    that:
+      - vm_wait_ssh_ip is defined
+      - vm_wait_ssh_ip
+    fail_msg: "Please specify the 'vm_wait_ssh_ip' parameter when using this task."
+
+- name: "Wait for port 22 to become open or contain specific keyword"
+  wait_for:
+    port: 22
+    host: "{{ vm_wait_ssh_ip }}"
+    search_regex: "{{ vm_wait_ssh_keyword | default('OpenSSH') }}"
+    delay: 5
+    timeout: "{{ vm_wait_ssh_timeout | default(900) }}"
+  register: vm_wait_ssh_result
+- name: Display the port 22 connectable result
+  debug: var=vm_wait_ssh_result
+  when: enable_debug is defined and enable_debug

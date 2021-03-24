@@ -1,0 +1,46 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Add or refresh the testing VM's IP in in-memory inventory hosts info
+# Parameters:
+#   update_inventory_timeout (optional): the timeout to get VM IP address
+#     and the timeout to wait SSH to be connectable
+#
+- include_tasks: vm_get_ip.yml
+  vars:
+    vm_get_ip_timeout: "{{ update_inventory_timeout | default(900) }}"
+- debug:
+    msg: "Get '{{ vm_name }}' IP address: {{ vm_guest_ip }}"
+
+- include_tasks: vm_wait_connection.yml
+  vars:
+    vm_wait_connection_timeout: "{{ update_inventory_timeout | default(900) }}"
+
+- name: "Initialize the default update inventory to True"
+  set_fact:
+    update_inventory: True
+
+- block:
+    - name: Loop groups to update update_inventory
+      set_fact:
+        update_inventory: False
+      when: vm_guest_ip == item
+      loop: "{{ groups['target_vm'] }}"
+  when: groups['target_vm'] is defined
+
+- name: "If VM IP Address not exist then update inventory"
+  block:
+    - include_tasks: add_host_in_memory_inventory.yml
+      vars:
+        add_host_in_memory_inventory_ip: "{{ vm_guest_ip }}"
+        add_host_in_memory_inventory_gp: "target_vm"
+        add_host_in_memory_inventory_user: "{{ vm_username }}"
+        add_host_in_memory_inventory_pwd: "{{ vm_password }}"
+        add_host_in_memory_inventory_sudo_pwd: "{{ vm_password }}"
+        add_host_in_memory_inventory_python: "{{ vm_python | default('auto') }}"
+        add_host_in_memory_inventory_become: "{{ vm_enable_become | default(omit) }}"
+        add_host_in_memory_inventory_become_mth: "{{ vm_become_method | default(omit) }}"
+        add_host_in_memory_inventory_become_usr: "{{ vm_become_user | default(omit) }}"
+        add_host_in_memory_inventory_become_pwd: "{{ vm_become_password | default(omit) }}"
+        add_host_in_memory_inventory_ssh_pipeline: "{{ vm_ssh_pipeline_enable | default(False) }}"
+  when: update_inventory

@@ -1,0 +1,37 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Customize Windows guest OS"
+  vmware_guest:
+    validate_certs: "{{ validate_certs | default(False) }}"
+    hostname: "{{ vcenter_hostname }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+    username: "{{ vcenter_username }}"
+    password: "{{ vcenter_password }}"
+    datacenter: "{{ datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    networks:
+      - name: "{{ customize_network }}"
+        ip: "{{ customize_ip | default(omit) }}"
+        gateway: "{{ customize_gateway | default(omit) }}"
+        netmask: "{{ customize_netmask | default(omit) }}"
+        type: "{{ customize_network_type }}"
+    customization:
+      existing_vm: True
+      dns_servers: "{{ gosc_dns_servers }}"
+      domain: "{{ customize_domain }}"
+      hostname: "{{ customize_gos_hostname }}"
+      autologon: "{{ customize_autologon }}"
+      autologoncount: "{{ customize_autologon_count }}"
+      password: "{{ customize_logon_password }}"
+      timezone: "{{ customize_timezone_id }}"
+      runonce:
+        - "{{ customize_runonce }}"
+    wait_for_customization: True
+    wait_for_customization_timeout: "{{ timeout | default(omit) }}"
+  register: customize_windows_result
+
+- name: Display the Windows customization result
+  debug: var=customize_windows_result
+  when: enable_debug

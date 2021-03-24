@@ -1,0 +1,68 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check 'vmware-toolbox-cmd' command can display
+# the date and time on the host. If VMware Tools is not installed or not running,
+# then this test case result will be "No Run".
+# Note: The difference between host time got from 'vmware-toolbox-cmd' in VM and
+# the host time got from ESXi host may not in 15s due to network issue.
+#
+- name: stat_hosttime
+  hosts: localhost
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../utils/test_setup.yml
+          vars:
+            vmtools_check: "True"
+
+        - block:
+            - include_tasks: ../../common/print_error_msg.yml
+              vars:
+                error_msg: "VMware tools is not installed or not running."
+            - include_tasks: ../../common/print_test_result.yml
+              vars:
+                test_result: "No Run"
+          when: not vmtools_is_running
+
+        - block:
+            - include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
+
+            - name: "Execute vmware-toolbox-cmd stat hosttime in guest OS"
+              shell: "LC_ALL='en_US.UTF-8' TZ=UTC {{ vmware_toolbox_cmd_path }} stat hosttime"
+              register: stat_time
+              delegate_to: "{{ vm_guest_ip }}"
+              poll: 0
+
+            # At the same time get ESXi host time by executing 'date' command
+            - name: "Get real host time on {{ esxi_hostname }}"
+              shell: date -u "+%d %b %Y %H:%M:%S"
+              register: real_time
+              delegate_to: "{{ esxi_hostname }}"
+            - debug:
+                msg:
+                  - "VMware Tools stat host time is: {{ stat_time.stdout }}"
+                  - "On ESXi host '{{ esxi_hostname }}' host time is: {{ real_time.stdout }}"
+
+            # Calculate how many seconds stat host time is behand real host time
+            - set_fact:
+                stat_behind_real: "{{ ((real_time.stdout | to_datetime('%d %b %Y %H:%M:%S')) - (stat_time.stdout | to_datetime('%d %b %Y %H:%M:%S')) ).total_seconds() }}"
+
+            - debug:
+                msg: "Stat host time in guest is behind real host time: {{ stat_behind_real }}s"
+
+            - name: "Check difference between stat host time and the real host time is less than 15s"
+              assert:
+                that:
+                  - stat_behind_real | float <= 15
+                fail_msg: "Difference between stat host time and real host time is larger than 15s: {{ stat_behind_real }}s"
+                success_msg: "Difference between stat host time and real host time: {{ stat_behind_real }}s"
+            - include_tasks: ../../common/print_test_result.yml
+              vars:
+                test_result: "Passed"
+          when: vmtools_is_running
+
+      rescue:
+        - include_tasks: ../utils/test_rescue.yml

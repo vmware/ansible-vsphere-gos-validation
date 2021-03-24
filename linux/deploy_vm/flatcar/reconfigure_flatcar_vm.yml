@@ -1,0 +1,35 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Reset deploy_casename in case user doesn't provide correct guest_id
+- name: "Set fact of deploy VM test case name"
+  set_fact:
+    deploy_casename: "deploy_flatcar_ova"
+
+# Use Ignition to configure ssh authorized key and user password
+- name: "Generate Ignition config file"
+  include_tasks: generate_ignition_config.yml
+
+- name: "Defining the Ignition config in Guestinfo"
+  include_tasks: ../../../common/vm_set_extra_config.yml
+  vars:
+    vm_custom_values:
+      - key: "guestinfo.coreos.config.data"
+        value: "{{ ignition_config_data }}"
+      - key: "guestinfo.coreos.config.data.encoding"
+        value: "base64"
+
+# Power on VM to update login information
+- include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-on'
+# Skip checking guest full name here because we will check it in TD1 case
+- include_tasks: ../../../common/vm_wait_guest_fullname.yml
+
+# Get guest ip
+- include_tasks: ../../../common/update_inventory.yml
+  vars:
+    update_inventory_timeout: 300
+
+# Post configuration for ssh, cloud-init and vmtools
+- include_tasks: flatcar_post_config.yml
