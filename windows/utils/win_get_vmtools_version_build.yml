@@ -6,6 +6,10 @@
 #   vmtools_version: VMware tools version
 #   vmtools_build_number: VMware tools build number
 #
+- name: Initialize VMware tools version info
+  set_fact:
+    vmtools_info_from_vmtoolsd: ''
+
 - name: Get VMware tools version and build number in guest OS
   win_shell: "& 'C:\\Program Files\\VMware\\VMware Tools\\VMwareToolboxCmd.exe' -v"
   register: get_tools_version_output
@@ -19,5 +23,6 @@
     vmtools_info_from_vmtoolsd: "{{ get_tools_version_output['stdout_lines'][0] }}"
     vmtools_version: "{{ get_tools_version_output['stdout_lines'][0].split(' ')[0].rsplit('.', 1)[0] }}"
     vmtools_build_number: "{{ get_tools_version_output['stdout_lines'][0].split(' ')[1][1:-1].split('-')[1] }}"
-- debug:
-    msg: "Get VMware tools version: {{ vmtools_version }}, build number: {{ vmtools_build_number }}"
+
+- name: "Print VMware Tools version and build"
+  debug: var=vmtools_info_from_vmtoolsd
