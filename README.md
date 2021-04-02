@@ -69,3 +69,13 @@ This project supports below scenarios for end-to-end guest OS validation testing
 | Windows 10                                      | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Windows Server 2019                             | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 
+
+### Docker images
+* Release v1.0:
+```
+# docker pull dianewang/ansible-vsphere-gos-validation:v1.0
+or
+# docker pull dianewang/ansible-vsphere-gos-validation:latest
+# docker run -it --privileged dianewang/ansible-vsphere-gos-validation:v1.0
+```
+Then launch testing in container using the steps in this section [Steps to Launch Testing](#steps-to-launch-testing)
