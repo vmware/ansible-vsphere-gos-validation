@@ -601,8 +601,11 @@ class CallbackModule(CallbackBase):
                         self.vm_info['Guest ID'] = debug_var_value
                     if not self.vm_info['Hardware Version'] and debug_var_name == "vm_hardware_version":
                         self.vm_info['Hardware Version'] = debug_var_value
-                    if not self.vm_info['VM Tools'] and debug_var_name ==  "vmtools_info_from_vmtoolsd":
-                        self.vm_info['VM Tools'] = debug_var_value
+                if ("get_guest_ovt_version_build.yml" == task_file or
+                   "win_get_vmtools_version_build.yml" == task_file):
+                    if debug_var_name ==  "vmtools_info_from_vmtoolsd" and debug_var_value:
+                        if not self.vm_info['VM Tools'] or self.vm_info['VM Tools'] != debug_var_name:
+                            self.vm_info['VM Tools'] = debug_var_value
                 if "esxi_get_version_build.yml" == task_file:
                     if not self.esxi_info['hostname'] and debug_var_name == "esxi_hostname":
                         self.esxi_info['hostname'] = debug_var_value
@@ -689,8 +692,6 @@ class CallbackModule(CallbackBase):
             #Use default testing vars file
             self.testing_vars_file = os.path.join(self.cwd, "vars/test.yml")
 
-        self._get_testing_vars()
-
         self.add_logger_file_handler(self.full_debug_log)
         msg = self._banner("PLAYBOOK: {}".format(playbook_path))
         msg += "Positional arguments: {}\n".format(' '.join(context.CLIARGS['args']))
@@ -766,6 +767,7 @@ class CallbackModule(CallbackBase):
         self.logger.info(msg)
 
         # Log testcases results
+        self._get_testing_vars()
         self._display.banner("TEST SUMMARY")
         self.logger.info(self._banner("TEST SUMMARY"))
         self.add_logger_file_handler(self.test_results_log)
