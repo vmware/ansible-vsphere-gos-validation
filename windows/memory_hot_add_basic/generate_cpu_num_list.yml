@@ -1,0 +1,17 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get ESXi host logical processor number
+- include_tasks: ../../common/esxi_get_cpu_mem_info.yml
+
+# Set the default maximum vCPU number in this test to 8
+# And conduct memory hotadd testing with vCPU number set
+# to 2, 4, 6, 8 at most
+- name: Set fact of the maximum vCPU number
+  set_fact:
+    max_cpu_number: "{{ [esxi_logical_cpu_num | int, 8] | min }}"
+- name: Set fact of the vCPU number list
+  set_fact:
+    cpu_number_list: "{{ range(2, max_cpu_number | int + 1, 2) }}"
+- debug:
+    msg: "vCPU number list: {{ cpu_number_list }}"

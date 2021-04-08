@@ -1,0 +1,30 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: Initialize CPU hotadd number list
+  set_fact:
+    cpu_hotadd_num_list: []
+
+# Get ESXi host logical processor number
+- include_tasks: ../../common/esxi_get_cpu_mem_info.yml
+
+# Set the maximum VM vCPU number set in this test to the
+# minimum of ESXi host logical processor number and the
+# configured parameter 'vm_cpu_hotadd_max' (default 16)
+# in vars/test.yml.
+- name: Set fact of the maximum vCPU number of hotadd test
+  set_fact:
+    max_num_cpus: "{{ [esxi_logical_cpu_num | int, vm_cpu_hotadd_max | default(16) | int] | min }}"
+- debug:
+    msg: "Maximum VM vCPU number of CPU hotadd test: {{ max_num_cpus }}"
+
+# Assume hotadded vCPU number is 1, 2, 3, ..., etc. in each test loop,
+# and after hotadd, VM vCPU number is less than the value of 'max_num_cpus'.
+# Assume will do N times CPU hotadd,
+# 1 + 2 + 3 + ... + N = max_num_cpus - initial_cpu_num,
+# we set N = root((max_num_cpus - initial_cpu_num) * 2) here for convenience.
+- name: Set fact of the vCPU number increase list
+  set_fact:
+    cpu_hotadd_num_list: "{{ range(1, (((max_num_cpus | int - initial_cpu_num | int) * 2) | root | int)) | list }}"
+- debug:
+    msg: "VM vCPU number increase list: {{ cpu_hotadd_num_list }}"

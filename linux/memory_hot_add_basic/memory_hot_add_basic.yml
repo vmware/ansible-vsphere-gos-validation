@@ -3,9 +3,10 @@
 ---
 # Description:
 #   This test case is used for check VM memory hotadd works as expected. When calculated
-# memory hotadd size list from free memory size on ESXi server or configured maximum memory
-# size(default 16384MB) is empty, this test case result is 'No Run'.
-# Note: before hotadd memory, VM memory size will be set to 2GB firstly.
+# memory hotadd size list from free memory size on ESXi server and the configured
+# maximum memory size (default 16384MB) is empty, or the free memory size on ESXi server
+# is lower than 4096MB, this test case result is 'No Run'.
+# Note: Linux VM memory size will be set to 2048MB before hotadd test.
 #
 - name: memory_hot_add_basic
   hosts: localhost
@@ -13,101 +14,34 @@
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
     - block:
-        # Get ESXi host total memory size and consumed size
-        - include_tasks: ../../common/esxi_get_property.yml
-          vars:
-            esxi_host_property_list:
-              - hardware.memorySize
-              - summary.quickStats.overallMemoryUsage
-        - name: Set fact of the free memory size of ESXi server
+        - name: Set fact of VM initial memory size to 2048MB before hotadd test
           set_fact:
-            esxi_host_free_mem: "{{ esxi_host_property_results.ansible_facts.hardware.memorySize|int / 1024 / 1024 - esxi_host_property_results.ansible_facts.summary.quickStats.overallMemoryUsage | int }}"
-        - debug:
-            msg: "Free memory size of ESXi server: {{ esxi_host_free_mem }}, will skip test case if free memory size < 4096 MB"
-
-        # Design to hotadd 1GB, 2GB, 3GB, ..., in each loop and VM memory size must not exceed 'max_memory_mb' value.
-        # Assume will do N times memory hotadd, then
-        # 1024 * (1 + 2 + 3 + ... + N) = max_memory_mb - 2048, which means N = root((max_memory_mb - 2048) * 2 / 1024)
-        - name: Set fact of the maximum VM memory size after hotadd
-          set_fact:
-            max_memory_mb: "{{ [ esxi_host_free_mem | int, vm_memory_hotadd_max | default(16384) ] | min }}"
-        - name: Set fact of the memory hotadd size list
-          set_fact:
-            memory_hotadd_size_list: "{{ range(1024, (((max_memory_mb | int - 2048) * 2048) | root | int), 1024) | list if (max_memory_mb | int >= 2048) else [] }}"
-        - debug:
-            msg: "Under test memory hotadd size list: {{ memory_hotadd_size_list }}"
-
-        # Run test case when the free memory size of ESXi host is larger than 4096 MB
+            vm_initial_mem_mb: 2048
+        - include_tasks: generate_mem_hot_add_list.yml 
+        
         - block:
             - include_tasks: ../utils/test_setup.yml
               vars:
                 vmtools_check: "False"
-
-            # Check if VM memory hotadd is enabled
-            - include_tasks: ../../common/vm_get_config.yml
-              vars:
-                property_list: ['config.memoryHotAddEnabled', 'config.hardware.memoryMB']
-            - name: Set fact of the VM memory hotadd status and original memory size
+            - name: Initialize memory hotadd test result
               set_fact:
-                mem_hotadd_enabled: "{{ vm_config.config.memoryHotAddEnabled }}"
-                mem_size_mb: "{{ vm_config.config.hardware.memoryMB }}"
-            - debug:
-                msg:
-                  - "VM '{{ vm_name }}' memory size: {{ mem_size_mb }} MB"
-                  - "VM memory hotadd enabled: {{ mem_hotadd_enabled }}"
-
-            # Shutdown VM if either memory hotadd is not enabled or memory size is not 2048 MB
-            - block:
-                - include_tasks: ../utils/shutdown.yml
-
-                # Enable memory hotadd
-                - include_tasks: ../../common/vm_enable_memory_hotadd.yml
-                  when: not mem_hotadd_enabled
-
-                # Reset VM's memory size to 2048 MB and validate it
-                - include_tasks: ../../common/vm_set_memory_size.yml
-                  vars:
-                    memory_mb: 2048
-                  when: mem_size_mb | int != 2048
-
-                - include_tasks: ../../common/vm_set_power_state.yml
-                  vars:
-                    vm_power_state_set: 'powered-on'
-                - include_tasks: ../../common/update_inventory.yml
-              when: >
-                (not mem_hotadd_enabled) or
-                (mem_size_mb != '2048')
-
-            # Validate memory size is 2048 MB in guest OS
-            - include_tasks: ../utils/wait_for_memory_blocks.yml
-              vars:
-                memory_size_mb: "2048"
-            - include_tasks: ../utils/memory_size_in_guest.yml
-            - name: "Validate 2048 MB memory size got in guest OS"
-              assert:
-                that:
-                  - memtotal_mb_in_guest | int == 2048
-                fail_msg: >
-                  "Get VM '{{ vm_name }}' memory size in guest OS: {{ memtotal_mb_in_guest }}, not 2048 MB,"
-                  "which is the initialize VM memory size for memory hotadd testing."
-                success_msg: "Get VM '{{ vm_name }}' memory size in guest OS: {{ memtotal_mb_in_guest }}."
-
+                mem_hotadd_results: []
+            
+            - include_tasks: memory_hot_add_prepare.yml 
             - include_tasks: memory_set_and_validate.yml
               loop: "{{ memory_hotadd_size_list }}"
               loop_control:
                 loop_var: hotadd_mb
-
+            - name: Display test result
+              debug: var=mem_hotadd_results
             - include_tasks: ../../common/print_test_result.yml
               vars:
                 test_result: "Passed"
-          when:
-            - esxi_host_free_mem | int >= 4096
-            - memory_hotadd_size_list | length != 0
+          when: memory_hotadd_size_list | length != 0
 
         - include_tasks: ../../common/print_test_result.yml
           vars:
             test_result: "No Run"
-          when: esxi_host_free_mem | int < 4096 or memory_hotadd_size_list | length == 0
-
+          when: memory_hotadd_size_list | length == 0
       rescue:
         - include_tasks: ../utils/test_rescue.yml

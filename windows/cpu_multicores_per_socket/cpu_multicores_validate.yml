@@ -1,0 +1,40 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VM cores per socket value
+- include_tasks: ../../common/vm_get_cpu_info.yml
+- name: Set fact of the test cores per socket value
+  set_fact:
+    new_cores_per_socket: "{{ vm_cpu_cores_per_socket | int + cores_per_socket_add | int }}"
+
+# Shutdown VM if it's in power on status
+- include_tasks: ../../common/vm_get_power_state.yml
+- include_tasks: ../utils/shutdown_vm.yml
+  when: vm_power_state_get == "poweredOn"
+
+# Set VM CPU to the test cores per socket value
+- include_tasks: ../../common/vm_set_cpu_number.yml
+  vars:
+    num_cores_per_socket: "{{ new_cores_per_socket }}"
+    num_cpus: "{{ new_cores_per_socket }}"
+
+- include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+
+# Check guest OS BSOD after cores per socket set
+- include_tasks: ../utils/win_check_winbsod.yml
+# Check guest OS winrm can be connected
+- include_tasks: ../utils/win_check_winrm.yml
+
+# Check cores per socket in guest OS
+- include_tasks: ../utils/win_get_cpu_cores_sockets.yml
+- name: Verify CPU number and CPU cores per socket number got in guest OS
+  assert:
+    that:
+      - "{{ win_cores_per_socket | int == new_cores_per_socket | int }}"
+      - "{{ win_cpu_number | int == new_cores_per_socket | int }}"
+    fail_msg: "VM CPU cores per socket set failed: {{ new_cores_per_socket }}, CPU number in guest OS: {{ win_cpu_number }}, cores per socket number: {{ win_cores_per_socket }}"
+- name: Add test result
+  set_fact:
+    cpu_multicores_per_socket_results: "{{ cpu_multicores_per_socket_results + ['VM vCPU cores per socket set: new_cores_per_socket succeed'] }}"

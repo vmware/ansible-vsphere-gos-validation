@@ -1,0 +1,15 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get memory size in MB in guest OS
+# Return:
+#   win_get_mem_size
+#
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "[int]((Get-WmiObject win32_OperatingSystem | % {$_.TotalVisibleMemorySize}) / 1MB)"
+- name: Set fact of memory size got in guest OS
+  set_fact:
+    win_get_mem_size: "{{ win_powershell_cmd_output.stdout_lines[0] | int * 1024 }}"
+- debug:
+    msg: "Get memory size in guest OS: {{ win_get_mem_size }}MB"

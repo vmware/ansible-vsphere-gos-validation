@@ -1,0 +1,38 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VM cores per socket value
+- include_tasks: ../../common/vm_get_cpu_info.yml
+- name: Set fact of the test cores per socket value
+  set_fact:
+    new_cores_per_socket: "{{ vm_cpu_cores_per_socket | int + cores_per_socket_add | int }}"
+
+- debug:
+    msg: "New cores per socket value '{{ new_cores_per_socket }}' is larger than '{{ max_num_cpus }}', skip test"
+  when: new_cores_per_socket | int > max_num_cpus | int
+
+- block:
+    - include_tasks: ../utils/shutdown.yml
+    # Set VM CPU cores per socket
+    - include_tasks: ../../common/vm_set_cpu_number.yml
+      vars:
+        num_cores_per_socket: "{{ new_cores_per_socket }}"
+        num_cpus: "{{ new_cores_per_socket }}"
+
+    - include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-on'
+    - include_tasks: ../../common/update_inventory.yml
+
+    # Get CPU cores per socket in guest OS
+    - include_tasks: ../utils/get_cpu_info.yml
+    - name: Verify CPU number got in guest OS
+      assert:
+        that:
+          - new_cores_per_socket | int == guest_cpu_cores | int
+          - vm_set_cpu_cores_result | int == guest_cpu_cores | int
+        fail_msg: "VM vCPU cores per socket set to: {{ new_cores_per_socket }}, while got in guest OS: {{ guest_cpu_cores }}"
+    - name: Add test result
+      set_fact:
+        cpu_multicores_per_socket_results: "{{ cpu_multicores_per_socket_results + ['VM vCPU cores per socket set succeeds: ' ~ new_cores_per_socket] }}"
+  when: new_cores_per_socket | int <= max_num_cpus | int
