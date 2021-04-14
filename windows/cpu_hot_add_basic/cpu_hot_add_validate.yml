@@ -12,7 +12,7 @@
     vcpu_after_hotadd: "{{( vcpu_before_hotadd | int) + (hotadd_num | int) }}"
 
 - debug:
-    msg: "After hotadd '{{ hotadd_num }}', VM vCPU number is '{{ vcpu_after_hotadd }}', greater than '{{ max_num_cpus }}', skip hotadd test"
+    msg: "Hotadd '{{ hotadd_num }}', VM vCPU number is '{{ vcpu_after_hotadd }}', greater than '{{ max_num_cpus }}', skip hotadd test"
   when: vcpu_after_hotadd | int > max_num_cpus | int
 
 - block:
@@ -41,9 +41,6 @@
     - include_tasks: ../utils/win_get_cpu_cores_sockets.yml
       when: win_guest_type == "server"
 
-    # Get CPU number from guest info
-    - include_tasks: ../../common/vm_get_guest_facts.yml
-    
     # Validate CPU number after hotadd
     - name: "Verify hotadded vCPU can be detected in guest OS"
       assert:
@@ -52,7 +49,7 @@
           - vm_set_cpu_number_result | int == win_cpu_number | int
         fail_msg: "Hotadd vCPU ({{ vcpu_before_hotadd }}->{{ vcpu_after_hotadd }}) failed"
 
-    - name: Set fact of the CPU hotadd results
+    - name: Add test result
       set_fact:
-        cpu_hotadd_results: "{{ cpu_hotadd_results + ['Hotadd vCPU (vcpu_before_hotadd -> vcpu_after_hotadd) succeed'] }}"
+        cpu_hotadd_results: "{{ cpu_hotadd_results + ['vCPU hotadd succeeds: ' ~ vcpu_before_hotadd ~ '->' ~ vcpu_after_hotadd] }}"
   when: vcpu_after_hotadd | int <= max_num_cpus | int

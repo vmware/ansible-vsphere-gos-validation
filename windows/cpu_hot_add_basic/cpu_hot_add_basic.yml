@@ -14,15 +14,13 @@
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
     - block:
-        - include_tasks: ../utils/win_get_guest_type.yml
-        # Set initial CPU number and cores per socket to 2 for Windows 10
+        - include_tasks: ../setup/test_setup.yml
         - name: Set fact of the initial CPU number and cores per socket
           set_fact:
             initial_cpu_num: 2
             initial_cores_num: 2
           when: win_guest_type == "client"
 
-        # Set initial CPU number 2, cores per socket 1 for Windows Server
         - name: Set fact of the initial CPU number and cores per socket
           set_fact:
             initial_cpu_num: 2
@@ -31,7 +29,6 @@
         - include_tasks: ../../linux/cpu_hot_add_basic/generate_cpu_hot_add_list.yml 
         
         - block:
-            - include_tasks: ../setup/test_setup.yml
             - name: Initialize the CPU hotadd test result
               set_fact:
                 cpu_hotadd_results: []
@@ -46,8 +43,8 @@
             
             - include_tasks: cpu_hot_add_test_client.yml
               when: win_guest_type == "client"
-            - debug:
-                msg: "VM vCPU hotadd test results: {{ cpu_hotadd_results | to_yaml }}"
+            - name: Display test result
+              debug: var=cpu_hotadd_results
           when: cpu_hotadd_num_list | length != 0
 
         - name: "Skip testcase: {{ ansible_play_name }}"

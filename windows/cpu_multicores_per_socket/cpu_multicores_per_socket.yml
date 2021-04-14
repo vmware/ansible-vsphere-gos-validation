@@ -16,7 +16,7 @@
             initial_cpu_num: 2
             initial_cores_num: 2
         - include_tasks: ../../linux/cpu_hot_add_basic/generate_cpu_hot_add_list.yml
-        # Test multiple cores per socket configuration
+        
         - block:
             - include_tasks: ../setup/test_setup.yml
             - name: Initialize the test result
@@ -30,13 +30,13 @@
               loop: "{{ cpu_hotadd_num_list }}"
               loop_control:
                 loop_var: cores_per_socket_add
-            - debug:
-                msg: "Display the CPU multiple cores per socket test result: {{ cpu_multicores_per_socket_results | to_yaml }}"
+            - name: Display test result
+              debug: var=cpu_multicores_per_socket_results
           when: cpu_hotadd_num_list | length != 0
 
         - name: "Skip testcase: {{ ansible_play_name }}"
           debug:
-            msg: "Skip testcase '{{ ansible_play_name }}', vCPU value increasement list is empty"
+            msg: "Skip testcase '{{ ansible_play_name }}', vCPU value increase list is empty"
           when: cpu_hotadd_num_list | length == 0
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
