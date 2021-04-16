@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Download VMware tools from specified URL and transfer to ESXi host datastore
-- name: Set fact of the VMware tools ISO file name
+- name: Set fact of VMware tools ISO file name and remote datastore path
   set_fact:
     win_vmtools_iso_download: "{{ vmtools_url_path.split('/')[-1] }}"
+    remote_datastore_path: "/vmfs/volumes/{{ datastore }}"
 
 - name: Download VMware tools
   get_url:
@@ -19,7 +20,7 @@
 
 - name: Set fact of the dest path of VMware tools ISO on ESXi host
   set_fact:
-    transferred_vmtools_iso: "/vmfs/volumes/{{ datastore }}/{{ win_vmtools_iso_download }}"
+    transferred_vmtools_iso: "{{ remote_datastore_path }}/{{ win_vmtools_iso_download }}"
 - debug:
     msg: "Will transfer VMware tools install ISO to: {{ transferred_vmtools_iso }}"
 
@@ -29,7 +30,7 @@
     transfer_file_remote_src: "{{ main_playbook_path }}/cache/{{ win_vmtools_iso_download }}"
     transfer_file_remote_dest: "{{ transferred_vmtools_iso }}"
     transfer_file_remote_server: "{{ esxi_hostname }}"
-    remote_tmp_folder: "/vmfs/volumes/{{ datastore }}"
+    ansible_remote_tmp: "{{ remote_datastore_path }}"
 
 - name: Set fact of the VMware tools ISO path on ESXi host
   set_fact:
