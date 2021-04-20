@@ -281,8 +281,9 @@ class CallbackModule(CallbackBase):
             self.remove_logger_file_handler(self.failed_tasks_log)
 
     def _get_testing_vars(self):
-        if not os.path.exists(self.testing_vars_file):
-            self.logger.error("Failed to get testing vars because {} doesn't exist".format(self.testing_vars_file))
+        if not self.testing_vars_file or not os.path.exists(self.testing_vars_file):
+            self.logger.error("Failed to get testing vars file")
+            return
 
         with open(self.testing_vars_file, 'r') as fd:
             self.testing_vars = yaml.load(fd, Loader=yaml.Loader)
@@ -687,7 +688,7 @@ class CallbackModule(CallbackBase):
 
         #Use user-defined testing vars file
         if 'testing_vars_file' in extra_vars.keys():
-            self.testing_vars_file = os.path.realpath(extra_vars['testing_vars_file'])
+            self.testing_vars_file = extra_vars['testing_vars_file']
         else:
             #Use default testing vars file
             self.testing_vars_file = os.path.join(self.cwd, "vars/test.yml")
