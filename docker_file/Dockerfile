@@ -13,10 +13,8 @@ RUN tdnf makecache && \
     pip3 install pycdlib netaddr pywinrm pyvmomi
 
 # Install ansible-base and Ansible collections
-# There is block issue in community.vmware 1.8.0, so here install
-# version 1.7.0, will change to use latest version when 1.9.0 releases
 RUN pip3 install ansible-base && \
-    ansible-galaxy collection install ansible.netcommon ansible.posix community.general community.vmware:==1.7.0 community.windows community.crypto
+    ansible-galaxy collection install ansible.netcommon ansible.posix community.general community.vmware community.windows community.crypto
 
 # Download latest 'ansible-vsphere-gos-validation' release to /root/ dir
 RUN curl -s https://api.github.com/repos/vmware/ansible-vsphere-gos-validation/releases/latest | grep "tarball_url" | cut -d "\"" -f 4 | xargs -n 1 wget -O test.tar.gz && \

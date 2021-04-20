@@ -71,11 +71,12 @@ This project supports below scenarios for end-to-end guest OS validation testing
 
 
 ### Docker images
-* Release v1.0:
+* Release v1.0 or the latest:
 ```
-# docker pull dianewang/ansible-vsphere-gos-validation:v1.0
+# docker pull projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v1.0
 or
-# docker pull dianewang/ansible-vsphere-gos-validation:latest
-# docker run -it --privileged dianewang/ansible-vsphere-gos-validation:v1.0
+# docker pull projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
+
+# docker run -it --privileged projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v1.0
 ```
 Then launch testing in container using the steps in this section [Steps to Launch Testing](#steps-to-launch-testing)
