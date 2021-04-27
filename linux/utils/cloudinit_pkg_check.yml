@@ -33,7 +33,6 @@
           - cloud_init_cfg_retry.stat.exists
         fail_msg: "/etc/cloud/cloud.cfg doesn't exist"
 
-    - include_tasks: cloudinit_version_get.yml
     # Check if cloud-init services is enabled, if not, enable them
     - include_tasks: service_operation.yml
       vars:
@@ -46,4 +45,14 @@
       loop_control:
         loop_var: service_name
   when:
+    - gosc_workflow is defined
     - gosc_workflow == "cloud-init"
+
+- include_tasks: cloudinit_version_get.yml
+  when: >
+    (cloud_init_cfg is defined and
+     cloud_init_cfg.stat is defined and
+     cloud_init_cfg.stat.exists) or
+    (cloud_init_cfg_retry is defined and
+     cloud_init_cfg_retry.stat is defined and
+     cloud_init_cfg_retry.stat.exists)

@@ -64,6 +64,8 @@ class CallbackModule(CallbackBase):
                         'Guest ID': '',
                         'Hardware Version':''}
 
+        self.os_cloudinit_version = None
+
         self.started_at = None
         self.finished_at = None
 
@@ -78,6 +80,7 @@ class CallbackModule(CallbackBase):
         self.full_debug_log = "full_debug.log"
         self.failed_tasks_log = "failed_tasks.log"
         self.test_results_log = "results.log"
+        self.os_release_info_file = None
 
         # Plays and Tasks
         self._play_name = None
@@ -503,6 +506,24 @@ class CallbackModule(CallbackBase):
         self.logger.info(msg)
         self._display.display(msg, color=C.COLOR_VERBOSE)
 
+    def _print_os_release_info(self):
+        """
+        Print OS release information into a JSON file, which includes open-vm-tools version,
+        cloud-init version, inbox drivers versions.
+        """
+        if self.os_release_info_file and os.path.exists(self.os_release_info_file):
+            os_release_info_detail = None
+            with open(self.os_release_info_file, 'r') as json_input:
+                os_release_info_detail = json.load(json_input, object_pairs_hook=OrderedDict)
+
+            if os_release_info_detail and len(os_release_info_detail) == 1:
+                if self.os_cloudinit_version and 'cloud-init' not in os_release_info_detail[0]:
+                    with open(self.os_release_info_file, 'w') as json_output:
+                        os_release_info_detail[0]['cloud-init'] = self.os_cloudinit_version
+                        os_release_info_detail[0].move_to_end('cloud-init', last=False)
+                        os_release_info_detail[0].move_to_end('Release', last=False)
+                        json.dump(os_release_info_detail, json_output, indent=4)
+
     def _get_exception_traceback(self, result):
         if 'exception' in result:
             msg = "An exception occurred during task execution. "
@@ -592,6 +613,9 @@ class CallbackModule(CallbackBase):
                 debug_var_value = str(task_result[debug_var_name])
                 if not self.testrun_log_dir and debug_var_name == 'testrun_log_path':
                     self.testrun_log_dir = debug_var_value
+                if "check_inbox_driver.yml" == task_file:
+                    if debug_var_name == "os_release_info_file_path":
+                        self.os_release_info_file = debug_var_value
                 if "deploy_vm.yml" == task_file:
                     if not self.vm_info['VM IP'] and debug_var_name == "vm_guest_ip":
                         self.vm_info['VM IP'] = debug_var_value
@@ -623,9 +647,11 @@ class CallbackModule(CallbackBase):
                         self.vcenter_info['version'] = debug_var_value
                     if not self.vcenter_info['build'] and debug_var_name == "vcenter_build":
                         self.vcenter_info['build'] = debug_var_value
-                if "cloudinit_version_get.yml" == task_file:
-                    if not self.vm_info['Cloud-Init'] and debug_var_name == "cloudinit_version":
+                if "cloudinit_version_get.yml" == task_file and debug_var_name == "cloudinit_version":
+                    if not self.vm_info['Cloud-Init']:
                         self.vm_info['Cloud-Init'] = debug_var_value
+                    if not self.os_cloudinit_version:
+                        self.os_cloudinit_version = debug_var_value
 
     def v2_runner_on_skipped(self, result):
         self._clean_results(result._result, result._task.action)
@@ -768,6 +794,7 @@ class CallbackModule(CallbackBase):
         self.logger.info(msg)
 
         # Log testcases results
+        self._print_os_release_info()
         self._get_testing_vars()
         self._display.banner("TEST SUMMARY")
         self.logger.info(self._banner("TEST SUMMARY"))
