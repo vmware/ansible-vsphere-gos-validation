@@ -64,6 +64,9 @@ class CallbackModule(CallbackBase):
                         'Guest ID': '',
                         'Hardware Version':''}
 
+        self.os_distribution = ""
+        self.os_distribution_ver = ""
+        self.os_arch = ""
         self.os_cloudinit_version = None
 
         self.started_at = None
@@ -412,6 +415,7 @@ class CallbackModule(CallbackBase):
             self._display.display(msg, color=C.COLOR_VERBOSE)
             return
 
+        self.vm_info['Guest OS Type'] = "{} {} {}".format(self.os_distribution, self.os_distribution_ver, self.os_arch)
         # Get column width
         head_col_width = len("VM Hardware Version")
         vm_col_width = max([len(self.vm_info[vm_info_key])
@@ -584,11 +588,12 @@ class CallbackModule(CallbackBase):
                     self.testcases[self._last_test_name] = self.testcases[old_test_name]
                     del self.testcases[old_test_name]
             if "get_guest_system_info.yml" == task_file:
-                if not self.vm_info['Guest OS Type'] and set_fact_result:
-                    guest_distribution = set_fact_result.get("guest_os_ansible_distribution", None)
-                    guest_disctribution_ver = set_fact_result.get("guest_os_ansible_distribution_ver", None)
-                    guest_arch = set_fact_result.get("guest_os_ansible_architecture", None)
-                    self.vm_info['Guest OS Type'] = "{} {} {}".format(guest_distribution, guest_disctribution_ver, guest_arch)
+                if set_fact_result.get("guest_os_ansible_distribution", None):
+                    self.os_distribution = set_fact_result.get("guest_os_ansible_distribution")
+                if set_fact_result.get("guest_os_ansible_distribution_ver", None):
+                    self.os_distribution_ver = set_fact_result.get("guest_os_ansible_distribution_ver")
+                if set_fact_result.get("guest_os_ansible_architecture", None):
+                    self.os_arch = set_fact_result.get("guest_os_ansible_architecture")
         elif 'print_test_result.yml' == task_file and str(task.action) == "lineinfile":
             if 'invocation' in task_result and 'module_args' in task_result['invocation']:
                 test_result_line = task_result['invocation']['module_args']['line']
