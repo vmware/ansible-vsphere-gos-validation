@@ -1,0 +1,36 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: Initialize the memory hotadd size list
+  set_fact:
+    memory_hotadd_size_list: []
+
+# Get ESXi host free memory size
+- include_tasks: ../../common/esxi_get_cpu_mem_info.yml
+
+# Set maximum memory size of this hotadd test to the minimum of ESXi
+# host free memory size and configured parameter value
+# 'vm_memory_hotadd_max'(default 16384) in vars/test.yml
+- block:
+    - name: Set fact of the maximum VM memory size
+      set_fact:
+        max_memory_mb: "{{ [esxi_memory_free_mb | int - 4096 + vm_initial_mem_mb | int, vm_memory_hotadd_max | default(16384)] | min }}"
+    - debug:
+        msg: "Maximum memory size set in this testing: {{ max_memory_mb }}"
+
+    # Assume hotadded memory size is 1GB, 2GB, 3GB, ...,etc. in this testing,
+    # after hotadd, VM memory size is less than the value of 'max_memory_mb'.
+    # Assume will do N times memory hotadd,
+    # 1024 * (1 + 2 + 3 + ... + N) = max_memory_mb - vm_initial_mem_mb,
+    # set N = root((max_memory_mb - vm_initial_mem_mb) * 2 / 1024) here for convenience.
+    - name: Set fact of the memory hotadd size list
+      set_fact:
+        memory_hotadd_size_list: "{{ range(1024, (((max_memory_mb | int - vm_initial_mem_mb | int) * 2048) | root | int), 1024) | list }}"
+  when: esxi_memory_free_mb | int > 4096
+
+- debug:
+    msg: "Skip VM memory hotadd test, the free memory size of ESXi server is lower than 4096MB."
+  when: esxi_memory_free_mb | int <= 4096
+
+- debug:
+    msg: "Under test memory hotadd size list: {{ memory_hotadd_size_list }}"

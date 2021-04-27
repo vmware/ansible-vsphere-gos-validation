@@ -2,11 +2,9 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is used for test VM memory hotadd with different VM vCPUs,
-# the VM vCPU number will be set to 2, 4, 8 separately, then with each
-# vCPU number, VM memory size will be added 1GB, 2GB, 3GB for 32 bit guest,
-# or 2GB, 4GB, 6GB for 64 bit guest from initial 2GB for 32 bit guest, 4GB
-# for 64 bit guest.   
+#   This test case is used for test VM memory hotadd with different VM vCPUs.
+# Note: VM memory size will be set to 2GB for 32 bit guest, 4GB for 64 bit
+# guest before hotadd testing.   
 #
 - name: memory_hot_add_basic
   hosts: localhost
@@ -15,29 +13,39 @@
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
-        - include_tasks: ../utils/win_get_guest_type.yml
-
-        - name: "Set fact of the initial memory size 2GB for 32bit client"
+        - name: "Set fact of initial memory size 2048MB for 32bit client"
           set_fact:
-            initial_memory_size: 2
+            vm_initial_mem_mb: 2048
           when: win_guest_bitness == "32-bit" and win_guest_type == "client"
-        - name: "Set fact of the initial memory size 4GB for 64bit guest"
+        - name: "Set fact of initial memory size 4096MB for 64bit guest"
           set_fact:
-            initial_memory_size: 4
+            vm_initial_mem_mb: 4096
           when: win_guest_bitness == "64-bit"
+        - include_tasks: ../../linux/memory_hot_add_basic/generate_mem_hot_add_list.yml
+        
+        - block:
+            - include_tasks: generate_cpu_num_list.yml
+            - name: Initialize the memory hotadd test result
+              set_fact:
+                mem_hotadd_results: []
 
-        - include_tasks: ../utils/shutdown_vm.yml
-        # Enable memory hotadd if it's disabled
-        - include_tasks: ../../common/vm_enable_memory_hotadd.yml
+            - include_tasks: ../utils/shutdown_vm.yml
+            # Enable memory hotadd
+            - include_tasks: ../../common/vm_enable_memory_hotadd.yml
 
-        # Do memory hotadd with different vCPU 1, 2, 4, 8
-        - include_tasks: hotadd_memory_for_vcpu.yml
-          loop:
-            - 2
-            - 4
-            - 8
-          loop_control:
-            loop_var: vcpu_number
+            # Do memory hotadd with different vCPU in the list
+            - include_tasks: hotadd_memory_for_vcpu.yml
+              loop: "{{ cpu_number_list }}"
+              loop_control:
+                loop_var: vcpu_number
+            - name: Display the test results
+              debug: var=mem_hotadd_results
+          when: memory_hotadd_size_list | length != 0
+        
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip testcase '{{ ansible_play_name }}', memory hotadd test value list is empty"
+          when: memory_hotadd_size_list | length == 0
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
           vars:

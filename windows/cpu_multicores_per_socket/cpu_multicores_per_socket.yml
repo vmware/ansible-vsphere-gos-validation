@@ -11,34 +11,33 @@
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
     - block:
-        - include_tasks: ../setup/test_setup.yml
-
-        - include_tasks: ../../common/esxi_get_property.yml
-          vars:
-            esxi_host_property_list:
-              - summary.hardware.numCpuThreads
-        - name: Set fact of the ESXi host logical processor number
+        - name: Set fact of the initial CPU number
           set_fact:
-            host_logical_processor: "{{ esxi_host_property_results.ansible_facts.summary.hardware.numCpuThreads }}"
-        - name: The number of ESXi host logical processor
-          debug: var=host_logical_processor
+            initial_cpu_num: 2
+            initial_cores_num: 2
+        - include_tasks: ../../linux/cpu_hot_add_basic/generate_cpu_hot_add_list.yml
+        
+        - block:
+            - include_tasks: ../setup/test_setup.yml
+            - name: Initialize the test result
+              set_fact:
+                cpu_multicores_per_socket_results: []
+            
+            - include_tasks: ../cpu_hot_add_basic/cpu_hot_add_prepare.yml
+              vars:
+                enable_vm_cpu_hotadd: False
+            - include_tasks: cpu_multicores_validate.yml
+              loop: "{{ cpu_hotadd_num_list }}"
+              loop_control:
+                loop_var: cores_per_socket_add
+            - name: Display the test results
+              debug: var=cpu_multicores_per_socket_results
+          when: cpu_hotadd_num_list | length != 0
 
-        - name: Set fact of the maximum CPU set
-          set_fact:
-            max_num_set: "{{ [vm_cpu_cores_per_socket_max | default(8) | int, host_logical_processor | int] | min }}"
-
-        - name: Set fact of the cores per socket list
-          set_fact:
-            cores_per_socket_loop_list: "{{ range(4, max_num_set | int) | list if max_num_set | int > 5 else range(4, 5) | list }}"
-        - name: The cores per socket test value loop list
-          debug: var=cores_per_socket_loop_list
-
-        # Test cores per socket value set on VM
-        - name: Test multiple cores per socket configuration
-          include_tasks: cores_per_socket_test.yml
-          loop: "{{ cores_per_socket_loop_list }}"
-          loop_control:
-            loop_var: cores_per_socket_set
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip testcase '{{ ansible_play_name }}', vCPU value increase list is empty"
+          when: cpu_hotadd_num_list | length == 0
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
           vars:

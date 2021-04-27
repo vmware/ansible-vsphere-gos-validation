@@ -1,22 +1,20 @@
 # Copyright 2021 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get VM power status
+# Get VM power status and shutdown
 - include_tasks: ../../common/vm_get_power_state.yml
-# Power off VM before setting VM memory
 - include_tasks: ../utils/shutdown_vm.yml
   when: vm_power_state_get != "poweredOff"
 
 # Set vCPU to specified value, set initial memory
 - include_tasks: ../../common/vm_set_memory_size.yml
   vars:
-    memory_mb: "{{ initial_memory_size|int * 1024 }}"
+    memory_mb: "{{ vm_initial_mem_mb }}"
 - include_tasks: ../../common/vm_set_cpu_number.yml
   vars:
     num_cpus: "{{ vcpu_number }}"
     num_cores_per_socket: "{{ vcpu_number }}"
 
-# Power on VM
 - include_tasks: ../../common/vm_set_power_state.yml
   vars:
     vm_power_state_set: "powered-on"
@@ -25,46 +23,25 @@
   vars:
     win_check_winrm_timeout: 600
 
-# Check cpu number in guest before memory hotadd
+# Check CPU number in guest OS before memory hotadd
 - include_tasks: ../utils/win_get_cpu_cores_sockets.yml
 - name: Check initial CPU number got from guest
   assert:
     that:
-      - "{{ win_cpu_number|int }} == {{ vcpu_number|int }}"
-    success_msg: "Get CPU number in guest is same as configured CPU: {{ vcpu_number|int }}"
-    fail_msg: "Get CPU number in guest: {{ win_cpu_number|int }}, not same as configured CPU: {{ vcpu_number|int }}"
+      - "{{ win_cpu_number | int }} == {{ vcpu_number | int }}"
+    success_msg: "Get CPU number in guest is same as configured CPU: {{ vcpu_number | int }}"
+    fail_msg: "Get CPU number in guest: {{ win_cpu_number | int }}, not same as configured CPU: {{ vcpu_number | int }}"
 
-# Check memory size in guest before hotadd
-- name: Get memory size in guest OS
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "[int]((Get-WmiObject win32_OperatingSystem | % {$_.TotalVisibleMemorySize}) / 1MB)"
-- name: Set fact of memory size got in guest OS
-  set_fact:
-    get_os_memory: "{{ win_powershell_cmd_output.stdout_lines[0] if not win_powershell_cmd_output.failed else 0 }}"
+# Check memory size in guest OS before hotadd
+- include_tasks: ../utils/win_get_mem_size.yml
 - name: Check initial memory size got from guest
   assert:
     that:
-      - "{{ initial_memory_size|int }} == {{ get_os_memory|int }}"
-    success_msg: "Get memory size in guest is same as initial memory: {{ get_os_memory|int }}GB"
-    fail_msg: "Get memory size in guest: {{ get_os_memory|int }}, not same as initial memory: {{ initial_memory_size|int }}GB"
+      - "{{ vm_initial_mem_mb | int }} == {{ win_get_mem_size | int }}"
+    success_msg: "Get memory size in guest is same as initial memory: {{ win_get_mem_size | int }}MB"
+    fail_msg: "Get memory size in guest: {{ win_get_mem_size | int }}MB, not same as initial memory set: {{ vm_initial_mem_mb }}MB"
 
-# Do memory hotadd 2GB, 4GB, 6GB for 64bit guest OS
 - include_tasks: hotadd_memory_verify.yml
-  loop:
-    - "{{ initial_memory_size|int + 2 }}"
-    - "{{ initial_memory_size|int + 4 }}"
-    - "{{ initial_memory_size|int + 6 }}"
+  loop: "{{ memory_hotadd_size_list }}"
   loop_control:
-    loop_var: memory_hotadd_to_size
-  when: win_guest_bitness == "64-bit"
-
-# Do memory hotadd 1GB, 2GB, 3GB for 32bit guest OS
-- include_tasks: hotadd_memory_verify.yml
-  loop:
-    - "{{ initial_memory_size|int + 1 }}"
-    - "{{ initial_memory_size|int + 2 }}"
-    - "{{ initial_memory_size|int + 3 }}"
-  loop_control:
-    loop_var: memory_hotadd_to_size
-  when: win_guest_bitness == "32-bit"
+    loop_var: hotadd_mb

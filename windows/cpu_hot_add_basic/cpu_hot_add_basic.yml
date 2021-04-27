@@ -15,33 +15,43 @@
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
-        - include_tasks: ../utils/win_get_guest_type.yml
-        
-        # Get ESXi host logical processor number as the maximun number of VM cpu hotadd
-        - include_tasks: ../../common/esxi_get_property.yml
-          vars:
-            esxi_host_property_list:
-              - summary.hardware.numCpuThreads
-        - name: Set fact of the ESXi host logical processor number
+        - name: Set fact of the initial CPU number and cores per socket
           set_fact:
-            host_logical_cpu: "{{ esxi_host_property_results.ansible_facts.summary.hardware.numCpuThreads }}"
-        
-        - name: Set fact of the maximum CPU number for hotadd test
-          set_fact:
-            max_num_cpus: "{{ [host_logical_cpu|int, vm_cpu_hotadd_max | default(16) |int] | min }}"
-        - debug:
-            msg: "The maximum hotadded vCPU number set to: {{ max_num_cpus }}"
-        
-        - name: Initialize the CPU hotadd test result
-          set_fact:
-            cpu_hotadd_results: []
-        - include_tasks: cpu_hot_add_prepare.yml
-        - include_tasks: cpu_hot_add_test_server.yml
-          when: win_guest_type == "server"
-        - include_tasks: cpu_hot_add_test_client.yml
+            initial_cpu_num: 2
+            initial_cores_num: 2
           when: win_guest_type == "client"
-        - debug:
-            msg: "VM vCPU hotadd result: {{ cpu_hotadd_results | to_yaml }}"
+
+        - name: Set fact of the initial CPU number and cores per socket
+          set_fact:
+            initial_cpu_num: 2
+            initial_cores_num: 1
+          when: win_guest_type == "server"
+        - include_tasks: ../../linux/cpu_hot_add_basic/generate_cpu_hot_add_list.yml 
+        
+        - block:
+            - name: Initialize the CPU hotadd test result
+              set_fact:
+                cpu_hotadd_results: []
+            - include_tasks: cpu_hot_add_prepare.yml
+              vars:
+                enable_vm_cpu_hotadd: True 
+            - include_tasks: cpu_hot_add_validate.yml
+              loop: "{{ cpu_hotadd_num_list }}"
+              loop_control:
+                loop_var: hotadd_num
+              when: win_guest_type == "server"
+            
+            - include_tasks: cpu_hot_add_test_client.yml
+              when: win_guest_type == "client"
+            - name: Display the test results
+              debug: var=cpu_hotadd_results
+          when: cpu_hotadd_num_list | length != 0
+
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip testcase '{{ ansible_play_name }}', vCPU hotadd test value list is empty"
+          when: cpu_hotadd_num_list | length == 0
+  
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
           vars:

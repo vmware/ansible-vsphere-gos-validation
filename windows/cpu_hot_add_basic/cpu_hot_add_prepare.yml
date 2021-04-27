@@ -1,34 +1,8 @@
 # Copyright 2021 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Set initial CPU number and cores per socket to 2 for Windows 10
-- name: Set fact of the initial CPU number and cores per socket
-  set_fact:
-    initial_cpu_num: 2
-    initial_cores_num: 2
-  when: win_guest_type == "client"
-
-# Set initial CPU number 2, cores per socket 1 for Windows Server
-- name: Set fact of the initial CPU number and cores per socket
-  set_fact:
-    initial_cpu_num: 2
-    initial_cores_num: 1
-  when: win_guest_type == "server"
-
 # Check VM CPU hotadd enable status and VM vCPU number
-- include_tasks: ../../common/vm_get_config.yml
-  vars:
-    property_list: ['config.cpuHotAddEnabled', 'config.hardware.numCPU', 'config.hardware.numCoresPerSocket']
-- name: Set fact of the VM CPU hotadd status and vCPU number
-  set_fact:
-    cpu_hotadd_enabled: "{{ vm_config.config.cpuHotAddEnabled }}"
-    cpu_num: "{{ vm_config.config.hardware.numCPU }}"
-    cpu_cores_per_socket: "{{ vm_config.config.hardware.numCoresPerSocket }}"
-- debug:
-    msg:
-      - "VM vCPU number: {{ cpu_num }}"
-      - "VM vCPU cores per socket number: {{ cpu_cores_per_socket }}"
-      - "VM vCPU hotadd enabled: {{ cpu_hotadd_enabled }}"
+- include_tasks: ../../common/vm_get_cpu_info.yml
 
 # Enable VM CPU hotadd or set initial VM CPU number
 - block:
@@ -36,20 +10,30 @@
       vars:
         set_win_power_state: "shutdown"
     - include_tasks: ../../common/vm_enable_cpu_hotadd.yml
-      when: not cpu_hotadd_enabled 
+      when: not vm_cpu_hotadd_enabled and enable_vm_cpu_hotadd 
 
     - include_tasks: ../../common/vm_set_cpu_number.yml
       vars:
         num_cores_per_socket: "{{ initial_cores_num }}"
         num_cpus: "{{ initial_cpu_num }}"
       when: >
-        (cpu_num | int != initial_cpu_num | int) or
-        (cpu_cores_per_socket | int != initial_cores_num | int)
+        (vm_cpu_num | int != initial_cpu_num | int) or
+        (vm_cpu_cores_per_socket | int != initial_cores_num | int)
     - include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: "powered-on"
     - include_tasks: ../utils/win_check_winbsod.yml
   when: >
-    (not cpu_hotadd_enabled) or
-    (cpu_num | int != initial_cpu_num | int) or
-    (cpu_cores_per_socket | int != initial_cores_num | int)
+    (not vm_cpu_hotadd_enabled and enable_vm_cpu_hotadd) or
+    (vm_cpu_num | int != initial_cpu_num | int) or
+    (vm_cpu_cores_per_socket | int != initial_cores_num | int)
+
+# Validate VM CPU number in guest OS
+- include_tasks: ../utils/win_get_cpu_cores_sockets.yml
+- name: Check VM CPU number got in guest OS
+  assert:
+    that:
+      - win_cpu_number | int == initial_cpu_num | int
+      - win_cores_per_socket | int == initial_cores_num | int
+    fail_msg: "VM vCPU number is set to: {{ win_cpu_number }} (not {{ initial_cpu_num }}), cores per socket: {{ win_cores_per_socket }} (not {{ initial_cores_num }}) before hotadd testing."
+    success_msg: "VM vCPU number is set to: {{ win_cpu_number }}, cores per socket: {{ win_cores_per_socket }} before hotadd testing."

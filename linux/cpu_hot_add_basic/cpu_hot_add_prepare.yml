@@ -1,0 +1,38 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# When 'enable_vm_cpu_hotadd' is set to True and VM CPU hotadd
+# is not enabled, will enable VM CPU hotadd.
+# When 'enable_vm_cpu_hotadd' is set to False, will not enable
+# VM CPU hotadd, just set the VM vCPU number to the initial value.
+#
+- include_tasks: ../../common/vm_get_cpu_info.yml
+- block:
+    - include_tasks: ../utils/shutdown.yml
+    - include_tasks: ../../common/vm_enable_cpu_hotadd.yml
+      when: not vm_cpu_hotadd_enabled and enable_vm_cpu_hotadd
+
+    - include_tasks: ../../common/vm_set_cpu_number.yml
+      vars:
+        num_cpus: "{{ initial_cpu_num }}"
+        num_cores_per_socket: "{{ initial_cores_num }}"
+      when: (vm_cpu_num | int != initial_cpu_num | int) or (vm_cpu_cores_per_socket | int != initial_cores_num | int)
+
+    - include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-on'
+    - include_tasks: ../../common/update_inventory.yml
+  when: >
+    (not vm_cpu_hotadd_enabled and enable_vm_cpu_hotadd) or
+    (vm_cpu_num | int != initial_cpu_num | int) or
+    (vm_cpu_cores_per_socket | int != initial_cores_num | int)
+
+# Validate VM CPU number in guest OS
+- include_tasks: ../utils/get_cpu_info.yml
+- name: Check VM CPU number in guest OS
+  assert:
+    that:
+      - guest_cpu_num | int == initial_cpu_num | int
+      - guest_cpu_cores | int == initial_cores_num | int
+    fail_msg: "VM vCPU number is set to: {{ guest_cpu_num }} (not {{ initial_cpu_num }}), cores per socket: {{ guest_cpu_cores }} (not {{ initial_cores_num }}) before hotadd testing."
+    success_msg: "VM vCPU number is set to: {{ guest_cpu_num }}, cores per socket: {{ guest_cpu_cores }} before hotadd testing."
