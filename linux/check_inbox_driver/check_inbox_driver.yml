@@ -100,7 +100,7 @@
 
             - name: "Convert modinfo result to dictionary"
               set_fact:
-                vmware_modules_info: "{{ vmware_modules_info + ['\n'.join(item.stdout_lines | select('match', '^[^:]+:[^:]+$')) | from_yaml] }}"
+                vmware_modules_info: "{{ vmware_modules_info + ['\n'.join(item.stdout_lines | select('match', '^[^:]+:.+$')) | from_yaml] }}"
               when: item.stdout_lines is defined and item.stdout_lines | length
               loop: "{{ modinfo_result.results }}"
 
@@ -115,6 +115,12 @@
           when:
             - guest_os_ansible_system == "Linux"
             - guest_os_ansible_distribution != "VMware Photon OS"
+
+        - name: "Check whether Xorg server is installed"
+          command: "which Xorg"
+          register: which_xorg_server
+          failed_when: False
+          delegate_to: "{{ vm_guest_ip }}"
 
         - block:
             - name: "Check Xorg server"
@@ -148,6 +154,7 @@
             - block:
                 - name: "Looking for VMware video driver package"
                   shell: "dpkg -l xserver-xorg-video-vmware* | grep xserver-xorg-video-vmware"
+                  failed_when: False
                   register: vmware_video_package_result
                   delegate_to: "{{ vm_guest_ip }}"
 
@@ -174,8 +181,9 @@
                     - package_info.Version
               when: video_driver_pkg_name
           when:
-            - guest_os_with_gui is defined
-            - guest_os_with_gui | bool
+            - which_xorg_server is defined
+            - which_xorg_server.rc is defined
+            - which_xorg_server.rc == 0
 
         - name: "Print inbox drivers versions"
           debug: var=inbox_drivers_versions
