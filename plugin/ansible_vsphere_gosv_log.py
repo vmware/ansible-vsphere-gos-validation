@@ -68,6 +68,7 @@ class CallbackModule(CallbackBase):
         self.os_distribution_ver = ""
         self.os_arch = ""
         self.os_cloudinit_version = None
+        self.os_inbox_ovt_version = None
 
         self.started_at = None
         self.finished_at = None
@@ -520,12 +521,21 @@ class CallbackModule(CallbackBase):
             with open(self.os_release_info_file, 'r') as json_input:
                 os_release_info_detail = json.load(json_input, object_pairs_hook=OrderedDict)
 
+            # Update cloud-init version or open-vm-tools version in OS releas info
             if os_release_info_detail and len(os_release_info_detail) == 1:
+                data_changed = False
                 if self.os_cloudinit_version and 'cloud-init' not in os_release_info_detail[0]:
+                   os_release_info_detail[0]['cloud-init'] = self.os_cloudinit_version
+                   os_release_info_detail[0].move_to_end('cloud-init', last=False)
+                   data_changed = True
+                if self.os_inbox_ovt_version and 'open-vm-tools' not in os_release_info_detail[0]:
+                   os_release_info_detail[0]['open-vm-tools'] = self.os_inbox_ovt_version
+                   os_release_info_detail[0].move_to_end('open-vm-tools', last=False)
+                   data_changed = True
+
+                if data_changed:
+                    os_release_info_detail[0].move_to_end('Release', last=False)
                     with open(self.os_release_info_file, 'w') as json_output:
-                        os_release_info_detail[0]['cloud-init'] = self.os_cloudinit_version
-                        os_release_info_detail[0].move_to_end('cloud-init', last=False)
-                        os_release_info_detail[0].move_to_end('Release', last=False)
                         json.dump(os_release_info_detail, json_output, indent=4)
 
     def _get_exception_traceback(self, result):
@@ -594,6 +604,8 @@ class CallbackModule(CallbackBase):
                     self.os_distribution_ver = set_fact_result.get("guest_os_ansible_distribution_ver")
                 if set_fact_result.get("guest_os_ansible_architecture", None):
                     self.os_arch = set_fact_result.get("guest_os_ansible_architecture")
+            if "install_ovt.yml" == task_file and set_fact_result.get("guest_inbox_ovt_version", None):
+                self.os_inbox_ovt_version = set_fact_result.get("guest_inbox_ovt_version")
         elif 'print_test_result.yml' == task_file and str(task.action) == "lineinfile":
             if 'invocation' in task_result and 'module_args' in task_result['invocation']:
                 test_result_line = task_result['invocation']['module_args']['line']
@@ -652,7 +664,7 @@ class CallbackModule(CallbackBase):
                         self.vcenter_info['version'] = debug_var_value
                     if not self.vcenter_info['build'] and debug_var_name == "vcenter_build":
                         self.vcenter_info['build'] = debug_var_value
-                if "cloudinit_version_get.yml" == task_file and debug_var_name == "cloudinit_version":
+                if "cloudinit_pkg_check.yml" == task_file and debug_var_name == "cloudinit_version":
                     if not self.vm_info['Cloud-Init']:
                         self.vm_info['Cloud-Init'] = debug_var_value
                     if not self.os_cloudinit_version:

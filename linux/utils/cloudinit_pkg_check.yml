@@ -4,14 +4,23 @@
 # for cloudinit GOSC, if not exist, will install it, if not installed, then the test "failed"
 # for perl GOSC, if not exist, never mind, if exists, then disable it
 #
-- name: "Check /etc/cloud/cloud.cfg existence"
-  stat:
-    path: /etc/cloud/cloud.cfg
-  register: cloud_init_cfg
-  delegate_to: "{{ vm_guest_ip }}"
+- name: "Initialize the fact of cloud-init version"
+  set_fact:
+    cloudinit_version: ""
+    cloudinit_is_installed: False
 
-- name: "Get cloud-init version only when cloud-init gosc workflow"
-  block:
+- include_tasks: get_installed_package_info.yml
+  vars:
+    package_name: "cloud-init"
+
+- name: "Set fact that cloud-init is installed"
+  set_fact:
+    cloudinit_is_installed: True
+  when: package_info | length > 0
+
+# Install cloud-init for GOSC
+- block:
+    # Install cloud-init if it doesn't exist
     - block:
         - include_tasks: repo_update.yml
         - include_tasks: install_uninstall_package.yml
@@ -19,40 +28,22 @@
             package_name: "cloud-init"
             package_state: "present"
             update_cache: True
-      when: not cloud_init_cfg.stat.exists
 
-    - name: "Check /etc/cloud/cloud.cfg existence in cloud-init work flow"
-      stat:
-        path: /etc/cloud/cloud.cfg
-      register: cloud_init_cfg_retry
-      delegate_to: "{{ vm_guest_ip }}"
-
-    - name: "Assert /etc/cloud/cloud.cfg exist for cloud-init GOSC"
-      assert:
-        that:
-          - cloud_init_cfg_retry.stat.exists
-        fail_msg: "/etc/cloud/cloud.cfg doesn't exist"
-
-    # Check if cloud-init services is enabled, if not, enable them
-    - include_tasks: service_operation.yml
-      vars:
-        enable_service: 'yes'
-      loop:
-        - cloud-init-local
-        - cloud-init
-        - cloud-config
-        - cloud-final
-      loop_control:
-        loop_var: service_name
+        - include_tasks: get_installed_package_info.yml
+          vars:
+            package_name: "cloud-init"
+      when: not cloudinit_is_installed
   when:
     - gosc_workflow is defined
     - gosc_workflow == "cloud-init"
 
-- include_tasks: cloudinit_version_get.yml
-  when: >
-    (cloud_init_cfg is defined and
-     cloud_init_cfg.stat is defined and
-     cloud_init_cfg.stat.exists) or
-    (cloud_init_cfg_retry is defined and
-     cloud_init_cfg_retry.stat is defined and
-     cloud_init_cfg_retry.stat.exists)
+- name: "Set fact of cloud-init version"
+  set_fact:
+    cloudinit_version: "{{ package_info.Version }}"
+  when:
+    - package_info | length > 0
+    - package_info.Version is defined
+    - package_info.Version
+
+- name: "Print the cloud-init version"
+  debug: var=cloudinit_version
