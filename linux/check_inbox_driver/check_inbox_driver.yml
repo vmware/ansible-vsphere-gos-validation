@@ -94,18 +94,19 @@
             - name: "Get module information"
               command: "modinfo {{ module_name }}"
               register: modinfo_result
+              delegate_to: "{{ vm_guest_ip }}"
               loop: "{{ inbox_drivers }}"
               loop_control:
                 loop_var: module_name
 
             - name: "Convert modinfo result to dictionary"
               set_fact:
-                vmware_modules_info: "{{ vmware_modules_info + ['\n'.join(item.stdout_lines | select('match', '^[^:\\s]+:.*[^:]$')) | from_yaml] }}"
+                vmware_modules_info: "{{ vmware_modules_info + ['\n'.join(item.stdout_lines | select('match', '^\\w+:.*[^:]$')) | from_yaml | combine({'module_name': item.module_name }) ] }}"
               when: item.stdout_lines is defined and item.stdout_lines | length
               loop: "{{ modinfo_result.results }}"
 
             - set_fact:
-                vmware_modules: "{{ vmware_modules_info | selectattr('version', 'defined') | items2dict(key_name='name', value_name='version') }}"
+                vmware_modules: "{{ vmware_modules_info | selectattr('version', 'defined') | items2dict(key_name='module_name', value_name='version') }}"
               when: vmware_modules_info is defined and vmware_modules_info | length > 0
 
             - name: "Set fact of inbox drivers versions"
