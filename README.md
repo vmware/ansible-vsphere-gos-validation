@@ -68,7 +68,7 @@ This project supports below scenarios for end-to-end guest OS validation testing
 | Debian 9.x, 10.x                                |                                  |                          | :heavy_check_mark:                 |
 | Windows 10                                      | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Windows Server 2019                             | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-
+| Windows Server SAC releases                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 
 ### Docker images
 * Release v1.0 or the latest:
