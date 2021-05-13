@@ -91,28 +91,37 @@
 
 # If base snapshot not exist, take base snapshot
 - block:
-    # Disable firewall in guest OS
+    # Disable sleep
+    - include_tasks: ../utils/win_set_powercfg.yml
+    
+    # Disable firewall
     - include_tasks: ../utils/win_execute_cmd.yml
       vars:
         win_powershell_cmd: "netsh advfirewall set allprofiles state off"
-    # By default, Windows guest OS will restart automatically
-    # when BSOD, this task is used for diable this automatic reboot
+    
+    # By default, Windows will restart automatically when BSOD,
+    # diable this automatic reboot when failure
     - include_tasks: ../utils/win_execute_cmd.yml
       vars:
         win_powershell_cmd: "wmic RecoverOs set AutoReboot=False"
+    
+    # Restart guest OS
     - include_tasks: ../utils/win_shutdown_restart.yml
       vars:
         set_win_power_state: "restart" 
+    
     - include_tasks: ../../common/vm_take_snapshot.yml
       vars:
         snapshot_name: "{{ base_snapshot_name }}"
         dump_memory: yes
   when: not base_snapshot_exists
 
-# Get VM files path on ESXi host
-- include_tasks: ../../common/vm_get_guest_facts.yml
-- name: Set fact of the VM files path
-  set_fact:
-    vm_files_path: "/vmfs/volumes/{{ vm_guest_facts.instance.hw_files[0].split(' ')[0].strip('[]') }}/{{ ('/').join(vm_guest_facts.instance.hw_files[0].split(' ')[1].split('/')[:-1]) }}"
+# Set VM files path on ESXi host
+- block:
+    - include_tasks: ../../common/vm_get_guest_facts.yml
+    - name: Set fact of the VM files path
+      set_fact:
+        vm_files_path: "/vmfs/volumes/{{ vm_guest_facts.instance.hw_files[0].split(' ')[0].strip('[]') }}/{{ ('/').join(vm_guest_facts.instance.hw_files[0].split(' ')[1].split('/')[:-1]) }}"
+  when: vm_files_path is undefined or not vm_files_path
 - debug:
     msg: "VM files path: {{ vm_files_path }}"
