@@ -1,8 +1,18 @@
-{% for item in ubuntu_install_method_setting -%}
-    {% for os_item in item.os_version.split("/") -%}
-        {% if ubuntu_os_image.find(os_item) != -1 %}
-ubuntu_install_method: "{{ item.install_method }}"
-ubuntu_install_file: "{{ item.install_file }}"
-        {% endif %}
-    {%- endfor %}
+{% set ubuntu_install_method_idx=[] %}
+{% for idx in range(0, ubuntu_install_method_setting|length) -%}
+{% for os_item in ubuntu_install_method_setting[idx].os_version.split("/") -%}
+{% if ubuntu_os_image.find(os_item) != -1 %}
+{{ ubuntu_install_method_idx.append(idx) }}
+{% endif %}
 {%- endfor %}
+{%- endfor %}
+{% if ubuntu_install_method_idx|length > 0 %}
+ubuntu_install_method_idx: "{{ ubuntu_install_method_idx[0] }}"
+ubuntu_install_method: "{{ ubuntu_install_method_setting[ubuntu_install_method_idx[0]].install_method }}"
+ubuntu_install_file: "{{ ubuntu_install_method_setting[ubuntu_install_method_idx[0]].install_file }}"
+{% else %}
+ubuntu_install_method_idx: "-1"
+ubuntu_install_method: "{{ ubuntu_install_method_setting[-1].install_method }}"
+ubuntu_install_file: "{{ ubuntu_install_method_setting[-1].install_file }}"
+{% endif %}
+
