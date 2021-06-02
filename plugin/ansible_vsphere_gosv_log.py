@@ -68,7 +68,7 @@ class CallbackModule(CallbackBase):
         self.os_distribution_ver = ""
         self.os_arch = ""
         self.os_cloudinit_version = None
-        self.os_inbox_ovt_version = None
+        self.os_ovt_version = None
 
         self.started_at = None
         self.finished_at = None
@@ -528,8 +528,8 @@ class CallbackModule(CallbackBase):
                    os_release_info_detail[0]['cloud-init'] = self.os_cloudinit_version
                    os_release_info_detail[0].move_to_end('cloud-init', last=False)
                    data_changed = True
-                if self.os_inbox_ovt_version and 'open-vm-tools' not in os_release_info_detail[0]:
-                   os_release_info_detail[0]['open-vm-tools'] = self.os_inbox_ovt_version
+                if self.os_ovt_version and 'open-vm-tools' not in os_release_info_detail[0]:
+                   os_release_info_detail[0]['open-vm-tools'] = self.os_ovt_version
                    os_release_info_detail[0].move_to_end('open-vm-tools', last=False)
                    data_changed = True
 
@@ -604,8 +604,6 @@ class CallbackModule(CallbackBase):
                     self.os_distribution_ver = set_fact_result.get("guest_os_ansible_distribution_ver")
                 if set_fact_result.get("guest_os_ansible_architecture", None):
                     self.os_arch = set_fact_result.get("guest_os_ansible_architecture")
-            if "install_ovt.yml" == task_file and set_fact_result.get("guest_inbox_ovt_version", None):
-                self.os_inbox_ovt_version = set_fact_result.get("guest_inbox_ovt_version")
         elif 'print_test_result.yml' == task_file and str(task.action) == "lineinfile":
             if 'invocation' in task_result and 'module_args' in task_result['invocation']:
                 test_result_line = task_result['invocation']['module_args']['line']
@@ -646,6 +644,8 @@ class CallbackModule(CallbackBase):
                 if ("get_guest_ovt_version_build.yml" == task_file or
                    "win_get_vmtools_version_build.yml" == task_file):
                     if debug_var_name ==  "vmtools_info_from_vmtoolsd" and debug_var_value:
+                        if "get_guest_ovt_version_build.yml" == task_file and not self.os_ovt_version:
+                            self.os_ovt_version = debug_var_value
                         if not self.vm_info['VM Tools'] or self.vm_info['VM Tools'] != debug_var_name:
                             self.vm_info['VM Tools'] = debug_var_value
                 if "esxi_get_version_build.yml" == task_file:
