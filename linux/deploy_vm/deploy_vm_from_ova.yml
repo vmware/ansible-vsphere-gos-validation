@@ -147,6 +147,20 @@
             - vm_guest_facts.instance is defined
             - vm_guest_facts.instance.hw_guest_id is defined
 
+        # Try to get the OS type from guest full name
+        - name: "Get guest OS type for VM '{{ vm_name }}' based on guest full name"
+          set_fact:
+            ova_guest_os_type: |-
+              {%- if 'ubuntu' in vm_guest_facts.instance.hw_guest_full_name | lower -%}ubuntu
+              {%- elif 'amazon linux' in vm_guest_facts.instance.hw_guest_full_name | lower -%}amazonlinux
+              {%- elif 'vmware photon' in vm_guest_facts.instance.hw_guest_full_name | lower -%}photon
+              {%- elif 'flatcar' in vm_guest_facts.instance.hw_guest_full_name | lower -%}flatcar
+              {%- else -%}unknown{%- endif -%}
+          when:
+            - ova_guest_os_type == 'unknown'
+            - vm_guest_facts.instance is defined
+            - vm_guest_facts.instance.hw_guest_full_name is defined
+
         # If ova_guest_os_type is still not determined by guest id,
         # retrieve guest OS detailed data from vmx file
         # guestOS.detailed.data or guestInfo.detailed.data is supported by VMTools >= 11.0.0

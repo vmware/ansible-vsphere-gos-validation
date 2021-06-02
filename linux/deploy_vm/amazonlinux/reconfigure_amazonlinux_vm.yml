@@ -10,20 +10,14 @@
 - include_tasks: ../../../common/esxi_get_version_build.yml
   when: esxi_version is undefined or esxi_version == 'N/A'
 
-- name: "Set fact of the ESXi version"
-  set_fact:
-    esxi_version_num: "{{ esxi_version | regex_replace('\\.','') | int }}"
-
 # Amazon Linux OVA is using other3xlinux64 as guest id
-# amazonlinux2_64 is added in 6.7U1 (HWv14)
-# amazonlinux3_64 is added in 7.0U1 (HWv18)
 - include_tasks: ../../../common/vm_set_guest_id.yml
   vars:
     vm_guest_id: "{{ guest_id }}"
   when:
     - guest_id == 'amazonlinux2_64Guest'
     - ova_hw_guest_id != guest_id
-    - esxi_version_num | int > 670 or (esxi_version_num | int == 670 and esxi_update_version | int > 0)
+    - ((esxi_version is version('6.7.0', '>')) or (esxi_version is version('6.7.0', '==') and esxi_update_version | int > 0))
     - vm_hw_version | int >= 14
 
 - include_tasks: ../../../common/vm_set_guest_id.yml

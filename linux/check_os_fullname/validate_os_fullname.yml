@@ -4,6 +4,16 @@
 # Wait VMware tools to report Guest OS fullname
 - include_tasks: ../../common/vm_wait_guest_fullname.yml
 
+# If the guest os full name has detailed OS info, test passed
+- block:
+    - include_tasks: ../../common/print_test_result.yml
+      vars:
+        test_result: "Passed"
+    - meta: end_play
+  when:
+    - guest_os_ansible_distribution == "Flatcar"
+    - "'Flatcar' in vm_guest_facts.instance.hw_guest_full_name"
+
 - block:
     - name: "Assert Guest OS fullname is either {{ guest_fullname[0] }} or {{ guest_fullname[1] }}"
       assert:
