@@ -132,6 +132,11 @@
         - include_tasks: ../../common/vm_set_power_state.yml
           vars:
             vm_power_state_set: 'powered-on'
+
+        - name: "Set current power state"
+          set_fact:
+            current_power_state: "{{ vm_power_state_get }}"
+
         - include_tasks: ../../common/vm_wait_guest_fullname.yml
 
         # Try to get the OS type from guest id
@@ -146,6 +151,20 @@
             - ova_guest_os_type == 'unknown'
             - vm_guest_facts.instance is defined
             - vm_guest_facts.instance.hw_guest_id is defined
+
+        # Try to get the OS type from guest full name
+        - name: "Get guest OS type for VM '{{ vm_name }}' based on guest full name"
+          set_fact:
+            ova_guest_os_type: |-
+              {%- if 'ubuntu' in vm_guest_facts.instance.hw_guest_full_name | lower -%}ubuntu
+              {%- elif 'amazon linux' in vm_guest_facts.instance.hw_guest_full_name | lower -%}amazonlinux
+              {%- elif 'vmware photon' in vm_guest_facts.instance.hw_guest_full_name | lower -%}photon
+              {%- elif 'flatcar' in vm_guest_facts.instance.hw_guest_full_name | lower -%}flatcar
+              {%- else -%}unknown{%- endif -%}
+          when:
+            - ova_guest_os_type == 'unknown'
+            - vm_guest_facts.instance is defined
+            - vm_guest_facts.instance.hw_guest_full_name is defined
 
         # If ova_guest_os_type is still not determined by guest id,
         # retrieve guest OS detailed data from vmx file
@@ -175,17 +194,17 @@
           when:
             - vm_guest_facts.instance.guest_tools_version | int >= 11264
             - ova_guest_os_type == 'unknown'
+      when: ova_guest_os_type == 'unknown'
 
-        # Revert to snapshot "FreshDeployedFromOVA" or "AfterUpgradeHwv" to
-        # proceed the following tasks so that VM's reconfiguration can be
-        # performed at the first time boot.
-        - include_tasks: ../../common/vm_revert_snapshot.yml
-          vars:
-            snapshot_name: "{{ base_snapshot_for_reconfig }}"
+    # Revert to snapshot "FreshDeployedFromOVA" or "AfterUpgradeHwv" to
+    # proceed the following tasks so that VM's reconfiguration can be
+    # performed at the first time boot.
+    - include_tasks: ../../common/vm_revert_snapshot.yml
+      vars:
+        snapshot_name: "{{ base_snapshot_for_reconfig }}"
       when:
-        - "'ubuntu' not in ova_hw_guest_id"
-        - "'amazonlinux' not in ova_hw_guest_id"
-        - "'vmwarePhoton' not in ova_hw_guest_id"
+        - current_power_state is defined
+        - current_power_state == "poweredOn"
 
     # Configure username/password, ssh public key, sshd, etc in guest
     # Reconfig Amazon Linux VM

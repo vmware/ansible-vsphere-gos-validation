@@ -26,15 +26,17 @@
     - name: "Set guest_fullname variable for Amazon Linux on ESXi <= 6.5.0"
       set_fact:
         guest_fullname: ["Other 3.x or later Linux {{ bitness }}", "Other 3.x Linux {{ bitness }}"]
-      when:
-        - (esxi_version_num | int <= 650) or ((esxi_version_num | int == 670) and (esxi_update_version | int == 0))
+      when: >
+        (esxi_version is version('6.5.0', '<=')) or
+        (esxi_version is version('6.7.0', '==') and (esxi_update_version | int == 0))
 
     # Map Amazon Linux when ESXi > 6.7.0 GA
     - name: "Set guest_fullname variable for Amazon Linux on ESXi >= 6.7.0"
       set_fact:
         guest_fullname: "Amazon Linux {{ guest_os_ansible_distribution_major_ver }} {{ bitness }}"
-      when:
-        - (esxi_version_num | int > 670) or ((esxi_version_num | int == 670) and (esxi_update_version | int > 0))
+      when: >
+        (esxi_version is version('6.7.0', '>')) or
+        (esxi_version is version('6.7.0', '==') and (esxi_update_version | int > 0))
   when:
     - short_name is undefined or not short_name
 
