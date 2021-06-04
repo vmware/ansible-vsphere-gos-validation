@@ -53,6 +53,22 @@
           - vm_exists
         fail_msg: "VM '{{ vm_name }}' doesn't exist. Please set new_vm to True to deploy the VM or provide an existing VM name."
       when: new_vm is undefined or not new_vm | bool
+    
+    # Set VM datastore path directly when creating a new VM
+    - name: Set fact of the VM files parent path
+      set_fact:
+        vm_datastore_path: "/vmfs/volumes/{{ datastore }}"
+      when: new_vm is defined and new_vm | bool
+    # Get VM datatore path when testing on existing VM
+    - block:
+        - include_tasks: ../common/vm_get_guest_facts.yml
+        - name: Set fact of the VM files parent path
+          set_fact:
+            vm_datastore_path: "/vmfs/volumes/{{ vm_guest_facts.instance.hw_datastores[0] }}"
+      when: vm_exists is defined and vm_exists
+
+    - name: Display the datatore path of VM files
+      debug: var=vm_datastore_path
 
     # Get vCenter and ESXi version info
     - include_tasks: ../common/vcenter_get_version_build.yml
@@ -68,6 +84,7 @@
         add_host_in_memory_inventory_pwd: "{{ esxi_password }}"
         add_host_in_memory_inventory_python: "/bin/python"
         add_host_in_memory_inventory_ssh_pipeline: "{{ esxi_ssh_pipeline_enable | default(False) }}"
+        add_host_in_memory_inventory_remote_tmp: "{{ vm_datastore_path }}"
 
     # Enable guest IP hack on ESXi host to get VM IP address when
     # there is no VMware tools installed or VMware tools is not up

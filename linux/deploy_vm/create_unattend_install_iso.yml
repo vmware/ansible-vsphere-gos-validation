@@ -5,9 +5,10 @@
   set_fact:
     iso_timestamp: "{{ lookup('pipe','date +%s') }}"
 
-- name: "Set fact of the unattend install ISO file name"
+- name: "Set fact of unattend install ISO file name and remote datastore path"
   set_fact:
     unattend_iso_file_name: "{{ guest_id }}{{ '_'.join(''.join(unattend_install_conf.split('.')[:-1]).split('/')) }}-{{ iso_timestamp }}.iso"
+
 - name: "Set fact of the temp path of generated unattend install ISO file"
   set_fact:
     generated_unattend_iso: "/tmp/{{ unattend_iso_file_name }}"
@@ -55,7 +56,7 @@
 
 - name: Set fact of the dest path of unattend install iso on ESXi host
   set_fact:
-    transferred_unattend_iso: "/vmfs/volumes/{{ datastore }}/{{ unattend_iso_file_name }}"
+    transferred_unattend_iso: "{{ vm_datastore_path }}/{{ unattend_iso_file_name }}"
 - name: Print debug message
   debug:
     msg: "Will transfer unattend install iso to: {{ transferred_unattend_iso }}"
