@@ -17,7 +17,11 @@
     folder: "{{ vm_folder }}"
     name: "{{ vm_name }}"
   register: vm_snapshot_facts
-  until: vm_snapshot_facts.guest_snapshots.current_snapshot.name == expected_snapshot_name
+  until:
+    - vm_snapshot_facts is defined
+    - vm_snapshot_facts.guest_snapshots is defined
+    - vm_snapshot_facts.guest_snapshots.current_snapshot is defined
+    - vm_snapshot_facts.guest_snapshots.current_snapshot.name == expected_snapshot_name
   retries: "{{ (expected_snapshot_wait_time | default(30) | int / 3) | int }}"
   delay: 3
 
