@@ -1,0 +1,15 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Loop to get new {{ new_ctrl_type }} controller number"
+  set_fact:
+    new_ctrl_number: "0"
+    new_unit_number: "0"
+    existing_ctrl_numbers: "{{ disk_controller_facts['disk_controller_data'][new_ctrl_type].values() | map(attribute='controller_busnumber') | list }}"
+
+- debug: var=disk_controller_facts['disk_controller_data'][new_ctrl_type]
+
+- name: "Get the new {{ new_ctrl_type }} controller number not assigned"
+  set_fact:
+    new_ctrl_number: "{{ range(0, 4) |  difference(existing_ctrl_numbers) | min }}"
+  when: total_existing_controller_num | int >= 1

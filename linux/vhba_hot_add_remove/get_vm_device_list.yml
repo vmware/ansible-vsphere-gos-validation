@@ -1,19 +1,24 @@
 # Copyright 2021 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+- name: "Initialize device list"
+  set_fact:
+    device_list: []
+
 - name: "Do rescan for lsilogic or buslogic disk"
   shell: (for i in `find /sys/ -iname rescan`;do echo 1 >$i; done;) && (for i in `find /sys/ -iname scan`;do echo "- - -" >$i; done;)
   delegate_to: "{{ vm_guest_ip }}"
-  when: scsi_type in ['buslogic', 'lsilogic']
+  when: new_disk_ctrl_type in ['buslogic', 'lsilogic']
 
-- name: "Get VM '{{ vm_name }}' device list"
-  shell: lsblk --nodeps | grep -i disk | grep -v fd0 | awk '{print $1}'
-  changed_when: False
-  register: lsblk_result
-  delegate_to: "{{ vm_guest_ip }}"
-- name: "Set fact of device_list from lsblk command"
+# Get the fact of system devices
+- include_tasks: ../../common/get_system_info.yml
+  vars:
+    filter: "ansible_devices"
+
+- name: "Get the fact of all OS devices"
   set_fact:
-    device_list: "{{ lsblk_result.stdout.split('\n') }}"
+    device_list: "{{ guest_system_info.ansible_devices.keys() | difference(['fd0']) }}"
+  when: guest_system_info.ansible_devices is defined
 
 - name: "Print current all block devices in VM '{{ vm_name }}'"
   debug: var=device_list
