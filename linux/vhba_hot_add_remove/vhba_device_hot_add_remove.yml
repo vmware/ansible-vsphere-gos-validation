@@ -23,9 +23,30 @@
     - debug:
         msg: "Will use iozone tool to test new added disk: {{ iozone_tools_path }}"
 
-    - name: "The controller type for new disk is scsi controller"
-      set_fact:
-        new_ctrl_type: "scsi"
+    - block:
+        - name: "The controller type for new disk is scsi controller"
+          set_fact:
+            new_ctrl_type: "scsi"
+
+        - name: "Set SCSI command tools package name"
+          set_fact:
+            sg3_utils_pkg: |-
+              {%- if guest_os_ansible_distribution in ["Ubuntu", "Debian"] -%}sg3-utils
+              {%- else -%}sg3_utils{%- endif -%}
+
+        # Install SCSI command tools
+        - include_tasks: get_installed_package_info.yml
+          vars:
+            package_name: "{{ sg3_utils_pkg }}"
+
+        - include_tasks: install_uninstall_package.yml
+          vars:
+            package_name: "{{ sg3_utils_pkg }}"
+            package_state: "present"
+            update_cache: True
+          when:
+            - package_info is defined
+            - package_info | length == 0
       when: new_disk_ctrl_type in ['paravirtual', 'lsilogic', 'lsilogicsas', 'buslogic']
 
     - name: "The controller type for new disk is sata controller"

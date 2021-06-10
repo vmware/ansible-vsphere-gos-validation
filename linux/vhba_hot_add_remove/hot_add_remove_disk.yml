@@ -7,9 +7,11 @@
     disk_controller_type: "{{ new_disk_ctrl_type }}"
     ctrl_number: "{{ new_ctrl_number }}"
     unit_number: "{{ new_unit_number }}"
-- name: "Pause 5 seconds to wait for operation completed"
-  pause:
-    seconds: 5
+
+- include_tasks: wait_device_list_changed.yml
+  vars:
+    wait_device_list: "{{ old_device_list }}"
+    wait_device_diff: 1
 
 - include_tasks: get_vm_device_list.yml
 - name: "Set fact of block device list in VM after hotadd"
@@ -29,15 +31,10 @@
     unit_number: "{{ new_unit_number }}"
     disk_controller_type: "{{ new_disk_ctrl_type }}"
 
-- name: "Wait for disk {{ device_name }} is removed completely"
-  command: "lsblk -o NAME --nodeps"
-  delegate_to: "{{ vm_guest_ip }}"
-  register: lsblk_result
-  until:
-    - lsblk_result.stdout is defined
-    - device_name not in lsblk_result.stdout
-  delay: 5
-  retries: 10
+- include_tasks: wait_device_list_changed.yml
+  vars:
+    wait_device_list: "{{ old_device_list }}"
+    wait_device_diff: 0
 
 - include_tasks: get_vm_device_list.yml
 - name: "Set fact of block device list in VM after hot remove"
