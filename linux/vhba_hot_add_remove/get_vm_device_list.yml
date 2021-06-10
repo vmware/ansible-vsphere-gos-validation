@@ -5,15 +5,17 @@
   set_fact:
     device_list: []
 
-# Get the fact of system devices
-- include_tasks: ../../common/get_system_info.yml
-  vars:
-    filter: "ansible_devices"
+- name: "Get block devices"
+  shell: "lsblk -o NAME --nodeps | grep -v NAME"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: lsblk_result
 
-- name: "Get the fact of all OS devices"
+- name: "Set the fact of block device list"
   set_fact:
-    device_list: "{{ guest_system_info.ansible_devices.keys() | difference(['fd0']) }}"
-  when: guest_system_info.ansible_devices is defined
+    device_list: "{{ lsblk_result.stdout_lines }}"
+  when:
+    - lsblk_result is defined
+    - lsblk_result.stdout_lines is defined
 
 - name: "Print current all block devices in VM '{{ vm_name }}'"
   debug: var=device_list

@@ -4,7 +4,7 @@
 # Wait for a device state is present or absent
 # Parameters:
 #   wait_device_list: The devices list
-#   wait_device_diff: The difference length of device list
+#   wait_device_diff: The difference length of device list, like  1 or -1.
 #
 
 # Rescan SCSI bus
@@ -21,24 +21,12 @@
         - rescan_scsi_result.stdout_lines
   when: new_ctrl_type == "scsi"
 
-# Wait for new devices
-- name: "Get the difference device list"
-  set_fact:
-    device_diff_list: "{{ lsblk_result.stdout_lines | difference(wait_device_list) }}"
-  when: wait_device_diff >= 0
-
-# Wait for devices removed
-- name: "Get the difference device list"
-  set_fact:
-    device_diff_list: "{{ wait_device_list | difference(lsblk_result.stdout_lines) }}"
-  when: wait_device_diff < 0
-
-- name: "Wait for disk list changed"
+- name: "Wait for device list changed"
   shell: "lsblk -o NAME --nodeps | grep -v NAME"
   delegate_to: "{{ vm_guest_ip }}"
   register: lsblk_result
   until:
     - lsblk_result.stdout_lines is defined
-    - device_diff_list | length == wait_device_diff | abs
+    - (lsblk_result.stdout_lines | length) - (wait_device_list | length) == wait_device_diff
   delay: 5
   retries: 10
