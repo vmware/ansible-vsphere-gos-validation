@@ -43,25 +43,6 @@
 
     - debug: var=vm_path
 
-    # Add proxy prefix
-    - block:
-        - name: "Add prefix to proxy URL"
-          set_fact:
-            http_proxy_vm: "http://{{ http_proxy_vm }}"
-          when:
-            - not http_proxy_vm.startswith('https://')
-            - not http_proxy_vm.startswith('http://')
-            - not http_proxy_vm.startswith('ftp://')
-      when: http_proxy_vm is defined and http_proxy_vm
-
-    # Remove proxy setting in cloud-init user data file if http_proxy_vm is not set
-    - name: "No proxy setting for Ubuntu autoinstall"
-      lineinfile:
-        path: "../templates/{{ ubuntu_install_file }}"
-        regexp: "^ *proxy:"
-        state: absent
-      when: http_proxy_vm is undefined or not http_proxy_vm
-
     # Create the seed.iso to modify login information
     - include_tasks: ../../utils/create_seed_iso.yml
       vars:
