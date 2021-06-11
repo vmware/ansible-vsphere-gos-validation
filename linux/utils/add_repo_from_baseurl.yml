@@ -53,6 +53,22 @@
         gpgkey: "{{ gpg_key_path | default(omit) }}"
         skip_if_unavailable: True
       delegate_to: "{{ vm_guest_ip }}"
+      register: add_yum_repo_result
+
+    - debug: var=add_yum_repo_result
+
+    - block:
+        - name: "Get new repo file path"
+          set_fact:
+            new_yum_repo_path: "{{ add_yum_repo_result.diff.after_header }}"
+
+        - name: "Remove spaces in repo file"
+          shell: "sed -i 's/ *= */=/' {{ new_yum_repo_path }}"
+          delegate_to: "{{ vm_guest_ip }}"
+      when:
+        - add_yum_repo_result is defined
+        - add_yum_repo_result.diff is defined
+        - add_yum_repo_result.diff.after_header is defined
   when: guest_os_ansible_distribution in ['RedHat', 'CentOS', 'OracleLinux', 'VMware Photon OS', 'Amazon']
 
 # Add repo for SLES/SLED
