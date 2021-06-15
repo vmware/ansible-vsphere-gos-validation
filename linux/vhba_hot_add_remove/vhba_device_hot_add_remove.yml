@@ -23,31 +23,10 @@
     - debug:
         msg: "Will use iozone tool to test new added disk: {{ iozone_tools_path }}"
 
-    - block:
-        - name: "The controller type for new disk is scsi controller"
-          set_fact:
-            new_ctrl_type: "scsi"
-
-        - name: "Set SCSI command tools package name"
-          set_fact:
-            sg3_utils_pkg: |-
-              {%- if guest_os_ansible_distribution in ["Ubuntu", "Debian"] -%}sg3-utils
-              {%- else -%}sg3_utils{%- endif -%}
-
-        # Install SCSI command tools
-        - include_tasks: ../utils/get_installed_package_info.yml
-          vars:
-            package_name: "{{ sg3_utils_pkg }}"
-
-        - include_tasks: ../utils/install_uninstall_package.yml
-          vars:
-            package_name: "{{ sg3_utils_pkg }}"
-            package_state: "present"
-            update_cache: True
-          when:
-            - package_info is defined
-            - package_info | length == 0
-      when: new_disk_ctrl_type in ['paravirtual', 'lsilogic', 'lsilogicsas', 'buslogic']
+    - name: "The controller type for new disk is sata controller"
+      set_fact:
+        new_ctrl_type: "scsi"
+      when: new_disk_ctrl_type in ['paravirtual', 'lsilogic', 'lsilogicsas']
 
     - name: "The controller type for new disk is sata controller"
       set_fact:
@@ -82,33 +61,33 @@
             old_device_list: "{{ device_list }}"
         - name: "Print existing block device list in guest OS"
           debug: var=old_device_list
-        # Hotadd new disk controller
-        - include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
-          vars:
-            disk_controller_ops: "present"
-            disk_controller_type: "{{ new_disk_ctrl_type }}"
-            disk_controller_number: "{{ new_ctrl_number }}"
-        - name: "Pause 2 seconds to wait for new disk controller added"
-          pause:
-            seconds: 2
-        # Hotadd new disk, do disk iozone test and then remove disk
+
+        # Hot add a new controller and disk at the same time, run disk iozone test and then remove it
         - include_tasks: hot_add_remove_disk.yml
+
+        # Get VM disk controller info after hot adding
+        - include_tasks: ../../common/vm_get_disk_controller_facts.yml
+
+        - name: "Print disk controller info after disk hot adding"
+          debug: var=disk_controller_facts['disk_controller_data'][new_ctrl_type]
+
+        # Hot add another new disk on the new disk controller just added, run disk iozone test and then remove it
+        - include_tasks: hot_add_remove_disk.yml
+
         # Hot remove new added disk controller
         - include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
           vars:
             disk_controller_ops: "absent"
             disk_controller_type: "{{ new_disk_ctrl_type }}"
             disk_controller_number: "{{ new_ctrl_number }}"
-        - name: "Pause 2 seconds to wait for disk controller removed"
-          pause:
-            seconds: 2
+
         # Check VM disk controller facts is the same as the one before hotadd testing
         - include_tasks: compare_vm_vhba_facts.yml
       when: total_existing_controller_num | int < 4
 
     - debug:
         msg: "There are already 4 SCSI controllers, skip testing on hotadd new disk onto new disk controller."
-      when: total_existing_controller_num|int == 4
+      when: total_existing_controller_num | int == 4
 
     # If found existing disk controller with the specifc type, then add new disk onto it
     - block:
@@ -139,7 +118,7 @@
           when:
             - found_existing_ctrl is defined and found_existing_ctrl
             - total_existing_disks | int == 16
-      when: total_existing_controller_num|int >= 1
+      when: total_existing_controller_num | int >= 1
 
     - include_tasks: ../../common/print_test_result.yml
       vars:

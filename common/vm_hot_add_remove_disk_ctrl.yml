@@ -9,7 +9,7 @@
 #   sleep_time_disk_controller_ops: default is 10 seconds
 # Return: disk_controller_facts
 #
-- name: Hotadd or remove VM disk controller
+- name: Hot add or remove VM disk controller
   vmware_guest_controller:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -23,6 +23,12 @@
         type: "{{ disk_controller_type }}"
         controller_number: "{{ disk_controller_number | default(omit) }}"
   register: disk_controller_facts
+  until:
+    - disk_controller_facts is defined
+    - disk_controller_facts.changed is defined
+    - disk_controller_facts.changed
+  delay: 5
+  retries: 10
 
 - name: Display the VM disk controller operation result
   debug: var=disk_controller_facts
