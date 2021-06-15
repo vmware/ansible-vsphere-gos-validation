@@ -81,6 +81,11 @@
         - name: "Print disk controller info after disk hot adding"
           debug: var=disk_controller_facts['disk_controller_data'][new_ctrl_type]
 
+        - name: "Fail the test if new disk controller doesn't exist"
+          fail:
+            msg: "Failed to create a new {{ new_disk_ctrl_type }} controller while adding new disk"
+          when: disk_controller_facts['disk_controller_data'][new_ctrl_type][new_ctrl_number] is undefined
+
         # Hot add another new disk on the new disk controller just added, run disk iozone test and then remove it
         - include_tasks: hot_add_remove_disk.yml
 
