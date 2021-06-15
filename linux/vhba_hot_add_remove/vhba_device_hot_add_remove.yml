@@ -49,6 +49,16 @@
     - name: "Print existing SCSI controller number in VM '{{ vm_name }}'"
       debug: var=total_existing_controller_num
 
+    - block:
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "There are already 4 SCSI controllers, skip testing on hotadd new disk onto new disk controller."
+
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "No Run"
+      when: total_existing_controller_num | int == 4
+
     # Add a new disk controller and a new disk attaching to it
     # when the total existing controller number < 4
     - block:
@@ -83,46 +93,10 @@
 
         # Check VM disk controller facts is the same as the one before hotadd testing
         - include_tasks: compare_vm_vhba_facts.yml
-      when: total_existing_controller_num | int < 4
 
-    - debug:
-        msg: "There are already 4 SCSI controllers, skip testing on hotadd new disk onto new disk controller."
-      when: total_existing_controller_num | int == 4
-
-    # If found existing disk controller with the specifc type, then add new disk onto it
-    - block:
-        # Get current device list in guest OS
-        - include_tasks: get_vm_device_list.yml
-        - name: "Set fact of existing block device list"
-          set_fact:
-            old_device_list: "{{ device_list }}"
-        - name: "Print existing block device list in guest OS"
-          debug: var=old_device_list
-
-        - include_tasks: get_new_disk_node_existing_ctrl.yml
+        - include_tasks: ../../common/print_test_result.yml
           vars:
-            scsi_facts: "{{ disk_controller_facts_old }}"
-        - debug:
-            msg: "Skip testing on hotadd new disk to existing disk controller since not found '{{ new_disk_ctrl_type }}' controller."
-          when: found_existing_ctrl is undefined or not found_existing_ctrl
-        - block:
-            # Hotadd new disk, do disk iozone check then hot remove disk
-            - include_tasks: hot_add_remove_disk.yml
-            # Check VM disk controller facts is the same as the one got before hotadd testing
-            - include_tasks: compare_vm_vhba_facts.yml
-          when:
-            - found_existing_ctrl is defined and found_existing_ctrl
-            - total_existing_disks | int < 16
-        - debug:
-            msg: "There are 16 disks on the existing '{{ new_disk_ctrl_type }}' disk controller, skip testing on hotadd new disk."
-          when:
-            - found_existing_ctrl is defined and found_existing_ctrl
-            - total_existing_disks | int == 16
-      when: total_existing_controller_num | int >= 1
-
-    - include_tasks: ../../common/print_test_result.yml
-      vars:
-        test_result: "Passed"
-
+            test_result: "Passed"
+      when: total_existing_controller_num | int < 4
   rescue:
     - include_tasks: ../utils/test_rescue.yml
