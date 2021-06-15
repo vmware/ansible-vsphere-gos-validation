@@ -112,10 +112,6 @@
 
     # If found existing disk controller with the specifc type, then add new disk onto it
     - block:
-        - name: "Initialize the fact of found existing '{{ new_disk_ctrl_type }}' controller result"
-          set_fact:
-            found_existing_ctrl: False
-
         # Get current device list in guest OS
         - include_tasks: get_vm_device_list.yml
         - name: "Set fact of existing block device list"
@@ -129,7 +125,7 @@
             scsi_facts: "{{ disk_controller_facts_old }}"
         - debug:
             msg: "Skip testing on hotadd new disk to existing disk controller since not found '{{ new_disk_ctrl_type }}' controller."
-          when: not found_existing_ctrl
+          when: found_existing_ctrl is undefined or not found_existing_ctrl
         - block:
             # Hotadd new disk, do disk iozone check then hot remove disk
             - include_tasks: hot_add_remove_disk.yml

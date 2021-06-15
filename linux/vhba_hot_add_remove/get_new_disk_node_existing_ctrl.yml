@@ -25,7 +25,9 @@
   set_fact:
     new_ctrl_number: "{{ new_disk_ctrl_facts[item].controller_busnumber }}"
     found_existing_ctrl: "{{ new_disk_ctrl_facts[item] }}"
-  when: new_disk_ctrl_facts[item].controller_disks_devicekey | length < 16
+  when:
+    - controller_name_map[new_disk_ctrl_type] == new_disk_ctrl_facts[item].controller_summary
+    - new_disk_ctrl_facts[item].controller_disks_devicekey | length < 16
   with_items: "{{ new_disk_ctrl_facts }}"
 
 - name: "Found an existing '{{ new_disk_ctrl_type }}' controller"
@@ -34,7 +36,7 @@
 - block:
     - block:
         - include_tasks: ../../common/vm_get_disk_facts.yml
-    
+
         - name: "Get all disks attached to {{ found_existing_ctrl.controller_label }}"
           set_fact:
             existing_disks: "{{ vm_guest_disk_facts.guest_disk_info.values() | selectattr('controller_key', 'equalto', found_existing_ctrl.controller_devicekey) }}"
@@ -48,7 +50,7 @@
         - include_tasks: ../../common/vm_get_devices_with_ctrl_key.yml
           vars:
             device_controller_key: "{{ found_existing_ctrl.controller_devicekey }}"
-    
+
         - name: "Get all devices attached to {{ found_existing_ctrl.controller_label }}"
           set_fact:
             existing_disks: "{{ device_list_with_ctrl_key }}"
