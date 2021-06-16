@@ -23,36 +23,42 @@
     - debug:
         msg: "Will use iozone tool to test new added disk: {{ iozone_tools_path }}"
 
-    - name: "The controller type for new disk is sata controller"
+    - name: "The controller type for new disk is SCSI controller"
       set_fact:
         new_ctrl_type: "scsi"
       when: new_disk_ctrl_type in ['paravirtual', 'lsilogic', 'lsilogicsas']
 
-    - name: "The controller type for new disk is sata controller"
+    - name: "The controller type for new disk is SATA controller"
       set_fact:
         new_ctrl_type: "sata"
       when: new_disk_ctrl_type == "sata"
 
-    - name: "The controller type for new disk is nvme controller"
+    - name: "The controller type for new disk is NVMe controller"
       set_fact:
         new_ctrl_type: "nvme"
       when: new_disk_ctrl_type == "nvme"
 
     # Get VM current disk controller info before doing hotadd testing
     - include_tasks: ../../common/vm_get_disk_controller_facts.yml
-    - name: "Save original disk controller facts"
+
+    - name: "Print VM {{ new_ctryl_type }} controller facts before hot adding"
+      debug: var=disk_controller_facts['disk_controller_data'][new_ctrl_type]
+
+    - name: "Save the fact of original {{ new_ctrl_type }} controllers"
       set_fact:
         disk_controller_facts_old: "{{ disk_controller_facts['disk_controller_data'][new_ctrl_type] }}"
-    - name: "Get existing SCSI controller number"
+
+    - name: "Get the number of existing {{ new_ctrl_type }} controllers"
       set_fact:
         total_existing_controller_num: "{{ disk_controller_facts['disk_controller_data'][new_ctrl_type] | length }}"
-    - name: "Print existing SCSI controller number in VM '{{ vm_name }}'"
+
+    - name: "Print the number of existing {{ new_ctrl_type }} controllers on VM '{{ vm_name }}'"
       debug: var=total_existing_controller_num
 
     - block:
         - name: "Skip testcase: {{ ansible_play_name }}"
           debug:
-            msg: "There are already 4 SCSI controllers, skip testing on hotadd new disk onto new disk controller."
+            msg: "There are already 4 {{ new_ctrl_type }} controllers, skip testing on hotadd new disk onto new disk controller."
 
         - include_tasks: ../../common/print_test_result.yml
           vars:
@@ -62,8 +68,18 @@
     # Add a new disk controller and a new disk attaching to it
     # when the total existing controller number < 4
     - block:
+        - name: "Get existing {{ new_ctrl_type }} controller numbers"
+          set_fact:
+            new_ctrl_number: "0"
+            new_unit_number: "0"
+            existing_ctrl_numbers: "{{ disk_controller_facts_old.values() | map(attribute='controller_busnumber') | list }}"
+
         # Get new disk controller number and new disk unit number
-        - include_tasks: get_new_disk_controller_num.yml
+        - name: "Get the next {{ new_ctrl_type }} controller number can be assigned"
+          set_fact:
+            new_ctrl_number: "{{ range(0, 4) |  difference(existing_ctrl_numbers) | min }}"
+          when: total_existing_controller_num | int >= 1
+
         # Get current device list in guest OS
         - include_tasks: get_vm_device_list.yml
         - name: "Set fact of existing block device list"
