@@ -1,0 +1,34 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- include_tasks: ../../common/vm_hot_add_remove_disk.yml
+  vars:
+    disk_operation: 'present'
+    disk_controller_type: "{{ new_disk_ctrl_type }}"
+    ctrl_number: "{{ new_ctrl_number }}"
+    unit_number: "{{ new_unit_number }}"
+
+- include_tasks: wait_device_list_changed.yml
+  vars:
+    wait_device_list: "{{ old_device_list }}"
+    wait_device_diff: 1
+
+- name: "Set fact of new device list"
+  set_fact:
+    new_device_list: "{{ device_list_after_change }}"
+
+# Create new partition for new disk
+- include_tasks: prepare_new_disk.yml
+- include_tasks: run_iozone_test.yml
+
+- include_tasks: ../../common/vm_hot_add_remove_disk.yml
+  vars:
+    disk_operation: 'absent'
+    ctrl_number: "{{ new_ctrl_number }}"
+    unit_number: "{{ new_unit_number }}"
+    disk_controller_type: "{{ new_disk_ctrl_type }}"
+
+- include_tasks: wait_device_list_changed.yml
+  vars:
+    wait_device_list: "{{ new_device_list }}"
+    wait_device_diff: -1

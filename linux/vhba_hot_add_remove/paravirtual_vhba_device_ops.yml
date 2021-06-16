@@ -2,12 +2,14 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is used for check hotadd and hot remove PVSCSI
-# controller and disk. The testing contains 2 parts:
-# 1. hotadd new PVSCSI controller and new disk when VM existing
-# SCSI controller number < 4.
-# 2. hotadd new disk to existing PVSCSI controller when there is
-# existing PVSCI controller and the number of disks attached < 16.
+#   This test case is used for check hot add and hot remove PVSCSI
+# controller and disk. The testing contains 3 phase:
+# 1. hot add a new PVSCSI controller and disk at the same time when
+# VM existing SCSI controller number is less than 4. Then run iozone
+# test on this new disk. After that, hot remove the new disk.
+# 2. hot add a new disk to the PVSCSI controller added at first phase,
+# and run iozone test on it. After that, hot remove the new disk.
+# 3. hot remove the new PVSCSI controller at the end.
 #
 - name: paravirtual_vhba_device_ops
   hosts: localhost
@@ -15,6 +17,6 @@
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   vars:
     timestamp: "{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
-    scsi_type: "paravirtual"
+    new_disk_ctrl_type: "paravirtual"
   tasks:
     - include_tasks: vhba_device_hot_add_remove.yml

@@ -2,20 +2,35 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - block:
-    - name: "Skip test case because guest OS doesn't support {{ scsi_type }} controller"
-      block:
+    - include_tasks: ../utils/test_setup.yml
+      vars:
+        vmtools_check: "False"
+
+    - block:
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip test case because guest OS doesn't support {{ new_disk_ctrl_type }} controller"
         - include_tasks: ../../common/print_test_result.yml
           vars:
             test_result: "No Run"
         - meta: end_play
       when:
-        - scsi_type in ["lsilogic", "lsilogicsas"]
+        - new_disk_ctrl_type in ["lsilogic", "lsilogicsas"]
         - guest_os_ansible_distribution in ["RedHat", "CentOS"]
         - guest_os_ansible_distribution_major_ver | int >= 8
 
-    - include_tasks: ../utils/test_setup.yml
-      vars:
-        vmtools_check: "False"
+    - block:
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "VM with hardware version of {{ vm_hardware_version }} doesn't support hot add NVMe disk on existing NVMe controller"
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "No Run"
+        - meta: end_play
+      when:
+        - new_disk_ctrl_type == 'nvme'
+        - vm_hardware_version.split('-')[-1] | int < 19
+
 
     - name: "Set fact of the iozone file path"
       set_fact:
@@ -23,86 +38,89 @@
     - debug:
         msg: "Will use iozone tool to test new added disk: {{ iozone_tools_path }}"
 
+    - name: "Get the vHBA type for {{ new_disk_ctrl_type }} controller"
+      set_fact:
+        new_vhba_type: "{{ new_disk_ctrl_type if new_disk_ctrl_type in ['sata', 'nvme'] else 'scsi' }}"
+
     # Get VM current disk controller info before doing hotadd testing
     - include_tasks: ../../common/vm_get_disk_controller_facts.yml
-    - name: "Save original disk controller facts"
+
+    - name: "Set fact of VM disk controllers before hot adding tests"
       set_fact:
-        old_scsi_facts: "{{ disk_controller_facts['disk_controller_data']['scsi'] }}"
-    - name: "Get existing SCSI controller number"
-      set_fact:
-        total_existing_scsi_ctrls: "{{ disk_controller_facts['disk_controller_data']['scsi'] | length }}"
-    - name: "Print existing SCSI controller number in VM '{{ vm_name }}'"
-      debug: var=total_existing_scsi_ctrls
+        disk_controller_facts_old: "{{ disk_controller_facts['disk_controller_data'] }}"
+
+    - name: "Print VM controller facts before hot adding tests"
+      debug: var=disk_controller_facts_old
+
+    - include_tasks: ../../common/vm_get_new_vhba_bus_number.yml
+      vars:
+        disk_controller_facts_data: "{{ disk_controller_facts_old }}"
+
+    - block:
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Not found available {{ new_vhba_type }} controllers bus number, skip testing on hot adding new {{ new_disk_ctrl_type }} disk."
+
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "No Run"
+      when: new_vhba_bus_found is undefined or not new_vhba_bus_found | bool
 
     # Add a new disk controller and a new disk attaching to it
     # when the total existing controller number < 4
     - block:
-        # Get new disk controller number and new disk unit number
-        - include_tasks: get_new_scsi_ctrl_num.yml
+        - name: "Get new {{ new_vhba_type }} controller bus number"
+          set_fact:
+            new_ctrl_number: "{{ new_vhba_bus_number }}"
+            new_unit_number: "0"
+
         # Get current device list in guest OS
         - include_tasks: get_vm_device_list.yml
-        - name: "Set fact of existing block device list"
+        - name: "Set existing block device list"
           set_fact:
             old_device_list: "{{ device_list }}"
         - name: "Print existing block device list in guest OS"
           debug: var=old_device_list
-        # Hotadd new disk controller
-        - include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
-          vars:
-            disk_controller_ops: "present"
-            disk_controller_type: "{{ scsi_type }}"
-            disk_controller_number: "{{ new_ctrl_number }}"
-        - name: "Pause 2 seconds to wait for new disk controller added"
-          pause:
-            seconds: 2
-        # Hotadd new disk, do disk iozone test and then remove disk
-        - include_tasks: hotadd_hotremove_disk.yml
+
+        # Hot add a new controller and disk, run disk iozone test and then remove it
+        - include_tasks: hot_add_remove_disk.yml
+
+        # Get VM disk controller info after hot adding
+        - include_tasks: ../../common/vm_get_disk_controller_facts.yml
+
+        - name: "Print disk controller facts after disk hot adding"
+          debug: var=disk_controller_facts['disk_controller_data']
+
+        - name: "Fail the test if new disk controller doesn't exist"
+          fail:
+            msg: "Failed to create a new {{ new_disk_ctrl_type }} controller while adding new disk"
+          when: >
+            disk_controller_facts['disk_controller_data'][new_vhba_type] is undefined or
+            disk_controller_facts['disk_controller_data'][new_vhba_type][new_ctrl_number | quote] is undefined
+
         # Hot remove new added disk controller
         - include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
           vars:
             disk_controller_ops: "absent"
-            disk_controller_type: "{{ scsi_type }}"
+            disk_controller_type: "{{ new_disk_ctrl_type }}"
             disk_controller_number: "{{ new_ctrl_number }}"
-        - name: "Pause 2 seconds to wait for disk controller removed"
-          pause:
-            seconds: 2
-        # Check VM disk controller facts is the same as the one before hotadd testing
-        - include_tasks: compare_vm_vhba_facts.yml
-      when: total_existing_scsi_ctrls | int < 4
 
-    - debug:
-        msg: "There are already 4 SCSI controllers, skip testing on hotadd new disk onto new disk controller."
-      when: total_existing_scsi_ctrls|int == 4
-
-    # If found existing disk controller with the specifc type, then add new disk onto it
-    - block:
-        - name: "Initialize the fact of found existing '{{ scsi_type }}' controller result"
+        - name: "Set facts of disk controller on VM '{{ vm_name }}'"
           set_fact:
-            found_existing_ctrl: False
-        - include_tasks: get_new_disk_node_existing_ctrl.yml
+            disk_controller_facts_new: "{{ disk_controller_facts['disk_controller_data'] }}"
+
+        - name: "Print VM disk controller facts after controller hot removing"
+          debug: var=disk_controller_facts_new
+
+        - name: "Check disk controller facts are same as before hot adding tests"
+          assert:
+            that:
+              - disk_controller_facts_old[new_vhba_type] == disk_controller_facts_new[new_vhba_type]
+            fail_msg: "After tests VM disk controller fact is: {{ disk_controller_facts_new }}; before tests it's: {{ disk_controller_facts_old }}"
+
+        - include_tasks: ../../common/print_test_result.yml
           vars:
-            scsi_facts: "{{ old_scsi_facts }}"
-        - debug:
-            msg: "Skip testing on hotadd new disk to existing disk controller since not found '{{ scsi_type }}' controller."
-          when: not found_existing_ctrl
-        - block:
-            # Hotadd new disk, do disk iozone check then hot remove disk
-            - include_tasks: hotadd_hotremove_disk.yml
-            # Check VM disk controller facts is the same as the one got before hotadd testing
-            - include_tasks: compare_vm_vhba_facts.yml
-          when:
-            - found_existing_ctrl is defined and found_existing_ctrl
-            - total_existing_disks | int < 16
-        - debug:
-            msg: "There are 16 disks on the existing '{{ scsi_type }}' disk controller, skip testing on hotadd new disk."
-          when:
-            - found_existing_ctrl is defined and found_existing_ctrl
-            - total_existing_disks | int == 16
-      when: total_existing_scsi_ctrls|int >= 1
-
-    - include_tasks: ../../common/print_test_result.yml
-      vars:
-        test_result: "Passed"
-
+            test_result: "Passed"
+      when: new_vhba_bus_found is defined and new_vhba_bus_found | bool
   rescue:
     - include_tasks: ../utils/test_rescue.yml

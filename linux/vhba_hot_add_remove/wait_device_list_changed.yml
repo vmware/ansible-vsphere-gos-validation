@@ -1,0 +1,66 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Wait for a device state is present or absent
+# Parameters:
+#   wait_device_list: The devices list
+#   wait_device_diff: The difference length of device list, like  1 or -1.
+#
+
+# Rescan SCSI bus
+- block:
+    - name: "Set SCSI command tools package name"
+      set_fact:
+        sg3_utils_pkg: |-
+          {%- if guest_os_ansible_distribution in ["Ubuntu", "Debian"] -%}sg3-utils
+          {%- else -%}sg3_utils{%- endif -%}
+
+    # Install SCSI command tools
+    - include_tasks: ../utils/get_installed_package_info.yml
+      vars:
+        package_name: "{{ sg3_utils_pkg }}"
+
+    - include_tasks: ../utils/install_uninstall_package.yml
+      vars:
+        package_name: "{{ sg3_utils_pkg }}"
+        package_state: "present"
+        update_cache: True
+      when:
+        - package_info is defined
+        - package_info | length == 0
+
+    - name: "Rescan all scsi devices"
+      command: "/usr/bin/rescan-scsi-bus.sh -a -r"
+      register: rescan_scsi_result
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Print result of rescanning scsi"
+      debug: var=rescan_scsi_result.stdout_lines
+      when:
+        - rescan_scsi_result is defined
+        - rescan_scsi_result.stdout_lines
+  when: new_disk_ctrl_type == 'lsilogic'
+
+- name: "Initialize new device list after change"
+  set_fact:
+    device_list_after_change: []
+
+- name: "Wait for device list changed"
+  shell: "lsblk -o NAME,TYPE --nodeps| grep disk | awk '{print $1}'"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: lsblk_result
+  until:
+    - lsblk_result.stdout_lines is defined
+    - (lsblk_result.stdout_lines | length) - (wait_device_list | length) == wait_device_diff
+  delay: 5
+  retries: 10
+
+- name: "Set fact of new device list after change"
+  set_fact:
+    device_list_after_change: "{{ lsblk_result.stdout_lines }}"
+  when:
+    - lsblk_result is defined
+    - lsblk_result.stdout_lines is defined
+
+- name: "Print the new device list after change"
+  debug: var=device_list_after_change
