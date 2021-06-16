@@ -6,8 +6,10 @@
       vars:
         vmtools_check: "False"
 
-    - name: "Skip test case because guest OS doesn't support {{ new_disk_ctrl_type }} controller"
-      block:
+    - block:
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip test case because guest OS doesn't support {{ new_disk_ctrl_type }} controller"
         - include_tasks: ../../common/print_test_result.yml
           vars:
             test_result: "No Run"
@@ -16,6 +18,19 @@
         - new_disk_ctrl_type in ["lsilogic", "lsilogicsas"]
         - guest_os_ansible_distribution in ["RedHat", "CentOS"]
         - guest_os_ansible_distribution_major_ver | int >= 8
+
+    - block:
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "VM with hardware version of {{ vm_hardware_version }} doesn't support hot add NVMe disk on existing NVMe controller"
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "No Run"
+        - meta: end_play
+      when:
+        - new_disk_ctrl_type == 'nvme'
+        - vm_hardware_version.split('-')[-1] | int < 19
+
 
     - name: "Set fact of the iozone file path"
       set_fact:
@@ -67,7 +82,7 @@
         - name: "Print existing block device list in guest OS"
           debug: var=old_device_list
 
-        # Hot add a new controller and disk at the same time, run disk iozone test and then remove it
+        # Hot add a new controller and disk, run disk iozone test and then remove it
         - include_tasks: hot_add_remove_disk.yml
 
         # Get VM disk controller info after hot adding
@@ -82,12 +97,6 @@
           when: >
             disk_controller_facts['disk_controller_data'][new_vhba_type] is undefined or
             disk_controller_facts['disk_controller_data'][new_vhba_type][new_ctrl_number | quote] is undefined
-
-        # Hot add another new disk on the new disk controller just added, run disk iozone test and then remove it
-        - include_tasks: hot_add_remove_disk.yml
-          when: >
-            (new_vhba_type != 'nvme') or
-            ((new_vhba_type == 'nvme') and (esxi_version is version('7.0.2', '>=')))
 
         # Hot remove new added disk controller
         - include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
