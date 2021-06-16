@@ -1,57 +1,58 @@
 # Copyright 2021 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Hot add disk controller
-- include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
-  vars:
-    disk_controller_ops: "present"
-    disk_controller_type: "{{ test_disk_controller_type }}"
-    disk_controller_number: "{{ new_vhba_bus_number }}"
-  when: not in_adding_disk_existing_ctl
-
-# Hot add disk
-- name: Set fact of the new disk controller number and unit number
+# Get the number of controllers and disks in guest OS before hotadd
+- include_tasks: get_guest_disk_ctl_num.yml
+- name: Set fact of the controller number and disk number before hotadd
   set_fact:
-    new_disk_ctl_num: "{{ existing_vhba_bus_number if in_adding_disk_existing_ctl else new_vhba_bus_number }}"
-    new_disk_unit_num: "{{ new_disk_unit_number if in_adding_disk_existing_ctl else 0 }}"
+    ctl_num_guest_before_hotadd: "{{ ctl_num_guest }}"
+    disk_num_guest_before_hotadd: "{{ disk_num_guest }}"
+
+# Get NVMe controller devices instance ID in guest OS before hotadd
+- block:
+    - include_tasks: ../utils/win_get_nvme_ctl_inst_id_list.yml
+    - name: Set fact of the NVMe controller instance id list before hotadd
+      set_fact:
+        nvme_ctl_inst_id_list_before: "{{ nvme_ctl_instance_id_list }}"
+  when: disk_controller == 'nvme'
+
+# Hot add disk controller and disk
 - include_tasks: ../../common/vm_hot_add_remove_disk.yml
   vars:
     disk_operation: 'present'
-    scsi_controller_type: "{{ test_disk_controller_type }}"
-    ctrl_number: "{{ new_disk_ctl_num }}"
-    unit_number: "{{ new_disk_unit_num }}"
+    disk_controller_type: "{{ test_disk_controller_type }}"
+    ctrl_number: "{{ new_vhba_bus_number }}"
+    unit_number: "{{ new_disk_unit_num }}" 
 
-# Check added disk controller in guest OS
-- block:
-    - include_tasks: ../utils/win_get_disk_ctl.yml
-    - name: Set fact of the number of controller
-      set_fact:
-        ctl_number: "{{ ctls_in_guest_dict[test_disk_controller_type] }}"
-    - debug:
-        msg: "Get the number of '{{ disk_controller }}' controller in guest OS after hotadd: {{ ctl_number }}"
-    - name: Verify disk controller number increases in guest OS
-      assert:
-        that:
-          - "{{ ctl_number|int == ctl_num_guest_before_hotadd|int + 1 }}"
-        success_msg: "Disk controller number in guest increases 1"
-        fail_msg: "Disk controller number not increase 1 in guest, before hotadd: {{ ctl_num_guest_before_hotadd }}, after hotadd: {{ ctl_number }}"
-  when: not in_adding_disk_existing_ctl and test_disk_controller_type in ['pvscsi', 'nvme', 'sata', 'lsilogicsas', 'paravirtual']
-
-# Check added disk in guest OS
-- name: Get the number of disks in guest OS
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "(get-disk | measure).Count"
-- name: Set fact of the number of disk
+# For NVMe disk hotadd, requires NVMe controller device disable and enable
+# operation in guest OS, then disk can be recognized
+- include_tasks: disable_enable_nvme_device.yml
+  when: test_disk_controller_type == 'nvme'
+    
+# Get the number of disk controller and disk in guest OS after hotadd
+- include_tasks: get_guest_disk_ctl_num.yml
+- name: Set fact of the controller number and disk number after hotadd
   set_fact:
-    disk_num: "{{ win_powershell_cmd_output.stdout_lines[0] if not win_powershell_cmd_output.failed else 0 }}"
-- name: Verify disk number increases in guest
+    ctl_num_guest_after_hotadd: "{{ ctl_num_guest }}"
+    disk_num_guest_after_hotadd: "{{ disk_num_guest }}"
+- debug:
+    msg:
+      - "The number of '{{ disk_controller }}' controller in guest OS after hotadd: {{ ctl_num_guest_after_hotadd }}"
+      - "The number of disk in guest OS after hotadd: {{ disk_num_guest_after_hotadd }}"
+
+- name: Verify disk controller number increases in guest OS
   assert:
     that:
-      - "{{ disk_num|int == disk_num_guest_before_hotadd|int + 1 }}"
+      - "{{ ctl_num_guest_after_hotadd | int == ctl_num_guest_before_hotadd | int + 1 }}"
+    success_msg: "Disk controller number in guest increases 1"
+    fail_msg: "Disk controller number not increase 1, before hotadd: {{ ctl_num_guest_before_hotadd }}, after hotadd: {{ ctl_num_guest_after_hotadd }}"
+
+- name: Verify disk number increases in guest OS
+  assert:
+    that:
+      - "{{ disk_num_guest_after_hotadd | int == disk_num_guest_before_hotadd | int + 1 }}"
     success_msg: "Disk number increases 1 in guest OS"
-    fail_msg: "Disk number not increase 1 in guest OS, before hotadd: {{ disk_num_guest_before_hotadd }}, after hotadd: {{ disk_num }}"
-  when: disk_num_guest_before_hotadd|int != 0
+    fail_msg: "Disk number not increase 1, before hotadd: {{ disk_num_guest_before_hotadd }}, after hotadd: {{ disk_num_guest_after_hotadd }}"
 
 # Initialize new disk and create disk partition in guest OS
 - include_tasks: create_partition_raw_disk.yml
