@@ -41,6 +41,10 @@
         - rescan_scsi_result.stdout_lines
   when: new_disk_ctrl_type == 'lsilogic'
 
+- name: "Initialize new device list after change"
+  set_fact:
+    device_list_after_change: []
+
 - name: "Wait for device list changed"
   shell: "lsblk -o NAME,TYPE --nodeps| grep disk | awk '{print $1}'"
   delegate_to: "{{ vm_guest_ip }}"
@@ -50,3 +54,13 @@
     - (lsblk_result.stdout_lines | length) - (wait_device_list | length) == wait_device_diff
   delay: 5
   retries: 10
+
+- name: "Set fact of new device list after change"
+  set_fact:
+    device_list_after_change: "{{ lsblk_result.stdout_lines }}"
+  when:
+    - lsblk_result is defined
+    - lsblk_result.stdout_lines is defined
+
+- name: "Print the new device list after change"
+  debug: var=device_list_after_change
