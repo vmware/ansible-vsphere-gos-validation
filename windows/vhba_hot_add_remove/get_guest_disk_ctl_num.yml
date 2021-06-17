@@ -1,0 +1,21 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the number of disk controllers and disks in guest OS
+# with specific type
+#
+- include_tasks: ../utils/win_get_disk_ctl.yml
+- name: Set fact of the disk controller number got in guest OS
+  set_fact:
+    ctl_num_guest: "{{ ctls_in_guest_dict[test_disk_controller_type] }}"
+- debug:
+    msg: "Get the number of '{{ test_disk_controller_type }}' controller in guest OS: {{ ctl_num_guest }}"
+
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(get-disk | measure).Count"
+- name: Set fact of total number of disks in guest OS
+  set_fact:
+    disk_num_guest: "{{ win_powershell_cmd_output.stdout_lines[0] if not win_powershell_cmd_output.failed else 0 }}"
+- debug:
+    msg: "Get the total number of disk in guest OS: {{ disk_num_guest }}"

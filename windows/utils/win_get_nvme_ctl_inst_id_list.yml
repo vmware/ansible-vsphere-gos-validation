@@ -1,0 +1,12 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get NVMe controller devices instance ID in guest OS
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-PnpDevice | where-object {$_.FriendlyName -like '*NVM Express*'}).InstanceId"
+- name: Set fact of the instance ID list of NVMe controller in guest OS
+  set_fact:
+    nvme_ctl_instance_id_list: "{{ win_powershell_cmd_output.stdout_lines if not win_powershell_cmd_output.failed else [] }}"
+- debug:
+    msg: "Get the instance ID list of NVMe controller in guest OS: {{ nvme_ctl_instance_id_list }}" 
