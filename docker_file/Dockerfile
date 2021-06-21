@@ -13,7 +13,8 @@ RUN tdnf makecache && \
     pip3 install pycdlib netaddr pywinrm pyvmomi
 
 # Install ansible-base and Ansible collections
-RUN pip3 install ansible-base && \
+# Change to ansible-core from Ansible 2.11
+RUN pip3 install ansible-core && \
     ansible-galaxy collection install ansible.netcommon ansible.posix community.general community.vmware community.windows community.crypto
 
 # Download latest 'ansible-vsphere-gos-validation' release to /root/ dir
