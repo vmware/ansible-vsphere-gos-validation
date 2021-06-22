@@ -11,12 +11,19 @@
   set_fact:
     nvme_ctl_inst_id: "{{ nvme_ctl_inst_id_list_after | difference(nvme_ctl_inst_id_list_before) }}"
 
-# Disable NVMe controller in guest OS
-- include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "pnputil /disable-device '{{ nvme_ctl_inst_id[0] }}'"
+- block:
+    # Disable NVMe controller in guest OS
+    - include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "pnputil /disable-device '{{ nvme_ctl_inst_id[0] }}'"
 
-# Re-enable NVMe controller in guest OS
-- include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "pnputil /enable-device '{{ nvme_ctl_inst_id[0] }}'"
+    # Re-enable NVMe controller in guest OS
+    - include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "pnputil /enable-device '{{ nvme_ctl_inst_id[0] }}'"
+  when: nvme_ctl_inst_id | length != 0
+
+- name: Not get the new NVMe controller instance id
+  fail:
+    msg: "Before controller hotadd, NVMe controller instance id list is '{{ nvme_ctl_inst_id_list_before }}', after hotadd NVMe controller instance id list is '{{ nvme_ctl_inst_id_list_after }}', not get the new controller instance id."
+  when: nvme_ctl_inst_id | length == 0
