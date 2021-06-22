@@ -6,7 +6,7 @@
   vars:
     disk_operation: 'absent'
     ctrl_number: "{{ new_vhba_bus_number }}"
-    unit_number: "0"
+    unit_number: "{{ new_disk_unit_num }}"
     disk_controller_type: "{{ test_disk_controller_type }}"
 - name: "Wait 15 seconds after disk hot remove"
   pause:
@@ -22,7 +22,7 @@
     - name: "Wait 15 seconds after disk controller hot remove"
       pause:
         seconds: 15
-  when: not in_adding_disk_existing_ctl 
+  when: not in_new_disk_new_ctl 
 
 # Get disk controller and disk number in guest OS after hot remove
 - include_tasks: get_guest_disk_ctl_num.yml
@@ -45,7 +45,7 @@
           - "{{ ctl_num_guest_after_remove | int == ctl_num_guest_before_hotadd | int }}"
         fail_msg: "Disk controller number is '{{ ctl_num_guest_before_hotadd }}' before hotadd, while it's '{{ ctl_num_guest_after_remove }}' after hot remove in guest OS"
         success_msg: "Disk controller number before hotadd is the same as after hot remove in guest OS"
-      when: not in_adding_disk_existing_ctl
+      when: not in_new_disk_new_ctl
   when: disk_controller != 'nvme'
 
 - debug:

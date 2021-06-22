@@ -9,25 +9,40 @@
     disk_num_guest_before_hotadd: "{{ disk_num_guest }}"
 
 # Get NVMe controller devices instance ID in guest OS before hotadd
+# when adding a new disk to existing controller
 - block:
     - include_tasks: ../utils/win_get_nvme_ctl_inst_id_list.yml
     - name: Set fact of the NVMe controller instance id list before hotadd
       set_fact:
         nvme_ctl_inst_id_list_before: "{{ nvme_ctl_instance_id_list }}"
-  when: disk_controller == 'nvme'
+  when:
+    - disk_controller == 'nvme'
+    - not in_new_disk_new_ctl
 
-# Hot add disk controller and disk
+# Hot add disk controller and disk at the same time
+- include_tasks: ../../common/vm_hot_add_ctrl_disk.yml
+  vars:
+    disk_datastore: "{{ vm_datastore_path.split('/')[3] }}"
+    disk_controller_type: "{{ test_disk_controller_type }}"
+    ctrl_number: "{{ new_vhba_bus_number }}"
+    unit_number: "{{ new_disk_unit_num }}"
+  when: in_new_disk_new_ctl
+
+# Hot add disk to existing controller
 - include_tasks: ../../common/vm_hot_add_remove_disk.yml
   vars:
     disk_operation: 'present'
     disk_controller_type: "{{ test_disk_controller_type }}"
     ctrl_number: "{{ new_vhba_bus_number }}"
-    unit_number: "0" 
+    unit_number: "{{ new_disk_unit_num }}"
+  when: not in_new_disk_new_ctl 
 
-# For NVMe disk hotadd, requires NVMe controller device disable and enable
-# operation in guest OS, then disk can be recognized
+# When hotadd a NVMe disk to existing controller, disable and re-enable NVMe
+# controller device in guest OS, then new disk can be recognized
 - include_tasks: disable_enable_nvme_device.yml
-  when: test_disk_controller_type == 'nvme'
+  when:
+    - test_disk_controller_type == 'nvme'
+    - not in_new_disk_new_ctl
     
 # Get the number of disk controller and disk in guest OS after hotadd
 - include_tasks: get_guest_disk_ctl_num.yml

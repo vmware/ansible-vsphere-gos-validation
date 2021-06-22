@@ -10,59 +10,43 @@
 # - sata: use the version of community.vmware collection which contains this controller type support.
 # - buslogic: not supported in 64bit Windows guest OS, no testing.
 #
-- name: Set fact of the valid SCSI controller types list
-  set_fact:
-    valid_scsi_controller_list: ['buslogic', 'paravirtual', 'lsilogicsas', 'lsilogic']
-- name: Set disk controller type to scsi, sata or nvme
-  set_fact:
-    disk_controller: "{{ 'scsi' if test_disk_controller_type in valid_scsi_controller_list else test_disk_controller_type }}"
-- debug:
-    msg: "Under test disk controller type: {{ disk_controller }}"
+- include_tasks: hotadd_remove_vhba_test_prepare.yml
 
-# Get the total number of controllers with type: scsi, sata or nvme
-- include_tasks: get_vm_disk_ctl_num.yml
-- name: "Set controller '{{ disk_controller }}' number before hotadd"
-  set_fact:
-    vhba_number_before_hotadd: "{{ vhba_number }}"
-- debug:
-    msg: "Get the number of '{{ disk_controller }}' controller before hotadd: {{ vhba_number_before_hotadd }}"
-
-# New disk controller can be added when existing controller number < 4
-- name: "Set fact of run add new disk controller test when it's number < 4"
-  set_fact:
-    add_new_controller: "{{ True if vhba_number_before_hotadd | int < 4 else False }}"
-- debug:
-    msg: "Add new '{{ disk_controller }}' controller when existing < 4: {{ add_new_controller }}"
-
-# Get new disk controller bus number
-- include_tasks: ../../common/vm_get_new_vhba_bus_number.yml
-  vars:
-    disk_controller_facts_data: "{{ disk_controller_facts.disk_controller_data }}"
-    new_vhba_type: "{{ disk_controller }}"
-  when: add_new_controller
-
-# Test on adding new disk controller and disk separately
+# test on adding new disk on the existing controller
 - block:
-    - name: Set fact of in new disk controller and disk test
-      set_fact:
-        in_adding_disk_existing_ctl: False
+    # Test on adding new disk controller and new disk at same time
     - include_tasks: hotadd_vm_controller_disk.yml
+      vars:
+        in_new_disk_new_ctl: True
+        new_disk_unit_num: 0
     - include_tasks: hotremove_vm_controller_disk.yml
+      vars:
+        in_new_disk_new_ctl: True
+        new_disk_unit_num: 0
     - name: Set fact of test on new disk and new disk controller
       set_fact:
         new_disk_new_ctl: True
+
+    # Test on adding a new disk on the existing controller
+    - include_tasks: hotadd_vm_controller_disk.yml
+      vars:
+        in_new_disk_new_ctl: False
+        new_disk_unit_num: 1
+    - include_tasks: hotremove_vm_controller_disk.yml
+      vars:
+        in_new_disk_new_ctl: False
+        new_disk_unit_num: 1
+    - name: Set fact of test on new disk on existing disk controller
+      set_fact:
+        new_disk_existing_ctl: True
   when:
     - add_new_controller
-    - new_vhba_bus_found
-
-# TBD: will add test on existing disk controller when
-# vmware_guest_disk module ready for adding and removing
-# disk controller and disk at the same time.
-- name: Set fact of test on new disk on existing disk controller
-  set_fact:
-    new_disk_existing_ctl: False
+    - new_vhba_bus_found is defined and new_vhba_bus_found
 
 - name: "Skip testcase: {{ ansible_play_name }}"
   debug:
     msg: "Skip test case due to controller '{{ disk_controller }}' number is already 4: {{ vhba_number_before_hotadd }}, or not get new disk controller bus number."
-  when: not add_new_controller or not new_vhba_bus_found
+  when: >
+    (not add_new_controller) or
+    (new_vhba_bus_found is undefined) or
+    (not new_vhba_bus_found)
