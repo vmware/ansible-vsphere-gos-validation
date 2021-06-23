@@ -12,15 +12,22 @@
 #
 - include_tasks: hotadd_remove_vhba_test_prepare.yml
 
-# Get the number of controllers and disks in guest OS before hotadd
-- include_tasks: get_guest_disk_ctl_num.yml
-- name: Set fact of the controller number and disk number before hotadd
-  set_fact:
-    ctl_num_guest_before_hotadd: "{{ ctl_num_guest }}"
-    disk_num_guest_before_hotadd: "{{ disk_num_guest }}"
-
-# test on adding new disk on the existing controller
 - block:
+    # Get the number of controllers and disks in guest OS before hotadd
+    - include_tasks: get_guest_disk_ctl_num.yml
+    - name: Set fact of the controller number and disk number before hotadd
+      set_fact:
+        ctl_num_guest_before_hotadd: "{{ ctl_num_guest }}"
+        disk_num_guest_before_hotadd: "{{ disk_num_guest }}"
+
+    # Get the NVMe controller device instance id list before hotadd
+    - block:
+        - include_tasks: ../utils/win_get_nvme_ctl_inst_id_list.yml
+        - name: Set fact of the NVMe controller instance id list before hotadd
+          set_fact:
+            nvme_ctl_inst_id_list_before: "{{ nvme_ctl_instance_id_list }}"
+      when: disk_controller == 'nvme'
+
     # Test on adding new disk controller and new disk at same time
     - include_tasks: hotadd_vm_controller_disk.yml
       vars:
