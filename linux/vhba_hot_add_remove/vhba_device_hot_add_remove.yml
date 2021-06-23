@@ -19,19 +19,6 @@
         - guest_os_ansible_distribution in ["RedHat", "CentOS"]
         - guest_os_ansible_distribution_major_ver | int >= 8
 
-    - block:
-        - name: "Skip testcase: {{ ansible_play_name }}"
-          debug:
-            msg: "VM with hardware version of {{ vm_hardware_version }} doesn't support hot add NVMe disk on existing NVMe controller"
-        - include_tasks: ../../common/print_test_result.yml
-          vars:
-            test_result: "No Run"
-        - meta: end_play
-      when:
-        - new_disk_ctrl_type == 'nvme'
-        - vm_hardware_version.split('-')[-1] | int < 19
-
-
     - name: "Set fact of the iozone file path"
       set_fact:
         iozone_tools_path: "{{ '../../tools/iozone_64bit' if guest_os_ansible_architecture == 'x86_64' else '../../tools/iozone_32bit' }}"
@@ -82,7 +69,11 @@
         - name: "Print existing block device list in guest OS"
           debug: var=old_device_list
 
-        # Hot add a new controller and disk, run disk iozone test and then remove it
+        - name: "Firstly hot add a new disk controller and disk at the same time"
+          set_fact:
+            add_new_controller: True
+
+        # Hot add a new controller and disk at the same time, run disk iozone test and then remove it
         - include_tasks: hot_add_remove_disk.yml
 
         # Get VM disk controller info after hot adding
@@ -97,6 +88,13 @@
           when: >
             disk_controller_facts['disk_controller_data'][new_vhba_type] is undefined or
             disk_controller_facts['disk_controller_data'][new_vhba_type][new_ctrl_number | quote] is undefined
+
+        - name: "Then hot add a new disk on previously added controller {{new_disk_ctrl_type }}{{ new_ctrl_number }}"
+          set_fact:
+            add_new_controller: False
+
+        # Hot add a new disk on the previous added controller, run disk iozone test and then remove it
+        - include_tasks: hot_add_remove_disk.yml
 
         # Hot remove new added disk controller
         - include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
