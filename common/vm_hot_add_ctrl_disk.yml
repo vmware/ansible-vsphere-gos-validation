@@ -1,0 +1,48 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Add a new disk or a new disk controller and disk at the same time
+# to VM in the specified datastore
+# Parameters:
+#   disk_size_gb (optional): the new disk size in GB, default value is 1.
+#   disk_provision_type (optional): the type of disk, valid value is 'thin',
+#     'eagerzeroedthick', or 'thick'.
+#   disk_mode_type (optional): the type of disk mode, valid value is 'persistent',
+#     'independent_persistent', 'independent_nonpersistent'.
+#   disk_controller_type: the disk controller type, valid value is 'buslogic',
+#     'lsilogic', 'lsilogicsas', 'paravirtual', 'sata', or 'nvme'.
+#   ctrl_number: the disk controller bus number.
+#   unit_number: the disk unit number.
+#
+- name: Check required parameter and valid value
+  assert:
+    that:
+      - disk_controller_type is defined and disk_controller_type
+      - disk_controller_type | lower in ['buslogic', 'lsilogic', 'lsilogicsas', 'paravirtual', 'sata', 'nvme']
+      - ctrl_number is defined and ctrl_number | int < 4
+      - unit_number is defined
+    fail_msg:
+      - "disk_controller_type is required and valid value is 'buslogic', 'lsilogic', 'lsilogicsas', 'paravirtual', 'sata', or 'nvme'."
+      - "ctrl_number and unit_number are also required."
+
+- name: "Add new disk to VM via vmware_guest module"
+  vmware_guest:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    disk:
+      - size_gb: "{{ disk_size_gb | default(1) }}"
+        type: "{{ disk_provision_type | default('thin') }}"
+        disk_mode: "{{ disk_mode_type | default(omit) }}"
+        datastore: "{{ disk_datastore | default(omit) }}"
+        controller_type: "{{ disk_controller_type }}"
+        controller_number: "{{ ctrl_number }}"
+        unit_number: "{{ unit_number }}"
+  register: disk_add_facts
+- name: Display the VM disk operation result
+  debug: var=disk_add_facts
+  when: enable_debug

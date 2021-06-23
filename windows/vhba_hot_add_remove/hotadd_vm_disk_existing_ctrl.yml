@@ -1,0 +1,36 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Hot add disk to existing controller
+- include_tasks: ../../common/vm_hot_add_remove_disk.yml
+  vars:
+    disk_operation: 'present'
+    disk_controller_type: "{{ test_disk_controller_type }}"
+    ctrl_number: "{{ new_vhba_bus_number }}"
+    unit_number: 1
+
+# When hotadd a NVMe disk to existing controller, disable and re-enable NVMe
+# controller device in guest OS, then new disk can be recognized
+- include_tasks: disable_enable_nvme_device.yml
+  when: test_disk_controller_type == 'nvme'
+    
+# Get the number of disk controller and disk in guest OS after hotadd
+- include_tasks: get_guest_disk_ctl_num.yml
+- name: Set fact of the controller number and disk number after hotadd
+  set_fact:
+    ctl_num_guest_after_hotadd: "{{ ctl_num_guest }}"
+    disk_num_guest_after_hotadd: "{{ disk_num_guest }}"
+- debug:
+    msg:
+      - "The number of '{{ disk_controller }}' controller in guest OS after hotadd: {{ ctl_num_guest_after_hotadd }}"
+      - "The number of disk in guest OS after hotadd: {{ disk_num_guest_after_hotadd }}"
+
+- name: Verify disk number increases in guest OS
+  assert:
+    that:
+      - "{{ disk_num_guest_after_hotadd | int == disk_num_guest_before_hotadd | int + 2 }}"
+    success_msg: "Disk number increases 2 in guest OS"
+    fail_msg: "Disk number not increase 2, before hotadd: {{ disk_num_guest_before_hotadd }}, after hotadd: {{ disk_num_guest_after_hotadd }}"
+
+# Initialize new disk and create disk partition in guest OS
+- include_tasks: create_partition_raw_disk.yml

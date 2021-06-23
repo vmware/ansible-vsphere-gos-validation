@@ -46,3 +46,11 @@ guest_customization/gosc_cloudinit_dhcp.yml
 2. SLE 15 SP2
 * Failure: Get error when using 'zypper' module due to 'ImportError' when using Python2.
 * Workaround: Set 'vm_python' parameter in 'vars/test.yml' to correct Python3 path, e.g., '/usr/bin/python3'.
+
+3. Windows 10 or Windows Server
+* Failure: Get error when removing NVMe controller from VM with error message "The guest operating system did not respond to a hot-remove request for device nvme1 in a timely manner.".
+* Workaround: not available
+* Affected test cases:
+```
+vhba_hot_add_remove/nvme_vhba_device_ops.yml
+```

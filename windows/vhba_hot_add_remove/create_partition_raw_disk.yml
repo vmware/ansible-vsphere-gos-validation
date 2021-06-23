@@ -25,14 +25,9 @@
 
 - include_tasks: ../utils/win_get_raw_disk_num.yml
 - include_tasks: ../utils/win_get_unused_drive_letter.yml
-  when: disk_num_guest_before_hotadd | int > 1
-- name: Set fact of the new disk drive letter
-  set_fact:
-    drive_letter_new: "T"
-  when: disk_num_guest_before_hotadd | int == 1
 - include_tasks: ../utils/win_check_disk_online.yml
   vars:
-    win_check_disk_online_num: "{{ win_get_raw_disk_num_num }}"
+    win_check_disk_online_num: "{{ win_get_raw_disk_num }}"
 
 # Transfer diskpart script file from local to remote Windows guest OS
 - include_tasks: ../utils/win_copy_file_from_local.yml
@@ -57,7 +52,7 @@
   win_lineinfile:
     path: "{{ diskpart_file_path_win }}"
     regexp: 'select disk *'
-    line: "select disk {{ win_get_raw_disk_num_num }}"
+    line: "select disk {{ win_get_raw_disk_num }}"
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: Modify new drive letter in diskpart script file
