@@ -12,6 +12,9 @@
 #
 - include_tasks: hotadd_remove_vhba_test_prepare.yml
 
+# When there are 4 disk controllers with under test type already,
+# or not get the new disk controller bus number, this test case
+# will be "No Run".
 - block:
     # Get the number of controllers and disks in guest OS before hotadd
     - include_tasks: get_guest_disk_ctl_num.yml
@@ -29,30 +32,13 @@
       when: disk_controller == 'nvme'
 
     # Test on adding new disk controller and new disk at same time
-    - include_tasks: hotadd_vm_controller_disk.yml
-      vars:
-        in_new_disk_new_ctl: True
-        new_disk_unit_num: 0
-    - include_tasks: hotremove_vm_controller_disk.yml
-      vars:
-        in_new_disk_new_ctl: True
-        new_disk_unit_num: 0
-    - name: Set fact of test on new disk and new disk controller
-      set_fact:
-        new_disk_new_ctl: True
+    - include_tasks: hotadd_vm_disk_new_ctrl.yml
 
     # Test on adding a new disk on the existing controller
-    - include_tasks: hotadd_vm_controller_disk.yml
-      vars:
-        in_new_disk_new_ctl: False
-        new_disk_unit_num: 1
-    - include_tasks: hotremove_vm_controller_disk.yml
-      vars:
-        in_new_disk_new_ctl: False
-        new_disk_unit_num: 1
-    - name: Set fact of test on new disk on existing disk controller
-      set_fact:
-        new_disk_existing_ctl: True
+    - include_tasks: hotadd_vm_disk_existing_ctrl.yml
+
+    # Remove new added disks and disk controller 
+    - include_tasks: hotremove_vm_disk_ctrl.yml
   when:
     - add_new_controller
     - new_vhba_bus_found is defined and new_vhba_bus_found
