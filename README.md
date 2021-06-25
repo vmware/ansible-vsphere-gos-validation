@@ -57,7 +57,7 @@ This project supports below scenarios for end-to-end guest OS validation testing
 | Red Hat Enterprise Linux 7.x, 8.x               | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | CentOS 7.x, 8.x                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Oracle Linux 7.x, 8.x                           | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| SUSE Linux Enterprise 15 SP2                    | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| SUSE Linux Enterprise 15 SP2, SP3               | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise 12 SP5, 15 SP0/SP1        |                                  |                          | :heavy_check_mark:                 |
 | Photon OS 3.x                                   | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Photon OS 4.0                                   |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
