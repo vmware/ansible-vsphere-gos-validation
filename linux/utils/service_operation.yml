@@ -1,35 +1,27 @@
 # Copyright 2021 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 # This task is used to enable/disable service
-- name: "Set variables for enable service"
-  set_fact:
-    enable: "Enable"
-    mask: "not masked"
-    enabled: "enabled"
-  when: enable_service == "yes"
-- name: "Set variables for disable service"
-  set_fact:
-    enable: "Disable"
-    mask: "masked"
-    enabled: "disabled"
-  when: enable_service == "no"
-- name: "{{ enable }} service: {{ service_name }} and ensure it is {{ mask }}"
-  systemd:
+# Parameters:
+#   service_name: The service name to be configured
+#   service_enabled: True of false to enable or disable service
+#   service_state: The service state: reloaded, restarted, started, or stopped
+#
+- name: "Validate service state"
+  fail:
+    msg: "Invalid parameter service_enabled or service_state. service_enabled: {{ service_enabled }}, service_state: {{ service_state }}"
+  when: >
+    (service_enabled is undefined and service_state is undefined) or
+    (service_enabled is defined and service_enabled | bool not in [true, false]) or
+    (service_state is defined and service_state not in ['reloaded', 'restarted', 'started', 'stopped'])
+
+- name: "Update service {{ service_name }}, enabled: {{ service_enabled }}, state: {{ service_state }}"
+  service:
     name: "{{ service_name }}"
-    enabled: "{{ enable_service }}"
-    daemon_reload: yes
+    enabled: "{{ service_enabled }}"
+    state: "{{ service_state }}"
   delegate_to: "{{ vm_guest_ip }}"
-- name: "Get {{ service_name }} is-enabled status"
-  command: "systemctl is-enabled {{ service_name }}"
-  register: service_status
-  delegate_to: "{{ vm_guest_ip }}"
-  changed_when: false
-  ignore_errors: true
-- name: "Print sevice is-enabled output"
-  debug: var=service_status
-  when: enable_debug is defined and enable_debug
-- name: "Assert {{ service_name }} is {{ enabled }}"
-  assert:
-    that:
-      - service_status.stdout.count(enabled) > 0
-    fail_msg: "Failed, {{ service_name }} is not expected {{ enabled }}"
+
+- include_tasks: check_service_status.yml
+  vars:
+    expected_service_state: "{{ 'active' if service_state in ['started', 'restarted'] else 'inactive' }}"
+    expected_service_status: "{{ 'enabled' if service_enabled else 'disabled' }}"

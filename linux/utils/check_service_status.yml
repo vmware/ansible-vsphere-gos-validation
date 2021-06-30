@@ -14,19 +14,18 @@
 #     enabled: the service is enabled to start at boot
 #     disabled: the service is disabled to start at boot
 
-
-- name: "Ignore expected_service_status when service '{{ service_name }}' is expected to be '{{ expected_service_state }}'"
+- name: "Set fact of valid service status"
   set_fact:
-    expected_service_status: ""
-  when: expected_service_state == 'absent'
+    valid_service_status: "{{ [''] if expected_service_state is defined and expected_service_state == 'absent' else ['enabled', 'disabled'] }}"
 
-- name: "Validate the value of 'expected_service_state' and 'expected_service_status'"
-  assert:
-    that:
-      - expected_service_state is defined
-      - expected_service_state in ['active', 'inactive', 'running', 'stopped', 'absent']
-      - (expected_service_state == 'absent') or (expected_service_status is defined and expected_service_status in ['enabled', 'disabled'])
-    fail_msg: "Invalid parameters: expected_service_state={{ expected_service_state | default('undefined') }}, expected_service_status={{ expected_service_status | default('undefined') }}"
+- name: "Check the value of 'expected_service_state' and 'expected_service_status'"
+  fail:
+    msg: "Invalid parameters: expected_service_state={{ expected_service_state | default('undefined') }}, expected_service_status={{ expected_service_status | default('undefined') }}"
+  when: >
+    (expected_service_state is undefined) or
+    (expected_service_state not in ['active', 'inactive', 'running', 'stopped', 'absent']) or
+    (expected_service_status is undefined) or
+    (expected_service_status not in valid_service_status)
 
 - include_tasks: get_service_info.yml
 

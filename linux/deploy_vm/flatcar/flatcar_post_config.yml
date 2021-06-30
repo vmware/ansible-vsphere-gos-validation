@@ -26,6 +26,15 @@
         - vm_guest_ip in groups.target_vm
   when: (vm_python != "/opt/bin/python") or (vm_python != "/opt/bin/python3")
 
+# Disable automatically update
+- include_tasks: "../../utils/service_operation.yml"
+  vars:
+    service_enabled: false
+    service_state: "stopped"
+  with_items: ["locksmithd.service", "update-engine.service"]
+  loop_control:
+    loop_var: service_name
+
 - name: "Check /etc/ssh/sshd_config status"
   stat:
     path: "/etc/ssh/sshd_config"
