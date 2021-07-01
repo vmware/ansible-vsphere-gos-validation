@@ -35,7 +35,7 @@ guest_customization/gosc_perl_staticip.yml
 ```
 
 ## Guest OS
-1. Photon OS 3.0 and later, Ubuntu 18.04 and later
+1. Ubuntu 18.04 and later
 * Failure: Configured DNS search domains in guest OS customization spec will not be set correctly in guest OS after cloud-init GOSC with DHCP network configuration.
 * Workaround: not available
 * Affected test cases:
@@ -53,4 +53,12 @@ guest_customization/gosc_cloudinit_dhcp.yml
 * Affected test cases:
 ```
 vhba_hot_add_remove/nvme_vhba_device_ops.yml
+```
+
+4. VMware Photon OS 3.0 and later
+* Failure: When hot adding or removing NVMe disk to existing controller, VMware Photon OS cannot detect NVMe disk changes.
+* Workaround: not available
+* Affected test cases:
+```
+nvme_vhba_device_ops
 ```
