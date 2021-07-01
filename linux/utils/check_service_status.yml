@@ -14,9 +14,11 @@
 #     enabled: the service is enabled to start at boot
 #     disabled: the service is disabled to start at boot
 
-- name: "Set fact of valid service status"
+
+- name: "Ignore expected_service_status when service '{{ service_name }}' is expected to be '{{ expected_service_state }}'"
   set_fact:
-    valid_service_status: "{{ [''] if expected_service_state is defined and expected_service_state == 'absent' else ['enabled', 'disabled'] }}"
+    expected_service_status: ""
+  when: expected_service_state == 'absent'
 
 - name: "Check the value of 'expected_service_state' and 'expected_service_status'"
   fail:
@@ -24,8 +26,9 @@
   when: >
     (expected_service_state is undefined) or
     (expected_service_state not in ['active', 'inactive', 'running', 'stopped', 'absent']) or
-    (expected_service_status is undefined) or
-    (expected_service_status not in valid_service_status)
+    (expected_service_state != 'absent' and
+     (expected_service_status is undefined or
+     expected_service_status not in ['enabled', 'disabled']))
 
 - include_tasks: get_service_info.yml
 
