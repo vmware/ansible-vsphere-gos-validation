@@ -55,10 +55,18 @@ guest_customization/gosc_cloudinit_dhcp.yml
 vhba_hot_add_remove/nvme_vhba_device_ops.yml
 ```
 
-4. VMware Photon OS 3.0 and later
+4. VMware Photon OS 3.x
+* Failure: After reinstalling open-vm-tools 11.2.5, the VGAuthService cann't be started successfully due to xmlsec1 version mismatch
+* Workaround: Manually upgrade xmlsec1 package by running command 'tdnf install xmlsec1', and then reboot Photon OS.
+* Affected test cases:
+```
+vgauth_check_service/vgauth_check_service.yml
+```
+
+5. VMware Photon OS 3.0 and later
 * Failure: When hot adding or removing NVMe disk to existing controller, VMware Photon OS cannot detect NVMe disk changes.
 * Workaround: not available
 * Affected test cases:
 ```
-nvme_vhba_device_ops
+vhba_hot_add_remove/nvme_vhba_device_ops.yml
 ```
