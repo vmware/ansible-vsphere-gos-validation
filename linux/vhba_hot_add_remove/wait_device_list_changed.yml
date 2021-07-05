@@ -9,36 +9,46 @@
 
 # Rescan SCSI bus
 - block:
-    - name: "Set SCSI command tools package name"
-      set_fact:
-        sg3_utils_pkg: |-
-          {%- if guest_os_ansible_distribution in ["Ubuntu", "Debian"] -%}sg3-utils
-          {%- else -%}sg3_utils{%- endif -%}
+    - block:
+        - name: "Set SCSI command tools package name"
+          set_fact:
+            sg3_utils_pkg: |-
+              {%- if guest_os_ansible_distribution in ["Ubuntu", "Debian"] -%}sg3-utils
+              {%- else -%}sg3_utils{%- endif -%}
+    
+        # Install SCSI command tools
+        - include_tasks: ../utils/get_installed_package_info.yml
+          vars:
+            package_name: "{{ sg3_utils_pkg }}"
+    
+        - include_tasks: ../utils/install_uninstall_package.yml
+          vars:
+            package_name: "{{ sg3_utils_pkg }}"
+            package_state: "present"
+            update_cache: True
+          when:
+            - package_info is defined
+            - package_info | length == 0
+    
+        - name: "Rescan all scsi devices"
+          command: "/usr/bin/rescan-scsi-bus.sh -a -r"
+          register: rescan_scsi_result
+          delegate_to: "{{ vm_guest_ip }}"
+    
+        - name: "Print result of rescanning scsi"
+          debug: var=rescan_scsi_result.stdout_lines
+          when:
+            - rescan_scsi_result is defined
+            - rescan_scsi_result.stdout_lines
+      when: guest_os_ansible_distribution != 'Flatcar'
 
-    # Install SCSI command tools
-    - include_tasks: ../utils/get_installed_package_info.yml
-      vars:
-        package_name: "{{ sg3_utils_pkg }}"
-
-    - include_tasks: ../utils/install_uninstall_package.yml
-      vars:
-        package_name: "{{ sg3_utils_pkg }}"
-        package_state: "present"
-        update_cache: True
-      when:
-        - package_info is defined
-        - package_info | length == 0
-
-    - name: "Rescan all scsi devices"
-      command: "/usr/bin/rescan-scsi-bus.sh -a -r"
-      register: rescan_scsi_result
-      delegate_to: "{{ vm_guest_ip }}"
-
-    - name: "Print result of rescanning scsi"
-      debug: var=rescan_scsi_result.stdout_lines
-      when:
-        - rescan_scsi_result is defined
-        - rescan_scsi_result.stdout_lines
+    - block:
+        - name: "Rescan all hard disks"
+          shell: |
+            for i in `find /sys/ -iname rescan`;do echo 1 >$i; done;
+            for i in `find /sys/ -iname scan`;do echo "- - -" >$i; done;
+          delegate_to: "{{ vm_guest_ip }}"
+      when: guest_os_ansible_distribution == 'Flatcar'
   when: new_disk_ctrl_type == 'lsilogic'
 
 - block:
