@@ -102,12 +102,12 @@
 - block:
     - name: "Set the fact of Photon OS {{ guest_os_ansible_distribution_major_ver }} online repos"
       set_fact:
-        photon_online_repos: ["photon", "photon-updates"]
+        photon_online_repos: ["photon", "photon-updates", "photon-extras"]
       when: guest_os_ansible_distribution_major_ver | int < 4
 
     - name: "Set the fact of Photon OS {{ guest_os_ansible_distribution_major_ver }} online repos"
       set_fact:
-        photon_online_repos: ["photon", "photon-release", "photon-updates"]
+        photon_online_repos: ["photon", "photon-release", "photon-updates", "photon-extras"]
       when: guest_os_ansible_distribution_major_ver | int >= 4
 
     - include_tasks: ../../common/update_ini_style_file.yml
@@ -117,4 +117,12 @@
         option_name: "enabled"
         option_value: 1
       with_items: "{{ photon_online_repos }}"
+
+    # Update baseurl to repos on https://packages.vmware.com/photon
+    - block:
+        - name: "Update repo's baseurl"
+          command: "sed -i 's#dl.bintray.com/vmware/#packages.vmware.com/photon/$releasever/#' /etc/yum.repos.d/{{ item }}.repo"
+          delegate_to: "{{ vm_guest_ip }}"
+          with_items: "{{ photon_online_repos }}"
+      when: guest_os_ansible_distribution_major_ver | int < 4
   when: guest_os_ansible_distribution == 'VMware Photon OS'
