@@ -322,13 +322,15 @@ class CallbackModule(CallbackBase):
         +---------------------------------------------------------+
         """
 
-        if not self.vcenter_info['hostname'] and \
-           'vcenter_hostname' in self.testing_vars and \
-           self.testing_vars['vcenter_hostname']:
+        if (self.testing_vars and
+            not self.vcenter_info['hostname'] and
+            'vcenter_hostname' in self.testing_vars and
+            self.testing_vars['vcenter_hostname']):
             self.vcenter_info['hostname'] = self.testing_vars['vcenter_hostname']
-        if not self.esxi_info['hostname'] and \
-           'esxi_hostname' in self.testing_vars and \
-           self.testing_vars['esxi_hostname']:
+        if (self.testing_vars and
+            not self.esxi_info['hostname'] and
+            'esxi_hostname' in self.testing_vars and
+            self.testing_vars['esxi_hostname']):
             self.esxi_info['hostname'] = self.testing_vars['esxi_hostname']
 
         msg = "Testbed information:\n"
@@ -408,7 +410,9 @@ class CallbackModule(CallbackBase):
         # Get VM name from testing vars file and set log dir
         msg = 'VM information:\n'
 
-        if 'vm_name' in self.testing_vars and self.testing_vars['vm_name']:
+        if (self.testing_vars and
+            'vm_name' in self.testing_vars and
+            self.testing_vars['vm_name']):
             self.vm_info['VM Name'] = self.testing_vars['vm_name']
         else:
             msg += "Not found VM information\n"
