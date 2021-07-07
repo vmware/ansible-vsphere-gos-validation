@@ -32,7 +32,9 @@ $ ansible-galaxy install -r requirements.yml
   # test case list file
   $ ansible-playbook main.yml -e "testing_vars_file=/path_to/test.yml testing_testcase_file=/path_to/gosv_testcase_list.yml"
 ```
-5. New folder for log files and files collected in test cases are created for current test run, e.g., "logs/test-vm/2021-07-06-09-27-51/",find test case results in "results.log", failed tasks in "failed_tasks.log", testing debug log in "full_debug.log". 
+5. New folder for log files and files collected in test cases are created for current test run,
+e.g., "logs/test-vm/2021-07-06-09-27-51/",
+find test case results in "results.log", failed tasks in "failed_tasks.log", testing debug log in "full_debug.log". 
 
 ### Catalog
 * main.yml: Main playbook for Guest OS validation test
