@@ -72,13 +72,12 @@ This project supports below scenarios for end-to-end guest OS validation testing
 | Windows Server SAC releases                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 
 ### Docker images
-* Release v1.1 or the latest:
-projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v1.1
-or
-projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
-
+* Latest (Release v1.1):
+  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
+* Release v1.1:
+  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v1.1
 * Release v1.0:
-projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v1.0
+  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v1.0
 
 Launch testing using Docker image
 1. Execute below commands in your machine
