@@ -1,4 +1,4 @@
-# Project for Guest OS Validation test on vSphere using Ansible
+# Guest OS Validation on vSphere using Ansible
 
 ## Getting Started
 
