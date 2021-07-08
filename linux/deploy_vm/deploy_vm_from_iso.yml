@@ -65,16 +65,20 @@
         - "'sle' in guest_id"
         - firmware is defined and firmware|lower == "bios"
 
-    # For RHEL, CentOS, OracleLinux, sendkey to boot screen to not do
-    # disk check and start installation directly
+    # For RHEL, CentOS, RockyLinux, OracleLinux, sendkey to boot screen to not do
+    # disk check and start installation directly. RockyLinux is using Other 4.x or
+    # later Linux (64-bit) as guest OS type.
     - block:
         - include_tasks: ../../common/vm_guest_send_key.yml
           vars:
             keys_send:
               - UPARROW
               - ENTER
-      when:
-        - ('rhel' in guest_id) or ('centos' in guest_id) or ('oracleLinux' in guest_id)
+      when: >
+        ('rhel' in guest_id) or
+        ('centos' in guest_id) or
+        ('oracleLinux' in guest_id) or
+        ('other' in guest_id)
 
     # For Photon OS installation
     - block:
@@ -90,7 +94,7 @@
       when:
         - "'Photon' in guest_id"
 
-    # For RedHat, OracleLinux, CentOS, SLED, SLES, Ubuntu installation
+    # For RedHat, OracleLinux, CentOS, RockyLinux, SLED, SLES, Ubuntu installation
     # Wait Guest OS is installed and connectable
     - block:
         - include_tasks: ../../common/update_inventory.yml
@@ -133,9 +137,9 @@
               pause:
                 seconds: 5
           when:
+            - guest_os_ansible_distribution in ["RedHat", "OracleLinux", "CentOS"]
             - guest_os_ansible_distribution_major_ver|int == 7
             - guest_os_with_gui is defined and guest_os_with_gui
-            - guest_os_ansible_distribution in ["RedHat", "OracleLinux", "CentOS"]
         - block:
             - include_tasks: ../utils/wait_for_service_status.yml
               vars:
@@ -158,7 +162,7 @@
           when: unattend_install_conf is defined and unattend_install_conf
       when:
         - "'Photon' not in guest_id"
-        - guest_os_ansible_distribution in ["RedHat", "OracleLinux", "CentOS", "SLED", "SLES"]
+        - guest_os_family in ["RedHat", "Suse"]
 
     - include_tasks: ../../common/print_test_result.yml
       vars:

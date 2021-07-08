@@ -10,7 +10,7 @@
   - name: "Set fact of guest OS with/without desktop experience"
     set_fact:
       guest_os_with_gui: "{% if not result.stat.exists %}False{% else %}True{% endif %}"
-  when: guest_os_ansible_distribution in ["Ubuntu", "Debian"]
+  when: guest_os_family == "Debian"
 
 # For SLES/SLED, if runlevel is 5, means OS has Desktop
 - block:
@@ -25,7 +25,7 @@
     - name: "Set fact of guest OS with/without desktop experience"
       set_fact:
         guest_os_with_gui: "{% if runlevel_output.stdout.find('5') != -1 %}True{% else %}False{% endif %}"
-  when: guest_os_ansible_distribution in ["SLES", "SLED"]
+  when: guest_os_family == "Suse"
 
 # Photon, Amazon and Flatcar have no desktop
 - block:
@@ -44,8 +44,7 @@
     - name: "Set fact of guest OS with/without desktop experience"
       set_fact:
         guest_os_with_gui: "{% if not X_output.stat.exists %}False{% else %}True{% endif %}"
-  when:
-    guest_os_ansible_distribution in ["RedHat", "OracleLinux", "CentOS", "Fedora"]
+  when: guest_os_family == "RedHat"
 
 - block:
     - name: "Check if guest OS has desktop environment"
