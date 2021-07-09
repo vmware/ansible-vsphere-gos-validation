@@ -21,11 +21,14 @@
 
 - block:
     # Generate unattend install iso file
-    - include_tasks: create_unattend_install_iso.yml
-      when: unattend_install_conf is defined and unattend_install_conf
-    - debug:
-        msg: "unattend_install_conf is not defined or set to a file path, will not generate unattend iso file"
-      when: unattend_install_conf is undefined or not unattend_install_conf
+    - block:
+        - include_tasks: create_unattend_install_iso.yml
+          when: unattend_install_conf is defined and unattend_install_conf
+
+        - debug:
+            msg: "unattend_install_conf is not defined or set to a file path, will not generate unattend iso file"
+          when: unattend_install_conf is undefined or not unattend_install_conf
+      when: "'ubuntu' not in guest_id"
 
     # Compose VM CDROMs to mount OS install ISO files
     - include_tasks: compose_vm_cdroms.yml
