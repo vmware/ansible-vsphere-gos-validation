@@ -11,13 +11,13 @@
     - name: "Disable all yum repositories"
       shell: "sed -i 's/enabled *= *1/enabled=0/' /etc/yum.repos.d/*.repo"
       delegate_to: "{{ vm_guest_ip }}"
-      when: guest_os_ansible_distribution in ['RedHat', 'CentOS', 'OracleLinux', 'VMware Photon OS', 'Amazon']
+      when: guest_os_family in ['RedHat', 'VMware Photon OS']
 
     # SUSE
     - name: "Disable all zypper repositories"
       shell: "sed -i 's/enabled *= *1/enabled=0/' /etc/zypp/repos.d/*.repo"
       delegate_to: "{{ vm_guest_ip }}"
-      when: guest_os_ansible_distribution in ['SLES', 'SLED']
+      when: guest_os_family == "Suse"
   when: repo_name is undefined or not repo_name
 
 # Disable repo with name {{ repo_name }}
@@ -33,7 +33,7 @@
           command: "dnf config-manager --set-disabled {{ repo_name }}"
           delegate_to: "{{ vm_guest_ip }}"
           when: guest_os_ansible_pkg_mgr | lower == "dnf"
-      when: guest_os_ansible_distribution in ['RedHat', 'CentOS', 'OracleLinux', 'Amazon']
+      when: guest_os_family == 'RedHat'
 
     # Photon OS
     - name: "Disable yum repository {{ repo_name }}"
@@ -45,6 +45,6 @@
     - name: "Disable zypper repository {{ repo_name }}"
       command: "zypper mr -d {{ repo_name }}"
       delegate_to: "{{ vm_guest_ip }}"
-      when: guest_os_ansible_distribution in ['SLES', 'SLED']
+      when: guest_os_family == "Suse"
   when: repo_name is defined and repo_name
 

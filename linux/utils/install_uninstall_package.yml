@@ -37,9 +37,9 @@
 - include_tasks: ../utils/add_local_dvd_repo.yml
   when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat']
 
-# Add online repo for CentOS, OracleLinux, Ubuntu, Debian and Photon
+# Add online repo for RockyLinux, CentOS, OracleLinux, Ubuntu, Debian and Photon
 - include_tasks: ../utils/add_official_online_repo.yml
-  when: guest_os_ansible_distribution in ['CentOS', 'OracleLinux', 'Ubuntu', 'Debian', 'VMware Photon OS']
+  when: guest_os_ansible_distribution in ['Rocky', 'CentOS', 'OracleLinux', 'Ubuntu', 'Debian', 'VMware Photon OS']
 
 - block:
     - block:
@@ -105,7 +105,7 @@
         allow_downgrade: yes
         state: "{{ package_state }}"
       delegate_to: "{{ vm_guest_ip }}"
-      when: guest_os_ansible_distribution_major_ver | int <= 7
+      when: guest_os_ansible_pkg_mgr | lower == "yum"
 
     - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       dnf:
@@ -113,23 +113,15 @@
         allow_downgrade: yes
         state: "{{ package_state }}"
       delegate_to: "{{ vm_guest_ip }}"
-      when: guest_os_ansible_distribution_major_ver | int >= 8
-  when: guest_os_ansible_distribution in ["RedHat", "CentOS", "OracleLinux"]
-
-- name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-  yum:
-    name: "{{ package_name }}"
-    state: "{{ package_state }}"
-    update_cache: "{{ update_cache | default(True) }}"
-  delegate_to: "{{ vm_guest_ip }}"
-  when: guest_os_ansible_distribution == "Amazon"
+      when: guest_os_ansible_pkg_mgr | lower == "dnf"
+  when: guest_os_family == "RedHat"
 
 - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
   zypper:
     name: "{{ package_name }}"
     state: "{{ package_state }}"
   delegate_to: "{{ vm_guest_ip }}"
-  when: guest_os_ansible_distribution in ["SLES", "SLED"]
+  when: guest_os_family == "Suse"
 
 - block:
     - include_tasks: remove_dpkg_lock_file.yml
@@ -138,4 +130,4 @@
         name: "{{ package_name }}"
         state: "{{ package_state }}"
       delegate_to: "{{ vm_guest_ip }}"
-  when: guest_os_ansible_distribution in ["Ubuntu", "Debian"]
+  when: guest_os_family == "Debian"

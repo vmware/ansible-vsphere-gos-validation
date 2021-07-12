@@ -25,8 +25,8 @@
     check_update_cmd: "dnf check-update"
     clean_cache_cmd: "dnf clean all"
   when:
-    - guest_os_ansible_distribution in ['RedHat', 'CentOS', 'OracleLinux']
-    - guest_os_ansible_distribution_major_ver | int > 7
+    - guest_os_family == "RedHat"
+    - guest_os_ansible_pkg_mgr | lower == "dnf"
 
 - name: "Set OS commands for installing or uninstalling packages on {{ guest_os_ansible_distribution }}"
   set_fact:
@@ -35,16 +35,8 @@
     check_update_cmd: "yum check-update"
     clean_cache_cmd: "yum clean all"
   when:
-    - guest_os_ansible_distribution in ['RedHat', 'CentOS', 'OracleLinux']
-    - guest_os_ansible_distribution_major_ver | int <= 7
-
-- name: "Set OS commands for installing or uninstalling packages on {{ guest_os_ansible_distribution }}"
-  set_fact:
-    package_install_cmd: "yum install -y"
-    package_uninstall_cmd: "yum remove -y"
-    check_update_cmd: "yum check-update"
-    clean_cache_cmd: "yum clean all"
-  when: guest_os_ansible_distribution == "Amazon"
+    - guest_os_family == "RedHat"
+    - guest_os_ansible_pkg_mgr | lower == "yum"
 
 - name: "Set OS commands for installing or uninstalling packages on {{ guest_os_ansible_distribution }}"
   set_fact:
@@ -52,7 +44,7 @@
     package_uninstall_cmd: "zypper remove -y"
     check_update_cmd: "zypper ref"
     clean_cache_cmd: "zypper clean -a"
-  when: guest_os_ansible_distribution in ['SLES', 'SLED']
+  when: guest_os_family == "Suse"
 
 - name: "Set OS commands for installing or uninstalling packages on {{ guest_os_ansible_distribution }}"
   set_fact:
@@ -60,7 +52,7 @@
     package_uninstall_cmd: "apt-get purge -y"
     check_update_cmd: "apt-get update"
     clean_cache_cmd: "apt-get clean"
-  when: guest_os_ansible_distribution in ['Ubuntu', 'Debian']
+  when: guest_os_family == "Debian"
 
 - name: "Check OS commands are valid"
   assert:

@@ -24,6 +24,7 @@
         guest_os_ansible_kernel: "{{ guest_system_info.ansible_kernel }}"
         guest_os_ansible_distribution_release: "{{ guest_system_info.ansible_distribution_release if 'ansible_distribution_release' in guest_system_info else 'N/A' }}"
         guest_os_ansible_pkg_mgr: "{{ guest_system_info.ansible_pkg_mgr if 'ansible_pkg_mgr' in guest_system_info else 'N/A' }}"
+        guest_os_family: "{{ guest_system_info.ansible_os_family if 'ansible_os_family' in guest_system_info else '' }}"
 
     # Get Debian OS version from /etc/debian_version
     - block:
@@ -39,6 +40,11 @@
           when: debian_version_result.stdout is defined and debian_version_result.stdout
       when: guest_os_ansible_distribution == "Debian"
 
+    - name: "Set OS family for {{ guest_os_ansible_distribution }} to RedHat"
+      set_fact:
+        guest_os_family: "RedHat"
+      when: guest_os_ansible_distribution in ["RedHat", "CentOS", "OracleLinux", "Rocky", "Amazon", "Fedora"]
+
     - name: "Print guest OS information"
       debug:
         msg:
@@ -50,6 +56,7 @@
           - "Guest OS version: {{ guest_os_ansible_distribution_ver }}"
           - "Guest OS kernel: {{ guest_os_ansible_kernel }}"
           - "Guest OS release: {{ guest_os_ansible_distribution_release }}"
+          - "Guest OS family: {{ guest_os_family }}"
 
     - name: "Set fact that ansible system information about guest OS has been retrieved"
       set_fact:

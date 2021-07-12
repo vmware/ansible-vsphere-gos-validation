@@ -3,16 +3,18 @@
 ---
 # Add official online package repository
 - block:
-    - name: "Set BaseOS repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
+    - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
       set_fact:
         online_repos:
           - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}"
             baseurl: "http://mirror.centos.org/$contentdir/$releasever/os/$basearch"
             mirrorlist: "http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=os&infra=$infra"
             gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7"
-      when: guest_os_ansible_distribution_major_ver | int < 8
+      when:
+        - guest_os_ansible_distribution == "CentOS"
+        - guest_os_ansible_distribution_major_ver | int < 8
 
-    - name: "Set BaseOS and AppStream repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
+    - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
       set_fact:
         online_repos:
           - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
@@ -23,7 +25,27 @@
             baseurl: "http://mirror.centos.org/$contentdir/$releasever/AppStream/$basearch/os/"
             mirrorlist: "http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=AppStream&infra=$infra"
             gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
-      when: guest_os_ansible_distribution_major_ver | int >= 8
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
+            baseurl: "http://mirror.centos.org/$contentdir/$releasever/PowerTools/$basearch/os/"
+            mirrorlist: "http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=PowerTools&infra=$infra"
+            gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
+      when:
+        - guest_os_ansible_distribution == "CentOS"
+        - guest_os_ansible_distribution_major_ver | int >= 8
+
+    - name: "Set online repositories for Rocky Linux {{ guest_os_ansible_distribution_ver }}"
+      set_fact:
+        online_repos:
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
+            mirrorlist: "https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=BaseOS-$releasever"
+            gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial"
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
+            mirrorlist: "https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=AppStream-$releasever"
+            gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial"
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
+            mirrorlist: "https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=PowerTools-$releasever"
+            gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial"
+      when: guest_os_ansible_distribution == "Rocky"
 
     - include_tasks: add_repo_from_baseurl.yml
       vars:
@@ -35,7 +57,7 @@
       with_list: "{{ online_repos }}"
       loop_control:
         loop_var: "online_repo"
-  when: guest_os_ansible_distribution == "CentOS"
+  when: guest_os_ansible_distribution in ["CentOS", "Rocky"]
 
 - block:
     - name: "Set default online repository for OracleLinux {{ guest_os_ansible_distribution_ver }}"
