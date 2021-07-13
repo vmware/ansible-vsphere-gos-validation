@@ -57,32 +57,34 @@
         namespaces:
           x: "http://www.suse.com/1.0/yast2ns"
         pretty_print: True
+        input_type: "xml"
         add_children:
-          - user:
-              t: "map"
-              _:
-                - authorized_keys: ""
-                    t: "list"
-                - encrypted: "true"
-                    t: "boolean"
-                - fullname: "{{ vm_username }}"
-                - gid: "0"
-                - home: "/home/{{ vm_username }}"
-                - home_btrfs_subvolume: "false"
-                    t: "boolean"
-                - password_settings:
-                    t: "map"
-                    _:
-                      - expire: ""
-                      - flag: ""
-                      - inact: ""
-                      - max: ""
-                      - min: ""
-                      - warn: ""
-                - shell: "/bin/bash"
-                - uid: "101"
-                - user_password: "{{ vm_password_hash }}"
-                - uesrname: "{{ vm_username }}"
+          - |
+             <user t="map">
+               <authorized_keys t="list"/>
+               <encrypted t="boolean">true</encrypted>
+               <fullname>test</fullname>
+               <gid>0</gid>
+               <home>/root/test</home>
+               <home_btrfs_subvolume t="boolean">false</home_btrfs_subvolume>
+               <password_settings t="map">
+                 <expire/>
+                 <flag/>
+                 <inact/>
+                 <max/>
+                 <min/>
+                 <warn/>
+               </password_settings>
+               <shell>/bin/bash</shell>
+               <uid>101</uid>
+               <user_password>{{ vm_password_hash }}</user_password>
+               <uesrname>{{ vm_username }}</uesrname>
+             </user>
+
+    - name: "Print XML content in pretty format"
+      xml:
+        path: "{{ new_unattend_install_conf }}"
+        pretty_print: True
   when:
     - unattend_os_type == "SLE"
     - vm_username is defined and vm_username != "root"

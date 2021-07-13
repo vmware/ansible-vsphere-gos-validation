@@ -59,36 +59,32 @@
 
 # Add a local account for Windows desktop
 - block:
-   - name: "Add Windows local account {{ win_username }}"
-     xml:
-      path: "{{ new_unattend_install_conf }}"
-      xpath: "/x:unattend/x:settings/x:component/x:UserAccounts"
-      namespaces:
-        x: "urn:schemas-microsoft-com:unattend"
-      pretty_print: True
-      add_children:
-        - LocalAccounts:
-            _:
-              - LocalAccount:
-                  _:
-                    - Password:
-                        _:
-                          - PlainTest: "false"
-                          - Value: "{{ win_password_encode }}"
-                    - DisplayName: "{{ win_username }}"
-                    - Name: "{{ win_username }}"
-                    - Group: "Administrators"
-
-    - name: "Set local account action to 'add'"
+    - name: "Add Windows local account {{ win_username }}"
       xml:
         path: "{{ new_unattend_install_conf }}"
-        xpath: "/x:unattend/x:settings/x:component/x:UserAccounts/x:LocalAccounts/x:LocalAccount"
+        xpath: "/x:unattend/x:settings/x:component/x:UserAccounts"
         namespaces:
           x: "urn:schemas-microsoft-com:unattend"
-          wcm: "http://schemas.microsoft.com/WMIConfig/2002/State"
-        attribute: "wcm:action"
-        value: "add"
         pretty_print: True
+        input_type: "xml"
+        add_children:
+          - |
+            <LocalAccounts>
+                <LocalAccount wcm:action="add">
+                    <Password>
+                        <PlainText>false</PlainText>
+                        <Value>{{ win_password_encode }}</Value>
+                    </Password>
+                    <DisplayName></DisplayName>
+                    <Name>{{ win_username }}</Name>
+                    <Group>Administrators</Group>
+                </LocalAccount>
+            </LocalAccounts>
+
+   - name: "Print XML content in pretty format"
+     xml:
+       path: "{{ new_unattend_install_conf }}"
+       pretty_print: True
   when:
     - "'win_server' not in unattend_win_product"
     - win_username | lower != "administrator"
