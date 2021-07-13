@@ -10,6 +10,7 @@
     unattend_iso_cache: "{{ main_playbook_path }}/cache/{{ iso_timestamp }}"
     unattend_iso_file_name: "{{ guest_id }}{{ '_'.join(''.join(unattend_install_conf.split('.')[:-1]).split('/')) }}-{{ iso_timestamp }}.iso"
     unattend_install_template: "{{ main_playbook_path }}/autoinstall/{{ unattend_install_conf }}"
+    unattend_os_type: "{{ unattend_install_conf.strip('/').split('/')[1] }}"
 
 - debug:
     msg: "The unattend install config file is {{ unattend_install_template }}"
@@ -38,12 +39,53 @@
     dest: "{{ new_unattend_install_conf }}"
     mode: "0644"
 
-- name: "Add new user {{ vm_username }}"
+- name: "Add new user {{ vm_username }} in {{ unattend_os_type }} unattend install config file"
   lineinfile:
     path: "{{ new_unattend_install_conf }}"
     insertafter: "^rootpw"
     line: 'user --name={{ vm_username }} --password={{ vm_password_hash }} --iscrypted --gecos="{{ vm_username }}"'
-  when: vm_username is defined and vm_username != "root"
+  when:
+    - unattend_os_type in ["CentOS", "RHEL"]
+    - vm_username is defined and vm_username != "root"
+
+# Add new user for SLE
+- block:
+    - name: "Add a new user {{ vm_username }} in SLE unattend install config file"
+      xml:
+        path: "{{ new_unattend_install_conf }}"
+        xpath: "/x:profile/x:users"
+        namespaces:
+          x: "http://www.suse.com/1.0/yast2ns"
+        pretty_print: True
+        add_children:
+          - user:
+              t: "map"
+              _:
+                - authorized_keys: ""
+                    t: "list"
+                - encrypted: "true"
+                    t: "boolean"
+                - fullname: "{{ vm_username }}"
+                - gid: "100"
+                - home: "/home/{{ vm_username }}"
+                - home_btrfs_subvolume: "false"
+                    t: "boolean"
+                - password_settings:
+                    t: "map"
+                    _:
+                      - expire: ""
+                      - flag: ""
+                      - inact: ""
+                      - max: ""
+                      - min: ""
+                      - warn: ""
+                - shell: "/bin/bash"
+                - uid: "101"
+                - user_password: "{{ vm_password_hash }}"
+                - uesrname: "{{ vm_username }}"
+  when:
+    - unattend_os_type == "SLE"
+    - vm_username is defined and vm_username != "root"
 
 # For nvme boot disk, boot device name shoule be nvme0n1 instead of sda
 - block:
@@ -56,6 +98,10 @@
         - ["=sda", "=nvme0n1"]
         - ["/dev/sda", "/dev/nvme0n1"]
   when: boot_disk_controller == 'nvme'
+
+- name: "Print the content of {{ unattend_os_type }} unattend install config file"
+  debug:
+    msg: "{{  lookup('file', new_unattend_install_conf) | split('\n') }}"
 
 - name: "Create a guest OS unattend install ISO file"
   include_tasks: ../../common/create_iso.yml
