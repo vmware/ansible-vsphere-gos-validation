@@ -33,13 +33,18 @@
   set_fact:
     vm_password_hash: "{{ vm_password | password_hash('sha512') }}"
 
-- name: "Set root password in unattend config file"
+# For nvme boot disk, boot device name shoule be nvme0n1 instead of sda
+- name: "Set boot disk name"
+  set_fact:
+    boot_disk_name: "{{ 'nvme0n1' if boot_disk_controller == 'nvme' else 'sda' }}"
+
+- name: "Create unattend config file from template"
   template:
     src: "{{ unattend_install_template }}"
     dest: "{{ new_unattend_install_conf }}"
     mode: "0644"
 
-- name: "Add new user {{ vm_username }} in {{ unattend_os_type }} unattend install config file"
+- name: "Add a new user {{ vm_username }} in {{ unattend_os_type }} unattend install config file"
   lineinfile:
     path: "{{ new_unattend_install_conf }}"
     insertafter: "^rootpw"
@@ -88,18 +93,6 @@
   when:
     - unattend_os_type == "SLE"
     - vm_username is defined and vm_username != "root"
-
-# For nvme boot disk, boot device name shoule be nvme0n1 instead of sda
-- block:
-    - name: "Replace sda with nvme device name"
-      replace:
-        path: "{{ new_unattend_install_conf }}"
-        regexp: "=sda"
-        replace: "=nvme0n1"
-      with_items:
-        - ["=sda", "=nvme0n1"]
-        - ["/dev/sda", "/dev/nvme0n1"]
-  when: boot_disk_controller == 'nvme'
 
 - name: "Print the content of {{ unattend_os_type }} unattend install config file"
   debug:
