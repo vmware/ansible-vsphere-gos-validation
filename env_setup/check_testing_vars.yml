@@ -11,13 +11,13 @@
       - vm_password is defined and vm_password
     fail_msg: "Invalid variables: vm_name, vm_username and vm_password must be set"
 
-- name: "Check privilege escalation variables of OS users"
+- name: "Check username is root for existing VM"
   assert:
     that:
-      - vm_become_method is defined and vm_become_method
-      - vm_become_user is defined and vm_become_user
-      - vm_become_password is defined and vm_become_password
-  when: vm_enable_become is defined and vm_enable_become
+      - vm_username == "root"
+  when:
+    - new_vm is undefined or not new_vm | bool
+    - testing_testcase_file | dirname | basename == "linux"
 
 - block:
     - name: "Check VM deploy method"
