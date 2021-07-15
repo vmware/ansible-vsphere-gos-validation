@@ -16,28 +16,17 @@
     vm_guest_id: "{{ guest_id }}"
   when:
     - guest_id == 'amazonlinux2_64Guest'
-    - ova_hw_guest_id != guest_id
+    - vm_guest_id != guest_id
     - ((esxi_version is version('6.7.0', '>')) or (esxi_version is version('6.7.0', '==') and esxi_update_version | int > 0))
-    - vm_hw_version | int >= 14
+    - vm_hardware_version_num | int >= 14
 
 - include_tasks: ../../../common/vm_set_guest_id.yml
   vars:
     vm_guest_id: "{{ guest_id }}"
   when:
     - guest_id == 'amazonlinux3_64Guest'
-    - ova_hw_guest_id != guest_id
-    - vm_hw_version | int >= 18
-
-# Get VM path on ESXi datastore
-- include_tasks: ../../../common/vm_get_config.yml
-  vars:
-    property_list: ['config.files.logDirectory']
-
-- name: "Set VM file path"
-  set_fact:
-    vm_path: "{{ vm_config.config.files.logDirectory | replace('[', '/vmfs/volumes/') | replace('] ', '/') }}"
-
-- debug: var=vm_path
+    - vm_guest_id != guest_id
+    - vm_hardware_version_num | int >= 18
 
 # Create the seed.iso to modify login information
 - include_tasks: ../../utils/create_seed_iso.yml
@@ -70,11 +59,9 @@
 - include_tasks: ../../common/vm_set_power_state.yml
   vars:
     vm_power_state_set: 'powered-on'
-# Skip to check guest full name here because we will check it
-# in TD1 case
+
 - include_tasks: ../../../common/vm_wait_guest_fullname.yml
 
-# Get guest ip
 - include_tasks: ../../../common/update_inventory.yml
   vars:
     update_inventory_timeout: 300
