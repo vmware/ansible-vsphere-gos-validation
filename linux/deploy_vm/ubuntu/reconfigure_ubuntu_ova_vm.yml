@@ -33,20 +33,16 @@
 - name: "Copy {{ seed_iso_path }} to VM folder"
   copy:
     src: "{{ seed_iso_path }}"
-    dest: "{{ vm_path }}/{{ seed_iso_path | basename }}"
+    dest: "{{ vm_files_path }}/{{ seed_iso_path | basename }}"
     force: yes
     mode: 0755
   delegate_to: "{{ esxi_hostname }}"
 
 # Attach seed.iso to Ubuntu Linux VM
-- name: "Set fact of the seed ISO path"
-  set_fact:
-    cdrom_seed_iso: "{{ vm_config.config.files.logDirectory }}/{{ seed_iso_path | basename }}"
-
 - include_tasks: ../../../common/vm_configure_cdrom.yml
   vars:
     cdrom_type: iso
-    cdrom_iso_file: "{{ cdrom_seed_iso }}"
+    cdrom_iso_file: "{{ vm_files_path_ds }}/{{ seed_iso_path | basename }}"
     cdrom_controller_num: 0
     cdrom_unit_num: 0
 
