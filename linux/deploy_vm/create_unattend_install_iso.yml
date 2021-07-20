@@ -44,104 +44,96 @@
   set_fact:
     ssh_public_key: "{{ lookup('file', ssh_public_key_file) }}"
 
-- block:
-    - name: "Get SLE patch level"
-      set_fact:
-        sle_patch_level: "{{ unattend_install_conf | dirname | dirname | basename }}"
-
-    - name: "Set type attribute name in SLE unattend install config file"
-      set_fact:
-        type_attribute_name: "{{ 't' if '15/SP3' in unattend_install_conf else 'config:type' }}"
-        type_attribute_map: "{{ 't=\"map\"' if '15/SP3' in unattend_install_conf else '' }}"
-  when: unattend_os_type == "SLE"
-
 - name: "Create unattend config file from template"
   template:
     src: "{{ unattend_install_template }}"
     dest: "{{ new_unattend_install_conf }}"
     mode: "0644"
 
+# Add new user config in unattend install config file
 - block:
-    - name: "Add a new user {{ vm_username }} in {{ unattend_os_type }} unattend install config file"
-      lineinfile:
-        path: "{{ new_unattend_install_conf }}"
-        insertafter: "^rootpw"
-        line: 'user --name={{ vm_username }} --password={{ vm_password_hash }} --groups=root,wheel --iscrypted --gecos="{{ vm_username }}"'
-
-    - name: "Add SSH key for user {{ vm_username }}"
-      lineinfile:
-        path: "{{ new_unattend_install_conf }}"
-        insertafter: "^sshkey"
-        line: 'sshkey --username={{ vm_username }} "{{ ssh_public_key }}"'
-  when:
-    - unattend_os_type in ["CentOS", "RHEL"]
-    - vm_username is defined and vm_username != "root"
-
-# Add new user for SLE
-- block:
-    - name: "Set type attribute name in SLE unattend install config file"
+    # Set post script content
+    - name: "Set post script for adding new user to sudoers"
       set_fact:
-        type_attribute_name: "{{ 't' if '15/SP3' in unattend_install_conf else 'config:type' }}"
-        type_attribute_map: "{{ 't=\"map\"' if '15/SP3' in unattend_install_conf else '' }}"
-        xmlns_config: "{{ 'xmlns:config=\"http://www.suse.com/1.0/configns\"' if '15/SP2' else '' }}"
+        post_script: "echo '{{ new_user }} ALL=(ALL) NOPASSWD:ALL' >/etc/sudoers.d/{{ new_user }}"
 
-    - name: "Add a new user group {{ vm_username }} in SLE unattend install config file"
-      xml:
-        path: "{{ new_unattend_install_conf }}"
-        xpath: "/x:profile/x:groups"
-        namespaces:
-          x: "http://www.suse.com/1.0/yast2ns"
-        pretty_print: True
-        input_type: "xml"
-        add_children:
-          - |
-            <group {{ type_attribute_map }} {{ xmlns_config }}>
-              <encrypted {{ type_attribute_name}}="boolean">true</encrypted>
-              <gid>1000</gid>
-              <group_password>x</group_password>
-              <groupname>{{ vm_username }}</groupname>
-              <userlist>{{ vm_username }}</userlist>
-            </group>
+    # Add new user for RHEL and its varieties
+    - block:
+        - name: "Add a new user {{ new_user }} in {{ unattend_os_type }} unattend install config file"
+          lineinfile:
+            path: "{{ new_unattend_install_conf }}"
+            insertafter: "^rootpw"
+            line: 'user --name={{ new_user }} --password={{ vm_password_hash }} --groups=root,wheel --iscrypted --gecos="{{ new_user }}"'
 
-    - name: "Add a new user {{ vm_username }} in SLE unattend install config file"
-      xml:
-        path: "{{ new_unattend_install_conf }}"
-        xpath: "/x:profile/x:users"
-        namespaces:
-          x: "http://www.suse.com/1.0/yast2ns"
-        pretty_print: True
-        input_type: "xml"
-        add_children:
-          - |
-             <user {{ type_attribute_map }} {{ xmlns_config }}>
-               <authorized_keys {{ type_attribute_name }}="list">
-                   <authorized_key>{{ ssh_public_key }}</authorized_key>
-               </authorized_keys>
-               <encrypted {{ type_attribute_name }}="boolean">true</encrypted>
-               <fullname>{{ vm_username }}</fullname>
-               <gid>1000</gid>
-               <home_btrfs_subvolume {{ type_attribute_name }}="boolean">false</home_btrfs_subvolume>
-               <password_settings {{ type_attribute_map }}>
-                 <expire/>
-                 <flag/>
-                 <inact/>
-                 <max/>
-                 <min/>
-                 <warn/>
-               </password_settings>
-               <shell>/bin/bash</shell>
-               <uid>1000</uid>
-               <user_password>{{ vm_password_hash }}</user_password>
-               <uesrname>{{ vm_username }}</uesrname>
-             </user>
+        - name: "Add user {{ new_user }} to sudoers at post-script stage"
+          lineinfile:
+            path: "{{ new_unattend_install_conf }}"
+            insertafter: "^%post"
+            line: "{{ post_script }}"
 
-    - name: "Print XML content in pretty format"
-      xml:
-        path: "{{ new_unattend_install_conf }}"
-        pretty_print: True
-  when:
-    - unattend_os_type == "SLE"
-    - vm_username is defined and vm_username != "root"
+        - name: "Add SSH key for user {{ new_user }}"
+          lineinfile:
+            path: "{{ new_unattend_install_conf }}"
+            insertafter: "^sshkey"
+            line: 'sshkey --username={{ new_user }} "{{ ssh_public_key }}"'
+      when: unattend_os_type in ["CentOS", "RHEL"]
+
+    # Add new user for SLE
+    - block:
+        - name: "Add a new user {{ new_user }} in SLE unattend install config file"
+          xml:
+            path: "{{ new_unattend_install_conf }}"
+            xpath: "/x:profile/x:users"
+            namespaces:
+              x: "http://www.suse.com/1.0/yast2ns"
+            pretty_print: True
+            input_type: "xml"
+            add_children:
+              - |
+                 <user t="map">
+                   <authorized_keys t="list">
+                       <authorized_key>{{ ssh_public_key }}</authorized_key>
+                   </authorized_keys>
+                   <encrypted t="boolean">true</encrypted>
+                   <fullname>{{ new_user }}</fullname>
+                   <home_btrfs_subvolume t="boolean">false</home_btrfs_subvolume>
+                   <password_settings t="map">
+                     <expire/>
+                     <flag/>
+                     <inact/>
+                     <max/>
+                     <min/>
+                     <warn/>
+                   </password_settings>
+                   <shell>/bin/bash</shell>
+                   <user_password>{{ vm_password_hash }}</user_password>
+                   <uesrname>{{ new_user }}</uesrname>
+                 </user>
+
+        - name: "Add user {{ new_user }} to sudoers at post-script stage"
+          xml:
+            path: "{{ new_unattend_install_conf }}"
+            xpath: "/x:profile/x:scripts/x:post-scripts"
+            namespaces:
+              x: "http://www.suse.com/1.0/yast2ns"
+            pretty_print: True
+            input_type: "xml"
+            add_children:
+              - |
+                <script>
+                  <filename>add_sudoer.sh</filename>
+                  <source><![CDATA[#!bin/sh
+                  {{ post_script }}
+                  ]]>
+                 </source>
+                </script>
+
+        - name: "Print XML content in pretty format"
+          xml:
+            path: "{{ new_unattend_install_conf }}"
+            pretty_print: True
+      when: unattend_os_type == "SLE"
+  when: new_user is defined and new_user
 
 - name: "Print the content of {{ unattend_os_type }} unattend install config file"
   debug:

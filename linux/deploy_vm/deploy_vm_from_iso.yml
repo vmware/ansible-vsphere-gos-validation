@@ -19,14 +19,6 @@
   set_fact:
     deploy_casename: "deploy_vm_{{ firmware }}_{{ boot_disk_controller }}_{{ network_adapter_type }}"
 
-- name: "Set privilege escalation variables for non-root user"
-  set_fact:
-    vm_enable_become: True
-    vm_become_method: sudo
-    vm_become_user: root
-    vm_become_password: "{{ vm_password }}"
-  when: vm_username != "root"
-
 - block:
     # Generate unattend install iso file
     - block:
@@ -98,9 +90,14 @@
           vars:
             wait_guest_fullname: "VMware Photon OS (64-bit)"
 
-        # Add user as a sudoer
-        - include_tasks: ../utils/add_sudoer.yml
-          when: vm_username != "root"
+        # Add new user
+        - block:
+            - include_tasks: ../utils/add_user.yml
+              vars:
+                os_username: "{{ new_user }}"
+
+            - include_tasks: ../utils/add_sudoer.yml
+          when: new_user is defined and new_user
 
         # Config SSH to permit root login and password authentication
         - include_tasks: ../utils/permit_root_login.yml
@@ -119,9 +116,6 @@
           vars:
             vm_wait_vmtools_running: True
             vm_wait_vmtools_ignore_error: True
-
-        # Config SSH to permit root login and password authentication
-        - include_tasks: ../utils/permit_root_login.yml
 
         - include_tasks: ../../common/get_guest_system_info.yml
         - include_tasks: ../utils/check_guest_os_gui.yml
