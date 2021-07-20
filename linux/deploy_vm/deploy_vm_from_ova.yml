@@ -6,6 +6,17 @@
   set_fact:
     deploy_casename: "deploy_ova"
 
+# Change vm_username to root if it is not. And create a new user after OVA deployment
+- block:
+    - name: "A new user '{{ vm_username }}' will be created after OVA deployment"
+      set_fact:
+        ova_new_user: "{{ vm_username }}"
+
+    - name: "OVA are using root user, and set root password same as user '{{ vm_username }}'"
+      set_fact:
+        vm_username: root
+  when: vm_username != "root"
+
 - block:
     # OVA file on local machine
     - name: "Get OVA path and file name"
@@ -119,6 +130,14 @@
     - debug:
         msg: "WARN: OVA guest OS type is not supported in this project. The following tests might fail."
       when: ova_guest_os_type == 'unknown'
+
+    # Add a new user after OVA deployment
+    - include_tasks: ../utils/add_user.yml
+      vars:
+        os_username: "{{ ova_new_user }}"
+      when:
+        - ova_new_user is defined and ova_new_user
+        - ova_guest_os_type != 'unknown'
 
     - include_tasks: ../../common/print_test_result.yml
       vars:
