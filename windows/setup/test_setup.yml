@@ -53,24 +53,6 @@
 - name: "Print VM guest IP address"
   debug: var=vm_guest_ip
 
-# Get VM guest ID and hardware version when they're not defined
-# while testing on existing VM 
-- block:
-    - include_tasks: ../../common/vm_get_config.yml
-      vars:
-        property_list: ['config.guestId', 'config.version']
-    - name: Set fact of guest ID and hardware version of VM
-      set_fact:
-        vm_guest_id: "{{ vm_config.config.guestId }}"
-        vm_hardware_version: "{{ vm_config.config.version }}"
-  when: >
-    (vm_guest_id is undefined) or
-    (vm_hardware_version is undefined)
-- name: "Print VM guest id"
-  debug: var=vm_guest_id
-- name: "Print VM hardware version"
-  debug: var=vm_hardware_version
-
 # Check VMware tools status
 - name: "Get VMware tools status in VM"
   include_tasks: ../../common/vm_get_vmtools_status.yml
@@ -115,13 +97,3 @@
         snapshot_name: "{{ base_snapshot_name }}"
         dump_memory: yes
   when: not base_snapshot_exists
-
-# Set VM files path on ESXi host
-- block:
-    - include_tasks: ../../common/vm_get_guest_facts.yml
-    - name: Set fact of the VM files path
-      set_fact:
-        vm_files_path: "/vmfs/volumes/{{ vm_guest_facts.instance.hw_files[0].split(' ')[0].strip('[]') }}/{{ ('/').join(vm_guest_facts.instance.hw_files[0].split(' ')[1].split('/')[:-1]) }}"
-  when: vm_files_path is undefined or not vm_files_path
-- debug:
-    msg: "VM files path: {{ vm_files_path }}"

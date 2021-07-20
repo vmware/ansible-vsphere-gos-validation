@@ -4,6 +4,7 @@
 # Add a new disk to VM in the VM's datastore or remove disk from VM
 # Parameters:
 #   disk_operation: valid value is 'present' or 'absent'.
+#   disk_datastore: the datastore name of disk files.
 #   disk_size_gb (optional): the new disk size in GB, only support 'size_gb'
 #     parameter for 'vmware_guest_disk' module here. Default value is 1.
 #   disk_provision_type (optional): the type of disk, valid value is 'thin',
@@ -38,10 +39,6 @@
       set_fact:
         disk_provision_type: 'thin'
       when: disk_provision_type is undefined or not disk_provision_type
-    - include_tasks: vm_get_guest_facts.yml
-    - name: Get VM datastore name
-      set_fact:
-        vm_datastore: "{{ vm_guest_facts.instance.hw_files[0].split(' ')[0].strip('['']') }}"
   when: disk_operation | lower == 'present'
 
 - name: "{{ disk_operation }} disk to VM"
@@ -57,7 +54,7 @@
       - size_gb: "{{ disk_size_gb | default(omit) }}"
         type: "{{ disk_provision_type | default(omit) }}"
         state: "{{ disk_operation }}"
-        datastore: "{{ vm_datastore | default(omit) }}"
+        datastore: "{{ disk_datastore | default(omit) }}"
         controller_type: "{{ disk_controller_type }}"
         controller_number: "{{ ctrl_number }}"
         unit_number: "{{ unit_number }}"

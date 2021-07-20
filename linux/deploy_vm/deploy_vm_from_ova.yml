@@ -7,193 +7,85 @@
     deploy_casename: "deploy_ova"
 
 - block:
-    - name: "Set OVA deploy datastore"
-      set_fact:
-        vm_datastore: "{{ datastore }}"
-
-    # OVA is at localhost
+    # OVA file on local machine
     - name: "Get OVA path and file name"
       set_fact:
         vm_ova_path: "{{ ova_path | realpath }}"
         vm_ova_name: "{{ ova_path | basename }}"
       when: ova_nfs_server_path is undefined or not ova_nfs_server_path
 
-    # OVA is on NFS server
-    - block:
-        # Get the NFS server and volume from OVA path
-        - set_fact:
-            ova_nfs_server: "{{ ova_nfs_server_path.split(':')[0] }}"
-            ova_nfs_volume: "{{ ova_nfs_server_path.split(':')[1] }}"
-
-        - name: "Create a temporary directory to mount NFS storage"
-          include_tasks: ../../common/create_temp_file_dir.yml
-          vars:
-            tmp_state: "directory"
-            tmp_prefix: "nfs_"
-
-        - name: "Set fact of the temp dir"
-          set_fact:
-            tmp_nfs_mount_dir: "{{ tmp_path }}"
-
-        # Mount OS Image folder
-        - include_tasks: ../../common/nfs_mount.yml
-          vars:
-            nfs_server: "{{ ova_nfs_server }}"
-            nfs_share_folder: "{{ ova_nfs_volume }}"
-            nfs_mount_path: "{{ tmp_nfs_mount_dir }}"
-
-        - name: "Set fact of the NFS mount result"
-          set_fact:
-            ova_nfs_mounted: "{% if nfs_mount_result is defined and nfs_mount_result.changed %}True{% else %}False{% endif %}"
-
-        - name: "Get OVA path and file name"
-          set_fact:
-            vm_ova_path: "{{ tmp_nfs_mount_dir }}/{{ ova_path }}"
-            vm_ova_name: "{{ ova_nfs_server_path | basename }}"
+    # OVA file on NFS server
+    - include_tasks: mount_nfs_storage_local.yml
       when: ova_nfs_server_path is defined and ova_nfs_server_path
 
-    # Check OVF/OVA exists
+    # Check OVA file exists
     - name: "Check for {{ vm_ova_path }} existence"
       stat:
         path: "{{ vm_ova_path }}"
       register: vm_ova_stat
       failed_when: not vm_ova_stat.stat.exists
 
-    # Deploy OVA
+    # Deploy a new VM from OVA
     - include_tasks: ../../common/ovf_deploy.yml
       vars:
         ovf_path: "{{ vm_ova_path }}"
         ovf_vm_name: "{{ vm_name }}"
-        datastore: "{{ vm_datastore }}"
-
+        deploy_datastore: "{{ datastore }}"
     - name: "Set fact of the ova deploy result"
       set_fact:
         ova_is_deployed: "{% if ovf_deploy is defined and ovf_deploy.changed %}True{% else %}False{% endif %}"
-
     - name: "Assert OVA is deployed successfully"
       assert:
         that:
           - ova_is_deployed | bool
         fail_msg: "Failed to deploy VM '{{ vm_name }}' from {{ vm_ova_path }}"
 
-    # Take a snapshot before making any changes
-    - include_tasks: ../../common/vm_take_snapshot.yml
-      vars:
-        snapshot_name: "FreshDeployedFromOVA"
-
+    # Take a snapshot after OVA deploy
     # Reconfiguration must be performed at VM first time boot
     - name: "Set fact of the base snapshot name"
       set_fact:
         base_snapshot_for_reconfig: "FreshDeployedFromOVA"
-
-    # Get OVA hardawre version and guest id
-    - include_tasks: ../../common/vm_get_config.yml
+    - include_tasks: ../../common/vm_take_snapshot.yml
       vars:
-        property_list: ['config.guestId', 'config.version']
+        snapshot_name: "{{ base_snapshot_for_reconfig }}"
 
-    - name: "Get OVA hardware version and guest id"
-      set_fact:
-        ova_hw_guest_id: "{{ vm_config.config.guestId }}"
-        ova_hw_version: "{{ vm_config.config.version }}"
-        vm_hw_version: "{{ vm_config.config.version.split('-')[1] }}"
+    # Get OVA deployed VM info
+    - include_tasks: ../../common/vm_get_vm_info.yml
 
     - name: "Set fact of guest OS type for VM '{{ vm_name }}'"
       set_fact:
         ova_guest_os_type: |-
-          {%- if 'ubuntu' in ova_hw_guest_id -%}ubuntu
-          {%- elif 'amazonlinux' in ova_hw_guest_id -%}amazonlinux
-          {%- elif 'vmwarePhoton' in ova_hw_guest_id -%}photon
+          {%- if 'ubuntu' in vm_guest_id -%}ubuntu
+          {%- elif 'amazonlinux' in vm_guest_id -%}amazonlinux
+          {%- elif 'vmwarePhoton' in vm_guest_id -%}photon
           {%- else -%}unknown{%- endif -%}
 
-    # Upgrade VM's hardware version
-    # Ubuntu OVA deploying will block if we upgrade hardware
-    - block:
-        - include_tasks: ../../common/vm_upgrade_hardware_version.yml
-          vars:
-            hw_version: "{{ hardware_version }}"
-
-        - name: "Set fact of the VM hardware version"
-          set_fact:
-            vm_hw_version: "{{ vm_upgrade_hw_result.instance.hw_version.split('-')[1] }}"
-
-        - include_tasks: ../../common/vm_take_snapshot.yml
-          vars:
-            snapshot_name: "AfterUpgradeHwv"
-
-        - name: "Set fact of the base snapshot name"
-          set_fact:
-            base_snapshot_for_reconfig: "AfterUpgradeHwv"
+    # Upgrade VM hardware version
+    # Note:
+    # Known issue on Ubuntu cloud image OVA deployed VM, after upgrade hardware version,
+    # VM will hang during booting, tracked in this issue:
+    # https://bugs.launchpad.net/cloud-images/+bug/1898871
+    - include_tasks: upgrade_ova_vm_hwv.yml
       when:
         - hardware_version is defined and hardware_version
-        - hardware_version == "latest" or ((ova_hw_version.split('-')[1] | int) < (hardware_version | int))
+        - hardware_version == "latest" or (vm_hardware_version_num | int < hardware_version | int)
 
-    # Power on VM and try to get OVA OS type from guest info
+    # Power on VM and try to get OS type from guest info or vmx detailed data
     - block:
         - include_tasks: ../../common/vm_set_power_state.yml
           vars:
             vm_power_state_set: 'powered-on'
-
         - name: "Set current power state"
           set_fact:
             current_power_state: "{{ vm_power_state_get }}"
-
         - include_tasks: ../../common/vm_wait_guest_fullname.yml
 
-        # Try to get the OS type from guest id
-        - name: "Get guest OS type for VM '{{ vm_name }}' based on guest id"
-          set_fact:
-            ova_guest_os_type: |-
-              {%- if 'ubuntu' in vm_guest_facts.instance.hw_guest_id -%}ubuntu
-              {%- elif 'amazonlinux' in vm_guest_facts.instance.hw_guest_id -%}amazonlinux
-              {%- elif 'vmwarePhoton' in vm_guest_facts.instance.hw_guest_id -%}photon
-              {%- else -%}unknown{%- endif -%}
-          when:
-            - ova_guest_os_type == 'unknown'
-            - vm_guest_facts.instance is defined
-            - vm_guest_facts.instance.hw_guest_id is defined
-
-        # Try to get the OS type from guest full name
-        - name: "Get guest OS type for VM '{{ vm_name }}' based on guest full name"
-          set_fact:
-            ova_guest_os_type: |-
-              {%- if 'ubuntu' in vm_guest_facts.instance.hw_guest_full_name | lower -%}ubuntu
-              {%- elif 'amazon linux' in vm_guest_facts.instance.hw_guest_full_name | lower -%}amazonlinux
-              {%- elif 'vmware photon' in vm_guest_facts.instance.hw_guest_full_name | lower -%}photon
-              {%- elif 'flatcar' in vm_guest_facts.instance.hw_guest_full_name | lower -%}flatcar
-              {%- else -%}unknown{%- endif -%}
-          when:
-            - ova_guest_os_type == 'unknown'
-            - vm_guest_facts.instance is defined
-            - vm_guest_facts.instance.hw_guest_full_name is defined
-
-        # If ova_guest_os_type is still not determined by guest id,
-        # retrieve guest OS detailed data from vmx file
-        # guestOS.detailed.data or guestInfo.detailed.data is supported by VMTools >= 11.0.0
-        - block:
-            - include_tasks: ../../common/vm_get_extra_config.yml
-
-            # The field was changed from guestOS.detailed.data to guestInfo.detailed.data
-            - name: "Get guest OS detailed data field name"
-              set_fact:
-                gos_detailed_data_name: |-
-                  {%- if 'guestOS.detailed.data' in vm_extra_config -%}guestOS.detailed.data
-                  {%- elif 'guestInfo.detailed.data' in vm_extra_config -%}guestInfo.detailed.data
-                  {%- else -%}{%- endif -%}
-
-            - name: "Get guest OS type for VM '{{ vm_name }}' based on guest OS detailed data"
-              set_fact:
-                ova_guest_os_type: |-
-                  {%- if 'Ubuntu' in vm_extra_config[gos_detailed_data_name] -%}ubuntu
-                  {%- elif 'Amazon Linux' in vm_extra_config[gos_detailed_data_name] -%}amazonlinux
-                  {%- elif 'VMware Photon OS' in vm_extra_config[gos_detailed_data_name] -%}photon
-                  {%- elif 'Flatcar' in vm_extra_config[gos_detailed_data_name] -%}flatcar
-                  {%- else -%}unknown{%- endif -%}
-              when:
-                - gos_detailed_data_name
-                - vm_extra_config[gos_detailed_data_name]
-          when:
-            - vm_guest_facts.instance.guest_tools_version | int >= 11264
-            - ova_guest_os_type == 'unknown'
+        # Try to get OS type from guest info
+        - include_tasks: get_os_type_guest_info.yml
+ 
+        # Try to get OS type from vmx detailed data
+        - include_tasks: get_os_type_detailed_data.yml 
+          when: vm_guest_facts.instance.guest_tools_version | int >= 11264
       when: ova_guest_os_type == 'unknown'
 
     # Revert to snapshot "FreshDeployedFromOVA" or "AfterUpgradeHwv" to

@@ -7,27 +7,7 @@
   vars_files:
     - "{{ testing_vars_file | default('../vars/test.yml') }}"
   tasks:
-    - name: "Set the timestamp of this test run"
-      set_fact:
-        testrun_timestamp: "{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
-
-    # Initialize variables
-    - name: "Set default base snapshot name of VM"
-      set_fact:
-        base_snapshot_name: "BaseSnapshot"
-      when: base_snapshot_name is undefined or not base_snapshot_name
-    - name: "Enable debug log by default"
-      set_fact:
-        enable_debug: True
-      when: enable_debug is undefined
-    - name: "Set not exit testing when fail by default"
-      set_fact:
-        exit_testing_when_fail: False
-      when: exit_testing_when_fail is undefined
-
-    - name: "Set the fact of using proxy at localhost or not"
-      set_fact:
-        use_localhost_proxy: "{{ True if http_proxy_localhost is defined and http_proxy_localhost else False }}"
+    - include_tasks: set_default_variables.yml
 
     # Create this test run log files path
     - include_tasks: create_local_log_path.yml
@@ -54,19 +34,12 @@
         fail_msg: "VM '{{ vm_name }}' doesn't exist. Please set new_vm to True to deploy the VM or provide an existing VM name."
       when: new_vm is undefined or not new_vm | bool
     
-    # Set VM datastore path directly when creating a new VM
-    - name: Set fact of the VM files parent path
+    # Get VM related info if testing on existing VM
+    - include_tasks: ../common/vm_get_vm_info.yml
+      when: vm_exists is defined and vm_exists
+    - name: Set fact of the VM datastore path
       set_fact:
         vm_datastore_path: "/vmfs/volumes/{{ datastore }}"
-      when: new_vm is defined and new_vm | bool
-    # Get VM datatore path when testing on existing VM
-    - block:
-        - include_tasks: ../common/vm_get_guest_facts.yml
-        - name: Set fact of the VM files parent path
-          set_fact:
-            vm_datastore_path: "/vmfs/volumes/{{ vm_guest_facts.instance.hw_files[0].split(' ')[0].strip('['']') }}"
-      when: vm_exists is defined and vm_exists
-
     - name: Display the datatore path of VM files
       debug: var=vm_datastore_path
 
@@ -90,7 +63,7 @@
     # there is no VMware tools installed or VMware tools is not up
     - include_tasks: ../common/esxi_enable_guest_ip_hack.yml
 
-    # Existing VM
+    # For existing VM
     - block:
         - name: "Not cleanup old snapshot by default"
           set_fact:

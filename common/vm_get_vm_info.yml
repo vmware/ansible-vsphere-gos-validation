@@ -1,0 +1,27 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VM's vmx file path
+- include_tasks: vm_get_config.yml
+  vars:
+    property_list: ['config.files.logDirectory', 'config.files.vmPathName', 'config.guestId', 'config.version']
+
+- name: Set fact of VM path related variables
+  set_fact:
+    vm_files_path: "{{ vm_config.config.files.logDirectory | replace('[', '/vmfs/volumes/') | replace('] ', '/') }}"
+    vm_files_path_ds: "{{ vm_config.config.files.logDirectory }}"
+    vm_vmx_path: "{{ vm_config.config.files.vmPathName | replace('[', '/vmfs/volumes/') | replace('] ', '/') }}"
+    datastore: "{{ vm_config.config.files.logDirectory.split(' ')[0].strip('['']') }}"
+    vm_guest_id: "{{ vm_config.config.guestId }}"
+    vm_hardware_version: "{{ vm_config.config.version }}"
+    vm_hardware_version_num: "{{ vm_config.config.version.split('-')[-1] }}"
+ 
+- debug:
+    msg:
+      - "VM datastore: {{ datastore }}"
+      - "VM files path: {{ vm_files_path }}"
+      - "VM files path: {{ vm_files_path_ds }}"
+      - "VM vmx file path: {{ vm_vmx_path }}"
+      - "VM guest ID: {{ vm_guest_id }}"
+      - "VM hardware version: {{ vm_hardware_version }}"
+      - "VM hardware version number: {{ vm_hardware_version_num }}"

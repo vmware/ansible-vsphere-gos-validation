@@ -27,14 +27,14 @@
                 change_secureboot: 'disable'
           when:
             - vm_firmware is defined and vm_firmware | lower == 'efi'
-            - vm_hardware_version.split('-')[-1] | int >= 13
+            - vm_hardware_version_num | int >= 13
 
         - name: "Skip testcase: {{ ansible_play_name }}"
           debug:
             msg: "Skip test case due to VM firmware is not EFI: {{ vm_firmware | default('NA') }}"
           when: >
             (vm_firmware is undefined or vm_firmware | lower != 'efi') or
-            (vm_hardware_version.split('-')[-1] | int < 13)
+            (vm_hardware_version_num | int < 13)
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
           vars:

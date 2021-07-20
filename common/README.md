@@ -82,7 +82,7 @@
 ### Tasks for VM vmx config
 * vm_get_extra_config.yml: Get all configs in the vmx file
 * vm_set_extra_config.yml: Set VM config in the vmx file
-* vm_get_vmx_path.yml: Get VM vmx file path
+* vm_get_vm_info.yml: Get VM datastore path, VM files path, VM guest ID, hardware version info
 
 ### Tasks for VM connection
 * vm_wait_connection.yml: Wait for VM is connectable via ping and ssh

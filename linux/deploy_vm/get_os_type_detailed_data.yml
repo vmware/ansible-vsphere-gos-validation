@@ -1,0 +1,32 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Retrieve guest OS detailed data from vmx file
+# guestOS.detailed.data or guestInfo.detailed.data is supported by VMTools >= 11.0.0
+#
+- include_tasks: ../../common/vm_get_extra_config.yml
+
+# The field was changed from guestOS.detailed.data to guestInfo.detailed.data
+- block:
+    - name: "Get guest OS detailed data field name"
+      set_fact:
+        gos_detailed_data_name: |-
+          {%- if 'guestOS.detailed.data' in vm_extra_config -%}guestOS.detailed.data
+          {%- elif 'guestInfo.detailed.data' in vm_extra_config -%}guestInfo.detailed.data
+          {%- else -%}{%- endif -%}
+
+    - name: "Get guest OS type for VM '{{ vm_name }}' based on guest OS detailed data"
+      set_fact:
+        ova_guest_os_type: |-
+          {%- if 'Ubuntu' in vm_extra_config[gos_detailed_data_name] -%}ubuntu
+          {%- elif 'Amazon Linux' in vm_extra_config[gos_detailed_data_name] -%}amazonlinux
+          {%- elif 'VMware Photon OS' in vm_extra_config[gos_detailed_data_name] -%}photon
+          {%- elif 'Flatcar' in vm_extra_config[gos_detailed_data_name] -%}flatcar
+          {%- else -%}unknown{%- endif -%}
+      when:
+        - gos_detailed_data_name
+        - vm_extra_config[gos_detailed_data_name]
+    - debug:
+        msg: "Not found OS detailed data info in vmx file, please check manually."
+      when: not gos_detailed_data_name or not vm_extra_config[gos_detailed_data_name]
+  when: ova_guest_os_type == 'unknown'
