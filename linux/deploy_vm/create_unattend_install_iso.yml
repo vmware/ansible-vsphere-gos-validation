@@ -80,6 +80,24 @@
 
     # Add new user for SLE
     - block:
+        - name: "Add a new user group {{ new_user }} in SLE unattend install config file"
+          xml:
+            path: "{{ new_unattend_install_conf }}"
+            xpath: "/x:profile/x:groups"
+            namespaces:
+              x: "http://www.suse.com/1.0/yast2ns"
+            pretty_print: True
+            input_type: "xml"
+            add_children:
+              - |
+                <group t="map">
+                  <encrypted t="boolean">true</encrypted>
+                  <gid>1000</gid>
+                  <group_password>x</group_password>
+                  <groupname>{{ new_user }}</groupname>
+                  <userlist>{{ new_user }}</userlist>
+                </group>
+
         - name: "Add a new user {{ new_user }} in SLE unattend install config file"
           xml:
             path: "{{ new_unattend_install_conf }}"
@@ -90,43 +108,34 @@
             input_type: "xml"
             add_children:
               - |
-                 <user t="map">
-                   <authorized_keys t="list">
-                       <authorized_key>{{ ssh_public_key }}</authorized_key>
-                   </authorized_keys>
-                   <encrypted t="boolean">true</encrypted>
-                   <fullname>{{ new_user }}</fullname>
-                   <home_btrfs_subvolume t="boolean">false</home_btrfs_subvolume>
-                   <password_settings t="map">
-                     <expire/>
-                     <flag/>
-                     <inact/>
-                     <max/>
-                     <min/>
-                     <warn/>
-                   </password_settings>
-                   <shell>/bin/bash</shell>
-                   <user_password>{{ vm_password_hash }}</user_password>
-                   <uesrname>{{ new_user }}</uesrname>
-                 </user>
+                <user t="map">
+                  <authorized_keys t="list">
+                    <authorized_key>{{ ssh_public_key }}</authorized_key>
+                  </authorized_keys>
+                  <encrypted t="boolean">true</encrypted>
+                  <fullname/>
+                  <gid>1000</gid>
+                  <home>/home/{{ new_user }}</home>
+                  <home_btrfs_subvolume t="boolean">false</home_btrfs_subvolume>
+                  <password_settings t="map">
+                    <expire/>
+                    <flag/>
+                    <inact/>
+                    <max>99999</max>
+                    <min>0</min>
+                    <warn>7</warn>
+                  </password_settings>
+                  <shell>/bin/bash</shell>
+                  <uid>1001</uid>
+                  <user_password>{{ vm_password_hash }}</user_password>
+                  <username>{{ new_user }}</username>
+                </user>
 
         - name: "Add user {{ new_user }} to sudoers at post-script stage"
-          xml:
+          lineinfile:
             path: "{{ new_unattend_install_conf }}"
-            xpath: "/x:profile/x:scripts/x:post-scripts"
-            namespaces:
-              x: "http://www.suse.com/1.0/yast2ns"
-            pretty_print: True
-            input_type: "xml"
-            add_children:
-              - |
-                <script>
-                  <filename>add_sudoer.sh</filename>
-                  <source><![CDATA[#!bin/sh
-                  {{ post_script }}
-                  ]]>
-                 </source>
-                </script>
+            insertafter: "<source>"
+            line: "{{ post_script }}"
 
         - name: "Print XML content in pretty format"
           xml:
