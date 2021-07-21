@@ -10,88 +10,42 @@
   set_fact:
     current_test_log_folder: "{{ testrun_log_path }}/{{ ansible_play_name }}"
 
+# Check and revert base snapshot
 - name: "Set not revert to base snapshot by default"
   set_fact:
     revert_base_snapshot: False
   when: revert_base_snapshot is undefined
+- include_tasks: base_snapshot_check_revert.yml
 
-# Check if base snapshot exists
-- name: Initialize the base snapshot existence status
-  set_fact:
-    base_snapshot_exists: False
-- include_tasks: ../../common/vm_check_snapshot_exist.yml
-  vars:
-    snapshot_name: "{{ base_snapshot_name }}"
-- name: Set fact of base snapshot existence
-  set_fact:
-    base_snapshot_exists: True
-  when: snapshot_exist is defined and snapshot_exist | bool
-
-# Revert to base snapshot when it exists and revert to base set to True
-- block:
-    - include_tasks: ../../common/vm_revert_snapshot.yml
-      vars:
-        snapshot_name: "{{ base_snapshot_name }}"
-    - debug:
-        msg: "Revert to base snapshot '{{ base_snapshot_name }}' firstly"
-  when:
-    - base_snapshot_exists
-    - revert_base_snapshot | bool
-
-# Power on VM if it's not powered on
+# Get VM IP address and check connection
 - include_tasks: ../../common/vm_set_power_state.yml
   vars:
     vm_power_state_set: "powered-on"
-
-# Get VM IP address and check winrm connection
 - include_tasks: ../../common/vm_get_ip.yml
   vars:
     vm_get_ip_timeout: 600
 - include_tasks: ../utils/win_check_winrm.yml
-# Add VM IP to the hosts inventory
 - include_tasks: ../utils/add_windows_host.yml
 - name: "Print VM guest IP address"
   debug: var=vm_guest_ip
 
-# Check VMware tools status
-- name: "Get VMware tools status in VM"
-  include_tasks: ../../common/vm_get_vmtools_status.yml
-# Get VMware tools version and build number
+# Get VMware tools status and version
+- include_tasks: ../../common/vm_get_vmtools_status.yml
 - include_tasks: ../utils/win_get_vmtools_version_build.yml
   when:
-    - vmtools_is_installed
+    - vmtools_is_installed is defined and vmtools_is_installed
     - vmtools_info_from_vmtoolsd is undefined or not vmtools_info_from_vmtoolsd
 
-# Get guest system info once
+# Get guest OS info if not defined
 - include_tasks: ../../common/get_guest_system_info.yml
-# Get guest OS bitness
 - include_tasks: ../utils/win_get_bitness.yml
   when: win_guest_bitness is undefined or not win_guest_bitness
-# Get guest OS type 
 - include_tasks: ../utils/win_get_guest_type.yml
   when: win_guest_type is undefined or win_guest_type == 'NA'
 
-# If base snapshot not exist, take base snapshot
+# Take base snapshot if not exist
 - block:
-    # Disable sleep
-    - include_tasks: ../utils/win_set_powercfg.yml
-    
-    # Disable firewall
-    - include_tasks: ../utils/win_execute_cmd.yml
-      vars:
-        win_powershell_cmd: "netsh advfirewall set allprofiles state off"
-    
-    # By default, Windows will restart automatically when BSOD,
-    # diable this automatic reboot when failure
-    - include_tasks: ../utils/win_execute_cmd.yml
-      vars:
-        win_powershell_cmd: "wmic RecoverOs set AutoReboot=False"
-    
-    # Restart guest OS
-    - include_tasks: ../utils/win_shutdown_restart.yml
-      vars:
-        set_win_power_state: "restart" 
-    
+    - include_tasks: win_guest_reconfig.yml 
     - include_tasks: ../../common/vm_take_snapshot.yml
       vars:
         snapshot_name: "{{ base_snapshot_name }}"

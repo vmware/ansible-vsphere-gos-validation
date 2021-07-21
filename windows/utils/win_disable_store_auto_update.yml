@@ -1,0 +1,19 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Diable Microsoft Store Update to resolve sysprep issue.
+# Reference:
+# https://docs.microsoft.com/en-us/answers/questions/333299/windows-10-sysprep.html
+#
+- name: Set fact of the registry path of Microsoft Store
+  set_fact:
+    win_store_reg: "HKLM\\SOFTWARE\\Policies\\Microsoft\\WindowsStore"
+# Set Auto download registry key
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "reg add '{{ win_store_reg }}' /v AutoDownload /t REG_DWORD /d 2 /f"
+
+# Stop and diable Microsoft Store install service
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Stop-Service InstallService; Set-Service -Name InstallService -StartupType Disabled"

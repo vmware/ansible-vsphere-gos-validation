@@ -1,0 +1,25 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Disable sleep
+- include_tasks: ../utils/win_set_powercfg.yml
+
+# Disable firewall
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "netsh advfirewall set allprofiles state off"
+
+# By default, Windows will restart automatically when BSOD,
+# diable this automatic reboot when failure
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "wmic RecoverOs set AutoReboot=False"
+
+# Disable Microsoft Store service
+- include_tasks: ../utils/win_disable_store_auto_update.yml
+  when: win_guest_type == "client"
+
+# Restart guest OS
+- include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"

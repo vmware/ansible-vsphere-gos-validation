@@ -58,9 +58,6 @@
               vars:
                 wait_guest_hostname: "{{ customize_gos_hostname }}"
             
-            # Get GOSC log files 
-            - include_tasks: get_gosc_logs_no_network.yml
-
             - include_tasks: ../../common/vm_get_config.yml
               vars:
                 property_list: ['guest.hostName'] 
@@ -79,8 +76,6 @@
                   - "{{ guest_ip_after_gosc == '192.168.1.10' }}"
                 success_msg: "Check guest IP address, hostname after GOSC succeed."
                 fail_msg: "Check guest IP address, hostname after GOSC failed."
-
-            - include_tasks: win_gosc_cleanup.yml
           when:
             - vmtools_is_installed and vmtools_is_running
             - vcenter_is_defined is defined and vcenter_is_defined
@@ -92,3 +87,8 @@
         - include_tasks: ../setup/rescue_cleanup.yml
           vars:
             current_testcase_name: "{{ ansible_play_name }}"
+            rescue_revert_base_snapshot: False
+      always:
+        # Get GOSC log files
+        - include_tasks: get_gosc_logs_no_network.yml
+        - include_tasks: win_gosc_cleanup.yml
