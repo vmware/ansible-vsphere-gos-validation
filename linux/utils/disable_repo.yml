@@ -5,18 +5,20 @@
 # Parameter
 #   repo_name: (Optional)The repo name to disable. By default, all repos will be disabled
 
-# Disable all repositories
+# Disable all repositories and ignore errors if no repo exists
 - block:
     # RHEL-like OS
     - name: "Disable all yum repositories"
       shell: "sed -i 's/enabled *= *1/enabled=0/' /etc/yum.repos.d/*.repo"
       delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: True
       when: guest_os_family in ['RedHat', 'VMware Photon OS']
 
     # SUSE
     - name: "Disable all zypper repositories"
       shell: "sed -i 's/enabled *= *1/enabled=0/' /etc/zypp/repos.d/*.repo"
       delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: True
       when: guest_os_family == "Suse"
   when: repo_name is undefined or not repo_name
 
