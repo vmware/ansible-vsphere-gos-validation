@@ -8,9 +8,20 @@
 - block:
     - include_tasks: ../../../common/vm_wait_guest_ip.yml
 
-    - name: Sleep 300 seconds to wait confirm message for ubuntu
+    - name: "Wait for autoinstall early commands"
+      command: "grep -c -e '{{ autoinstall_start_msg }}' {{ vm_serial_port_output_file }}"
+      until:
+        - autoinstall_started is defined
+        - autoinstall_started.stdout is defined
+        - autoinstall_started.stdout == "1"
+      delay: 5
+      retries: 120
+      delegate_to: "{{ esxi_hostname }}"
+      register: autoinstall_started
+
+    - name: Sleep 200 seconds to wait confirm message for ubuntu
       pause:
-        seconds: 300
+        seconds: 200
 
     - include_tasks: ../../../common/vm_guest_send_key.yml
       vars:

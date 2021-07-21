@@ -1,20 +1,7 @@
 #cloud-config
-users:
-  - default
-  - name: {{ vm_username }}
-    passwd: {{ vm_password_hash }}
-    lock_passwd: false
-    groups: sudo, adm, admin
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    shell: /bin/bash
-    homedir: /home/{{ vm_username }}
-    ssh_authorized_keys:
-      - {{ ssh_public_key }}
 chpasswd:
   list: |
-    ubuntu:{{ vm_password_hash }}
     root:{{ vm_password_hash }}
-    {{ vm_username }}:{{ vm_password_hash }}
   expire: false
 ssh_pwauth: true
 disable_root: false
@@ -22,7 +9,7 @@ ssh_authorized_keys:
   - {{ ssh_public_key }}
 
 runcmd:
-  - sed -i 's/^#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+  - sed -i 's/^#*PermitRootLogin .*/PermitRootLogin yes/' /etc/ssh/sshd_config
   - systemctl restart sshd
 
 final_message: "The system is finally up, after $UPTIME seconds"
