@@ -2,25 +2,54 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Map Flatcar, RockyLinux, or other Linux distribution which doesn't have a unique guest id
-# Flatcar 2605 and later
+
+# If there is no best match of the guest full name on ESXi server, it will show the guest OS detailed information
+# in the guest full name, which include the kernel version and os distribution
+- name: "Set guest detailed data for {{ guest_os_ansible_distribution}} {{ guest_os_ansible_distribution_ver }} on ESXi 6.7GA"
+  set_fact:
+    guest_detailed_data: "Linux {{ guest_os_ansible_kernel }} {{ guest_os_ansible_distribution }}"
+
+# Linux 5.x
 - block:
-    # Map Flatcar when ESXi <= 7.0.0
-    - name: "Set guest_fullname variable for {{ guest_os_ansible_distribution}} {{ guest_os_ansible_distribution_ver }} on ESXi <= 7.0.0"
-      set_fact:
-        guest_fullname: ["Other 3.x or later Linux {{ bitness }}", "Other 3.x Linux {{ bitness }}"]
+    # Map Linux 5.x when ESXi <= 7.0.0
+    - block:
+        - name: "Set guest_fullname variable for {{ guest_os_ansible_distribution}} {{ guest_os_ansible_distribution_ver }} on ESXi <= 7.0.0"
+          set_fact:
+            guest_fullname: ["Other 3.x or later Linux {{ bitness }}", "Other 3.x Linux {{ bitness }}"]
+          when: "'other3xLinux' in vm_guest_id"
+
+        - name: "Set guest_fullname variable for {{ guest_os_ansible_distribution}} {{ guest_os_ansible_distribution_ver }} on ESXi <= 7.0.0"
+          set_fact:
+            guest_fullname: ["Other 4.x or later Linux {{ bitness }}", "Other 4.x Linux {{ bitness }}"]
+          when: "'other4xLinux' in vm_guest_id"
       when: esxi_version is version('7.0.0', '<=')
 
-    # Map Flatcar when ESXi > 7.0.0 as Other 5.x or later Linux is supported on ESXi 7.0.1 and later
+    # Map Linux 5.x when ESXi > 7.0.0 as Other 5.x or later Linux is supported on ESXi 7.0.1 and later
     - name: "Set guest_fullname variable for {{ guest_os_ansible_distribution}} {{ guest_os_ansible_distribution_ver }} on ESXi > 7.0.0"
       set_fact:
         guest_fullname: "Other 5.x or later Linux {{ bitness }}"
       when: esxi_version is version('7.0.0', '>')
   when: guest_os_ansible_kernel is version('5.0', '>=')
 
-# Flatcar 2512 and earlier or RockyLinux
-- name: "Set guest_fullname variable for {{ guest_os_ansible_distribution}} {{ guest_os_ansible_distribution_ver }}"
-  set_fact:
-    guest_fullname: ["Other 4.x or later Linux {{ bitness }}", "Other 4.x Linux {{ bitness }}"]
+# Linux 4.x
+- block:
+    - name: "Set guest_fullname variable for {{ guest_os_ansible_distribution}} {{ guest_os_ansible_distribution_ver }} on ESXi <= 7.0.0"
+      set_fact:
+        guest_fullname: ["Other 3.x or later Linux {{ bitness }}", "Other 3.x Linux {{ bitness }}"]
+      when: esxi_version is version('6.7.0', '<')
+
+    - name: "Set guest_fullname variable for {{ guest_os_ansible_distribution}} {{ guest_os_ansible_distribution_ver }}"
+      set_fact:
+        guest_fullname: ["Other 4.x or later Linux {{ bitness }}", "Other 4.x Linux {{ bitness }}"]
+      when: esxi_version is version('6.7.0', '>=')
   when:
     - guest_os_ansible_kernel is version('5.0', '<')
     - guest_os_ansible_kernel is version('4.0', '>=')
+
+# Linux 3.x
+- name: "Set guest_fullname variable for {{ guest_os_ansible_distribution}} {{ guest_os_ansible_distribution_ver }}"
+  set_fact:
+    guest_fullname: ["Other 3.x or later Linux {{ bitness }}", "Other 3.x Linux {{ bitness }}"]
+  when:
+    - guest_os_ansible_kernel is version('4.0', '<')
+    - guest_os_ansible_kernel is version('3.0', '>=')

@@ -16,8 +16,21 @@
         - meta: end_play
       when:
         - new_disk_ctrl_type in ["lsilogic", "lsilogicsas"]
-        - guest_os_ansible_distribution in ["RedHat", "CentOS", "Rocky"]
+        - guest_os_family == "RedHat"
+        - guest_os_ansible_distribution != "OracleLinux"
         - guest_os_ansible_distribution_major_ver | int >= 8
+
+    - block:
+        - name: "Skip testcase: {{ ansible_play_name }}"
+          debug:
+            msg: "Skip test case because VM with hardware version {{ vm_hardware_version_num }} doesn't support {{ new_disk_ctrl_type }} controller"
+        - include_tasks: ../../common/print_test_result.yml
+          vars:
+            test_result: "No Run"
+        - meta: end_play
+      when:
+        - new_disk_ctrl_type == "nvme"
+        - vm_hardware_version_num | int < 13
 
     - name: "Set fact of the iozone file path"
       set_fact:
