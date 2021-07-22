@@ -24,6 +24,7 @@
 * vm_connect_cdrom_to_iso.yml: Connect VM's CDROM to an ISO file
 * vm_set_power_state.yml: Set VM power state
 * vm_wait_gosc_completed.yml: Wait for GOSC being completed
+* vm_add_serial_port.yml: Add a serial port to VM
 
 ### Tasks for VM CPU or Memory settings
 * vm_enable_cpu_hotadd.yml: Enable VM CPU hotadd
