@@ -8,7 +8,19 @@ packages:
   - cloud-init
   - sg3_utils
 
+ssh_pwauth: yes
+disable_root: false
+
+{% if new_user is defined and new_user != 'root' %}
+users:
+  - name: {{ new_user }}
+    passwd: {{ vm_password_hash }}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - {{ ssh_public_key }}
+{% endif %}
+
 runcmd:
-  - [sed, -i, "s/^ *#*PermitRootLogin .*/PermitRootLogin yes/", /etc/ssh/sshd_config]
+  - [systemctl, start, sshd.socket]
   - [systemctl, stop, iptables]
   - [systemctl, disable, iptables]

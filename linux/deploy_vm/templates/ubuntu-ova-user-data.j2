@@ -8,6 +8,15 @@ disable_root: false
 ssh_authorized_keys:
   - {{ ssh_public_key }}
 
+{% if new_user is defined and new_user != 'root' %}
+users:
+  - name: {{ new_user }}
+    passwd: {{ vm_password_hash }}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - {{ ssh_public_key }}
+{% endif %}
+
 runcmd:
   - sed -i 's/^#*PermitRootLogin .*/PermitRootLogin yes/' /etc/ssh/sshd_config
   - systemctl restart sshd

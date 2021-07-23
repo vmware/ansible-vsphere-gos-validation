@@ -10,7 +10,6 @@
     unattend_iso_cache: "{{ main_playbook_path }}/cache/{{ iso_timestamp }}"
     unattend_iso_file_name: "{{ guest_id }}{{ '_'.join(''.join(unattend_install_conf.split('.')[:-1]).split('/')) }}-{{ iso_timestamp }}.iso"
     unattend_install_template: "{{ main_playbook_path }}/autoinstall/{{ unattend_install_conf }}"
-    unattend_os_type: "{{ unattend_install_conf.strip('/').split('/')[0] }}"
 
 - debug:
     msg: "The unattend install config file is {{ unattend_install_template }}"
@@ -29,10 +28,6 @@
     mode: "0777"
     state: directory
 
-- name: "Get user password hash"
-  set_fact:
-    vm_password_hash: "{{ vm_password | password_hash('sha512') }}"
-
 # For nvme boot disk, boot device name shoule be nvme0n1 instead of sda
 - name: "Set boot disk name"
   set_fact:
@@ -50,101 +45,7 @@
     dest: "{{ new_unattend_install_conf }}"
     mode: "0644"
 
-# Add new user config in unattend install config file
-- block:
-    # Set post script content
-    - name: "Set post script for adding new user to sudoers"
-      set_fact:
-        post_script: "echo '{{ new_user }} ALL=(ALL) NOPASSWD:ALL' >/etc/sudoers.d/{{ new_user }}"
-
-    # Add new user for RHEL and its varieties
-    - block:
-        - name: "Add a new user {{ new_user }} in {{ unattend_os_type }} unattend install config file"
-          lineinfile:
-            path: "{{ new_unattend_install_conf }}"
-            insertafter: "^rootpw"
-            line: 'user --name={{ new_user }} --password={{ vm_password_hash }} --groups=root,wheel --iscrypted --gecos="{{ new_user }}"'
-
-        - name: "Add user {{ new_user }} to sudoers at post-script stage"
-          lineinfile:
-            path: "{{ new_unattend_install_conf }}"
-            insertafter: "^%post"
-            line: "{{ post_script }}"
-
-        - name: "Add SSH key for user {{ new_user }}"
-          lineinfile:
-            path: "{{ new_unattend_install_conf }}"
-            insertafter: "^sshkey"
-            line: 'sshkey --username={{ new_user }} "{{ ssh_public_key }}"'
-      when: unattend_os_type in ["CentOS", "RHEL"]
-
-    # Add new user for SLE
-    - block:
-        - name: "Add a new user group {{ new_user }} in SLE unattend install config file"
-          xml:
-            path: "{{ new_unattend_install_conf }}"
-            xpath: "/x:profile/x:groups"
-            namespaces:
-              x: "http://www.suse.com/1.0/yast2ns"
-            pretty_print: True
-            input_type: "xml"
-            add_children:
-              - |
-                <group t="map">
-                  <encrypted t="boolean">true</encrypted>
-                  <gid>1000</gid>
-                  <group_password>x</group_password>
-                  <groupname>{{ new_user }}</groupname>
-                  <userlist>{{ new_user }}</userlist>
-                </group>
-
-        - name: "Add a new user {{ new_user }} in SLE unattend install config file"
-          xml:
-            path: "{{ new_unattend_install_conf }}"
-            xpath: "/x:profile/x:users"
-            namespaces:
-              x: "http://www.suse.com/1.0/yast2ns"
-            pretty_print: True
-            input_type: "xml"
-            add_children:
-              - |
-                <user t="map">
-                  <authorized_keys t="list">
-                    <authorized_key>{{ ssh_public_key }}</authorized_key>
-                  </authorized_keys>
-                  <encrypted t="boolean">true</encrypted>
-                  <fullname/>
-                  <gid>1000</gid>
-                  <home>/home/{{ new_user }}</home>
-                  <home_btrfs_subvolume t="boolean">false</home_btrfs_subvolume>
-                  <password_settings t="map">
-                    <expire/>
-                    <flag/>
-                    <inact/>
-                    <max>99999</max>
-                    <min>0</min>
-                    <warn>7</warn>
-                  </password_settings>
-                  <shell>/bin/bash</shell>
-                  <uid>1001</uid>
-                  <user_password>{{ vm_password_hash }}</user_password>
-                  <username>{{ new_user }}</username>
-                </user>
-
-        - name: "Add user {{ new_user }} to sudoers at post-script stage"
-          lineinfile:
-            path: "{{ new_unattend_install_conf }}"
-            insertafter: "<source>"
-            line: "{{ post_script }}"
-
-        - name: "Print XML content in pretty format"
-          xml:
-            path: "{{ new_unattend_install_conf }}"
-            pretty_print: True
-      when: unattend_os_type == "SLE"
-  when: new_user is defined and new_user
-
-- name: "Print the content of {{ unattend_os_type }} unattend install config file"
+- name: "Print the content of unattend install config file"
   debug:
     msg: "{{  lookup('file', new_unattend_install_conf) | split('\n') }}"
 
