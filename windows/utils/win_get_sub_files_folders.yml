@@ -18,13 +18,17 @@
 - include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "(Get-ChildItem -Path '{{ win_get_files_folders_folder }}').Name"
+    win_execute_cmd_ignore_error: True
 
 - name: Get files or folder from powershell output
   set_fact:
     win_get_files_folders_list: "{% for item in win_powershell_cmd_output.stdout_lines %}{{ win_get_files_folders_folder }}\\{{ item }} {% endfor %}"
+  when: not win_powershell_cmd_output.failed
 
 - name: Set fact of the files or folder list
   set_fact:
     win_get_files_folders_list: "{{ win_get_files_folders_list.split() }}"
+  when: win_get_files_folders_list | length != 0
+
 - name: Display the files or folders list
   debug: var=win_get_files_folders_list

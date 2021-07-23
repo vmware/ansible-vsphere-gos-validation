@@ -15,11 +15,13 @@
 - include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "(Get-Item -Path '{{ win_is_folder_path }}') -is [System.IO.DirectoryInfo]"
-
+    win_execute_cmd_ignore_error: True
+ 
 - name: Set fact of the check result
   set_fact:
     win_is_folder_result: True
   when:
+    - not win_powershell_cmd_output.failed
     - win_powershell_cmd_output.stdout_lines | length != 0
     - win_powershell_cmd_output.stdout_lines[0] == 'True'
 - debug:
