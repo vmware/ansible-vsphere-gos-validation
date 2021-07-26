@@ -65,7 +65,7 @@ vhba_hot_add_remove/nvme_vhba_device_ops.yml
 vgauth_check_service/vgauth_check_service.yml
 ```
 
-5. VMware Photon OS 3.0 and later
+5. VMware Photon OS 4.0
 * Failure: When hot adding or removing NVMe disk to existing controller, VMware Photon OS cannot detect NVMe disk changes.
 * Workaround: not available
 * Affected test cases:
