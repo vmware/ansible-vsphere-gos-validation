@@ -56,6 +56,7 @@ This project supports below scenarios for end-to-end guest OS validation testing
 * Deploy VM from an OVA template
 * Existing VM with installed guest OS, which should satisfy below requirments.
   * SSH and Python are installed and enabled
+  * The vm_python variable in vars/test.yml must be set with correct python path. Or user can set PATH in /etc/environment in guest OS to include the binary directory path to python.
   * The root user should be enabled and permitted to log in through SSH in Linux guest OS
   * Execute [ConfigureRemotingForAnsible.ps1](https://github.com/ansible/ansible/blob/devel/examples/scripts/ConfigureRemotingForAnsible.ps1) script in Windows guest OS in advance
 
