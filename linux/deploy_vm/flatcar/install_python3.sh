@@ -79,7 +79,7 @@ else
     rm -rf $ap_python3_download_dir
 
     # Add /opt/bin to PATH for python auto discovery
-    echo 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/opt/bin' >>/etc/environment
+    echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:$ap_python3_bin_dir" >>/etc/environment
 
     python_version=$($ap_python3_bin_dir/python -V)
     rc=$?
