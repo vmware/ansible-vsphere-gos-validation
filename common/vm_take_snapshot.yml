@@ -15,18 +15,23 @@
     quiesce: "{{ is_quiesce | default(False) }}"
     memory_dump: "{{ dump_memory | default(True) }}"
   ignore_errors: "{{ vm_take_snapshot_ignore_err | default(False) }}"
-  register: task_result
+  register: vm_take_snapshot_result
+
 - name: Display the result of taking snapshot
-  debug: var=task_result
+  debug: var=vm_take_snapshot_result
   when: enable_debug is defined and enable_debug
 
-- include_tasks: vm_get_snapshot_facts.yml
-- name: "Check VM snapshot is taken and is the current one"
-  assert:
-    that:
-      - vm_snapshot_facts is defined
-      - vm_snapshot_facts.guest_snapshots is defined
-      - vm_snapshot_facts.guest_snapshots.snapshots is defined
-      - vm_snapshot_facts.guest_snapshots.current_snapshot.name == snapshot_name
-    fail_msg: "Failed to take snapshot '{{ snapshot_name }}' on VM '{{ vm_name }}'."
-    success_msg: "Take snapshot '{{ snapshot_name }}' on VM '{{ vm_name }}' succeed."
+- block:
+    - include_tasks: vm_get_snapshot_facts.yml
+    - name: "Check VM snapshot is taken and is the current one"
+      assert:
+        that:
+          - vm_snapshot_facts is defined
+          - vm_snapshot_facts.guest_snapshots is defined
+          - vm_snapshot_facts.guest_snapshots.snapshots is defined
+          - vm_snapshot_facts.guest_snapshots.current_snapshot.name == snapshot_name
+        fail_msg: "Failed to take snapshot '{{ snapshot_name }}' on VM '{{ vm_name }}'."
+        success_msg: "Take snapshot '{{ snapshot_name }}' on VM '{{ vm_name }}' succeed."
+  when:
+    - "'failed' in vm_take_snapshot_result"
+    - not vm_take_snapshot_result.failed
