@@ -42,10 +42,12 @@ guest_customization/gosc_perl_staticip.yml
 ```
 guest_customization/gosc_cloudinit_dhcp.yml
 ```
-
 2. SLE 15 SP2
 * Failure: Get error when using 'zypper' module due to 'ImportError' when using Python2.
 * Workaround: Set 'vm_python' parameter in 'vars/test.yml' to correct Python3 path, e.g., '/usr/bin/python3'.
+
+* Failure: Get error 'A general system error occurred: vix error codes = (1, 4294967291).' while executing common/vm_shell_in_guest.yml.
+* Workaround: Configure vmtoolsd to use common authentication mechanism using PAM. See https://kb.vmware.com/s/article/78251.
 
 3. Windows 10 or Windows Server
 * Failure: Get error when removing NVMe controller from VM with error message "The guest operating system did not respond to a hot-remove request for device nvme1 in a timely manner.".
@@ -63,7 +65,7 @@ vhba_hot_add_remove/nvme_vhba_device_ops.yml
 vgauth_check_service/vgauth_check_service.yml
 ```
 
-5. VMware Photon OS 3.0 and later
+5. VMware Photon OS 4.0
 * Failure: When hot adding or removing NVMe disk to existing controller, VMware Photon OS cannot detect NVMe disk changes.
 * Workaround: not available
 * Affected test cases:

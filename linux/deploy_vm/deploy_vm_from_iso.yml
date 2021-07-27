@@ -21,11 +21,14 @@
 
 - block:
     # Generate unattend install iso file
-    - include_tasks: create_unattend_install_iso.yml
-      when: unattend_install_conf is defined and unattend_install_conf
-    - debug:
-        msg: "unattend_install_conf is not defined or set to a file path, will not generate unattend iso file"
-      when: unattend_install_conf is undefined or not unattend_install_conf
+    - block:
+        - include_tasks: create_unattend_install_iso.yml
+          when: unattend_install_conf is defined and unattend_install_conf
+
+        - debug:
+            msg: "unattend_install_conf is not defined or set to a file path, will not generate unattend iso file"
+          when: unattend_install_conf is undefined or not unattend_install_conf
+      when: "'ubuntu' not in guest_id"
 
     # Compose VM CDROMs to mount OS install ISO files
     - include_tasks: compose_vm_cdroms.yml
@@ -33,6 +36,8 @@
     - include_tasks: check_configured_cdrom_iso.yml
     # Create a new VM
     - include_tasks: ../../common/vm_create.yml
+
+    - include_tasks: ../../common/vm_get_vm_info.yml
 
     - include_tasks: ubuntu/reconfigure_ubuntu_iso_vm.yml
       when: guest_id == 'ubuntu64Guest'
@@ -91,35 +96,41 @@
         - include_tasks: ../utils/permit_root_login.yml
 
         - include_tasks: ../utils/disable_iptables.yml
-      when:
-        - "'Photon' in guest_id"
+      when: guest_id | lower == "vmwarephoton64guest"
 
-    # For RedHat, OracleLinux, CentOS, RockyLinux, SLED, SLES, Ubuntu installation
-    # Wait Guest OS is installed and connectable
+    # Get guest IP
+    - include_tasks: ../../common/update_inventory.yml
+      vars:
+        update_inventory_timeout: 3600
+
+    # Retrieve guest system info
+    - include_tasks: ../../common/get_guest_system_info.yml
+
+    # Add new user for Photon OS and Ubuntu
     - block:
-        - include_tasks: ../../common/update_inventory.yml
+        - include_tasks: ../utils/add_user.yml
           vars:
-            update_inventory_timeout: 3600
+            os_username: "{{ new_user }}"
+
+        - include_tasks: ../utils/add_sudoer.yml
+          vars:
+            os_username: "{{ new_user }}"
+      when:
+        - guest_os_ansible_distribution == "VMware Photon OS"
+        - new_user is defined and new_user
+
+    # If guest is not Photon OS, check guest has desktop or not
+    - block:
         - include_tasks: ../../common/vm_wait_vmtools_status.yml
           vars:
             vm_wait_vmtools_running: True
             vm_wait_vmtools_ignore_error: True
 
-        # Config SSH to permit root login and password authentication
-        - include_tasks: ../utils/permit_root_login.yml
-
-        - include_tasks: ../../common/get_guest_system_info.yml
         - include_tasks: ../utils/check_guest_os_gui.yml
-      when:
-        - "'Photon' not in guest_id"
 
-    - block:
         # OS with desktop:
         # For RHEL7/CentOS7/OracleLinux7 with desktop: initial-setup service
         # running at the end of installation, after click 'FINISH CONFIGURATION',
-        # display-manager service running to wait user login.
-        # For SLE, RHEL8/CentOS8/OracleLinux8 with desktop: display-manager
-        # service running at the end of installation to wait user login.
         - block:
             - include_tasks: ../utils/wait_for_service_status.yml
               vars:
@@ -140,6 +151,9 @@
             - guest_os_ansible_distribution in ["RedHat", "OracleLinux", "CentOS"]
             - guest_os_ansible_distribution_major_ver|int == 7
             - guest_os_with_gui is defined and guest_os_with_gui
+
+        # For SLE, RHEL8/CentOS8/OracleLinux8 with desktop: display-manager
+        # service running at the end of installation to wait user login.
         - block:
             - include_tasks: ../utils/wait_for_service_status.yml
               vars:
@@ -160,11 +174,8 @@
         # Eject unattend iso and delete it from datastore
         - include_tasks: eject_del_unattend_install_iso.yml
           when: unattend_install_conf is defined and unattend_install_conf
-      when:
-        - "'Photon' not in guest_id"
-        - guest_os_family in ["RedHat", "Suse"]
+      when: guest_os_family in ["RedHat", "Suse"]
 
-    - include_tasks: ../../common/vm_get_vm_info.yml
     - include_tasks: ../../common/print_test_result.yml
       vars:
         test_result: "Passed"

@@ -510,6 +510,15 @@
       <groupname>systemd-journal</groupname>
       <userlist/>
     </group>
+{% if new_user is defined and new_user != 'root' %}
+    <group t="map">
+      <encrypted t="boolean">true</encrypted>
+      <gid>1000</gid>
+      <group_password>x</group_password>
+      <groupname>{{ new_user }}</groupname>
+      <userlist>{{ new_user }}</userlist>
+    </group>
+{% endif %}
   </groups>
   <host t="map">
     <hosts t="list">
@@ -638,7 +647,7 @@
   </ntp-client>
   <partitioning t="list">
     <drive t="map">
-      <device>/dev/sda</device>
+      <device>/dev/{{ boot_disk_name }}</device>
       <disklabel>gpt</disklabel>
       <enable_snapshots t="boolean">true</enable_snapshots>
       <partitions t="list">
@@ -1346,7 +1355,9 @@
       <username>rtkit</username>
     </user>
     <user t="map">
-      <authorized_keys t="list"/>
+      <authorized_keys t="list">
+        <authorized_key>{{ ssh_public_key }}</authorized_key>
+      </authorized_keys>
       <encrypted t="boolean">true</encrypted>
       <fullname>root</fullname>
       <gid>0</gid>
@@ -1362,8 +1373,49 @@
       </password_settings>
       <shell>/bin/bash</shell>
       <uid>0</uid>
-      <user_password>$6$JzD5WNh5McNMQp55$kR6vFbf0lgI9ucOpob0OTSLNM1Yae4wBgBmFhSDNjdHDWDldzspdjWhSy332gkzaruwSm5ZnV/e0mEE1b9RcE.</user_password>
+      <user_password>{{ vm_password_hash }}</user_password>
       <username>root</username>
     </user>
+{% if new_user is defined and new_user != 'root' %}
+    <user t="map">
+      <authorized_keys t="list">
+        <authorized_key>{{ ssh_public_key }}</authorized_key>
+      </authorized_keys>
+      <encrypted t="boolean">true</encrypted>
+      <fullname/>
+      <gid>1000</gid>
+      <home>/home/{{ new_user }}</home>
+      <home_btrfs_subvolume t="boolean">false</home_btrfs_subvolume>
+      <password_settings t="map">
+        <expire/>
+        <flag/>
+        <inact/>
+        <max>99999</max>
+        <min>0</min>
+        <warn>7</warn>
+      </password_settings>
+      <shell>/bin/bash</shell>
+      <uid>1001</uid>
+      <user_password>{{ vm_password_hash }}</user_password>
+      <username>{{ new_user }}</username>
+    </user>
+{% endif %}
   </users>
+  <scripts t="map">
+    <post-scripts t="list">
+      <script t="map">
+        <filename>post-script.sh</filename>
+        <interpreter>shell</interpreter>
+        <source><![CDATA[
+        echo "disable_root: false" >>/etc/cloud/cloud.cfg
+        echo "ssh_pwauth: yes" >>/etc/cloud/cloud.cfg
+
+{% if new_user is defined and new_user != 'root' %}
+        echo '{{ new_user }} ALL=(ALL) NOPASSWD:ALL' >/etc/sudoers.d/{{ new_user }}
+{% endif %}
+        ]]>
+       </source>
+      </script>
+    </post-scripts>
+  </scripts>
 </profile>

@@ -2,7 +2,7 @@
 autoinstall:
   version: 1
   early-commands:
-    - ping -c 10 127.0.0.1
+    - echo "{{ autoinstall_start_msg }}" >/dev/ttyS0
   refresh-installer:
     update: no
   locale: en_US
@@ -15,6 +15,15 @@ autoinstall:
         root:{{ vm_password_hash }}
       expire: false
     disable_root: false
+    ssh_pwauth: yes
+{% if new_user is defined and new_user != 'root' %}
+    users:
+      - name: {{ new_user }}
+        passwd: {{ vm_password_hash }}
+        sudo: ALL=(ALL) NOPASSWD:ALL
+        ssh_authorized_keys:
+          - {{ ssh_public_key }}
+{% endif %}
   network:
     network:
       version: 2
@@ -34,6 +43,5 @@ autoinstall:
     username: {{ vm_username }}
     password: {{ vm_password_hash }}
   late-commands:
-    - sed -ie 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /target/etc/ssh/sshd_config
     - rm -f /etc/cloud/cloud.cfg.d/*-installer.cfg 2>/dev/null
     - echo 'Ubuntu autoinstall is completed' >/target/var/log/autoinstall.log

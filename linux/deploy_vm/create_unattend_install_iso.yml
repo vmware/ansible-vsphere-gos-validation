@@ -5,69 +5,76 @@
   set_fact:
     iso_timestamp: "{{ lookup('pipe','date +%s') }}"
 
-- name: "Set fact of unattend install ISO file name and remote datastore path"
+- name: "Set facts of unattend install cache and file names"
   set_fact:
+    unattend_iso_cache: "{{ main_playbook_path }}/cache/{{ iso_timestamp }}"
     unattend_iso_file_name: "{{ guest_id }}{{ '_'.join(''.join(unattend_install_conf.split('.')[:-1]).split('/')) }}-{{ iso_timestamp }}.iso"
+    unattend_install_template: "{{ main_playbook_path }}/autoinstall/{{ unattend_install_conf }}"
 
-- name: "Set fact of the temp path of generated unattend install ISO file"
-  set_fact:
-    generated_unattend_iso: "/tmp/{{ unattend_iso_file_name }}"
 - debug:
-    msg: "Will generate unattend install ISO file in: {{ generated_unattend_iso }}"
+    msg: "The unattend install config file is {{ unattend_install_template }}"
 
-- name: "Set fact of the absolute path of unattend install config file"
+- name: "Set fact of the absolute path of unattend install config file and ISO"
   set_fact:
-    unattend_install_conf: "{{ main_playbook_path }}/autoinstall/{{ unattend_install_conf }}"
-- name: "Display the path of unattend install config file"
-  debug: var=unattend_install_conf
+    new_unattend_install_conf: "{{ unattend_iso_cache }}/{{ unattend_install_template.split('/')[-1] }}"
+    generated_unattend_iso: "{{ unattend_iso_cache }}/{{ unattend_iso_file_name }}"
 
-- block:
-  # For nvme boot disk, boot device name shoule be nvme0n1 instead of sda
-    - name: "Get the configured unattend install control file name"
-      set_fact:
-        unattend_file: "{{ unattend_install_conf.split('/')[-1] }}"
-    - name: "Copy original unattend file to /tmp"
-      copy:
-        src: "{{ unattend_install_conf }}"
-        dest: "/tmp/{{ unattend_file }}"
-        mode: 0644
+- debug:
+    msg: "The unattend install ISO to be generated is {{ generated_unattend_iso }}"
 
-    - name: "Set new unattend install control file"
-      set_fact:
-        unattend_install_conf: "/tmp/{{ unattend_file }}"
-    - name: "Replace =sda with nvme device name"
-      replace:
-        path: "{{ unattend_install_conf }}"
-        regexp: "=sda"
-        replace: "=nvme0n1"
-    - name: "Replace /dev/sda with nvme device name"
-      replace:
-        path: "{{ unattend_install_conf }}"
-        regexp: "/dev/sda"
-        replace: "/dev/nvme0n1"
-  when: boot_disk_controller == 'nvme'
+- name: "Create temp folder for generating unattend install ISO file"
+  file:
+    path: "{{ unattend_iso_cache }}"
+    mode: "0777"
+    state: directory
 
-- name: Create a guest OS unattend install iso file
+# For nvme boot disk, boot device name shoule be nvme0n1 instead of sda
+- name: "Set boot disk name"
+  set_fact:
+    boot_disk_name: "{{ 'nvme0n1' if boot_disk_controller == 'nvme' else 'sda' }}"
+
+# Get SSH public key
+- include_tasks: ../utils/get_local_ssh_public_key.yml
+- name: "Get SSH public key"
+  set_fact:
+    ssh_public_key: "{{ lookup('file', ssh_public_key_file) }}"
+
+- name: "Create unattend config file from template"
+  template:
+    src: "{{ unattend_install_template }}"
+    dest: "{{ new_unattend_install_conf }}"
+    mode: "0644"
+
+- name: "Print the content of unattend install config file"
+  debug:
+    msg: "{{  lookup('file', new_unattend_install_conf) | split('\n') }}"
+
+- name: "Create a guest OS unattend install ISO file"
   include_tasks: ../../common/create_iso.yml
   vars:
-    create_iso_src: ["{{ unattend_install_conf }}"]
+    create_iso_src: ["{{ new_unattend_install_conf }}"]
     create_iso_dest: "{{ generated_unattend_iso }}"
     create_iso_vol_ident: 'OEMDRV'
 
-- name: Set fact of the dest path of unattend install iso on ESXi host
+- name: "Set fact of the dest path of unattend install iso on ESXi host"
   set_fact:
     transferred_unattend_iso: "{{ vm_datastore_path }}/{{ unattend_iso_file_name }}"
-- name: Print debug message
-  debug:
-    msg: "Will transfer unattend install iso to: {{ transferred_unattend_iso }}"
 
-- name: Copy generated unattend install iso to ESXi host
+- debug:
+    msg: "The unattend install ISO will be transferred to {{ transferred_unattend_iso }} on ESXi host"
+
+- name: "Transfer generated unattend install ISO to ESXi host"
   include_tasks: ../../common/transfer_file_remote.yml
   vars:
     transfer_file_remote_src: "{{ generated_unattend_iso }}"
     transfer_file_remote_dest: "{{ transferred_unattend_iso }}"
     transfer_file_remote_server: "{{ esxi_hostname }}"
 
-- name: Produce unattended ISO path
+- name: "Set fact of unattended install ISO path on datastore {{ datastore }}"
   set_fact:
     transferred_unattend_iso: "[{{ datastore }}] {{ unattend_iso_file_name }}"
+
+- name: "Remove cache folder {{ unattend_iso_cache }}"
+  file:
+    path: "{{ unattend_iso_cache }}"
+    state: absent

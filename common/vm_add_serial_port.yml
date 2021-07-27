@@ -1,0 +1,32 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Add a serial port to VM by using output file
+# Parameter:
+#   vm_serial_port_file_path: The serial port output file on datastore.
+# Return:
+#   vm_serial_port_output: The absolute path of the serial port output file
+#   
+- name: "Set default serial port output file"
+  set_fact:
+    vm_serial_port_file_path: "[{{ datastore }}] {{ vm_name }}/serial.log"
+  when: vm_serial_port_file_path is undefined or not vm_serial_port_file_path
+
+- name: "Add a serial port using output file"
+  vmware_guest_serial_port:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    name: "{{ vm_name }}"
+    backings:
+      - type: "file"
+        file_path: "{{ vm_serial_port_file_path }}"
+        yield_on_poll: True
+
+- name: "Set the absolute path of the serial port output file"
+  set_fact:
+    vm_serial_port_output_file: "{{ vm_serial_port_file_path | replace('[', '/vmfs/volumes/') | replace('] ', '/') }}"
+
+- debug:
+    msg: "The VM serial port is using output file: {{ vm_serial_port_output_file }}"

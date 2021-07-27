@@ -19,6 +19,21 @@
         - meta: end_play
       when: new_vm is undefined or (new_vm is defined and not new_vm|bool)
 
+    # Change vm_username to root if it is not. And add a new user after VM deployment
+    - block:
+        - name: "A new user '{{ vm_username }}' will be added"
+          set_fact:
+            new_user: "{{ vm_username }}"
+
+        - name: "Switch to root user and set root password same as user '{{ vm_username }}'"
+          set_fact:
+            vm_username: root
+      when: vm_username != "root"
+
+    - name: "Get VM user password hash"
+      set_fact:
+        vm_password_hash: "{{ vm_password | password_hash('sha512') }}"
+
     # Deploy VM by creating a new VM and install OS from ISO image on it
     - include_tasks: deploy_vm_from_iso.yml
       when: (vm_deploy_method is undefined) or (vm_deploy_method == "iso")
