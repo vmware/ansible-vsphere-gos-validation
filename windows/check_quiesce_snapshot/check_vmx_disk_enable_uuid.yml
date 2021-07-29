@@ -1,0 +1,18 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: Set fact of the disk enable UUID key
+  set_fact:
+    vm_advanced_settings:
+      - key: "disk.EnableUUID"
+        value: "TRUE"
+
+# Get VM vmx config
+- include_tasks: ../../common/vm_get_extra_config.yml
+- name: Check if get expected config in vmx
+  assert:
+    that:
+      - vm_advanced_settings[0].key in vm_extra_config
+      - vm_extra_config[vm_advanced_settings[0].key] | lower == vm_advanced_settings[0].value | lower
+    fail_msg: "'disk.EnableUUID = TRUE' is not in VM vmx file."
+    success_msg: "'disk.EnableUUID = TRUE' is in VM vmx file."
