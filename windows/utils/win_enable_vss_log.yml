@@ -19,17 +19,16 @@
   when: win_check_file_exist_result is defined and not win_check_file_exist_result 
 
 - name: Enable vss log in VMware tools config file
-  lineinfile:
+  win_lineinfile:
     path: "{{ vmtools_conf_path }}"
     regexp: "{{ item.key }}"
     line: "{{ item.value }}"
   loop:
-    - {key: '^#log = true', value: 'log = true'}
     - {key: '^#vmvss.level = debug', value: 'vmvss.level = debug'}
     - {key: '^#vmvss.handler = vmx', value: 'vmvss.handler = vmx'}
   delegate_to: "{{ vm_guest_ip }}"
 
 # Restart VMware tools service
-# - include_tasks: win_execute_cmd.yml
-#   vars:
-#     win_powershell_cmd: "Restart-Service -Force -Name VMTools"
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Restart-Service -Force -Name VMTools"
