@@ -2,15 +2,15 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Check if base snapshot exists when parameter is undefined
-- include_tasks: ../../common/vm_check_snapshot_exist.yml
-  vars:
-    snapshot_name: "{{ base_snapshot_name }}"
-  when: base_snapshot_exists is undefined
+- block:
+    - include_tasks: ../../common/vm_check_snapshot_exist.yml
+      vars:
+        snapshot_name: "{{ base_snapshot_name }}"
 
-- name: Set fact of base snapshot existence
-  set_fact:
-    base_snapshot_exists: "{{ True if snapshot_exist is defined and snapshot_exist | bool else False }}"
-  when: base_snapshot_exists is undefined
+    - name: Set fact of base snapshot existence
+      set_fact:
+        base_snapshot_exists: "{{ True if snapshot_exist is defined and snapshot_exist | bool else False }}"
+  when: base_snapshot_exists is undefined or not base_snapshot_exists
 
 - include_tasks: ../../common/vm_revert_snapshot.yml
   vars:
