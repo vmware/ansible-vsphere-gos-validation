@@ -27,38 +27,24 @@
             - name: Set fact of the snapshot name
               set_fact:
                 qs_snapshot_name: "quiesce_snapshot_{{ ansible_date_time.epoch }}"
+
             - include_tasks: copy_custom_scripts_to_guest.yml
-           
             - include_tasks: ../utils/win_enable_vss_log.yml
  
+            - name: Set fact of collecting quiesce log file
+              set_fact:
+                collect_vss_logs: True
             # Take quiesce snapshot of VM
             - include_tasks: ../../common/vm_take_snapshot.yml
               vars:
                 snapshot_name: "{{ qs_snapshot_name }}"
                 is_quiesce: yes
                 dump_memory: no
-                vm_take_snapshot_ignore_err: True
 
-            - block:
-                - name: Set fact of collecting quiesce log file
-                  set_fact:
-                    collect_vss_logs: True
-                - fail:
-                    msg: "Taking VM quiesce snapshot failed."
-              when:
-                - "'failed' in vm_take_snapshot_result"
-                - vm_take_snapshot_result.failed 
-            
-            - name: Take screenshot of VM after taking quiesce snapshot
-              include_tasks: ../../common/vm_take_screenshot.yml
+            - include_tasks: ../../common/vm_take_screenshot.yml
               vars:
                 vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
-            
             - include_tasks: check_custom_scripts_executed.yml
- 
-            # For testing purpose
-            - include_tasks: collect_vss_logs.yml
-
             - include_tasks: ../../common/vm_remove_snapshot.yml
               vars:
                 snapshot_name: "{{ qs_snapshot_name }}"
