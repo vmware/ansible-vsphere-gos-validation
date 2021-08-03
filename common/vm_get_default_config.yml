@@ -1,0 +1,112 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get default VM config for a specific guest id
+# Parameter
+#   guest_id: VM guest id
+#   hardware_version: VM hardware version
+# Return:
+#   vm_default_config: The VM default config options
+
+- name: "Initialize variables for getting VM default configs"
+  set_fact:
+    vm_config_option_esx_hw: "/etc/vmware/hostd/env/vmconfigoption-esx-hw{{ hardware_version }}.xml"
+    vm_default_config_xpath: "/ConfigRoot/ConfigurationOption/guestOSDescriptor/e[id='{{ guest_id }}']"
+    vm_device_types:
+      vim.vm.device.VirtualLsiLogicController: 'lsilogic'
+      vim.vm.device.VirtualLsiLogicSASController: 'lsilogicsas'
+      vim.vm.device.ParaVirtualSCSIController: 'paravirtual'
+      vim.vm.device.VirtualAHCIController: 'sata'
+      vim.vm.device.VirtualNVMEController: 'nvme'
+      vim.vm.device.VirtualIDEController: 'ide'
+      vim.vm.device.VirtualVmxnet3: 'vmxnet3'
+      vim.vm.device.VirtualE1000e: 'e1000e'
+      vim.vm.device.VirtualE1000: 'e1000'
+      vim.vm.device.VirtualVmxnet3Vrdma: 'pvrdma'
+      vim.vm.device.VirtualSriovEthernetCard: 'sriov'
+      vim.vm.device.VirtualPCNet32: 'pcnet32'
+      vim.vm.device.VirtualVmxnet2: 'vmxnet2'
+      vim.vm.device.VirtualUSBController: 'usb2'
+      vim.vm.device.VirtualUSBXHCIController: 'usb3'
+    vm_config_name:
+      defaultSecureBoot: "secureboot_enabled"
+      numRecommendedCoresPerSocket: "cpu_cores_per_socket"
+      numRecommendedPhysicalSockets: "cpu_socket_num"
+      recommendedCdromController: "cdrom_controller_type"
+      recommendedDiskController: "boot_disk_controller"
+      recommendedEthernetCard: "network_adapter_type"
+      recommendedFirmware: "firmware"
+      recommendedMemMB: "memory_mb"
+      recommendedUSBController: "usb_controller"
+    vm_config_options: {}
+    vm_default_config: {}
+
+- name: "Initialize VM default config options"
+  set_fact:
+    vm_default_config: "{{ vm_default_config | combine({item.value: ''}) }}"
+  loop: "{{ vm_config_name | dict2items }}"
+
+- name: "Get default config option from guest OS descriptor for guest id {{ guest_id }}"
+  xml:
+    path: "{{ vm_config_option_esx_hw }}"
+    xpath: "{{ vm_default_config_xpath }}/{{ item }}"
+    content: text
+  delegate_to: "{{ esxi_hostname }}"
+  register: guest_os_descriptor
+  ignore_errors: True
+  loop: "{{ vm_config_name.keys() }}"
+
+- set_fact:
+    vm_config_options: "{{ vm_config_options | combine(item) }}"
+  loop: "{{ guest_os_descriptor | json_query('results[*].matches[0]') }}"
+
+- name: "Set fact for VM default config with guest id {{ guest_id }}"
+  set_fact:
+    vm_default_config: "{{ vm_default_config | combine({vm_config_name[item.key]: vm_device_types[item.value] if item.value in vm_device_types else item.value}) }}"
+  loop: "{{ vm_config_options | dict2items }}"
+
+- name: "Set default CPU number for VM with guest id {{ guest_id }}"
+  set_fact:
+    vm_default_config: "{{ vm_default_config | combine({'cpu_number': (vm_default_config.cpu_cores_per_socket | int) * (vm_default_config.cpu_socket_num | int) }) }}"
+  when:
+    - vm_default_config.cpu_cores_per_socket is defined
+    - vm_default_config.cpu_cores_per_socket | int >= 1
+    - vm_default_config.cpu_socket_num is defined
+    - vm_default_config.cpu_socket_num | int >= 1
+
+- name: "Set default CPU number for VM with guest id {{ guest_id }}"
+  set_fact:
+    vm_default_config: "{{ vm_default_config | combine({'cpu_number': 1}) }}"
+  when: vm_default_config.cpu_number is undefined or not vm_default_config.cpu_number
+
+- name: "Set default USB controller for VM with guest id {{ guest_id }}"
+  set_fact:
+    vm_default_config: "{{ vm_default_config | combine({'usb_controller': 'usb2'}) }}"
+  when: vm_default_config.usb_controller is undefined or not vm_default_config.usb_controller
+
+- name: "Set default CDROM controller for VM with guest id {{ guest_id }}"
+  set_fact:
+    vm_default_config: "{{ vm_default_config | combine({'cdrom_controller_type': 'ide'}) }}"
+  when: vm_default_config.cdrom_controller_type is undefined or not vm_default_config.cdrom_controller_type
+
+- name: "Print VM default config with guest id {{ guest_id }}"
+  debug: var=vm_default_config
+
+
+# Example output:
+#TASK [Print VM default config with guest id windows9_64Guest] ********************************************************
+#task path: /home/qiz/workspace/github/ansible-vsphere-gos-validation/common/vm_get_default_config.yml:71
+#ok: [localhost] => {
+#    "vm_default_config": {
+#        "boot_disk_controller": "lsilogicsas",
+#        "cdrom_controller_type": "sata",
+#        "cpu_cores_per_socket": "2",
+#        "cpu_number": 2,
+#        "cpu_socket_num": "1",
+#        "firmware": "efi",
+#        "memory_mb": "4096",
+#        "network_adapter_type": "e1000e",
+#        "secureboot_enabled": "true",
+#        "usb_controller": "usb3"
+#    }
+#}

@@ -1,0 +1,43 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get all supported hardware versions on ESXi server
+# Return:
+#   esxi_hardware_versions: A list of all supported hardware versions on ESXi server
+#   esxi_default_hardware_version: The deafult hardware version on the ESXi server
+
+- name: "Initialized ESXi supported hardware version list and default hardware version"
+  set_fact:
+    esxi_hardware_versions: []
+    esxi_default_hardware_version: ""
+
+- name: "Get all hardware versions on ESXi server"
+  shell: "ls /etc/vmware/hostd/env/esx-hw*.xml"
+  register: esxi_hw_files
+  delegate_to: "{{ esxi_hostname }}"
+
+- block:
+    - name: "Set ESXi hardware version list"
+      set_fact:
+        esxi_hardware_versions: "{{ esxi_hw_files.stdout_lines | regex_findall('(?<=hw)\\d+') }}"
+
+    - name: "Get default hardware version"
+      shell: "grep -l '<defaultConfigOption>true</defaultConfigOption>' /etc/vmware/hostd/env/esx-hw*.xml"
+      register: esxi_default_hw_file
+      delegate_to: "{{ esxi_hostname }}"
+
+    - name: "Set default hardware version"
+      set_fact:
+        esxi_default_hardware_version: "{{ esxi_default_hw_file.stdout | regex_search('(?<=hw)\\d+') }}"
+      when:
+        - esxi_default_hw_file is defined
+        - esxi_default_hw_file.stdout is defined
+  when:
+    - esxi_hw_files is defined
+    - esxi_hw_files.stdout_lines is defined
+
+- name: "Print ESXi supported hardware versions"
+  debug: var=esxi_hardware_versions
+
+- name: "Print ESXi default hardware version"
+  debug: var=esxi_default_hardware_version

@@ -1,0 +1,48 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get all supported guest ids for a hardware version on ESXi server
+# Parameter:
+#   hardware_version: The hardware version
+# Return:
+#   esxi_guest_ids: A list of all supported guest ids for hardware version
+
+- name: "Initialize variables for getting hardware version supported guest ids"
+  set_fact:
+    vm_config_option_esx_hw: "/etc/vmware/hostd/env/vmconfigoption-esx-hw{{ hardware_version }}.xml"
+    vm_default_config_xpath: "/ConfigRoot/ConfigurationOption/guestOSDescriptor/e/id"
+    esxi_guest_ids: []
+
+- name: "Get hardware version {{ hardware_version }} supported guest ids on ESXi server"
+  xml:
+    path: "{{ vm_config_option_esx_hw }}"
+    xpath: "{{ vm_default_config_xpath }}"
+    content: text
+  delegate_to: "{{ esxi_hostname }}"
+  register: guest_os_desc_ids
+
+- name: "Set fact of supported guest ids for hardware version"
+  set_fact:
+    esxi_guest_ids: "{{ guest_os_desc_ids.matches | map(attribute='id') | list }}"
+
+- name: "Print hardware version {{ hardware_version }} supported guest id on ESXi server"
+  debug: var=esxi_guest_ids
+
+# Example output
+#TASK [debug] *********************************************************************************************************
+#task path: /home/qiz/workspace/github/ansible-vsphere-gos-validation/common/esxi_get_guest_ids.yml:28
+#ok: [localhost] => {
+#    "esxi_guest_ids": [
+#        "amazonlinux3_64Guest",
+#        "amazonlinux2_64Guest",
+#        "windows2019srvNext_64Guest",
+#        "windows2019srv_64Guest",
+#        "windows9Server64Guest",
+#        ...
+#        "vmkernel65Guest",
+#        "vmkernel7Guest",
+#        "vmkernel6Guest",
+#        "vmkernel5Guest",
+#        "vmkernelGuest"
+#    ]
+#}
