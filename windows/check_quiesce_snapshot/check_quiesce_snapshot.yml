@@ -13,6 +13,9 @@
     - block:
         - include_tasks: ../setup/test_setup.yml
         - block:
+            - include_tasks: check_vmx_disk_enable_uuid.yml
+              when: win_guest_type == "server"
+ 
             - name: Set fact of the remote path in guest OS
               set_fact:
                 quiesce_scripts_freeze_thaw_path: "C:\\Windows\\"
@@ -24,15 +27,21 @@
             - name: Set fact of the snapshot name
               set_fact:
                 qs_snapshot_name: "quiesce_snapshot_{{ ansible_date_time.epoch }}"
+
             - include_tasks: copy_custom_scripts_to_guest.yml
-            - name: Take quiesce snapshot of VM
-              include_tasks: ../../common/vm_take_snapshot.yml
+            - include_tasks: ../utils/win_enable_vss_log.yml
+ 
+            - name: Set fact of collecting quiesce log file
+              set_fact:
+                collect_vss_logs: True
+            # Take quiesce snapshot of VM
+            - include_tasks: ../../common/vm_take_snapshot.yml
               vars:
                 snapshot_name: "{{ qs_snapshot_name }}"
                 is_quiesce: yes
                 dump_memory: no
-            - name: Take screenshot of VM after taking quiesce snapshot
-              include_tasks: ../../common/vm_take_screenshot.yml
+
+            - include_tasks: ../../common/vm_take_screenshot.yml
               vars:
                 vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
             - include_tasks: check_custom_scripts_executed.yml
@@ -45,6 +54,9 @@
             msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed }}, running: {{ vmtools_is_running }}"
           when: not vmtools_is_installed or not vmtools_is_running
       rescue:
+        - include_tasks: collect_vss_logs.yml
+          when: collect_vss_logs is defined and collect_vss_logs
+
         - include_tasks: ../setup/rescue_cleanup.yml
           vars:
             current_testcase_name: "{{ ansible_play_name }}"

@@ -1,0 +1,47 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get vmware.log containing vss logs
+- name: Get vmware.log from ESXi host
+  fetch:
+    src: "{{ vm_files_path }}/vmware.log"
+    dest: "{{ current_test_log_folder }}/vmware.log"
+    flat: yes
+    validate_checksum: no
+  delegate_to: "{{ esxi_hostname }}"
+  register: get_vmware_log
+
+- name: Display the result of getting vmware.log file
+  debug: var=get_vmware_log
+  when: enable_debug
+
+- name: Set fact of the saved event log files
+  set_fact:
+    system_event_log: "C:\\system.evtx"
+    application_event_log: "C:\\application.evtx"
+
+# Get System event logs
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-WmiObject Win32_NTEventlogFile | where-object LogfileName -eq 'System').BackupEventlog('{{ system_event_log }}')"
+    win_execute_cmd_ignore_error: True
+- include_tasks: ../utils/win_get_file.yml
+  vars:
+    win_get_file_src_path: "{{ system_event_log }}"
+    win_get_file_dst_path: "{{ current_test_log_folder }}"
+  when:
+    - "'failed' in win_powershell_cmd_output"
+    - not win_powershell_cmd_output.failed
+
+# Get Application event logs
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-WmiObject Win32_NTEventlogFile | where-object LogfileName -eq 'Application').BackupEventlog('{{ application_event_log }}')"
+    win_execute_cmd_ignore_error: True
+- include_tasks: ../utils/win_get_file.yml
+  vars:
+    win_get_file_src_path: "{{ application_event_log }}"
+    win_get_file_dst_path: "{{ current_test_log_folder }}"
+  when:
+    - "'failed' in win_powershell_cmd_output"
+    - not win_powershell_cmd_output.failed

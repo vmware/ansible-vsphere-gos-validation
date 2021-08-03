@@ -22,7 +22,15 @@
     - include_tasks: ../../common/vm_take_screenshot.yml
       vars:
         vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
-    - name: Check VM guest IP and winrm connectable result
+    - name: VM guest IP should be set
       fail:
-        msg: "vm_guest_ip is not defined or vm_guest_ip is empty, or not winrm not connectable."
-  when: vm_guest_ip is undefined or not vm_guest_ip or check_winrm_result.failed
+        msg: "VM guest IP address variable 'vm_guest_ip' is not defined or not set."
+      when: vm_guest_ip is undefined or not vm_guest_ip
+    - name: Guest winrm should be connectable
+      fail:
+        msg: "Guest winrm is not connectable in {{ win_check_winrm_timeout | default(300) }} seconds."
+      when: check_winrm_result is defined and "'failed' in check_winrm_result" and check_winrm_result.failed
+  when: >
+    (vm_guest_ip is undefined) or
+    (not vm_guest_ip) or
+    (check_winrm_result is defined and "'failed' in check_winrm_result" and check_winrm_result.failed)
