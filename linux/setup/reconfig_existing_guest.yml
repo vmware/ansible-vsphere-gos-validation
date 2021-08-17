@@ -1,0 +1,32 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# For Ubuntu or Debian , modify sshd config to keep connection alive
+- include_tasks: ../utils/ssh_keep_alive.yml
+  when: guest_os_family == "Debian"
+
+# Diable auto update for Ubuntu
+- include_tasks: ../utils/disable_auto_update.yml
+  when: guest_os_ansible_distribution in ["Ubuntu"]
+
+# Disable iptables to allow IP pingable in Photon OS
+- include_tasks: ../utils/disable_iptables.yml
+  when:
+    - (new_vm is undefined) or (not new_vm | bool)
+    - vm_guest_id == "vmwarePhoton64Guest"
+    - vmtools_is_running
+
+- block:
+    - include_tasks: ../utils/get_installed_package_info.yml
+      vars:
+        package_name: "gawk"
+
+    - include_tasks: ../utils/install_uninstall_package.yml
+      vars:
+        package_name: "gawk"
+        package_state: "present"
+        update_cache: True
+      when:
+        - package_info is defined
+        - package_info | length == 0
+  when: guest_os_ansible_distribution == "VMware Photon OS"

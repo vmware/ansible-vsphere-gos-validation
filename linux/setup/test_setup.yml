@@ -1,0 +1,39 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Below tasks will be executed at the beginning of each Linux test case.
+# If base snapshot does not exist, will take a snapshot of VM as the
+# base snapshot, if it exists, then revert to it directly.
+#
+- name: "testcase: {{ ansible_play_name }}"
+  debug:
+    msg: "Starting testcase {{ ansible_play_name }}"
+
+- name: Set fact of the info collection folder of test case
+  set_fact:
+    testcase_info_collect_path: "{{ testrun_log_path }}/{{ ansible_play_name }}"
+- name: Set fact of check VMware tools status before testing
+  set_fact:
+    vmtools_check: True
+  when: vmtools_check is undefined
+
+- include_tasks: base_snapshot_check_revert.yml
+
+- include_tasks: vm_guest_ip_get_save.yml
+
+# Only get vmtools status as necessary
+- include_tasks: ../../common/vm_get_vmtools_status.yml
+  when: >
+    vmtools_check or
+    new_vm is undefined or
+    (not new_vm | bool and
+     vm_guest_id == "vmwarePhoton64Guest")
+
+- include_tasks: get_guest_ovt_version_build.yml
+  when:
+    - vmtools_is_installed | bool
+    - vmtools_info_from_vmtoolsd is undefined or not vmtools_info_from_vmtoolsd
+
+# Create a base snapshot when not exist for a new created VM or an existing VM
+- include_tasks: create_base_snapshot.yml
+  when: not base_snapshot_exist
