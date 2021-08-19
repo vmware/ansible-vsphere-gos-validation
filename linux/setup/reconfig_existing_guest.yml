@@ -9,14 +9,15 @@
 - include_tasks: ../utils/disable_auto_update.yml
   when: guest_os_ansible_distribution in ["Ubuntu"]
 
-# Disable iptables to allow IP pingable in Photon OS
-- include_tasks: ../utils/disable_iptables.yml
-  when:
-    - (new_vm is undefined) or (not new_vm | bool)
-    - vm_guest_id == "vmwarePhoton64Guest"
-    - vmtools_is_running
-
 - block:
+    - include_tasks: ../../common/vm_get_vmtools_status.yml
+      when: vmtools_is_running is undefined or not vmtools_is_running
+
+    - include_tasks: ../utils/disable_iptables.yml
+      when:
+        - (new_vm is undefined) or (not new_vm | bool)
+        - vmtools_is_running
+
     - include_tasks: ../utils/get_installed_package_info.yml
       vars:
         package_name: "gawk"

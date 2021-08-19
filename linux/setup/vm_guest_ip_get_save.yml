@@ -28,14 +28,12 @@
         vm_guest_ip_saved: "{{ vm_guest_ip }}"
       when: not vm_guest_ip_saved
 
-    # Refresh and reconnect VM guest IP
-    - block:
-        - name: Set vm_guest_ip to use saved base snapshot IP if necessary
-          set_fact:
-            vm_guest_ip: "{{ vm_guest_ip_saved }}"
-
-        - include_tasks: ../../common/vm_wait_connection.yml
+    - name: Set vm_guest_ip to the one saved in base snapshot
+      set_fact:
+        vm_guest_ip: "{{ vm_guest_ip_saved }}"
       when: vm_guest_ip != vm_guest_ip_saved
+
+    - include_tasks: ../../common/vm_wait_connection.yml
   when: use_saved_base_ip | bool
 
 - name: Print VM guest IP address

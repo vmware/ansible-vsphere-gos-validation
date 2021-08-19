@@ -36,18 +36,18 @@
     - block:
         - name: "Set '{{ revert_to_snapshot_name }}' existence status to false"
           set_fact:
-            snapshot_exists: False
+            revert_to_snapshot_exists: False
         - name: "Check if snapshot named '{{ revert_to_snapshot_name }}' exists"
           set_fact:
-            snapshot_exists: True
+            revert_to_snapshot_exists: True
           when: item.name == revert_to_snapshot_name
           with_items: "{{ vm_snapshot_facts.guest_snapshots.snapshots }}"
         - debug:
-            msg: "Revert to snapshot '{{ revert_to_snapshot_name }}' exists: {{ snapshot_exists }}"
+            msg: "Revert to snapshot '{{ revert_to_snapshot_name }}' exists: {{ revert_to_snapshot_exists }}"
         - name: Cleanup snapshots failed
           fail:
             msg: "Not find specified snapshot '{{ revert_to_snapshot_name }}' to revert, please make sure variable 'revert_to_snapshot' is set correctly."
-          when: not snapshot_exists
+          when: not revert_to_snapshot_exists
         - include_tasks: vm_revert_snapshot.yml
           vars:
             snapshot_name: "{{ revert_to_snapshot_name }}"
