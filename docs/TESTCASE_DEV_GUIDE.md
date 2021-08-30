@@ -21,7 +21,7 @@
 3. vars_files
 - Set the playbook 'vars_files' to the relative path to the configuration file "vars/test.yml", and/or other required variables file.
 4. tasks
-- Playbook 'tasks' part is a "block" - "rescue" section, write all the tasks of test case execution and validation in "block" part, "rescue" part includes a common task "utils/test_rescue.yml". It means any task fails in "block" part, the testing will jump to the "rescue" part to execute failure/error handling tasks.
+- Playbook 'tasks' part is a "block" - "rescue" section, write all the tasks of test case execution and validation in "block" part, "rescue" part includes a common task "setup/test_rescue.yml". It means any task fails in "block" part, the testing will jump to the "rescue" part to execute failure/error handling tasks.
 
 Below is an example of test case playbook:
 ```
@@ -32,7 +32,7 @@ Below is an example of test case playbook:
   tasks:
     - name: All the tasks of test case execution
       block:
-        - include_tasks: ../utils/test_setup.yml
+        - include_tasks: ../setup/test_setup.yml
 
         # e.g., set test result to 'No Run' when VMware tools is not installed
         - include_tasks: ../../common/print_test_result.yml
@@ -58,11 +58,11 @@ Below is an example of test case playbook:
 
           when: vmtools_is_installed
       rescue:
-        - include_tasks: ../utils/test_rescue.yml
+        - include_tasks: ../setup/test_rescue.yml
 ```
 
 #### Test case "block"
-1. In the "block" part, the first included task is "linux/utils/test_setup.yml", this task file is executed at the beginning of each test case. It will fulfill below functions mainly:
+1. In the "block" part, the first included task is "linux/setup/test_setup.yml", this task file is executed at the beginning of each test case. It will fulfill below functions mainly:
 * check base snapshot existence status, revert to it if exists or take base snapshot if does not exist,
 * get VMware Tools status,
 * get VM and guest OS info,
@@ -76,7 +76,7 @@ Below is an example of test case playbook:
 * "Passed": test case passed.
 
 #### Test case "rescue"
-- In the "rescure" part, the included task "linux/utils/test_rescue.yml" will fulfill below functions:
+- In the "rescure" part, the included task "linux/setup/test_rescue.yml" will fulfill below functions:
 * print "Failed" test case result,
 * take a failure status snapshot by default,
 * revert to base snapshot by default,
