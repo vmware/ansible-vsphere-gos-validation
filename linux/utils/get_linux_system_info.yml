@@ -1,0 +1,46 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- include_tasks: ../../common/get_guest_system_info.yml
+
+# Get Debian OS version from /etc/debian_version
+- block:
+    - name: "Get Debian version"
+      command: cat /etc/debian_version
+      register: debian_version_result
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Update guest OS distribution version"
+      set_fact:
+        guest_os_ansible_distribution_ver: "{{ debian_version_result.stdout }}"
+        guest_os_ansible_distribution_minor_ver: "{{ debian_version_result.stdout.split('.')[-1] }}"
+      when: debian_version_result.stdout is defined and debian_version_result.stdout
+  when: guest_os_ansible_distribution == "Debian"
+
+- name: "Set OS family for {{ guest_os_ansible_distribution }} to RedHat"
+  set_fact:
+    guest_os_family: "RedHat"
+  when:
+    - "'ansible_distribution_file_variety' in guest_system_info"
+    - guest_system_info.ansible_distribution_file_variety == "RedHat"
+    - guest_os_family != "RedHat"
+
+- include_tasks: check_guest_os_gui.yml
+
+- name: "Print Linux guest OS information"
+  debug:
+    msg:
+      - "Guest OS: {{ guest_os_ansible_distribution }}"
+      - "Guest OS type: {{ guest_os_ansible_system }}"
+      - "Guest OS arch: {{ guest_os_ansible_architecture }}"
+      - "Guest OS major version: {{ guest_os_ansible_distribution_major_ver }}"
+      - "Guest OS minor version: {{ guest_os_ansible_distribution_minor_ver }}"
+      - "Guest OS version: {{ guest_os_ansible_distribution_ver }}"
+      - "Guest OS kernel: {{ guest_os_ansible_kernel }}"
+      - "Guest OS release: {{ guest_os_ansible_distribution_release }}"
+      - "Guest OS family: {{ guest_os_family }}"
+      - "Guest OS with desktop environment: {{ guest_os_with_gui }}"
+
+- name: "Set fact that ansible system information about guest OS has been retrieved"
+  set_fact:
+    guest_os_system_info_retrieved: True

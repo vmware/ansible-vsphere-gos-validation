@@ -13,28 +13,28 @@
   set_fact:
     testcase_info_collect_path: "{{ testrun_log_path }}/{{ ansible_play_name }}"
 
+# Check base snapshot existence and/or revert to it
 - include_tasks: base_snapshot_check_revert.yml
 
+# Get/save or use saved VM guest IP
 - include_tasks: vm_guest_ip_get_save.yml
 
-# Only get vmtools status when necessary
+# Get VMware tools status if required
 - include_tasks: ../../common/vm_get_vmtools_status.yml
   when:
     - vmtools_check | default(True)
     - use_saved_base_ip | bool
 
-# Get guest system info once
-- include_tasks: ../../common/get_guest_system_info.yml
+# Get guest OS system info
+- include_tasks: ../utils/get_linux_system_info.yml
   when: guest_os_system_info_retrieved is undefined or not guest_os_system_info_retrieved
 
-- include_tasks: ../utils/check_guest_os_gui.yml
-  when: guest_os_with_gui is undefined
-
+# Get VMware tools version info
 - include_tasks: ../utils/get_guest_ovt_version_build.yml
   when:
     - vmtools_is_installed | bool
     - vmtools_info_from_vmtoolsd is undefined or not vmtools_info_from_vmtoolsd
 
-# Create a base snapshot when not exist for a new created VM or an existing VM
+# Create a base snapshot if it does not exist
 - include_tasks: create_base_snapshot.yml
   when: not (base_snapshot_exists | bool)
