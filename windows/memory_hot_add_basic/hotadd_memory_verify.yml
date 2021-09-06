@@ -26,14 +26,18 @@
     that:
       - "{{ mem_after_hotadd | int }} == {{ win_get_mem_size | int }}"
     fail_msg: "Get memory size in guest: {{ win_get_mem_size | int }}MB, not expected: {{ mem_after_hotadd | int }}MB"
-  when: win_guest_bitness == "64-bit" or (win_guest_bitness == "32-bit" and mem_after_hotadd | int < 4096)
+  when: >
+    (guest_os_ansible_architecture == "64-bit") or
+    (guest_os_ansible_architecture == "32-bit" and mem_after_hotadd | int < 4096)
 
 - name: Check memory size got from guest OS
   assert:
     that:
       - "{{ win_get_mem_size | int }} == 3072"
     fail_msg: "Get memory size in 32-bit guest: {{ win_get_mem_size | int }}MB, when configured memory size >= 4GB"
-  when: win_guest_bitness == "32-bit" and mem_after_hotadd | int >= 4096
+  when:
+    - guest_os_ansible_architecture == "32-bit"
+    - mem_after_hotadd | int >= 4096
 
 - name: Set fact of the memory hotadd results
   set_fact:

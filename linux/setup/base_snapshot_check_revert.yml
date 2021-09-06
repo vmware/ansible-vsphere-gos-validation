@@ -1,23 +1,23 @@
 # Copyright 2021 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Check if base snapshot exists when parameter is undefined
 - block:
+    # Get base snapshot existence status on existing VM
     - include_tasks: ../../common/vm_check_snapshot_exist.yml
       vars:
         snapshot_name: "{{ base_snapshot_name }}"
       when: >
         (new_vm is undefined) or
         (not new_vm | bool)
-
-    - name: Set fact of base snapshot existence
+    
+    - name: "Set fact of variable 'base_snapshot_exists'"
       set_fact:
-        base_snapshot_exists: "{{ True if snapshot_exist is defined and snapshot_exist | bool else False }}"
-  when: base_snapshot_exists is undefined or not base_snapshot_exists
+        base_snapshot_exists: "{{ snapshot_exist | default(False) }}"
+  when: base_snapshot_exists is undefined
 
+- debug:
+    msg: "Display base snapshot existence status: {{ base_snapshot_exists }}"
 - include_tasks: ../../common/vm_revert_snapshot.yml
   vars:
     snapshot_name: "{{ base_snapshot_name }}"
-  when:
-    - base_snapshot_exists | bool
-    - revert_base_snapshot | bool
+  when: base_snapshot_exists | bool

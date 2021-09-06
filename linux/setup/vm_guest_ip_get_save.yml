@@ -1,0 +1,40 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: Set fact of not use saved VM guest IP by default
+  set_fact:
+    use_saved_base_ip: False
+  when: use_saved_base_ip is undefined
+
+- name: Initialize the saved VM guest IP address
+  set_fact:
+    vm_guest_ip_saved: ""
+  when:
+    - use_saved_base_ip | bool
+    - vm_guest_ip_saved is undefined
+
+# Get VM guest IP address when not use saved IP address,
+# or use saved IP address while IP address is not set 
+- include_tasks: ../../common/update_inventory.yml
+  when: >
+    (not use_saved_base_ip | bool) or
+    (use_saved_base_ip | bool and not vm_guest_ip_saved)
+
+# Save VM guest IP address when use_saved_base_ip
+# is set to True
+- block:
+    - name: Set fact of saved VM guest IP address
+      set_fact:
+        vm_guest_ip_saved: "{{ vm_guest_ip }}"
+      when: not vm_guest_ip_saved
+
+    - name: Set vm_guest_ip to the one saved in base snapshot
+      set_fact:
+        vm_guest_ip: "{{ vm_guest_ip_saved }}"
+      when: vm_guest_ip != vm_guest_ip_saved
+
+    - include_tasks: ../../common/vm_wait_connection.yml
+  when: use_saved_base_ip | bool
+
+- name: Print VM guest IP address
+  debug: var=vm_guest_ip

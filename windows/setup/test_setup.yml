@@ -15,12 +15,9 @@
   set_fact:
     revert_base_snapshot: False
   when: revert_base_snapshot is undefined
+
 - include_tasks: base_snapshot_check_revert.yml
 
-# Get VM IP address and check connection
-- include_tasks: ../../common/vm_set_power_state.yml
-  vars:
-    vm_power_state_set: "powered-on"
 - include_tasks: ../../common/vm_get_ip.yml
   vars:
     vm_get_ip_timeout: 600
@@ -37,20 +34,9 @@
     - vmtools_info_from_vmtoolsd is undefined or not vmtools_info_from_vmtoolsd
 
 # Get guest OS info if not defined
-- include_tasks: ../../common/get_guest_system_info.yml
-- include_tasks: ../utils/win_get_bitness.yml
-  when: win_guest_bitness is undefined or not win_guest_bitness
-- include_tasks: ../utils/win_get_guest_type.yml
-  when: win_guest_type is undefined or win_guest_type == 'NA'
+- include_tasks: ../utils/get_windows_system_info.yml
+  when: guest_os_system_info_retrieved is undefined or not guest_os_system_info_retrieved
 
 # Take base snapshot if not exist
-- block:
-    - include_tasks: win_guest_reconfig.yml 
-    - include_tasks: ../../common/vm_take_snapshot.yml
-      vars:
-        snapshot_name: "{{ base_snapshot_name }}"
-        dump_memory: yes
-    - name: Set fact of base snapshot existence
-      set_fact:
-        base_snapshot_exists: True
+- include_tasks: create_base_snapshot.yml
   when: not base_snapshot_exists

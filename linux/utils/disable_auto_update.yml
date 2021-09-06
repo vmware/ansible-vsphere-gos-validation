@@ -1,54 +1,59 @@
 # Copyright 2021 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
-- block:
-    #for ubuntu server, it don't have file /etc/apt/apt.conf.d/20auto-upgrades, but for live server, it has.
-    - name: "apt configuration files and apt tasks"
-      set_fact:
-        apt_etc_files:
-          - '/etc/apt/apt.conf.d/10periodic'
-          - '/etc/apt/apt.conf.d/20auto-upgrades'
-        apt_tasks:
-          - "Update-Package-Lists"
-          - "Download-Upgradeable-Packages"
-          - "Download-Upgradeable-Packages-Debdelta"
-          - "Unattended-Upgrade"
-          - "Enable"
-        upgrade_etc_file: "/etc/update-manager/release-upgrades"
-        notifier_etc_file: "/etc/xdg/autostart/update-notifier.desktop"
+---
+# For Ubuntu server, /etc/apt/apt.conf.d/20auto-upgrades file not exist,
+# for Ubuntu live server, this file exists
+#
+- name: Set fact of apt configuration files and apt tasks
+  set_fact:
+    apt_etc_files:
+      - '/etc/apt/apt.conf.d/10periodic'
+      - '/etc/apt/apt.conf.d/20auto-upgrades'
+    apt_tasks:
+      - "Update-Package-Lists"
+      - "Download-Upgradeable-Packages"
+      - "Download-Upgradeable-Packages-Debdelta"
+      - "Unattended-Upgrade"
+      - "Enable"
+    upgrade_etc_file: "/etc/update-manager/release-upgrades"
+    notifier_etc_file: "/etc/xdg/autostart/update-notifier.desktop"
 
-    - include_tasks: replace_or_add_line_in_file.yml
-      vars:
-        file: "{{ apt_etc_files[0] }}"
-        reg_exp: "APT::Periodic::{{ item }}.*"
-        line_content: 'APT::Periodic::{{ item }} "0";'
-      loop: "{{ apt_tasks }}"
+- include_tasks: replace_or_add_line_in_file.yml
+  vars:
+    file: "{{ apt_etc_files[0] }}"
+    reg_exp: "APT::Periodic::{{ item }}.*"
+    line_content: 'APT::Periodic::{{ item }} "0";'
+  loop: "{{ apt_tasks }}"
 
-    - name: judge file exists or not
-      stat:
-        path: "{{ apt_etc_files[1] }}"
-      register: result_file_exists
-      delegate_to: "{{ vm_guest_ip }}"
+- name: Get apt configuration file status
+  stat:
+    path: "{{ apt_etc_files[1] }}"
+  register: result_file_exists
+  delegate_to: "{{ vm_guest_ip }}"
 
-    - include_tasks: replace_or_add_line_in_file.yml
-      vars:
-        file: "{{ apt_etc_files[1] }}"
-        reg_exp: "APT::Periodic::{{ item }}.*"
-        line_content: 'APT::Periodic::{{ item }} "0";'
-      loop: "{{ apt_tasks }}"
-      when: result_file_exists.stat.exists
-
-    - include_tasks: replace_or_add_line_in_file.yml
-      vars:
-        file: "{{ upgrade_etc_file }}"
-        reg_exp: "Prompt=.*"
-        line_content: "Prompt=never"
-
-    # In Ubuntu live server, no file /etc/xdg/autostart/update-notifier.desktop
-    - include_tasks: replace_or_add_line_in_file.yml
-      vars:
-        file: "{{ notifier_etc_file }}"
-        reg_exp: "NoDisplay=.*"
-        line_content: "NoDisplay=true"
-      when: guest_os_with_gui is defined and guest_os_with_gui
+- include_tasks: replace_or_add_line_in_file.yml
+  vars:
+    file: "{{ apt_etc_files[1] }}"
+    reg_exp: "APT::Periodic::{{ item }}.*"
+    line_content: 'APT::Periodic::{{ item }} "0";'
+  loop: "{{ apt_tasks }}"
   when:
-    - guest_os_ansible_distribution in ["Ubuntu"]
+    - "'stat' in result_file_exists"
+    - "'exists' in result_file_exists.stat"
+    - result_file_exists.stat.exists
+
+- include_tasks: replace_or_add_line_in_file.yml
+  vars:
+    file: "{{ upgrade_etc_file }}"
+    reg_exp: "Prompt=.*"
+    line_content: "Prompt=never"
+
+# In Ubuntu live server, no file /etc/xdg/autostart/update-notifier.desktop
+- include_tasks: replace_or_add_line_in_file.yml
+  vars:
+    file: "{{ notifier_etc_file }}"
+    reg_exp: "NoDisplay=.*"
+    line_content: "NoDisplay=true"
+  when:
+    - guest_os_with_gui is defined
+    - guest_os_with_gui

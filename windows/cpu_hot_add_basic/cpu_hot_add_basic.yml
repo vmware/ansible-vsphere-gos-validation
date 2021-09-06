@@ -19,13 +19,13 @@
           set_fact:
             initial_cpu_num: 2
             initial_cores_num: 2
-          when: win_guest_type == "client"
+          when: guest_os_product_type | lower == "client"
 
         - name: Set fact of the initial CPU number and cores per socket
           set_fact:
             initial_cpu_num: 2
             initial_cores_num: 1
-          when: win_guest_type == "server"
+          when: guest_os_product_type | lower == "server"
         - include_tasks: ../../linux/cpu_hot_add_basic/generate_cpu_hot_add_list.yml 
         
         - block:
@@ -39,10 +39,10 @@
               loop: "{{ cpu_hotadd_num_list }}"
               loop_control:
                 loop_var: hotadd_num
-              when: win_guest_type == "server"
+              when: guest_os_product_type | lower == "server"
             
             - include_tasks: cpu_hot_add_test_client.yml
-              when: win_guest_type == "client"
+              when: guest_os_product_type | lower == "client"
             - name: Display the test results
               debug: var=cpu_hotadd_results
           when: cpu_hotadd_num_list | length != 0
