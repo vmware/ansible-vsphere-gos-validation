@@ -1,0 +1,19 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Wait until specified file exists in Windows guest
+# Parameters:
+#   win_wait_file_exist_file: the file path
+#
+- name: Check specified file status until it exists in Windows guest
+  win_stat:
+    path: "{{ win_wait_file_exist_file }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: file_info
+  until: "'stat' in file_info" and "'exists' in file_info.stat" and file_info.stat.exists
+  retries: 40
+  delay: 3 
+
+- name: Display the returned file info
+  debug: var=file_info
+  when: enable_debug
