@@ -5,7 +5,6 @@
 #Parameters
 #  package_name: one or a list of packages to be installed or removed
 #  package_state: [absent, installed, latest, present, removed]. Default is present.
-#  update_cache: True to update cache or no before installing packages. Default is False.
 # Return:
 #  package_manage_output: The output of installing or uninstalling package
 
@@ -19,7 +18,6 @@
 - name: "Initialize variables for installing or uninstalling package"
   set_fact:
     package_state: "{% if package_state is undefined %}present{% endif %}"
-    update_cache: "{% if update_cache is undefined %}False{% endif %}"
     package_manage_output: ""
     local_task_name: |-
       {%- if package_state in [ 'installed', 'present' ] -%}
@@ -42,29 +40,6 @@
   when: guest_os_ansible_distribution in ['Rocky', 'CentOS', 'OracleLinux', 'Ubuntu', 'Debian', 'VMware Photon OS']
 
 - block:
-    - block:
-       - name: "Set the fact that tdnf has not made cache"
-         set_fact:
-           tdnf_makecache: False
-
-       # When networking or dns is not ready, tdnf commands would fail
-       # So here we add retries for tndf makecache
-       - include_tasks: repo_update.yml
-         vars:
-           check_update_cmd: "tdnf makecache"
-
-       - name: "Set the fact that tdnf has finished making cache"
-         set_fact:
-           tdnf_makecache: True
-         when:
-           - repo_update_output is defined
-           - repo_update_output.stderr is defined
-           - not repo_update_output.stderr
-      when: >
-        (tdnf_makecache is undefined) or
-        (not tdnf_makecache) or
-        (update_cache is defined and update_cache)
-
     - name: "Convert packages name list to a string"
       set_fact:
         package_name_str: |-
