@@ -22,6 +22,7 @@ import shutil
 import logging
 from datetime import datetime
 from collections import OrderedDict
+from textwrap import TextWrapper
 
 from ansible import context
 from ansible import constants as C
@@ -34,6 +35,108 @@ if sys.version_info.major == 2:
     sys.setdefaultencoding('utf8')
 else:
     importlib.reload(sys)
+
+class VmInfo(object):
+    def __init__(self, vm_name):
+        self.Name = vm_name
+        self.IP = ''
+        self.Guest_OS_Type = ''
+        self.VMTools_Version = ''
+        self.CloudInit_Version = ''
+        self.Config_Guest_Id = ''
+        self.Hardware_Version = ''
+        self.GuestInfo_Guest_Id = ''
+        self.GuestInfo_Guest_Full_Name = ''
+        self.GuestInfo_Detailed_Data = ''
+
+    def __str__(self):
+        """
+        Display VM information as below:
+
+        VM information:
+        +---------------------------------------------------------------+
+        | VM Name                   | photon-os-4.0-ansible-test        |
+        +---------------------------------------------------------------+
+        | VM IP                     | 192.168.10.125                    |
+        +---------------------------------------------------------------+
+        | Guest OS Type             | VMware Photon OS 4.0 x86_64       |
+        +---------------------------------------------------------------+
+        | VM Tools                  | 11.2.5.26209 (build-17337674)     |
+        +---------------------------------------------------------------+
+        | Cloud-Init                | 20.4.1                            |
+        +---------------------------------------------------------------+
+        | Config Guest Id           | vmwarePhoton64Guest               |
+        +---------------------------------------------------------------+
+        | Hardware Version          | vmx-19                            |
+        +---------------------------------------------------------------+
+        | GuestInfo Guest Id        | vmwarePhoton64Guest               |
+        +---------------------------------------------------------------+
+        | GuestInfo Guest Full Name | VMware Photon OS (64-bit)         |
+        +---------------------------------------------------------------+
+        | GuestInfo Detailed Data   | architecture='X86'                |
+        |                           | bitness='64'                      |
+        |                           | distroName='VMware Photon OS'     |
+        |                           | distroVersion='4.0'               |
+        |                           | familyName='Linux'                |
+        |                           | kernelVersion='5.10.4-13.ph4-esx' |
+        |                           | prettyName='VMware Photon OS 4.0' |
+        +---------------------------------------------------------------+
+        """
+
+        # Get VM name from testing vars file and set log dir
+        msg = 'VM information:\n'
+        wrap_width = 50
+        wrapped_vm_info = {}
+
+        # Get column width
+        head_col_width = 0
+        info_col_width = 0
+        for attr_name, attr_value in vars(self).items():
+            if not attr_name.startswith('__'):
+                head_col_width = max([head_col_width, len(attr_name)])
+                if len(attr_value) > wrap_width:
+                    if attr_name == 'GuestInfo_Detailed_Data':
+                        wrapped_vm_info[attr_name] = self.GuestInfo_Detailed_Data.replace("' ", "'\n").split('\n')
+                    else:
+                        textwrap = TextWrapper(width=wrap_width)
+                        wrapped_vm_info[attr_name] = textwrap.wrap(attr_value)
+                elif len(attr_value) > 0:
+                    wrapped_vm_info[attr_name] = [attr_value]
+                else:
+                    continue
+
+                max_text_line = max([len(line) for line in wrapped_vm_info[attr_name]])
+                info_col_width = max([info_col_width, max_text_line])
+
+        # Table width
+        table_width = head_col_width + info_col_width + 5
+
+        row_border = '+{}+\n'.format(''.ljust(table_width, '-'))
+        row_format = '| {:<} | {:<} |\n'
+
+        # Table content
+        msg += row_border
+        for attr_name in wrapped_vm_info:
+            head_name = attr_name.replace('_', ' ')
+            if (len(wrapped_vm_info[attr_name]) == 1 and
+                ('GuestInfo' in attr_name or
+                len(wrapped_vm_info[attr_name][0]) > 0)):
+                msg += row_format.format(head_name.ljust(head_col_width),
+                                         wrapped_vm_info[attr_name][0].ljust(info_col_width))
+            else:
+                msg += row_format.format(head_name.ljust(head_col_width),
+                                         wrapped_vm_info[attr_name][0].ljust(info_col_width))
+                index = 1
+                while index < len(wrapped_vm_info[attr_name]):
+                    msg += row_format.format(''.ljust(head_col_width, ' '),
+                                             wrapped_vm_info[attr_name][index].ljust(info_col_width))
+                    index += 1
+
+            msg += row_border
+
+        msg += "\n"
+
+        return msg
 
 class CallbackModule(CallbackBase):
     CALLBACK_NAME = 'ansible_vsphere_gosv_log'
@@ -56,13 +159,7 @@ class CallbackModule(CallbackBase):
                           'version':'',
                           'update_version':'',
                           'build':''}
-        self.vm_info = {'VM Name': '',
-                        'VM IP':'',
-                        'Guest OS Type':'',
-                        'VM Tools':'',
-                        'Cloud-Init':'',
-                        'Guest ID': '',
-                        'Hardware Version':''}
+        self.vm_info = None
 
         self.os_distribution = ""
         self.os_distribution_ver = ""
@@ -385,65 +482,6 @@ class CallbackModule(CallbackBase):
         self.logger.info(msg)
         self._display.display(msg, color=C.COLOR_VERBOSE)
 
-    def _print_vm_info(self):
-        """
-        Print VM information as below:
-
-        VM information:
-        +--------------------------------------------------------+
-        | VM Name             | photon-os-4.0-ansible-test       |
-        +--------------------------------------------------------+
-        | VM IP               | 192.168.10.125                   |
-        +--------------------------------------------------------+
-        | Guest OS Type       | VMware Photon OS 4.0 x86_64      |
-        +--------------------------------------------------------+
-        | VM Tools            | 11.2.5.26209 (build-17337674)    |
-        +--------------------------------------------------------+
-        | Cloud-Init          | 20.4.1                           |
-        +--------------------------------------------------------+
-        | Guest ID            | vmwarePhoton64Guest              |
-        +--------------------------------------------------------+
-        | Hardware Version    | vmx-19                           |
-        +--------------------------------------------------------+
-        """
-
-        # Get VM name from testing vars file and set log dir
-        msg = 'VM information:\n'
-
-        if (self.testing_vars and
-            'vm_name' in self.testing_vars and
-            self.testing_vars['vm_name']):
-            self.vm_info['VM Name'] = self.testing_vars['vm_name']
-        else:
-            msg += "Not found VM information\n"
-            self.logger.debug(msg)
-            self._display.display(msg, color=C.COLOR_VERBOSE)
-            return
-
-        self.vm_info['Guest OS Type'] = "{} {} {}".format(self.os_distribution, self.os_distribution_ver, self.os_arch)
-        # Get column width
-        head_col_width = len("VM Hardware Version")
-        vm_col_width = max([len(self.vm_info[vm_info_key])
-                            for vm_info_key in self.vm_info.keys()])
-
-        # Table width
-        table_width = head_col_width + vm_col_width + 5
-
-        row_border = '+{}+\n'.format(''.ljust(table_width, '-'))
-        row_format = '| {:<} | {:<} |\n'
-
-        # Table content
-        msg += row_border
-        for key in self.vm_info.keys():
-            if self.vm_info[key]:
-                msg += row_format.format(key.ljust(head_col_width),
-                                         self.vm_info[key].ljust(vm_col_width ))
-                msg += row_border
-
-        msg += "\n"
-
-        self.logger.info(msg)
-        self._display.display(msg, color=C.COLOR_VERBOSE)
 
     def _print_test_results(self):
         """
@@ -596,18 +634,29 @@ class CallbackModule(CallbackBase):
             set_fact_result = task_result.get('ansible_facts', None)
             # Update deploy_vm test case name if deploy_casename is set
             if self._last_test_name and self._last_test_name.startswith("deploy"):
-                if self._last_test_name in self.testcases and set_fact_result.get("deploy_casename", None):
+                deploy_casename = set_fact_result.get("deploy_casename", None)
+                if self._last_test_name in self.testcases and deploy_casename:
                     old_test_name = self._last_test_name
-                    self._last_test_name = set_fact_result.get("deploy_casename")
+                    self._last_test_name = deploy_casename
                     self.testcases[self._last_test_name] = self.testcases[old_test_name]
                     del self.testcases[old_test_name]
             if "get_guest_system_info.yml" == task_file:
-                if set_fact_result.get("guest_os_ansible_distribution", None):
-                    self.os_distribution = set_fact_result.get("guest_os_ansible_distribution")
-                if set_fact_result.get("guest_os_ansible_distribution_ver", None):
-                    self.os_distribution_ver = set_fact_result.get("guest_os_ansible_distribution_ver")
-                if set_fact_result.get("guest_os_ansible_architecture", None):
-                    self.os_arch = set_fact_result.get("guest_os_ansible_architecture")
+                self.os_distribution = set_fact_result.get("guest_os_ansible_distribution", '')
+                self.os_distribution_ver = set_fact_result.get("guest_os_ansible_distribution_ver", '')
+                self.os_arch = set_fact_result.get("guest_os_ansible_architecture", '')
+                if self.vm_info:
+                    self.vm_info.Guest_OS_Type = "{} {} {}".format(self.os_distribution,
+                                                                   self.os_distribution_ver,
+                                                                   self.os_arch)
+            if "vm_get_vm_info.yml" == task_file:
+               if self.vm_info:
+                   self.vm_info.Config_Guest_Id = set_fact_result.get("vm_guest_id", '')
+                   self.vm_info.Hardware_Version = set_fact_result.get("vm_hardware_version", '')
+            if "vm_get_guest_info.yml" == task_file:
+               if self.vm_info:
+                   self.vm_info.GuestInfo_Guest_Id = set_fact_result.get("guestinfo_guest_id", '')
+                   self.vm_info.GuestInfo_Guest_Full_Name = set_fact_result.get("guestinfo_guest_full_name", '')
+                   self.vm_info.GuestInfo_Detailed_Data = set_fact_result.get("guestinfo_detailed_data", '')
         elif 'print_test_result.yml' == task_file and str(task.action) == "lineinfile":
             if 'invocation' in task_result and 'module_args' in task_result['invocation']:
                 test_result_line = task_result['invocation']['module_args']['line']
@@ -636,22 +685,20 @@ class CallbackModule(CallbackBase):
                     if debug_var_name == "os_release_info_file_path":
                         self.os_release_info_file = debug_var_value
                 if "deploy_vm.yml" == task_file:
-                    if not self.vm_info['VM IP'] and debug_var_name == "vm_guest_ip":
-                        self.vm_info['VM IP'] = debug_var_value
+                    if debug_var_name == "vm_guest_ip" and self.vm_info and not self.vm_info.IP:
+                        self.vm_info.IP = debug_var_value
                 if "test_setup.yml" == task_file:
-                    if not self.vm_info['VM IP'] and debug_var_name == "vm_guest_ip":
-                        self.vm_info['VM IP'] = debug_var_value
-                    if not self.vm_info['Guest ID'] and debug_var_name == "vm_guest_id":
-                        self.vm_info['Guest ID'] = debug_var_value
-                    if not self.vm_info['Hardware Version'] and debug_var_name == "vm_hardware_version":
-                        self.vm_info['Hardware Version'] = debug_var_value
+                    if debug_var_name == "vm_guest_ip" and self.vm_info and not self.vm_info.IP:
+                        self.vm_info.IP = debug_var_value
                 if ("get_guest_ovt_version_build.yml" == task_file or
                    "win_get_vmtools_version_build.yml" == task_file):
                     if debug_var_name ==  "vmtools_info_from_vmtoolsd" and debug_var_value:
                         if "get_guest_ovt_version_build.yml" == task_file and not self.os_ovt_version:
                             self.os_ovt_version = debug_var_value
-                        if not self.vm_info['VM Tools'] or self.vm_info['VM Tools'] != debug_var_name:
-                            self.vm_info['VM Tools'] = debug_var_value
+                        if (self.vm_info and
+                            (not self.vm_info.VMTools_Version or
+                             self.vm_info.VMTools_Version != debug_var_value)):
+                            self.vm_info.VMTools_Version = debug_var_value
                 if "esxi_get_version_build.yml" == task_file:
                     if not self.esxi_info['hostname'] and debug_var_name == "esxi_hostname":
                         self.esxi_info['hostname'] = debug_var_value
@@ -669,8 +716,8 @@ class CallbackModule(CallbackBase):
                     if not self.vcenter_info['build'] and debug_var_name == "vcenter_build":
                         self.vcenter_info['build'] = debug_var_value
                 if "cloudinit_pkg_check.yml" == task_file and debug_var_name == "cloudinit_version":
-                    if not self.vm_info['Cloud-Init']:
-                        self.vm_info['Cloud-Init'] = debug_var_value
+                    if self.vm_info and not self.vm_info.CloudInit_Version:
+                        self.vm_info.CloudInit_Version = debug_var_value
                     if not self.os_cloudinit_version:
                         self.os_cloudinit_version = debug_var_value
 
@@ -739,6 +786,13 @@ class CallbackModule(CallbackBase):
         else:
             #Use default testing vars file
             self.testing_vars_file = os.path.join(self.cwd, "vars/test.yml")
+
+        self._get_testing_vars()
+
+        if (self.testing_vars and
+            'vm_name' in self.testing_vars and
+            self.testing_vars['vm_name']):
+            self.vm_info = VmInfo(self.testing_vars['vm_name'])
 
         self.add_logger_file_handler(self.full_debug_log)
         msg = self._banner("PLAYBOOK: {}".format(playbook_path))
@@ -816,12 +870,20 @@ class CallbackModule(CallbackBase):
 
         # Log testcases results
         self._print_os_release_info()
-        self._get_testing_vars()
         self._display.banner("TEST SUMMARY")
         self.logger.info(self._banner("TEST SUMMARY"))
         self.add_logger_file_handler(self.test_results_log)
         self._print_testbed_info()
-        self._print_vm_info()
+
+        # Print VM information
+        if self.vm_info:
+            vm_info_str = str(self.vm_info)
+        else:
+            vm_info_str = "Not found VM information"
+
+        self.logger.info(vm_info_str)
+        self._display.display(vm_info_str, color=C.COLOR_VERBOSE)
+
         self._print_test_results()
         self.remove_logger_file_handler(self.test_results_log)
 
