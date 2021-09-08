@@ -7,6 +7,13 @@
 #   vmtools_is_running: True or False. VMware Tools is running or not.
 #   vmtools_is_ovt: True or False. VMware Tools is open-vm-tools or not.
 #
+- name: Initialize VMware Tools installed status
+  set_fact:
+    vmtools_is_installed: False
+    vmtools_is_running: False
+    vmtools_is_ovt: False
+    vmtools_not_ready: True
+
 - name: Get VMware Tools installed information first
   vmware_guest_tools_info:
     hostname: "{{ vsphere_host_name }}"
@@ -28,6 +35,10 @@
     vmtools_is_running: "{{ get_vmtools_info.vmtools_info.vm_tools_running_status == 'guestToolsRunning' }}"
     vmtools_not_ready: "{{ (get_vmtools_info.vmtools_info.vm_tools_running_status == 'guestToolsExecutingScripts') or (get_vmtools_info.vmtools_info.vm_tools_running_status == 'guestToolsNotRunning') }}"
     vmtools_is_ovt: "{{ (get_vmtools_info.vmtools_info.vm_tools_install_type == 'guestToolsTypeOpenVMTools') or (get_vmtools_info.vmtools_info.vm_tools_version_status == 'guestToolsUnmanaged') }}"
+  when:
+    - "'failed' in get_vmtools_info"
+    - not get_vmtools_info.failed
+    - "'vmtools_info' in get_vmtools_info" 
 
 - block:
     - name: Wait for VMware Tools running when it's executing scripts or not running
