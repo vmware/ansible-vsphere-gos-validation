@@ -100,10 +100,13 @@ class VmInfo(object):
                     else:
                         textwrap = TextWrapper(width=wrap_width)
                         wrapped_vm_info[attr_name] = textwrap.wrap(attr_value)
-                elif len(attr_value) > 0:
-                    wrapped_vm_info[attr_name] = [attr_value]
-                else:
+                elif (attr_name == 'CloudInit_Version' and
+                      ('windows' in self.Config_Guest_Id.lower() or
+                       'windows' in self.Guest_OS_Type.lower() or
+                       'windows' in self.GuestInfo_Guest_Id.lower())):
                     continue
+                else:
+                    wrapped_vm_info[attr_name] = [attr_value]
 
                 max_text_line = max([len(line) for line in wrapped_vm_info[attr_name]])
                 info_col_width = max([info_col_width, max_text_line])
