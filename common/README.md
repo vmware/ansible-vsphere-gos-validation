@@ -4,6 +4,7 @@
 ### Tasks for getting VM facts
 * vm_get_id.yml: Get VM ID from ESXi host by vmware_guest_info module
 * vm_get_guest_facts.yml: Gather info about a VM
+* vm_get_guest_info.yml: Gather guest info of VM
 * vm_get_config.yml: Get specified property of VM
 * vm_get_power_state.yml: Get VM power status
 * get_guest_system_info.yml: Get guest system info

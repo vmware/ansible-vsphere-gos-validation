@@ -1,0 +1,28 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get guest information collected by VMTools
+
+- include_tasks: vm_wait_guest_fullname.yml
+
+- block:
+    - name: "Get info retrieved by VMware Tools"
+      set_fact:
+        guestinfo_guest_id: "{{ vm_guest_facts.instance.hw_guest_id }}"
+        guestinfo_guest_full_name: "{{ vm_guest_facts.instance.hw_guest_full_name }}"
+        guestinfo_detailed_data: |-
+          {%- if vm_guest_facts.instance.advanced_settings is defined -%}
+              {%- if 'guestOS.detailed.data' in vm_guest_facts.instance.advanced_settings -%}{{ vm_guest_facts.instance.advanced_settings['guestOS.detailed.data'] | replace('\"', '') }}
+              {%- elif 'guestInfo.detailed.data' in vm_guest_facts.instance.advanced_settings -%}{{ vm_guest_facts.instance.advanced_settings['guestInfo.detailed.data'] | replace('\"', '') }}
+              {%- endif -%}
+          {%- endif -%}
+        guestinfo_gathered: True
+
+    - debug:
+        msg:
+          - "VM guest info guest id: {{ guestinfo_guest_id }}"
+          - "VM guest info guest full name: {{ guestinfo_guest_full_name }}"
+          - "VM guset info guest detailed data: {{ guestinfo_detailed_data }}"
+  when:
+    - vm_guest_facts is defined
+    - vm_guest_facts.instance is defined
