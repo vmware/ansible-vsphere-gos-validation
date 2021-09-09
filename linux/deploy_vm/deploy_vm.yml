@@ -3,6 +3,7 @@
 ---
 - name: deploy_vm
   hosts: localhost
+  gather_facts: no
   collections:
     - community.general
   vars_files:
@@ -22,6 +23,10 @@
     # Change vm_username to root if it is not. And add a new user after VM deployment
     - include_tasks: set_new_vm_user_account.yml
 
+    - name: Set fact of timestamp for VM hostname
+      set_fact:
+        hostname_timestamp: "{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}" 
+    
     # Deploy VM by creating a new VM and install OS from ISO image on it
     - include_tasks: deploy_vm_from_iso.yml
       when: (vm_deploy_method is undefined) or (vm_deploy_method == "iso")
