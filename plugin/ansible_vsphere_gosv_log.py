@@ -47,6 +47,7 @@ class VmInfo(object):
         self.Hardware_Version = ''
         self.GuestInfo_Guest_Id = ''
         self.GuestInfo_Guest_Full_Name = ''
+        self.GuestInfo_Guest_Family = ''
         self.GuestInfo_Detailed_Data = ''
 
     def __str__(self):
@@ -659,6 +660,7 @@ class CallbackModule(CallbackBase):
                if self.vm_info:
                    self.vm_info.GuestInfo_Guest_Id = set_fact_result.get("guestinfo_guest_id", '')
                    self.vm_info.GuestInfo_Guest_Full_Name = set_fact_result.get("guestinfo_guest_full_name", '')
+                   self.vm_info.GuestInfo_Guest_Family = set_fact_result.get("guestinfo_guest_family", '')
                    self.vm_info.GuestInfo_Detailed_Data = set_fact_result.get("guestinfo_detailed_data", '')
         elif 'print_test_result.yml' == task_file and str(task.action) == "lineinfile":
             if 'invocation' in task_result and 'module_args' in task_result['invocation']:
