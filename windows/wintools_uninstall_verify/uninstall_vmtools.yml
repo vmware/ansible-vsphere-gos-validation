@@ -1,21 +1,18 @@
 # Copyright 2021 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: Get VMware tools product ID from registry
-  include_tasks: ../utils/win_execute_cmd.yml
+# Get VMware tools product ID from registry
+- include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Get-ChildItem 'HKLM:\\software\\microsoft\\windows\\currentversion\\uninstall' | where-object {$_.getvalue('DisplayName') -match 'VMware Tools'} | foreach-object {$_.name} | split-path -leaf"
+
 - name: Set fact of VMware tools product ID
   set_fact:
-    get_product_id: "{{ win_powershell_cmd_output.stdout_lines[0] if not win_powershell_cmd_output.failed else 'NA' }}"
+    get_product_id: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
 - debug:
-    msg: "Get VMware tools product id: {{ get_product_id }}"
-- name: Check product ID
-  fail:
-    msg: "Get VMware tools product id in guest failed, can not uninstall VMware tools"
-  when: get_product_id == 'NA'
+    msg: "Get VMware tools product ID: {{ get_product_id }}"
 
-- name: "Uninstall VMware tools in guest"
+- name: "Uninstall VMware tools in guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "msiexec.exe /q /x '{{ get_product_id }}' /norestart"

@@ -14,19 +14,19 @@
     - block:
         - include_tasks: ../setup/test_setup.yml
         - block:
-            - name: Get VMware pointing device driver in Windows guest OS
-              include_tasks: ../utils/win_execute_cmd.yml
+            # Get VMware pointing device driver version in Windows guest OS
+            - include_tasks: ../utils/win_execute_cmd.yml
               vars:
                 win_powershell_cmd: "(Get-WmiObject Win32_PnpSignedDriver | where-object {$_.DeviceName -Match 'VMware Pointing Device'}).DriverVersion"
             - name: Set fact of the pointing device driver version
               set_fact:
-                vmware_pointing_device_driver: "{{ win_powershell_cmd_output.stdout_lines[0] if not win_powershell_cmd_output.failed else 'NA' }}"
+                vmware_pointing_device_driver: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
             - debug:
                 msg: "Get VMware pointing device driver version: {{ vmware_pointing_device_driver }}"
-            - name: Verify VMware pointing device found in guest OS
+            - name: "Verify pointing device driver version is like 'x.x.x.x'"
               assert:
                 that:
-                  - vmware_pointing_device_driver != 'NA'
+                  - vmware_pointing_device_driver is regex("^\d+\.\d+\.\d+\.\d+$")
                 fail_msg: "Get VMware pointing device driver failed."
                 success_msg: "Get VMware pointing device driver succeed."
           when: vmtools_is_installed and vmtools_is_running
