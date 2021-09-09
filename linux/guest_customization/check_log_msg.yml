@@ -1,0 +1,24 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check specific message appears in GOSC log file
+# Parameters:
+#   check_log_file: The log file to check
+#   check_msg_regexp: The regular expression of message to check
+# Return:
+#   gosc_log_success: True if message is found; otherwise it is false
+- name: "Check '{{ check_msg_regexp }}' in GOSC log"
+  include_tasks: ../utils/file_content_search.yml
+  vars:
+    path: "{{ check_log_file }}"
+    regexp: "{{ check_msg_regexp }}"
+
+# Log error if message is not found
+- include_tasks: ../../common/print_error_msg.yml
+  vars:
+    error_msg: "Not found '{{ check_msg_regexp }}' in GOSC log"
+  when: regexp_found | int == 0
+
+- name: "Update GOSC log check result "
+  set_fact:
+    gosc_log_success: "{{ (gosc_log_success | bool) and (regexp_found | int > 0) }}"

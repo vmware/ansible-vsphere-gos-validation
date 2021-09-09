@@ -19,60 +19,16 @@
 
 # Check perl GOSC log file
 - block:
-    - name: "Check traditional GOSC workflow was executed"
-      include_tasks: ../utils/file_content_search.yml
+    # Check log message
+    - include_tasks: check_log_msg.yml
       vars:
-        path: "{{ deploypkg_log_path }}"
-        regexp: "Executing traditional GOSC workflow"
-
-    - name: "Save traditional GOSC workflow check result in the gosc log"
-      set_fact:
-        gosc_log_success: "{{ gosc_log_success | bool and regexp_found | int > 0 }}"
-
-    - include_tasks: ../../common/print_error_msg.yml
-      vars:
-        error_msg: "Not found 'Executing traditional GOSC workflow' in {{ deploypkg_log_path }}"
-      when: regexp_found | int == 0
-
-    - name: "Check GOSC deployment succeeded"
-      include_tasks: ../utils/file_content_search.yml
-      vars:
-        path: "{{ deploypkg_log_path }}"
-        regexp: "Deployment succeeded"
-
-    - name: "Save GOSC deployment check result in the gosc log"
-      set_fact:
-        gosc_log_success: "{{ gosc_log_success | bool and regexp_found | int > 0 }}"
-
-    - include_tasks: ../../common/print_error_msg.yml
-      vars:
-        error_msg: "Not found 'Deployment succeeded' in {{ deploypkg_log_path }}"
-      when: regexp_found | int == 0
-
-    - name: "Check DeployPkg_DeployPackageFromFile successfully"
-      include_tasks: ../utils/file_content_search.yml
-      vars:
-        path: "{{ deploypkg_log_path }}"
-        regexp: "Ran DeployPkg_DeployPackageFromFile successfully"
-
-    - name: "Save DeployPkg_DeployPackageFromFile check result in the gosc log"
-      set_fact:
-        gosc_log_success: "{{ gosc_log_success | bool and regexp_found | int ==  run_deploypkg_count | int }}"
-      when: run_deploypkg_count is defined
-
-    - name: "Save DeployPkg_DeployPackageFromFile check result in the gosc log"
-      set_fact:
-        gosc_log_success: "{{ gosc_log_success | bool and regexp_found | int > 0 }}"
-      when: run_deploypkg_count is undefined
-
-    - include_tasks: ../../common/print_error_msg.yml
-      vars:
-        error_msg: >
-          "Found 'Ran DeployPkg_DeployPackageFromFile successfully' {{ regexp_found | int }} time(s) in {{ deploypkg_log_path }},
-          but expected {{ run_deploypkg_count | default(1) }} time(s)"
-      when: >
-        regexp_found | int == 0 or
-        (run_deploypkg_count is defined and regexp_found | int != run_deploypkg_count | int)
+        check_log_file: "{{ deploypkg_log_path }}"
+      with_items:
+        - "Executing traditional GOSC workflow"
+        - "Deployment succeeded"
+        - "Ran DeployPkg_DeployPackageFromFile successfully"
+      loop_control:
+        loop_var: "check_msg_regexp"
   when: gosc_workflow == "perl"
 
 # Check cloud-init GOSC log file
@@ -87,35 +43,16 @@
         - "/var/log/cloud-init.log"
         - "/etc/cloud/cloud.cfg"
 
-    - name: "Check cloud-init GOSC was executed"
-      include_tasks: ../utils/file_content_search.yml
+    # Check log message
+    - include_tasks: check_log_msg.yml
       vars:
-        path: "{{ deploypkg_log_path }}"
-        regexp: "Executing cloud-init workflow"
-
-    - name: "Save cloud-init GOSC workflow check result in the gosc and cloud-init log"
-      set_fact:
-        gosc_log_success: "{{ gosc_log_success | bool and regexp_found | int > 0 }}"
-
-    - include_tasks: ../../common/print_error_msg.yml
-      vars:
-        error_msg: "Not found 'Executing cloud-init workflow' in {{ deploypkg_log_path }}"
-      when: regexp_found | int == 0
-
-    - name: "Check cloud-init deployment succeeded"
-      include_tasks: ../utils/file_content_search.yml
-      vars:
-        path: "{{ deploypkg_log_path }}"
-        regexp: "Deployment for cloud-init succeeded"
-
-    - name: "Save cloud-init deployment check result in the gosc and cloud-init log"
-      set_fact:
-        gosc_log_success: "{{ gosc_log_success | bool and regexp_found | int > 0 }}"
-
-    - include_tasks: ../../common/print_error_msg.yml
-      vars:
-        error_msg: "Not found 'Deployment for cloud-init succeeded' in {{ deploypkg_log_path }}"
-      when: not result.changed
+        check_log_file: "{{ deploypkg_log_path }}"
+      with_items:
+        - "Executing cloud-init workflow"
+        - "Deployment for cloud-init succeeded"
+        - "Ran DeployPkg_DeployPackageFromFile successfully"
+      loop_control:
+        loop_var: "check_msg_regexp"
   when: gosc_workflow == "cloud-init"
 
 - name: "Print GOSC log file check result"

@@ -3,20 +3,6 @@
 ---
 # Wait for gosc completed in guest
 #
-- name: "OS will be rebooted, and DeployPkg_DeployPackageFromFile will be ran 2 times"
-  set_fact:
-    run_deploypkg_count: 2
-  when:
-    - guest_os_ansible_distribution != "VMware Photon OS"
-    - gosc_workflow == "perl"
-
-- name: "OS will not be rebooted, and DeployPkg_DeployPackageFromFile will only be ran 1 time"
-  set_fact:
-    run_deploypkg_count: 1
-  when: >
-    guest_os_ansible_distribution == "VMware Photon OS" or
-    gosc_workflow == "cloud-init"
-
 - name: "Wait for DeployPkg_DeployPackageFromFile completed"
   vmware_vm_shell:
     hostname: "{{ vsphere_host_name }}"
@@ -29,7 +15,7 @@
     vm_username: "{{ vm_username }}"
     vm_password: "{{ vm_password }}"
     vm_shell: "/usr/bin/grep"
-    vm_shell_args: "-c -e 'Ran DeployPkg_DeployPackageFromFile successfully' /var/log/vmware-imc/toolsDeployPkg.log | grep {{ run_deploypkg_count }} >/dev/null"
+    vm_shell_args: "-c -e 'Ran DeployPkg_DeployPackageFromFile successfully' /var/log/vmware-imc/toolsDeployPkg.log | grep 1 >/dev/null"
     vm_shell_env:
       - "PATH=/usr/local/bin:/usr/bin:/sbin/bin:/bin"
       - "LC_ALL=en_US.UTF-8"

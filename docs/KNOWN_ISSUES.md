@@ -20,20 +20,6 @@ guest_customization/gosc_cloudinit_staticip.yml
 * Workaround: Please wait for the fix, or make sure not deleting VMs while the test is running.
 * Affected test cases: Testing will fail if any of the task failed due to this issue.
 
-## VMware tools
-1. open-vm-tools 11.1.0 and later
-* Failure: Error logs in 'var/log/vmware-imc/toolsDeployPkg.log' of Perl guest OS customization in RHEL/CentOS/Oracle Linux 7.x and 8.x, e.g.,
-```
-[2021-03-18T15:52:10.974Z] [   error] Customization command failed with exitcode: 127, stderr: ''.
-[2021-03-18T15:52:11.974Z] [   error] Failed to reboot, telinit returned error 127.
-```
-* Workaround: not available
-* Affected test cases:
-```
-guest_customization/gosc_perl_dhcp.yml
-guest_customization/gosc_perl_staticip.yml
-```
-
 ## Guest OS
 1. Ubuntu 18.04 and later
 * Failure: Configured DNS search domains in guest OS customization spec will not be set correctly in guest OS after cloud-init GOSC with DHCP network configuration.
@@ -71,4 +57,13 @@ vgauth_check_service/vgauth_check_service.yml
 * Affected test cases:
 ```
 vhba_hot_add_remove/nvme_vhba_device_ops.yml
+```
+
+6. SLE 15 SP3
+* Failure: Configured DNS servers and DNS search domains in guest OS customization spec will not be set correctly in guest OS after cloud-init GOSC.
+* Workaround: not available
+* Affected test cases:
+```
+guest_customization/gosc_cloudinit_dhcp.yml
+guest_customization/gosc_cloudinit_staticip.yml
 ```
