@@ -87,7 +87,6 @@
           loop_control:
             loop_var: config_file_for_netplan
           delegate_to: "{{ vm_guest_ip }}"
-          become: yes
           ignore_errors: True
 
         - name: Assert disable_vmware_customization is false
@@ -95,6 +94,11 @@
             that:
               - cloudinit_gosc_enabled
             fail_msg: "Failed to enable cloud-init GOSC"
+
+	- name: Clear cloud-init.log
+	  command: cat /dev/null >/var/log/cloud-init.log
+	  delegate_to: "{{ vm_guest_ip }}"
+	  ignore_errors: True
       when: enable_cloudinit_gosc | bool
 
     - name: Disable Cloud-Init GOSC for perl work flow
@@ -148,7 +152,6 @@
             mode: "777"
           when: guest_os_ansible_distribution == "Ubuntu"
           delegate_to: "{{ vm_guest_ip }}"
-          become: yes
 
         - name: Assert cloud-init GOSC is disabled
           assert:
