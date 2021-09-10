@@ -24,11 +24,7 @@
     folder: "{{ vm_folder }}"
     name: "{{ vm_name }}"
     schema: "vsphere"
-    properties:
-      - 'guest.guestId'
-      - 'guest.guestFullName'
-      - 'guest.guestFamily'
-      - 'guest.toolsRunningStatus'
+    properties: ['guest']
   delay: 5
   retries: "{{ ((vm_get_fullname_timeout | default(300) | int) / 5) | int }}"
   register: vm_guestinfo
@@ -41,6 +37,5 @@
     - ( not wait_guest_fullname ) or ( wait_guest_fullname and wait_guest_fullname == vm_guestinfo.instance.guest.guestFullName )
     - vm_guestinfo.instance.guest.toolsRunningStatus == "guestToolsRunning"
 
-- debug:
-    msg: "Get VM guest fullname: {{ vm_guestinfo.instance.guest.guestFullName }}"
-  when: vm_guestinfo.instance.guest.guestFullName
+- name: "Print VM guest info"
+  debug: var=vm_guestinfo
