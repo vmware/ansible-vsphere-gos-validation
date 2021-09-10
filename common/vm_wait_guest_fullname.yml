@@ -23,16 +23,19 @@
     datacenter: "{{ vsphere_host_datacenter }}"
     folder: "{{ vm_folder }}"
     name: "{{ vm_name }}"
+    schema: "vsphere"
+    properties: ['guest']
   delay: 5
   retries: "{{ ((vm_get_fullname_timeout | default(300) | int) / 5) | int }}"
-  register: vm_guest_facts
+  register: vm_guestinfo
   until:
-    - "'instance' in vm_guest_facts"
-    - "'hw_guest_full_name' in vm_guest_facts.instance"
-    - vm_guest_facts.instance.guest_tools_status == "guestToolsRunning"
-    - vm_guest_facts.instance.hw_guest_full_name
-    - ( not wait_guest_fullname ) or ( wait_guest_fullname and wait_guest_fullname == vm_guest_facts.instance.hw_guest_full_name )
+    - "'instance' in vm_guestinfo"
+    - "'guest' in vm_guestinfo.instance"
+    - "'guestFullName' in vm_guestinfo.instance.guest"
+    - "'toolsRunningStatus' in vm_guestinfo.instance.guest"
+    - vm_guestinfo.instance.guest.guestFullName
+    - ( not wait_guest_fullname ) or ( wait_guest_fullname and wait_guest_fullname == vm_guestinfo.instance.guest.guestFullName )
+    - vm_guestinfo.instance.guest.toolsRunningStatus == "guestToolsRunning"
 
-- debug:
-    msg: "Get VM guest fullname: {{ vm_guest_facts.instance.hw_guest_full_name }}"
-  when: vm_guest_facts.instance.hw_guest_full_name
+- name: "Print VM guest info"
+  debug: var=vm_guestinfo
