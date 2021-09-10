@@ -2,19 +2,15 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Fetch gosc log file to local and check the log content
-- name: "Set guest customization plugin log location on VM"
-  set_fact:
-    src_deploypkg_log: "/var/log/vmware-imc/toolsDeployPkg.log"
-
 - name: "Set guest customization plugin log location on localhost"
   set_fact:
-    deploypkg_log_path: "{{ testcase_info_collect_path }}{{ src_deploypkg_log }}"
+    deploypkg_log_path: "{{ testcase_info_collect_path }}{{ gosc_deploypkg_log_file }}"
     gosc_log_success: True
 
 - include_tasks: ../../common/vm_guest_file_operation.yml
   vars:
     operation: "fetch_file"
-    src_path: "{{ src_deploypkg_log }}"
+    src_path: "{{ gosc_deploypkg_log_file }}"
     dest_path: "{{ deploypkg_log_path }}"
 
 # Check perl GOSC log file
@@ -40,7 +36,7 @@
         src_path: "{{ item }}"
         dest_path: "{{ testcase_info_collect_path }}{{ item }}"
       with_items:
-        - "/var/log/cloud-init.log"
+        - "{{ gosc_cloudinit_log_file }}"
         - "/etc/cloud/cloud.cfg"
 
     # Check log message

@@ -58,12 +58,3 @@ vgauth_check_service/vgauth_check_service.yml
 ```
 vhba_hot_add_remove/nvme_vhba_device_ops.yml
 ```
-
-6. SLE 15 SP3
-* Failure: Configured DNS servers and DNS search domains in guest OS customization spec will not be set correctly in guest OS after cloud-init GOSC.
-* Workaround: not available
-* Affected test cases:
-```
-guest_customization/gosc_cloudinit_dhcp.yml
-guest_customization/gosc_cloudinit_staticip.yml
-```
