@@ -86,10 +86,19 @@
 # If 'resolvectl' command failed and guest OS is not Ubuntu
 # Try to get DNS servers and DNS search domains from /etc/resolv.conf
 - block:
+    # In some OS, /etc/resolv.conf is a symbolic link. But after GOSC,
+    # it might be overwritten to a file. Here we get content in /etc/resolv.conf
+    # in case the file is overwritten
+    - include_tasks: ../../common/vm_shell_in_guest.yml
+      vars:
+        vm_shell_cmd: "/usr/bin/cat"
+        vm_shell_args: "/etc/resolv.conf"
+        vm_shell_out: "/tmp/resolv.conf"
+
     - include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
-        src_path: "{{ resolv_conf_file }}"
+        src_path: "/tmp/resolv.conf"
         dest_path: "{{ testcase_info_collect_path }}/etc/resolv.conf"
 
     - name: "Get DNS servers from /etc/resolv.conf"
