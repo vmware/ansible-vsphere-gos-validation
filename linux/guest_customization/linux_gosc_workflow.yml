@@ -34,12 +34,26 @@
         ((guest_os_ansible_distribution is defined) and
         (guest_os_ansible_distribution in gos_not_support_gosc))
 
-    # Traditional GOSC in Photon OS is implemented with cloud-init,
-    # so will upgrade cloud-init to the latest version in Photon OS
-    - include_tasks: ../utils/install_uninstall_package.yml
-      vars:
-        package_name: "cloud-init"
-        package_state: "latest"
+    - block:
+       # Traditional GOSC in Photon OS is implemented with cloud-init,
+       # so will upgrade cloud-init to the latest version in Photon OS
+        - include_tasks: ../utils/install_uninstall_package.yml
+          vars:
+            package_name: "cloud-init"
+            package_state: "latest"
+
+        # Install tar for collecting cloud-init logs
+        - include_tasks: ../utils/get_installed_package_info.yml
+          vars:
+            package_name: "tar"
+
+        - include_tasks: ../utils/install_uninstall_package.yml
+          vars:
+            package_name: "tar"
+            package_state: "present"
+          when:
+            - package_info is defined
+            - package_info | length == 0
       when: guest_os_ansible_distribution == "VMware Photon OS"
 
     # Install perl if guest OS doesn't have it
