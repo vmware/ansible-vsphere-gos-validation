@@ -15,16 +15,24 @@
 
 # Check perl GOSC log file
 - block:
-    # Check log message
+    # Check below message exists
     - include_tasks: check_log_msg.yml
       vars:
         check_log_file: "{{ deploypkg_log_path }}"
+        check_msg_state: "present"
       with_items:
         - "Executing traditional GOSC workflow"
         - "Deployment succeeded"
         - "Ran DeployPkg_DeployPackageFromFile successfully"
       loop_control:
         loop_var: "check_msg_regexp"
+
+    # Check below message doesn't exist
+    - include_tasks: check_log_msg.yml
+      vars:
+        check_log_file: "{{ deploypkg_log_path }}"
+        check_msg_regexp: "uncaught signal 15"
+        check_msg_state: "absent"
   when: gosc_workflow == "perl"
 
 # Check cloud-init GOSC log file
@@ -39,10 +47,11 @@
         - "{{ gosc_cloudinit_log_file }}"
         - "/etc/cloud/cloud.cfg"
 
-    # Check log message
+    # Check below message exists
     - include_tasks: check_log_msg.yml
       vars:
         check_log_file: "{{ deploypkg_log_path }}"
+        check_msg_state: "present"
       with_items:
         - "Executing cloud-init workflow"
         - "Deployment for cloud-init succeeded"

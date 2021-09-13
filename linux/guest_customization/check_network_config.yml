@@ -66,13 +66,17 @@
         guest_netmask_success: "{{ guest_ipv4_netmask != '' }}"
         guest_gateway_success: "{{ guest_ipv4_gateway != '' }}"
 
-    - include_tasks: ../../common/print_error_msg.yml
+    - include_tasks: set_gosc_validation_result.yml
       vars:
-        error_msg: "GOSC failed to set DHCP IP on {{ vm_name }}"
-      when: >
-        (not guest_ipv4_success) or
-        (not guest_netmask_success) or
-        (not guest_gateway_success)
+        gosc_check_item: "{{ item.key }}"
+        gosc_check_error_msg: "{{ item.value }}"
+      with_list:
+        - key: "guest_ipv4_address"
+          value: "VM DHCP IPv4 address is '{{ guest_ipv4_address }}', expected IPv4 address should not be empty"
+        - key: "guest_ipv4_netmask"
+          value: "VM DHCP IPv4 netmask is '{{ guest_ipv4_netmask }}', expected IPv4 netmask should not be empty"
+        - key: "guest_ipv4_gateway"
+          value: "VM DHCP IPv4 gateway is '{{ guest_ipv4_gateway }}', expected IPv4 gateway should not be empty"
   when: ip_assignment == "dhcp"
 
 # Check static IP address, netmaks, gateway settings for GOSC with static IP
@@ -83,20 +87,17 @@
         guest_netmask_success: "{{ guest_ipv4_netmask == linux_gosc_spec['netmask'] }}"
         guest_gateway_success: "{{ guest_ipv4_gateway == linux_gosc_spec['gateway'] }}"
 
-    - include_tasks: ../../common/print_error_msg.yml
+    - include_tasks: set_gosc_validation_result.yml
       vars:
-        error_msg: "VM static IP is {{ guest_ipv4_address }}, expected static IP is {{ linux_gosc_spec['ip'] }}"
-      when: not guest_ipv4_success
-
-    - include_tasks: ../../common/print_error_msg.yml
-      vars:
-        error_msg: "VM static IP is {{ guest_ipv4_netmask }}, expected static IP is {{ linux_gosc_spec['netmask'] }}"
-      when: not guest_netmask_success
-
-    - include_tasks: ../../common/print_error_msg.yml
-      vars:
-        error_msg: "VM static IP is {{ guest_ipv4_gateway }}, expected static IP is {{ linux_gosc_spec['gateway'] }}"
-      when: not guest_gateway_success
+        gosc_check_item: "{{ item.key }}"
+        gosc_check_error_msg: "{{ item.value }}"
+      with_list:
+        - key: "guest_ipv4_address"
+          value: "VM static IPv4 address is '{{ guest_ipv4_address }}', expected IPv4 address is {{ linux_gosc_spec['ip'] }}"
+        - key: "guest_ipv4_netmask"
+          value: "VM static IPv4 netmask is '{{ guest_ipv4_netmask }}', expected IPv4 netmask is {{ linux_gosc_spec['netmask'] }}"
+        - key: "guest_ipv4_gateway"
+          value: "VM static IPv4 gateway is '{{ guest_ipv4_gateway }}', expected IPv4 gateway is {{ linux_gosc_spec['gateway'] }}"
   when: ip_assignment == "static"
 
 - name: "Print GOSC network IP address check result"
