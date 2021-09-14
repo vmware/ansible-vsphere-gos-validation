@@ -41,8 +41,41 @@
     type: "{{ ip_assignment }}"
     timeout: 900
 
-# Wait for GOSC completed
 - include_tasks: ../../common/vm_wait_gosc_completed.yml
+
+# Wait for GOS is rebooted by checking tools status
+- block:
+    - name: "Initialize fact for checking uncaught signal 15"
+      set_fact:
+        check_signal_15: False
+
+    # Wait for tools not running
+    - include_tasks: ../../common/vm_wait_vmtools_status.yml
+      vars:
+        vm_wait_vmtools_running: False
+        vm_wait_vmtools_ignore_error: True
+
+    # If GOS didn't reboot, check whether there is uncaught signal 15 in GOSC log
+    - name: "Set fact to check uncaught signal 15 in GOSC log"
+      set_fact:
+        check_signal_15: True
+      when:
+        - get_vmtools_info is defined
+        - get_vmtools_info.failed is defined
+        - get_vmtools_info.failed
+
+    # If GOS rebooted, wait for tools running again
+    - include_tasks: ../../common/vm_wait_vmtools_status.yml
+      vars:
+        vm_wait_vmtools_running: True
+        vm_wait_vmtools_ignore_error: True
+      when:
+        - get_vmtools_info is defined
+        - get_vmtools_info.failed is defined
+        - not get_vmtools_info.failed
+  when:
+    - not enable_cloudinit_gosc
+    - guest_os_ansible_distribution != "VMware Photon OS"
 
 - block:
     - include_tasks: ../../common/vm_wait_guest_ip.yml
