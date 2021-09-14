@@ -14,14 +14,14 @@
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
+          vars:
+            skip_test_no_vmtools: True
         - include_tasks: hotadd_remove_vhba_test.yml
           vars:
             test_disk_controller_type: "paravirtual"
-          when: vmtools_is_installed and vmtools_is_running
-        - name: "Skip testcase: {{ ansible_play_name }}"
-          debug:
-            msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed }}, running: {{ vmtools_is_running }}"
-          when: not vmtools_is_installed or not vmtools_is_running
+          when:
+            - vmtools_is_running is defined
+            - vmtools_is_running | bool
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
           vars:

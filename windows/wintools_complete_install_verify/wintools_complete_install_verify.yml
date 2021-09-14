@@ -53,12 +53,16 @@
             - include_tasks: ../../linux/open_vm_tools/set_base_snapshot.yml
             - include_tasks: detach_vmtools_and_remove.yml
           when: >
-            (vmtools_is_installed and update_vmtools) or
-            (not vmtools_is_installed)
+            (vmtools_is_installed is undefined) or
+            (not vmtools_is_installed | bool) or
+            (vmtools_is_installed | bool and update_vmtools | bool)
         - name: "Skip testcase: {{ ansible_play_name }}"
           debug:
             msg: "Skip test case due to VMware tools is installed, update VMware tools is set to: {{ update_vmtools }}"
-          when: vmtools_is_installed and not update_vmtools
+          when:
+            - vmtools_is_installed is defined
+            - vmtools_is_installed | bool
+            - not update_vmtools | bool
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
           vars:

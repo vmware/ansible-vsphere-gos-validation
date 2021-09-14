@@ -15,6 +15,8 @@
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
+          vars:
+            skip_test_no_vmtools: True
         - block:
             - include_tasks: ../utils/win_execute_cmd.yml
               vars:
@@ -26,11 +28,9 @@
                   - win_powershell_cmd_output.stdout_lines[0] == '0 MB'
                 fail_msg: "stat_balloon test failed"
                 success_msg: "stat_balloon test passed"
-          when: vmtools_is_installed and vmtools_is_running
-        - name: "Skip testcase: {{ ansible_play_name }}"
-          debug:
-            msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed }}, running: {{ vmtools_is_running }}"
-          when: not vmtools_is_installed or not vmtools_is_running
+          when:
+            - vmtools_is_running is defined
+            - vmtools_is_running | bool
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
           vars:

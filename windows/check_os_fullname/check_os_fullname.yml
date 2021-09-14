@@ -14,6 +14,8 @@
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
+          vars:
+            skip_test_no_vmtools: True
         - name: Set fact of the supported guest IDs in this test case
           set_fact:
             support_client_guest: ['windows9Guest', 'windows9_64Guest']
@@ -83,15 +85,9 @@
                 fail_msg: "Guest fullname in guest info: {{ os_fullname_guestinfo }}, got from guest OS: {{ os_fullname_guest }}."
                 success_msg: "Guest fullname in guest info: {{ os_fullname_guestinfo }} is the same as the one got from guest OS."
               ignore_errors: True
-          when: vmtools_is_installed and vmtools_is_running
-
-        - name: "Skip testcase: {{ ansible_play_name }}"
-          debug:
-            msg: "Skip test case '{{ ansible_play_name }}', VMware tools installed: {{ vmtools_is_installed }}, running: {{ vmtools_is_running }}, guest ID: {{ vm_guest_id }}"
-          when: >
-            (not vmtools_is_installed) or
-            (not vmtools_is_running) or
-            (vm_guest_id not in support_client_guest and vm_guest_id not in support_server_guest)
+          when:
+            - vmtools_is_running is defined
+            - vmtools_is_running | bool 
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
           vars:

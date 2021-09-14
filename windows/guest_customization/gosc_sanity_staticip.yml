@@ -15,6 +15,8 @@
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
+          vars:
+            skip_test_no_vmtools: True
         - block:
             - include_tasks: win_gosc_prepare.yml
 
@@ -78,12 +80,14 @@
                 success_msg: "Check guest IP address, hostname after GOSC succeed."
                 fail_msg: "Check guest IP address, hostname after GOSC failed."
           when:
-            - vmtools_is_installed and vmtools_is_running
-            - vcenter_is_defined is defined and vcenter_is_defined
+            - vmtools_is_running is defined
+            - vmtools_is_running | bool
+            - vcenter_is_defined is defined
+            - vcenter_is_defined | bool
         - name: "Skip testcase: {{ ansible_play_name }}"
           debug:
-            msg: "Skip test case '{{ ansible_play_name }}', VMware tools installed: {{ vmtools_is_installed }}, running: {{ vmtools_is_running }}, or vCenter configured: {{ vcenter_is_defined | default('NA') }}"
-          when: not vmtools_is_installed or not vmtools_is_running or vcenter_is_defined is undefined
+            msg: "Skip test case due to vCenter server is not configured"
+          when: vcenter_is_defined is undefined
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
           vars:

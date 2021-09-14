@@ -13,6 +13,8 @@
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
+          vars:
+            skip_test_no_vmtools: True
         - block:
             - include_tasks: check_vmx_disk_enable_uuid.yml
               when: guest_os_product_type | lower == "server"
@@ -53,11 +55,9 @@
             - include_tasks: ../../common/vm_remove_snapshot.yml
               vars:
                 snapshot_name: "{{ qs_snapshot_name }}"
-          when: vmtools_is_installed and vmtools_is_running
-        - name: "Skip testcase: {{ ansible_play_name }}"
-          debug:
-            msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed }}, running: {{ vmtools_is_running }}"
-          when: not vmtools_is_installed or not vmtools_is_running
+          when:
+            - vmtools_is_running is defined
+            - vmtools_is_running | bool
       rescue:
         - include_tasks: collect_vss_logs.yml
           when: collect_vss_logs is defined and collect_vss_logs
