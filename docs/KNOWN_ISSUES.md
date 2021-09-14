@@ -22,14 +22,13 @@ guest_customization/gosc_cloudinit_staticip.yml
 
 ## VMware tools
 1. open-vm-tools 11.1.0 and later
-* Failure: Error logs in 'var/log/vmware-imc/toolsDeployPkg.log' of Perl guest OS customization in RHEL/CentOS/Oracle Linux 7.x and 8.x, SLES 15 SP2 and later, e.g.,
+* Failure: Below error log in '/var/log/vmware-imc/toolsDeployPkg.log' might cause guest OS reboot failure after Perl guest OS customization, and then lead to static IP configuration failure in RHEL/Oracle Linux/CentOS 7.x and 8.x,Alma Linux/Rocky Linux 8.x, SLES 15 SP2 and later, e.g.,
 ```
 [   error] Process exited abnormally after 0 sec, uncaught signal 15
 ```
 * Workaround: not available
 * Affected test cases:
 ```
-guest_customization/gosc_perl_dhcp.yml
 guest_customization/gosc_perl_staticip.yml
 ```
 
@@ -62,6 +61,14 @@ vhba_hot_add_remove/nvme_vhba_device_ops.yml
 * Affected test cases:
 ```
 vgauth_check_service/vgauth_check_service.yml
+```
+
+* Failure: Perl GOSC with open-vm-tools 11.1.0 would fail to set hostname and domain.
+* Workaround: Upgrade open-vm-tools to latest version.
+* Affected test cases:
+```
+guest_customization/gosc_cloudinit_dhcp.yml
+guest_customization/gosc_cloudinit_staticip.yml
 ```
 
 5. VMware Photon OS 4.0
