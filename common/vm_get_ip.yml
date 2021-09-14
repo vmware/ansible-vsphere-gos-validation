@@ -20,15 +20,17 @@
 
 # Get VM IP address when VMware tools is installed
 - include_tasks: vm_get_ip_from_vmtools.yml
-  when: vmtools_is_running is defined and vmtools_is_running
+  when:
+    - vmtools_is_running is defined
+    - vmtools_is_running | bool
 
 # Get VM IP address when VMware tools not installed or not get from VMware tools
 - include_tasks: vm_get_ip_from_notools.yml
   when: >
     (vmtools_is_installed is undefined) or
-    (not vmtools_is_installed) or
+    (not vmtools_is_installed | bool) or
     (vmtools_is_running is undefined) or
-    (not vmtools_is_running) or
+    (not vmtools_is_running | bool) or
     (not vm_guest_ip)
 
 - name: "Check VM '{{ vm_name }}' IP address"
