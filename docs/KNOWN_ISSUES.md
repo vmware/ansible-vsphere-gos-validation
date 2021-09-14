@@ -20,18 +20,6 @@ guest_customization/gosc_cloudinit_staticip.yml
 * Workaround: Please wait for the fix, or make sure not deleting VMs while the test is running.
 * Affected test cases: Testing will fail if any of the task failed due to this issue.
 
-## VMware tools
-1. open-vm-tools 11.1.0 and later
-* Failure: Below error log in '/var/log/vmware-imc/toolsDeployPkg.log' might cause guest OS reboot failure after Perl guest OS customization, and then lead to static IP configuration failure in RHEL/Oracle Linux/CentOS 7.x and 8.x,Alma Linux/Rocky Linux 8.x, SLES 15 SP2 and later, e.g.,
-```
-[   error] Process exited abnormally after 0 sec, uncaught signal 15
-```
-* Workaround: not available
-* Affected test cases:
-```
-guest_customization/gosc_perl_staticip.yml
-```
-
 ## Guest OS
 1. Ubuntu 18.04 and later
 * Failure: Configured DNS search domains in guest OS customization spec will not be set correctly in guest OS after cloud-init GOSC with DHCP network configuration.
