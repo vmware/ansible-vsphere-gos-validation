@@ -100,10 +100,10 @@
 - name: "Print timezone check result"
   debug: var=timezone_success
 
-- include_tasks: ../../common/print_error_msg.yml
+- include_tasks: set_gosc_validation_result.yml
   vars:
-    error_msg: "VM timezone is {{ guest_timezone }}, expected timezone is {{ linux_gosc_spec['timezone'] }}"
-  when: not timezone_success
+    gosc_check_item: "timezone_success"
+    gosc_check_error_msg: "VM timezone is {{ guest_timezone }}, expected timezone is {{ linux_gosc_spec['timezone'] }}"
 
 # Check guest hwclock
 # cloud-init GOSC doesn't support hwclock customization
@@ -113,8 +113,9 @@
         hwclock_success: "{{ guest_hwclockUTC == linux_gosc_spec['hwclockUTC'] }}"
     - name: "Print hardware clock check result"
       debug: var=hwclock_success
-    - include_tasks: ../../common/print_error_msg.yml
+
+    - include_tasks: set_gosc_validation_result.yml
       vars:
-        error_msg: "VM hwclockUTC is {{ guest_hwclockUTC }}, expected hwclockUTC is {{ linux_gosc_spec['hwclockUTC'] }}"
-      when: not hwclock_success
+        gosc_check_item: "hwclock_success"
+        gosc_check_error_msg: "VM hwclockUTC is {{ guest_hwclockUTC }}, expected hwclockUTC is {{ linux_gosc_spec['hwclockUTC'] }}"
   when: gosc_workflow == "perl"

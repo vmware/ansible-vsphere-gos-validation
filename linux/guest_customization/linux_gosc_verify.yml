@@ -8,6 +8,12 @@
     state: directory
     mode: "777"
     recurse: True
+
+- name: "Initialize GOSC validation results"
+  set_fact:
+    gosc_validation_result: {}
+    gosc_validation_errors: {}
+
 # Check gosc log
 - include_tasks: check_gosc_log.yml
 
@@ -26,37 +32,18 @@
 # Check timezone and hwclock
 - include_tasks: check_timezone_and_hwclock.yml
 
-- name: "Save all GOSC checking results"
-  set_fact:
-    gosc_results:
-      'gosc_log_success': "{{ gosc_log_success }}"
-      'timezone_success': "{{ timezone_success }}"
-      'guest_ipv4_success': "{{ guest_ipv4_success }}"
-      'guest_netmask_success': "{{ guest_netmask_success }}"
-      'guest_gateway_success': "{{ guest_gateway_success }}"
-      'hostname_success': "{{ hostname_success }}"
-      'dns_domain_success': "{{ dns_domain_success }}"
-      'etc_hosts_success': "{{ etc_hosts_success }}"
-      'dns_servers_success': "{{ dns_servers_success }}"
-      'dns_suffix_success': "{{ dns_suffix_success }}"
+- name: "Print GOSC validation result"
+  debug: var=gosc_validation_result
 
-- name: "Add hwclock check result for perl guest customization"
-  set_fact:
-    gosc_results: "{{ gosc_results | combine({'hwclock_success': hwclock_success}) }}"
-  when: gosc_workflow == "perl"
-
-- name: "Print all GOSC checking results"
-  debug:
-    msg:
-      - "{{ item.key }}: {{ item.value }}"
-  with_dict: "{{ gosc_results }}"
+- name: "Print GOSC validation errors"
+  debug: var=gosc_validation_errors
 
 - name: "Assert {{ gosc_workflow }} guest customization checks all PASS"
   assert:
     that:
       - "{{ item.value }}"
-    fail_msg: "{{ gosc_workflow }} guest customization with {{ ip_assignment }} IP failed on: {{ item }}"
-  with_dict: "{{ gosc_results }}"
+    fail_msg: "{{ gosc_validation_errors[item.key] }}"
+  with_dict: "{{ gosc_validation_result }}"
 
 - include_tasks: ../../common/print_test_result.yml
   vars:

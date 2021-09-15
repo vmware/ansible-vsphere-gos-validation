@@ -2,77 +2,30 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Fetch gosc log file to local and check the log content
-- name: "Set guest customization plugin log location on VM"
-  set_fact:
-    src_deploypkg_log: "/var/log/vmware-imc/toolsDeployPkg.log"
-
 - name: "Set guest customization plugin log location on localhost"
   set_fact:
-    deploypkg_log_path: "{{ testcase_info_collect_path }}{{ src_deploypkg_log }}"
+    deploypkg_log_path: "{{ testcase_info_collect_path }}{{ gosc_deploypkg_log_file }}"
     gosc_log_success: True
 
 - include_tasks: ../../common/vm_guest_file_operation.yml
   vars:
     operation: "fetch_file"
-    src_path: "{{ src_deploypkg_log }}"
+    src_path: "{{ gosc_deploypkg_log_file }}"
     dest_path: "{{ deploypkg_log_path }}"
 
 # Check perl GOSC log file
 - block:
-    - name: "Check traditional GOSC workflow was executed"
-      include_tasks: ../utils/file_content_search.yml
+    # Check below message exists
+    - include_tasks: check_log_msg.yml
       vars:
-        path: "{{ deploypkg_log_path }}"
-        regexp: "Executing traditional GOSC workflow"
-
-    - name: "Save traditional GOSC workflow check result in the gosc log"
-      set_fact:
-        gosc_log_success: "{{ gosc_log_success | bool and regexp_found | int > 0 }}"
-
-    - include_tasks: ../../common/print_error_msg.yml
-      vars:
-        error_msg: "Not found 'Executing traditional GOSC workflow' in {{ deploypkg_log_path }}"
-      when: regexp_found | int == 0
-
-    - name: "Check GOSC deployment succeeded"
-      include_tasks: ../utils/file_content_search.yml
-      vars:
-        path: "{{ deploypkg_log_path }}"
-        regexp: "Deployment succeeded"
-
-    - name: "Save GOSC deployment check result in the gosc log"
-      set_fact:
-        gosc_log_success: "{{ gosc_log_success | bool and regexp_found | int > 0 }}"
-
-    - include_tasks: ../../common/print_error_msg.yml
-      vars:
-        error_msg: "Not found 'Deployment succeeded' in {{ deploypkg_log_path }}"
-      when: regexp_found | int == 0
-
-    - name: "Check DeployPkg_DeployPackageFromFile successfully"
-      include_tasks: ../utils/file_content_search.yml
-      vars:
-        path: "{{ deploypkg_log_path }}"
-        regexp: "Ran DeployPkg_DeployPackageFromFile successfully"
-
-    - name: "Save DeployPkg_DeployPackageFromFile check result in the gosc log"
-      set_fact:
-        gosc_log_success: "{{ gosc_log_success | bool and regexp_found | int ==  run_deploypkg_count | int }}"
-      when: run_deploypkg_count is defined
-
-    - name: "Save DeployPkg_DeployPackageFromFile check result in the gosc log"
-      set_fact:
-        gosc_log_success: "{{ gosc_log_success | bool and regexp_found | int > 0 }}"
-      when: run_deploypkg_count is undefined
-
-    - include_tasks: ../../common/print_error_msg.yml
-      vars:
-        error_msg: >
-          "Found 'Ran DeployPkg_DeployPackageFromFile successfully' {{ regexp_found | int }} time(s) in {{ deploypkg_log_path }},
-          but expected {{ run_deploypkg_count | default(1) }} time(s)"
-      when: >
-        regexp_found | int == 0 or
-        (run_deploypkg_count is defined and regexp_found | int != run_deploypkg_count | int)
+        check_log_file: "{{ deploypkg_log_path }}"
+        check_msg_state: "present"
+      with_items:
+        - "Executing traditional GOSC workflow"
+        - "Deployment succeeded"
+        - "Ran DeployPkg_DeployPackageFromFile successfully"
+      loop_control:
+        loop_var: "check_msg_regexp"
   when: gosc_workflow == "perl"
 
 # Check cloud-init GOSC log file
@@ -81,42 +34,39 @@
     - include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
-        src_path: "{{ item }}"
-        dest_path: "{{ testcase_info_collect_path }}{{ item }}"
+        src_path: "{{ gosc_cloudinit_log_file }}"
+        dest_path: "{{ testcase_info_collect_path }}{{ gosc_cloudinit_log_file }}"
+
+    # Check below message exists
+    - include_tasks: check_log_msg.yml
+      vars:
+        check_log_file: "{{ deploypkg_log_path }}"
+        check_msg_state: "present"
       with_items:
-        - "/var/log/cloud-init.log"
-        - "/etc/cloud/cloud.cfg"
-
-    - name: "Check cloud-init GOSC was executed"
-      include_tasks: ../utils/file_content_search.yml
-      vars:
-        path: "{{ deploypkg_log_path }}"
-        regexp: "Executing cloud-init workflow"
-
-    - name: "Save cloud-init GOSC workflow check result in the gosc and cloud-init log"
-      set_fact:
-        gosc_log_success: "{{ gosc_log_success | bool and regexp_found | int > 0 }}"
-
-    - include_tasks: ../../common/print_error_msg.yml
-      vars:
-        error_msg: "Not found 'Executing cloud-init workflow' in {{ deploypkg_log_path }}"
-      when: regexp_found | int == 0
-
-    - name: "Check cloud-init deployment succeeded"
-      include_tasks: ../utils/file_content_search.yml
-      vars:
-        path: "{{ deploypkg_log_path }}"
-        regexp: "Deployment for cloud-init succeeded"
-
-    - name: "Save cloud-init deployment check result in the gosc and cloud-init log"
-      set_fact:
-        gosc_log_success: "{{ gosc_log_success | bool and regexp_found | int > 0 }}"
-
-    - include_tasks: ../../common/print_error_msg.yml
-      vars:
-        error_msg: "Not found 'Deployment for cloud-init succeeded' in {{ deploypkg_log_path }}"
-      when: not result.changed
+        - "Executing cloud-init workflow"
+        - "Deployment for cloud-init succeeded"
+        - "Ran DeployPkg_DeployPackageFromFile successfully"
+      loop_control:
+        loop_var: "check_msg_regexp"
   when: gosc_workflow == "cloud-init"
+
+# Collect all cloud-init logs and userdata for cloud-init GOSC or Photon OS
+- block:
+    # Collect cloud-init logs
+    - include_tasks: ../../common/vm_shell_in_guest.yml
+      vars:
+        vm_shell_cmd: "/usr/bin/cloud-init"
+        vm_shell_args: "collect-logs -u -t /tmp/cloud-init.tar.gz"
+        vm_shell_out: ""
+
+    - include_tasks: ../../common/vm_guest_file_operation.yml
+      vars:
+        operation: "fetch_file"
+        src_path: "/tmp/cloud-init.tar.gz"
+        dest_path: "{{ testcase_info_collect_path }}/cloud-init.tar.gz"
+  when: >
+    (gosc_workflow == "cloud-init") or
+    (guest_os_ansible_distribution == "VMware Photon OS")
 
 - name: "Print GOSC log file check result"
   debug: var=gosc_log_success

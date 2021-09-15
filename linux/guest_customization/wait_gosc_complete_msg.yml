@@ -1,0 +1,36 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Wait for GOSC completed message in GOSC log file
+# Parameters:
+#   wait_gosc_log_file: The log file to check for GOSC complete message
+#   wait_gosc_msg_regexp: The regular expressions of GOSC completed message
+#
+- name: "Wait for '{{ wait_gosc_msg_regexp }}' present in {{ wait_gosc_log_file }}"
+  vmware_vm_shell:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    vm_id: "{{ vm_name }}"
+    vm_username: "{{ vm_username }}"
+    vm_password: "{{ vm_password }}"
+    vm_shell: "/usr/bin/grep"
+    vm_shell_args: '-c -e "{{ wait_gosc_msg_regexp }}" {{ wait_gosc_log_file }} | grep 1 >/dev/null'
+    vm_shell_env:
+      - "PATH=/usr/local/bin:/usr/bin:/sbin/bin:/bin"
+      - "LC_ALL=en_US.UTF-8"
+    vm_shell_cwd: "/tmp"
+    wait_for_process: True
+  register: wait_gosc_log
+  failed_when: False
+  until:
+    - wait_gosc_log.exit_code is defined
+    - wait_gosc_log.exit_code == 0
+  delay: 5
+  retries: 20
+
+- name: Display the result of waiting for GOSC complete message
+  debug: var=wait_gosc_log

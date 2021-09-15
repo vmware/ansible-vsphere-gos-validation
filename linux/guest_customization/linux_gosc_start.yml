@@ -41,7 +41,6 @@
     type: "{{ ip_assignment }}"
     timeout: 900
 
-# Wait for GOSC completed
 - include_tasks: ../../common/vm_wait_gosc_completed.yml
 
 - block:
@@ -55,5 +54,20 @@
     wait_ipv4: "{{ linux_gosc_spec.ip }}"
   when: ip_assignment == "static"
 
-# Wait GOSC completes OS rebooting
-- include_tasks: wait_deploypkg_success.yml
+- name: "Set fact of GOSC log files"
+  set_fact:
+    gosc_deploypkg_log_file: "/var/log/vmware-imc/toolsDeployPkg.log"
+    gosc_cloudinit_log_file: "/var/log/cloud-init.log"
+
+# Wait GOSC completes message in logs
+- include_tasks: wait_gosc_complete_msg.yml
+  vars:
+    wait_gosc_log_file: "{{ gosc_deploypkg_log_file }}"
+    wait_gosc_msg_regexp: "Ran DeployPkg_DeployPackageFromFile successfully"
+  when: not enable_cloudinit_gosc | bool
+
+- include_tasks: wait_gosc_complete_msg.yml
+  vars:
+    wait_gosc_log_file: "{{ gosc_cloudinit_log_file }}"
+    wait_gosc_msg_regexp: "Cloud-init .*finished at.*Datasource DataSourceOVF \\[seed=vmware-tools\\]"
+  when: enable_cloudinit_gosc | bool

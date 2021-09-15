@@ -34,12 +34,26 @@
         ((guest_os_ansible_distribution is defined) and
         (guest_os_ansible_distribution in gos_not_support_gosc))
 
-    # Traditional GOSC in Photon OS is implemented with cloud-init,
-    # so will upgrade cloud-init to the latest version in Photon OS
-    - include_tasks: ../utils/install_uninstall_package.yml
-      vars:
-        package_name: "cloud-init"
-        package_state: "latest"
+    - block:
+       # Traditional GOSC in Photon OS is implemented with cloud-init,
+       # so will upgrade cloud-init to the latest version in Photon OS
+        - include_tasks: ../utils/install_uninstall_package.yml
+          vars:
+            package_name: "cloud-init"
+            package_state: "latest"
+
+        # Install tar for collecting cloud-init logs
+        - include_tasks: ../utils/get_installed_package_info.yml
+          vars:
+            package_name: "tar"
+
+        - include_tasks: ../utils/install_uninstall_package.yml
+          vars:
+            package_name: "tar"
+            package_state: "present"
+          when:
+            - package_info is defined
+            - package_info | length == 0
       when: guest_os_ansible_distribution == "VMware Photon OS"
 
     # Install perl if guest OS doesn't have it
@@ -74,9 +88,8 @@
 
     # Skip cloud-init GOSC if cloud-init version is lower than 18.5
     - block:
-        - include_tasks: ../../common/print_error_msg.yml
-          vars:
-            error_msg: >
+        - debug:
+            msg: >
               "The guest OS doesn't have cloud-init (> 18.5) installed.
               Skip to run this test case."
         - include_tasks: ../../common/print_test_result.yml
@@ -116,15 +129,6 @@
         - {'hostname': "gosc-dhcp-vm-01"}
         - {'hwclockUTC': True}
       when: ip_assignment == "dhcp"
-
-    # Get the linked file name in guest OS,
-    # e.g., in SLES 15 /etc/resolv.conf is a link file
-    - include_tasks: ../utils/get_file_real_path.yml
-      vars:
-        src_file: "/etc/resolv.conf"
-    - name: "Save the real path and file name of /etc/resolv.conf"
-      set_fact:
-        resolv_conf_file: "{{ file_real_path }}"
 
     # Get DNS server info before GOSC
     - include_tasks: ../utils/get_system_dns.yml

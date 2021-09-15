@@ -1,0 +1,25 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+# Set GOSC validation results and error messages if there is any failure
+
+- name: "No error found while checking {{ gosc_check_item }}"
+  set_fact:
+    gosc_error_msg_list: []
+  when: vars[gosc_check_item] | bool
+
+- block:
+    - name: "Update error message list for checking {{ gosc_check_item }}"
+      set_fact:
+        gosc_error_msg_list: "{{ gosc_validation_errors[gosc_check_item] + [ gosc_check_error_msg ]}}"
+      when: gosc_check_item in gosc_validation_errors
+
+    - name: "Set error message list for checking {{ gosc_check_item }}"
+      set_fact:
+        gosc_error_msg_list: ["{{ gosc_check_error_msg }}"]
+      when: gosc_check_item not in gosc_validation_errors
+  when: not vars[gosc_check_item] | bool
+
+- name: "Update GOSC validation result"
+  set_fact:
+    gosc_validation_result: "{{ gosc_validation_result | combine({gosc_check_item: vars[gosc_check_item] | bool}) }}"
+    gosc_validation_errors: "{{ gosc_validation_errors | combine({gosc_check_item: gosc_error_msg_list}) }}"

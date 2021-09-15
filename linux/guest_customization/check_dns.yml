@@ -86,10 +86,19 @@
 # If 'resolvectl' command failed and guest OS is not Ubuntu
 # Try to get DNS servers and DNS search domains from /etc/resolv.conf
 - block:
+    # In SLES 15, /etc/resolv.conf is a symbolic link. But after cloud-initGOSC,
+    # it will be overwritten to a file. Here we get content in /etc/resolv.conf
+    # in case the file is overwritten
+    - include_tasks: ../../common/vm_shell_in_guest.yml
+      vars:
+        vm_shell_cmd: "/usr/bin/cat"
+        vm_shell_args: "/etc/resolv.conf"
+        vm_shell_out: "/tmp/resolv.conf"
+
     - include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
-        src_path: "{{ resolv_conf_file }}"
+        src_path: "/tmp/resolv.conf"
         dest_path: "{{ testcase_info_collect_path }}/etc/resolv.conf"
 
     - name: "Get DNS servers from /etc/resolv.conf"
@@ -191,10 +200,11 @@
     dns_servers_success: "{{ expected_dns_servers | difference(guest_dns_servers) | length == 0 }}"
 - name: "Print DNS servers check result"
   debug: var=dns_servers_success
-- include_tasks: ../../common/print_error_msg.yml
+
+- include_tasks: set_gosc_validation_result.yml
   vars:
-    error_msg: "VM DNS servers are {{ guest_dns_servers }}, not expected DNS servers {{ linux_gosc_spec['dns_servers'] }}"
-  when: not dns_servers_success
+    gosc_check_item: "dns_servers_success"
+    gosc_check_error_msg: "VM DNS servers are {{ guest_dns_servers }}, not expected DNS servers {{ linux_gosc_spec['dns_servers'] }}"
 
 # Check guest DNS search domains
 - name: "Check DNS search domains are customized"
@@ -202,7 +212,8 @@
     dns_suffix_success: "{{ linux_gosc_spec['dns_suffix'] | difference(guest_dns_search) | length == 0 }}"
 - name: "Print DNS suffix check result"
   debug: var=dns_suffix_success
-- include_tasks: ../../common/print_error_msg.yml
+
+- include_tasks: set_gosc_validation_result.yml
   vars:
-    error_msg: "VM DNS domain search domains are {{ guest_dns_search }}, not expected search domains {{ linux_gosc_spec['dns_suffix'] }}"
-  when: not dns_suffix_success
+    gosc_check_item: "dns_suffix_success"
+    gosc_check_error_msg: "VM DNS domain search domains are  {{ guest_dns_search }} not expected search domains {{ linux_gosc_spec['dns_suffix'] }}"
