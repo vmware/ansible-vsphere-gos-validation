@@ -11,11 +11,14 @@
   vars:
     vm_power_state_set: 'shutdown-guest'
   when:
-    - vmtools_is_installed is defined and vmtools_is_installed
-    - vmtools_is_running is defined and vmtools_is_running
+    - vmtools_is_running is defined
+    - vmtools_is_running | bool
 
 - include_tasks: win_shutdown_restart.yml
   vars:
     set_win_power_state: 'shutdown'
-  when:
-    - vmtools_is_installed is undefined or not vmtools_is_installed
+  when: >
+    (vmtools_is_installed is undefined) or
+    (not vmtools_is_installed | bool) or
+    (vmtools_is_running is undefined) or
+    (not vmtools_is_running | bool)

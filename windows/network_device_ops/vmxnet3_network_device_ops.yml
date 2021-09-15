@@ -17,14 +17,12 @@
         nic_type: 'VMXNET3'
     - block:
         - include_tasks: ../setup/test_setup.yml
-        - name: Add vmxnet3 network adapter to VM and verify status
-          include_tasks: network_adapter_deviceops.yml
-          when: vmtools_is_installed and vmtools_is_running
-
-        - name: "Skip testcase: {{ ansible_play_name }}"
-          debug:
-            msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed }}, and running: {{ vmtools_is_running }}"
-          when: not vmtools_is_installed or not vmtools_is_running
+          vars:
+            skip_test_no_vmtools: True
+        - include_tasks: network_adapter_deviceops.yml
+          when:
+            - vmtools_is_running is defined
+            - vmtools_is_running | bool
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
           vars:

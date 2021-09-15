@@ -14,6 +14,8 @@
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
+          vars:
+            skip_test_no_vmtools: True
         - block:
             # Get VMware pointing device driver version in Windows guest OS
             - include_tasks: ../utils/win_execute_cmd.yml
@@ -30,11 +32,9 @@
                   - vmware_pointing_device_driver is regex("^\d+\.\d+\.\d+\.\d+$")
                 fail_msg: "Get VMware pointing device driver failed."
                 success_msg: "Get VMware pointing device driver succeed."
-          when: vmtools_is_installed and vmtools_is_running
-        - name: "Skip testcase: {{ ansible_play_name }}"
-          debug:
-            msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed }}, running: {{ vmtools_is_running }}"
-          when: not vmtools_is_installed or not vmtools_is_running
+          when:
+            - vmtools_is_running is defined
+            - vmtools_is_running | bool
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
           vars:
