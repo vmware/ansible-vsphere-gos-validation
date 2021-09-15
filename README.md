@@ -67,7 +67,7 @@ This project supports below scenarios for end-to-end guest OS validation testing
 | Red Hat Enterprise Linux 7.x, 8.x               | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | CentOS 7.x, 8.x                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Oracle Linux 7.x, 8.x                           | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Rocky Linux 8.x                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Rocky Linux 8.4                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | AlmaLinux 8.4                                   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise 15 SP3                    | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise 12 SP5, 15 SP0/SP1/SP2    |                                  |                          | :heavy_check_mark:                 |
