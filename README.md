@@ -67,7 +67,8 @@ This project supports below scenarios for end-to-end guest OS validation testing
 | Red Hat Enterprise Linux 7.x, 8.x               | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | CentOS 7.x, 8.x                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Oracle Linux 7.x, 8.x                           | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Rocky Linux 8.x                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Rocky Linux 8.4                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| AlmaLinux 8.4                                   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise 15 SP3                    | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise 12 SP5, 15 SP0/SP1/SP2    |                                  |                          | :heavy_check_mark:                 |
 | Photon OS 3.x                                   | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
@@ -77,13 +78,15 @@ This project supports below scenarios for end-to-end guest OS validation testing
 | Ubuntu 18.04, 18.10, 20.04, 20.10, 21.04 desktop       |                                  |                          | :heavy_check_mark:                 |
 | Flatcar 2592.0.0 and later                      |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Debian 9.x, 10.x                                |                                  |                          | :heavy_check_mark:                 |
-| Windows 10                                      | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Windows Server 2019                             | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Windows 10, 11                                  | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Windows Server 2019, 2022                       | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Windows Server SAC releases                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 
 ### Docker images
-* Latest (Release v1.1):
+* Latest (Release v1.2):
   * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
+* Release v1.2:
+  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v1.2
 * Release v1.1:
   * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v1.1
 * Release v1.0:
