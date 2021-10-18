@@ -20,33 +20,27 @@
           set_fact:
             initial_cpu_num: 2
             initial_cores_num: 1
-        - include_tasks: generate_cpu_hot_add_list.yml 
-        
-        - block:
-            - include_tasks: ../setup/test_setup.yml
-              vars:
-                vmtools_check: "False"
-            - name: Initialize test results
-              set_fact:
-                cpu_hotadd_results: []
-            
-            - include_tasks: cpu_hot_add_prepare.yml 
-              vars:
-                enable_vm_cpu_hotadd: True
-            - include_tasks: cpu_hot_add_validate.yml
-              loop: "{{ cpu_hotadd_num_list }}"
-              loop_control:
-                loop_var: hotadd_num
-            - name: Display the test results
-              debug: var=cpu_hotadd_results
-            - include_tasks: ../../common/print_test_result.yml
-              vars:
-                test_result: "Passed"
-          when: cpu_hotadd_num_list | length != 0
+        - include_tasks: generate_cpu_hot_add_list.yml
 
-        - include_tasks: ../../common/print_test_result.yml
+        - include_tasks: ../../common/skip_test_case.yml
           vars:
-            test_result: "No Run"
+            skip_msg: "Skip testcase '{{ ansible_play_name }}', vCPU hotadd test value list is empty"
           when: cpu_hotadd_num_list | length == 0
+
+        - include_tasks: ../setup/test_setup.yml
+
+        - name: Initialize test results
+          set_fact:
+            cpu_hotadd_results: []
+
+        - include_tasks: cpu_hot_add_prepare.yml
+          vars:
+            enable_vm_cpu_hotadd: True
+        - include_tasks: cpu_hot_add_validate.yml
+          loop: "{{ cpu_hotadd_num_list }}"
+          loop_control:
+            loop_var: hotadd_num
+        - name: Display the test results
+          debug: var=cpu_hotadd_results
       rescue:
         - include_tasks: ../setup/test_rescue.yml

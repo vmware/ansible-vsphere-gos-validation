@@ -24,9 +24,6 @@
 
 # Get VMware tools status if required
 - include_tasks: ../../common/vm_get_vmtools_status.yml
-  when:
-    - vmtools_check | default(True)
-    - use_saved_base_ip | bool
 
 # Get guest OS system info
 - include_tasks: ../utils/get_linux_system_info.yml
@@ -49,3 +46,12 @@
 # Create a base snapshot if it does not exist
 - include_tasks: create_base_snapshot.yml
   when: not (base_snapshot_exists | bool)
+
+# Skip test case run when VMware tools is required but not installed or not running
+- include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed | default(False) }}, running: {{ vmtools_is_running | default(False) }}"
+  when:
+    - skip_test_no_vmtools is defined
+    - skip_test_no_vmtools
+    - not (vmtools_is_running is defined and vmtools_is_running | bool)

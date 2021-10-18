@@ -662,18 +662,6 @@ class CallbackModule(CallbackBase):
                    self.vm_info.GuestInfo_Guest_Full_Name = set_fact_result.get("guestinfo_guest_full_name", '')
                    self.vm_info.GuestInfo_Guest_Family = set_fact_result.get("guestinfo_guest_family", '')
                    self.vm_info.GuestInfo_Detailed_Data = set_fact_result.get("guestinfo_detailed_data", '')
-        elif 'print_test_result.yml' == task_file and str(task.action) == "lineinfile":
-            if 'invocation' in task_result and 'module_args' in task_result['invocation']:
-                test_result_line = task_result['invocation']['module_args']['line']
-                if test_result_line:
-                    [test_name, test_result] = test_result_line.split(':')
-                    test_name = test_name.strip()
-                    test_result = test_result.strip()
-                    if test_name in self.testcases:
-                        self.testcases[test_name]['status'] = test_result
-                        self.testcases[test_name]['finished_at'] = time.time()
-                        self.testcases[test_name]['duration'] = int(self.testcases[test_name]['finished_at'] -
-                                                                    self.testcases[test_name]['started_at'])
         elif str(task.action) == "debug":
             if re.match("skip\\s+testcase:", task.name.lower()):
                 test_name = task.name.split(':')[-1].strip()

@@ -15,79 +15,70 @@
     - block:
         - include_tasks: ../setup/test_setup.yml
           vars:
-            vmtools_check: "True"
+            skip_test_no_vmtools: True
 
         # Run this test when VMware tools is running
-        - block:
             - include_tasks: ../../common/esxi_get_version_build.yml
-              when: esxi_version is undefined or esxi_update_version is undefined
+          when: esxi_version is undefined or esxi_update_version is undefined
 
-            - name: Get OS fullname in guest OS
-              debug:
-                msg: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+        - name: Get OS fullname in guest OS
+          debug:
+            msg: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
 
-            # Map OS architecture to bitness
-            - name: Set fact of guest OS bitness
-              set_fact:
-                bitness: "{% if guest_os_ansible_architecture == 'x86_64' or guest_os_ansible_architecture == 'amd64' %}(64-bit){% else %}(32-bit){% endif %}"
+        # Map OS architecture to bitness
+        - name: Set fact of guest OS bitness
+          set_fact:
+            bitness: "{% if guest_os_ansible_architecture == 'x86_64' or guest_os_ansible_architecture == 'amd64' %}(64-bit){% else %}(32-bit){% endif %}"
 
-            - name: "Initalize guest_fullnane to 'guest fullname not defined in test case'"
-              set_fact:
-                guest_fullname: "guest fullname not defined in test case"
+        - name: "Initalize guest_fullnane to 'guest fullname not defined in test case'"
+          set_fact:
+            guest_fullname: "guest fullname not defined in test case"
 
-            # Map Ubuntu
-            - name: Set guest_fullname variable for Ubuntu
-              set_fact:
-                guest_fullname: "Ubuntu Linux {{ bitness }}"
-              when: guest_os_ansible_distribution == "Ubuntu"
+        # Map Ubuntu
+        - name: Set guest_fullname variable for Ubuntu
+          set_fact:
+            guest_fullname: "Ubuntu Linux {{ bitness }}"
+          when: guest_os_ansible_distribution == "Ubuntu"
 
-            # Map RHEL full name
-            - include_tasks: rhel_fullname_map.yml
-              when: guest_os_ansible_distribution == "RedHat"
+        # Map RHEL full name
+        - include_tasks: rhel_fullname_map.yml
+          when: guest_os_ansible_distribution == "RedHat"
 
-            # Map SLES full name
-            - include_tasks: sles_fullname_map.yml
-              when: guest_os_ansible_distribution in ["SLES", "SLED"]
+        # Map SLES full name
+        - include_tasks: sles_fullname_map.yml
+          when: guest_os_ansible_distribution in ["SLES", "SLED"]
 
-            # Map VMware Photon OS guest full name
-            - include_tasks: photon_fullname_map.yml
-              when: guest_os_ansible_distribution == "VMware Photon OS"
+        # Map VMware Photon OS guest full name
+        - include_tasks: photon_fullname_map.yml
+          when: guest_os_ansible_distribution == "VMware Photon OS"
 
-            # Map Amazon Linux guest full name
-            - include_tasks: amazonlinux_fullname_map.yml
-              when: guest_os_ansible_distribution == "Amazon"
+        # Map Amazon Linux guest full name
+        - include_tasks: amazonlinux_fullname_map.yml
+          when: guest_os_ansible_distribution == "Amazon"
 
-            # Map CentOS guest full name
-            - include_tasks: centos_fullname_map.yml
-              when: guest_os_ansible_distribution == "CentOS"
+        # Map CentOS guest full name
+        - include_tasks: centos_fullname_map.yml
+          when: guest_os_ansible_distribution == "CentOS"
 
-            # Map Oracle Linux guest full name
-            - include_tasks: oraclelinux_fullname_map.yml
-              when: guest_os_ansible_distribution == "OracleLinux"
+        # Map Oracle Linux guest full name
+        - include_tasks: oraclelinux_fullname_map.yml
+          when: guest_os_ansible_distribution == "OracleLinux"
 
-            # Map Debian guest full name
-            - include_tasks: debian_fullname_map.yml
-              when: guest_os_ansible_distribution == "Debian"
+        # Map Debian guest full name
+        - include_tasks: debian_fullname_map.yml
+          when: guest_os_ansible_distribution == "Debian"
 
-            # Map FreeBSD guest full name
-            - name: Set guest_fullname variable for FreeBSD
-              set_fact:
-                guest_fullname: "FreeBSD {{ guest_os_ansible_distribution_major_ver }} {{ bitness }}"
-              when: guest_os_ansible_distribution == "FreeBSD"
+        # Map FreeBSD guest full name
+        - name: Set guest_fullname variable for FreeBSD
+          set_fact:
+            guest_fullname: "FreeBSD {{ guest_os_ansible_distribution_major_ver }} {{ bitness }}"
+          when: guest_os_ansible_distribution == "FreeBSD"
 
-            # Map Other Linux
-            - include_tasks: otherlinux_fullname_map.yml
-              when: guest_os_ansible_distribution not in ["RedHat", "SLES", "SLED", "CentOS", "OracleLinux", "Ubuntu", "Debian", "Amazon", "VMware Photon OS", "FreeBSD"]
+        # Map Other Linux
+        - include_tasks: otherlinux_fullname_map.yml
+          when: guest_os_ansible_distribution not in ["RedHat", "SLES", "SLED", "CentOS", "OracleLinux", "Ubuntu", "Debian", "Amazon", "VMware Photon OS", "FreeBSD"]
 
-            # Validate guest OS fullname in guestinfo
-            - include_tasks: validate_os_fullname.yml
-          when: vmtools_is_running
-
-        # Skip this test case when VMware tools is not running
-        - include_tasks: ../../common/print_test_result.yml
-          vars:
-            test_result: "No Run"
-          when: not vmtools_is_running
-
+        # Validate guest OS fullname in guestinfo
+        - include_tasks: validate_os_fullname.yml
       rescue:
         - include_tasks: ../setup/test_rescue.yml

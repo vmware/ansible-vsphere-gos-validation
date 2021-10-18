@@ -3,8 +3,7 @@
 ---
 # Description:
 #   This test case is used for check VM EFI firmware is reported correctly in dmesg
-# and in "vmware.log" file, if VM firmware is BIOS or the VM is not Linux VM, this
-# test case result is 'No Run'.
+# and in "vmware.log" file, if VM firmware is BIOS, this test case result is 'No Run'.
 #
 - name: check_efi_firmware
   hosts: localhost
@@ -14,42 +13,32 @@
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
-          vars:
-            vmtools_check: "False"
 
         - include_tasks: ../../common/vm_get_config.yml
           vars:
             property_list: ['config.firmware']
-        - name: Verify VM is using EFI ROM
-          block:
-            - name: Set EFI ROM bitness
-              set_fact:
-                bitness: "{% if guest_os_ansible_architecture == 'x86_64' %}64-bit{% else %}32-bit{% endif %}"
 
-            - include_tasks: ../../common/vm_search_vmware_log.yml
-              vars:
-                keyword: "The EFI ROM is {{ bitness }}"
-
-            - include_tasks: ../utils/get_system_firmware.yml
-
-            - name: "Assert guest system firmware is EFI"
-              assert:
-                that:
-                  - guest_firmware == "EFI"
-                  - vmware_log_search
-                fail_msg: "Guest system is not using EFI"
-
-            - include_tasks: ../../common/print_test_result.yml
-              vars:
-                test_result: "Passed"
-          when:
-            - vm_config.config.firmware == "efi"
-            - guest_os_ansible_system == "Linux"
-
-        - include_tasks: ../../common/print_test_result.yml
+        - include_tasks: ../../common/skip_test_case.yml
           vars:
-            test_result: "No Run"
-          when: (vm_config.config.firmware != "efi") or (guest_os_ansible_system != "Linux")
+            skip_msg: "Skip test case due to VM's firmware is {{ vm_config.config.firmware }}"
+          when: vm_config.config.firmware != "efi"
 
+        # Verify VM is using EFI ROM
+        - name: Set EFI ROM bitness
+          set_fact:
+            bitness: "{% if guest_os_ansible_architecture == 'x86_64' %}64-bit{% else %}32-bit{% endif %}"
+
+        - include_tasks: ../../common/vm_search_vmware_log.yml
+          vars:
+            keyword: "The EFI ROM is {{ bitness }}"
+
+        - include_tasks: ../utils/get_system_firmware.yml
+
+        - name: "Assert guest system firmware is EFI"
+          assert:
+            that:
+              - guest_firmware == "EFI"
+              - vmware_log_search
+            fail_msg: "Guest system is not using EFI"
       rescue:
         - include_tasks: ../setup/test_rescue.yml

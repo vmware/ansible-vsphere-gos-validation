@@ -18,18 +18,14 @@
 
     - include_tasks: ../setup/test_setup.yml
       vars:
-        vmtools_check: "True"
+        skip_test_no_vmtools: True
 
-    - name: "Skip test case if guest OS status not meet GOSC requirements"
-      block:
-        - include_tasks: ../../common/print_test_result.yml
-          vars:
-            test_result: "No Run"
-        - meta: end_play
+    - include_tasks: ../../common/skip_test_case.yml
+      vars:
+        skip_msg: "Skip this test case as guest OS status doesn't meet GOSC requirements"
       when: >
         (vcenter_is_defined is undefined) or
         (not vcenter_is_defined) or
-        (not vmtools_is_running) or
         (enable_cloudinit_gosc and not vmtools_is_ovt) or
         ((guest_os_ansible_distribution is defined) and
         (guest_os_ansible_distribution in gos_not_support_gosc))
@@ -87,15 +83,11 @@
     - include_tasks: ../utils/cloudinit_pkg_check.yml
 
     # Skip cloud-init GOSC if cloud-init version is lower than 18.5
-    - block:
-        - debug:
-            msg: >
-              "The guest OS doesn't have cloud-init (> 18.5) installed.
-              Skip to run this test case."
-        - include_tasks: ../../common/print_test_result.yml
-          vars:
-            test_result: "No Run"
-        - meta: end_play
+    - include_tasks: ../../common/skip_test_case.yml
+      vars:
+        skip_msg: >
+          "The guest OS doesn't have cloud-init (> 18.5) installed.
+          Skip to run this test case."
       when:
         - enable_cloudinit_gosc
         - (not cloudinit_version) or (cloudinit_version is version('18.5', '<='))

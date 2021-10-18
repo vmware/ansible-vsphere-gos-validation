@@ -129,10 +129,7 @@
 * nfs_mount.yml: Mount an NFS share folder on localhost
 * nfs_unmount.yml: Unmount a NFS share folder
 * delete_local_file.yml: Delete local file or directory
-
-### Tasks for debug and summary
-* print_error_msg.yml: Print error message in errors.log file
-* print_test_result.yml: Print test case result to test_result.yml
+* skip_test_case.yml: Tasks for skipping testcase and ending play
 
 ### Folder and file management
 * create_iso.yml: Create an iso file

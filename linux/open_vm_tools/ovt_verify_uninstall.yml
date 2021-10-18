@@ -14,8 +14,6 @@
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
-          vars:
-            vmtools_check: "True"
 
         - name: "Set the fact to uninstall open-vm-tools"
           set_fact:
@@ -23,9 +21,9 @@
               {%- if vmtools_is_installed is defined and vmtools_is_installed -%}True
               {%- else %}False{%- endif -%}
 
-        - include_tasks: ../../common/print_test_result.yml
+        - include_tasks: ../../common/skip_test_case.yml
           vars:
-            test_result: "No Run"
+            skip_msg: "Skip test case because guest OS doesn't support uninstalling open-vm-tools or open-vm-tools is not installed"
           when: >
             (guest_os_ansible_distribution == 'Flatcar') or
             (uninstall_tools is undefined) or
@@ -37,10 +35,6 @@
 
             # Uninstall open-vm-tools for reinstallation
             - include_tasks: uninstall_ovt.yml
-
-            - include_tasks: ../../common/print_test_result.yml
-              vars:
-                test_result: "Passed"
           when:
             - guest_os_ansible_distribution != 'Flatcar'
             - uninstall_tools is defined

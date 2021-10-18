@@ -3,16 +3,11 @@
 ---
 - block:
     - include_tasks: ../setup/test_setup.yml
-      vars:
-        vmtools_check: "False"
 
     - block:
         - name: "Skip testcase: {{ ansible_play_name }}"
           debug:
             msg: "Skip test case because guest OS doesn't support {{ new_disk_ctrl_type }} controller"
-        - include_tasks: ../../common/print_test_result.yml
-          vars:
-            test_result: "No Run"
         - meta: end_play
       when:
         - new_disk_ctrl_type in ["lsilogic", "lsilogicsas"]
@@ -20,14 +15,9 @@
         - guest_os_ansible_distribution != "OracleLinux"
         - guest_os_ansible_distribution_major_ver | int >= 8
 
-    - block:
-        - name: "Skip testcase: {{ ansible_play_name }}"
-          debug:
-            msg: "Skip test case because VM with hardware version {{ vm_hardware_version_num }} doesn't support {{ new_disk_ctrl_type }} controller"
-        - include_tasks: ../../common/print_test_result.yml
-          vars:
-            test_result: "No Run"
-        - meta: end_play
+    - include_tasks: ../../common/skip_test_case.yml
+      vars:
+        skip_msg: "Skip test case because VM with hardware version {{ vm_hardware_version_num }} doesn't support {{ new_disk_ctrl_type }} controller"
       when:
         - new_disk_ctrl_type == "nvme"
         - vm_hardware_version_num | int < 13
@@ -56,82 +46,71 @@
       vars:
         disk_controller_facts_data: "{{ disk_controller_facts_old }}"
 
-    - block:
-        - name: "Skip testcase: {{ ansible_play_name }}"
-          debug:
-            msg: "Not found available {{ new_vhba_type }} controllers bus number, skip testing on hot adding new {{ new_disk_ctrl_type }} disk."
-
-        - include_tasks: ../../common/print_test_result.yml
-          vars:
-            test_result: "No Run"
+    - include_tasks: ../../common/skip_test_case.yml
+      vars:
+        skip_msg: "Not found available {{ new_vhba_type }} controllers bus number, skip testing on hot adding new {{ new_disk_ctrl_type }} disk."
       when: new_vhba_bus_found is undefined or not new_vhba_bus_found | bool
 
     # Add a new disk controller and a new disk attaching to it
     # when the total existing controller number < 4
-    - block:
-        - name: "Get new {{ new_vhba_type }} controller bus number"
-          set_fact:
-            new_ctrl_number: "{{ new_vhba_bus_number }}"
-            new_unit_number: "0"
+    - name: "Get new {{ new_vhba_type }} controller bus number"
+      set_fact:
+        new_ctrl_number: "{{ new_vhba_bus_number }}"
+        new_unit_number: "0"
 
-        # Get current device list in guest OS
-        - include_tasks: get_vm_device_list.yml
-        - name: "Set existing block device list"
-          set_fact:
-            old_device_list: "{{ device_list }}"
-        - name: "Print existing block device list in guest OS"
-          debug: var=old_device_list
+    # Get current device list in guest OS
+    - include_tasks: get_vm_device_list.yml
+    - name: "Set existing block device list"
+      set_fact:
+        old_device_list: "{{ device_list }}"
+    - name: "Print existing block device list in guest OS"
+      debug: var=old_device_list
 
-        - name: "Firstly hot add a new disk controller and disk at the same time"
-          set_fact:
-            add_new_controller: True
+    - name: "Firstly hot add a new disk controller and disk at the same time"
+      set_fact:
+        add_new_controller: True
 
-        # Hot add a new controller and disk at the same time, run disk iozone test and then remove it
-        - include_tasks: hot_add_remove_disk.yml
+    # Hot add a new controller and disk at the same time, run disk iozone test and then remove it
+    - include_tasks: hot_add_remove_disk.yml
 
-        # Get VM disk controller info after hot adding
-        - include_tasks: ../../common/vm_get_disk_controller_facts.yml
+    # Get VM disk controller info after hot adding
+    - include_tasks: ../../common/vm_get_disk_controller_facts.yml
 
-        - name: "Print disk controller facts after disk hot adding"
-          debug: var=disk_controller_facts['disk_controller_data']
+    - name: "Print disk controller facts after disk hot adding"
+      debug: var=disk_controller_facts['disk_controller_data']
 
-        - name: "Fail the test if new disk controller doesn't exist"
-          fail:
-            msg: "Failed to create a new {{ new_disk_ctrl_type }} controller while adding new disk"
-          when: >
-            disk_controller_facts['disk_controller_data'][new_vhba_type] is undefined or
-            disk_controller_facts['disk_controller_data'][new_vhba_type][new_ctrl_number | quote] is undefined
+    - name: "Fail the test if new disk controller doesn't exist"
+      fail:
+        msg: "Failed to create a new {{ new_disk_ctrl_type }} controller while adding new disk"
+      when: >
+        disk_controller_facts['disk_controller_data'][new_vhba_type] is undefined or
+        disk_controller_facts['disk_controller_data'][new_vhba_type][new_ctrl_number | quote] is undefined
 
-        - name: "Then hot add a new disk on previously added controller {{new_disk_ctrl_type }}{{ new_ctrl_number }}"
-          set_fact:
-            add_new_controller: False
+    - name: "Then hot add a new disk on previously added controller {{new_disk_ctrl_type }}{{ new_ctrl_number }}"
+      set_fact:
+        add_new_controller: False
 
-        # Hot add a new disk on the previous added controller, run disk iozone test and then remove it
-        - include_tasks: hot_add_remove_disk.yml
+    # Hot add a new disk on the previous added controller, run disk iozone test and then remove it
+    - include_tasks: hot_add_remove_disk.yml
 
-        # Hot remove new added disk controller
-        - include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
-          vars:
-            disk_controller_ops: "absent"
-            disk_controller_type: "{{ new_disk_ctrl_type }}"
-            disk_controller_number: "{{ new_ctrl_number }}"
+    # Hot remove new added disk controller
+    - include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
+      vars:
+        disk_controller_ops: "absent"
+        disk_controller_type: "{{ new_disk_ctrl_type }}"
+        disk_controller_number: "{{ new_ctrl_number }}"
 
-        - name: "Set facts of disk controller on VM '{{ vm_name }}'"
-          set_fact:
-            disk_controller_facts_new: "{{ disk_controller_facts['disk_controller_data'] }}"
+    - name: "Set facts of disk controller on VM '{{ vm_name }}'"
+      set_fact:
+        disk_controller_facts_new: "{{ disk_controller_facts['disk_controller_data'] }}"
 
-        - name: "Print VM disk controller facts after controller hot removing"
-          debug: var=disk_controller_facts_new
+    - name: "Print VM disk controller facts after controller hot removing"
+      debug: var=disk_controller_facts_new
 
-        - name: "Check disk controller facts are same as before hot adding tests"
-          assert:
-            that:
-              - disk_controller_facts_old[new_vhba_type] == disk_controller_facts_new[new_vhba_type]
-            fail_msg: "After tests VM disk controller fact is: {{ disk_controller_facts_new }}; before tests it's: {{ disk_controller_facts_old }}"
-
-        - include_tasks: ../../common/print_test_result.yml
-          vars:
-            test_result: "Passed"
-      when: new_vhba_bus_found is defined and new_vhba_bus_found | bool
+    - name: "Check disk controller facts are same as before hot adding tests"
+      assert:
+        that:
+          - disk_controller_facts_old[new_vhba_type] == disk_controller_facts_new[new_vhba_type]
+        fail_msg: "After tests VM disk controller fact is: {{ disk_controller_facts_new }}; before tests it's: {{ disk_controller_facts_old }}"
   rescue:
     - include_tasks: ../setup/test_rescue.yml
