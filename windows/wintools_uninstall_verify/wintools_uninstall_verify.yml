@@ -22,33 +22,27 @@
           debug:
             msg: "VMware tools installed: {{ vmtools_is_installed_before }}, running: {{ vmtools_is_running_before }}"
 
-        - block:
-            # Run uninstall tools if tools is installed and running
-            - include_tasks: uninstall_vmtools.yml
-            - include_tasks: ../../common/vm_get_vmtools_status.yml 
-            - name: Verify VMware tools is not running and not installed after uninstall
-              assert:
-                that:
-                  - vmtools_is_installed is defined
-                  - not vmtools_is_installed | bool
-                  - vmtools_is_running is defined
-                  - not vmtools_is_running | bool
-                success_msg: "wintools_uninstall_verify_status test succeed"
-                fail_msg: "wintools_uninstall_verify_status test failed"
-          when:
-            - vmtools_is_installed_before
-            - vmtools_is_running_before
-        - name: "Skip testcase: {{ ansible_play_name }}"
-          debug:
-            msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed_before }}, running: {{ vmtools_is_running_before }}"
+        - include_tasks: ../../skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed_before }}, running: {{ vmtools_is_running_before }}"
           when: not vmtools_is_installed_before
+
         - name: Check VMware tools is running before uninstall
           fail:
             msg: "VMware tools installed: {{ vmtools_is_installed_before }}, running: {{ vmtools_is_running_before }}"
-          when:
-            - vmtools_is_installed_before
-            - not vmtools_is_running_before
+          when: not vmtools_is_running_before
+
+        # Run uninstall tools if tools is installed and running
+        - include_tasks: uninstall_vmtools.yml
+        - include_tasks: ../../common/vm_get_vmtools_status.yml
+        - name: Verify VMware tools is not running and not installed after uninstall
+          assert:
+            that:
+              - vmtools_is_installed is defined
+              - not vmtools_is_installed | bool
+              - vmtools_is_running is defined
+              - not vmtools_is_running | bool
+            success_msg: "wintools_uninstall_verify_status test succeed"
+            fail_msg: "wintools_uninstall_verify_status test failed"
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
-          vars:
-            current_testcase_name: "{{ ansible_play_name }}"

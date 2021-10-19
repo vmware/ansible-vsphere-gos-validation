@@ -16,21 +16,16 @@
         - include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: True
-        - block:
-            - name: Get VGAuthService status in Windows guest OS
-              include_tasks: ../utils/win_get_service_status.yml
-              vars:
-                win_service_name: "VGAuthService"
-            - name: Verify VGAuthService is running
-              assert:
-                that:
-                  - service_status == "Running"
-                fail_msg: "VGAuth Service is not running in guest OS."
-                success_msg: "VGAuth service is running in guest OS."
-          when:
-            - vmtools_is_running is defined
-            - vmtools_is_running | bool
+
+        - name: Get VGAuthService status in Windows guest OS
+          include_tasks: ../utils/win_get_service_status.yml
+          vars:
+            win_service_name: "VGAuthService"
+        - name: Verify VGAuthService is running
+          assert:
+            that:
+              - service_status == "Running"
+            fail_msg: "VGAuth Service is not running in guest OS."
+            success_msg: "VGAuth service is running in guest OS."
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
-          vars:
-            current_testcase_name: "{{ ansible_play_name }}"

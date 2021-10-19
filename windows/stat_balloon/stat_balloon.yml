@@ -17,21 +17,16 @@
         - include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: True
-        - block:
-            - include_tasks: ../utils/win_execute_cmd.yml
-              vars:
-                win_powershell_cmd: "& 'C:\\Program Files\\VMware\\VMware Tools\\VMwareToolboxCmd.exe' stat balloon"
-            - name: Check balloon status is 0 MB
-              assert:
-                that:
-                  - not win_powershell_cmd_output.failed
-                  - win_powershell_cmd_output.stdout_lines[0] == '0 MB'
-                fail_msg: "stat_balloon test failed"
-                success_msg: "stat_balloon test passed"
-          when:
-            - vmtools_is_running is defined
-            - vmtools_is_running | bool
+
+        - include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "& 'C:\\Program Files\\VMware\\VMware Tools\\VMwareToolboxCmd.exe' stat balloon"
+        - name: Check balloon status is 0 MB
+          assert:
+            that:
+              - not win_powershell_cmd_output.failed
+              - win_powershell_cmd_output.stdout_lines[0] == '0 MB'
+            fail_msg: "stat_balloon test failed"
+            success_msg: "stat_balloon test passed"
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
-          vars:
-            current_testcase_name: "{{ ansible_play_name }}"

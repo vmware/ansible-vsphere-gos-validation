@@ -4,7 +4,7 @@
 # Description:
 #   This test case is used for test VM memory hotadd with different VM vCPUs.
 # Note: VM memory size will be set to 2GB for 32 bit guest, 4GB for 64 bit
-# guest before hotadd testing.   
+# guest before hotadd testing.
 #
 - name: memory_hot_add_basic
   hosts: localhost
@@ -25,31 +25,27 @@
             vm_initial_mem_mb: 4096
           when: guest_os_ansible_architecture == "64-bit"
         - include_tasks: ../../linux/memory_hot_add_basic/generate_mem_hot_add_list.yml
-        
-        - block:
-            - include_tasks: generate_cpu_num_list.yml
-            - name: Initialize the memory hotadd test result
-              set_fact:
-                mem_hotadd_results: []
 
-            - include_tasks: ../utils/shutdown_vm.yml
-            # Enable memory hotadd
-            - include_tasks: ../../common/vm_enable_memory_hotadd.yml
-
-            # Do memory hotadd with different vCPU in the list
-            - include_tasks: hotadd_memory_for_vcpu.yml
-              loop: "{{ cpu_number_list }}"
-              loop_control:
-                loop_var: vcpu_number
-            - name: Display the test results
-              debug: var=mem_hotadd_results
-          when: memory_hotadd_size_list | length != 0
-        
-        - name: "Skip testcase: {{ ansible_play_name }}"
-          debug:
-            msg: "Skip testcase '{{ ansible_play_name }}', memory hotadd test value list is empty"
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip testcase '{{ ansible_play_name }}', memory hotadd test value list is empty"
           when: memory_hotadd_size_list | length == 0
+
+        - include_tasks: generate_cpu_num_list.yml
+        - name: Initialize the memory hotadd test result
+          set_fact:
+            mem_hotadd_results: []
+
+        - include_tasks: ../utils/shutdown_vm.yml
+        # Enable memory hotadd
+        - include_tasks: ../../common/vm_enable_memory_hotadd.yml
+
+        # Do memory hotadd with different vCPU in the list
+        - include_tasks: hotadd_memory_for_vcpu.yml
+          loop: "{{ cpu_number_list }}"
+          loop_control:
+            loop_var: vcpu_number
+        - name: Display the test results
+          debug: var=mem_hotadd_results
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
-          vars:
-            current_testcase_name: "{{ ansible_play_name }}"

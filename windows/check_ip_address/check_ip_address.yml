@@ -16,31 +16,26 @@
         - include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: True
-        - block:
-            - name: Get VM IP address from guest info
-              include_tasks: ../../common/vm_get_ip_from_vmtools.yml
-              vars:
-                all_ip: True
-            - name: Set fact of the all IP addresses got from guest info
-              set_fact:
-                ip_from_guestinfo: "{{ vm_guest_all_ip }}"
-            - debug:
-                msg: "Get all IP addresses from guest info: {{ ip_from_guestinfo }}"
 
-            - name: Get VM IP address from guest OS
-              include_tasks: ../utils/win_get_ethernet_dict.yml
-              vars:
-                win_get_ethernet_dict_guest_ip: "{{ vm_guest_ip }}"
+        - name: Get VM IP address from guest info
+          include_tasks: ../../common/vm_get_ip_from_vmtools.yml
+          vars:
+            all_ip: True
+        - name: Set fact of the all IP addresses got from guest info
+          set_fact:
+            ip_from_guestinfo: "{{ vm_guest_all_ip }}"
+        - debug:
+            msg: "Get all IP addresses from guest info: {{ ip_from_guestinfo }}"
 
-            - name: Check IP addresses got in guest OS are all in guestinfo
-              include_tasks: check_ip_in_guestinfo.yml
-              loop: "{{ ethernet_ip_dict | dict2items }}"
-              loop_control:
-                loop_var: ip_list
-          when:
-            - vmtools_is_running is defined
-            - vmtools_is_running | bool
+        - name: Get VM IP address from guest OS
+          include_tasks: ../utils/win_get_ethernet_dict.yml
+          vars:
+            win_get_ethernet_dict_guest_ip: "{{ vm_guest_ip }}"
+
+        - name: Check IP addresses got in guest OS are all in guestinfo
+          include_tasks: check_ip_in_guestinfo.yml
+          loop: "{{ ethernet_ip_dict | dict2items }}"
+          loop_control:
+            loop_var: ip_list
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
-          vars:
-            current_testcase_name: "{{ ansible_play_name }}"
