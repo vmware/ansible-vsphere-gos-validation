@@ -656,6 +656,9 @@ class CallbackModule(CallbackBase):
                if self.vm_info:
                    self.vm_info.Config_Guest_Id = set_fact_result.get("vm_guest_id", '')
                    self.vm_info.Hardware_Version = set_fact_result.get("vm_hardware_version", '')
+            if "vm_upgrade_hardware_version.yml" == task_file:
+               if self.vm_info:
+                   self.vm_info.Hardware_Version = set_fact_result.get("vm_hardware_version", '')
             if "vm_get_guest_info.yml" == task_file:
                if self.vm_info:
                    self.vm_info.GuestInfo_Guest_Id = set_fact_result.get("guestinfo_guest_id", '')
