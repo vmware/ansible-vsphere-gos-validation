@@ -9,6 +9,11 @@
 #                 set it True once necessary, like deploy_vm fail or
 #                 ovt_install_verify_status fail
 #
+- name: "Set test case name for deploy VM testing case"
+  set_fact:
+    current_testcase_name: "{{ deploy_casename }}"
+  when: deploy_casename is defined and deploy_casename
+
 - name: "By default take failed snapshot"
   set_fact:
     take_fail_snapshot: True
@@ -26,7 +31,7 @@
         timestamp: "{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
     - include_tasks: ../../common/vm_take_snapshot.yml
       vars:
-        snapshot_name: "fail-{{ ansible_play_name }}-{{ timestamp }}"
+        snapshot_name: "fail-{{ current_testcase_name }}-{{ timestamp }}"
         dump_memory: "yes"
         vm_take_snapshot_ignore_err: True
   when: take_fail_snapshot
@@ -46,6 +51,6 @@
 # Exit ansible run if exit_testing_when_fail is True
 - name: "Exit testing when exit_testing_when_fail is set True"
   fail:
-    msg: "Failed to run test case {{ ansible_play_name }}"
+    msg: "Failed to run test case {{ current_testcase_name }}"
   when:
     - exit_testing_when_fail is defined and exit_testing_when_fail

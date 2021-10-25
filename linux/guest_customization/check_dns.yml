@@ -13,7 +13,7 @@
   vars:
     vm_shell_cmd: "/usr/bin/resolvectl"
     vm_shell_args: "status"
-    vm_shell_out: "/tmp/resolvectl_status"
+    vm_shell_out: "/tmp/resolvectl_status.txt"
 - name: "Set fact of the 'resolvectl status' command result"
   set_fact:
     resolvectl_status_result: "{{ false if vm_shell_result.exit_code is undefined or vm_shell_result.exit_code != 0 else true }}"
@@ -23,15 +23,15 @@
     - include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
-        src_path: "/tmp/resolvectl_status"
-        dest_path: "{{ testcase_info_collect_path }}/resolvectl_status"
+        src_path: "/tmp/resolvectl_status.txt"
+        dest_path: "{{ current_test_log_folder }}/resolvectl_status.txt"
 
     # Run command 'resolvectl dns' to get DNS servers
     - include_tasks: ../../common/vm_shell_in_guest.yml
       vars:
         vm_shell_cmd: "/usr/bin/resolvectl"
         vm_shell_args: "dns"
-        vm_shell_out: "/tmp/resolvectl_dns"
+        vm_shell_out: "/tmp/resolvectl_dns.txt"
 
     - name: "Set fact of the 'resolvectl dns' command result"
       set_fact:
@@ -41,11 +41,11 @@
         - include_tasks: ../../common/vm_guest_file_operation.yml
           vars:
             operation: "fetch_file"
-            src_path: "/tmp/resolvectl_dns"
-            dest_path: "{{ testcase_info_collect_path }}/resolvectl_dns"
+            src_path: "/tmp/resolvectl_dns.txt"
+            dest_path: "{{ current_test_log_folder }}/resolvectl_dns.txt"
 
         - name: "Get output of 'resolvectl dns'"
-          command: cat "{{ testcase_info_collect_path }}/resolvectl_dns"
+          command: cat "{{ current_test_log_folder }}/resolvectl_dns.txt"
           register: dns_servers
 
         - name: "Set fact of guest DNS servers"
@@ -59,7 +59,7 @@
       vars:
         vm_shell_cmd: "/usr/bin/resolvectl"
         vm_shell_args: "domain"
-        vm_shell_out: "/tmp/resolvectl_domain"
+        vm_shell_out: "/tmp/resolvectl_domain.txt"
 
     - name: "Set fact of the 'resolvectl domain' command result"
       set_fact:
@@ -69,11 +69,11 @@
         - include_tasks: ../../common/vm_guest_file_operation.yml
           vars:
             operation: "fetch_file"
-            src_path: "/tmp/resolvectl_domain"
-            dest_path: "{{ testcase_info_collect_path }}/resolvectl_domain"
+            src_path: "/tmp/resolvectl_domain.txt"
+            dest_path: "{{ current_test_log_folder }}/resolvectl_domain.txt"
 
         - name: "Get output of 'resolvectl domain'"
-          command: cat "{{ testcase_info_collect_path }}/resolvectl_domain"
+          command: cat "{{ current_test_log_folder }}/resolvectl_domain.txt"
           register: dns_domains
 
         - name: "Set fact of guest DNS searching domains"
@@ -99,10 +99,10 @@
       vars:
         operation: "fetch_file"
         src_path: "/tmp/resolv.conf"
-        dest_path: "{{ testcase_info_collect_path }}/etc/resolv.conf"
+        dest_path: "{{ current_test_log_folder }}/etc/resolv.conf"
 
     - name: "Get DNS servers from /etc/resolv.conf"
-      shell: cat "{{ testcase_info_collect_path }}/etc/resolv.conf" | grep -i "^nameserver\s*" | awk '{print $2}'
+      shell: cat "{{ current_test_log_folder }}/etc/resolv.conf" | grep -i "^nameserver\s*" | awk '{print $2}'
       register: dns_servers
 
     - name: "Get guest DNS servers from shell command output"
@@ -110,7 +110,7 @@
         guest_dns_servers: "{{ dns_servers.stdout_lines }}"
 
     - name: "Get DNS search domains from /etc/resolv.conf"
-      shell: cat "{{ testcase_info_collect_path }}/etc/resolv.conf" | grep -i "^search" | awk '{i=2;while(i<=NF) {print $i; i++ }}'
+      shell: cat "{{ current_test_log_folder }}/etc/resolv.conf" | grep -i "^search" | awk '{i=2;while(i<=NF) {print $i; i++ }}'
       register: dns_search
 
     - name: "Save guest DNS search list to tmp variable"
@@ -133,7 +133,7 @@
       vars:
         vm_shell_cmd: "/usr/bin/systemd-resolve"
         vm_shell_args: "--status"
-        vm_shell_out: "/tmp/systemd_resolve_status"
+        vm_shell_out: "/tmp/systemd_resolve_status.txt"
     - name: "Set fact of the systemd-resolve command result"
       set_fact:
         systemd_resolve_result: "{{ false if vm_shell_result.exit_code is undefined or vm_shell_result.exit_code != 0 else true }}"
@@ -142,9 +142,9 @@
           vars:
             operation: "fetch_file"
             src_path: "/tmp/systemd_resolve_status"
-            dest_path: "{{ testcase_info_collect_path }}/systemd_resolve_status"
+            dest_path: "{{ current_test_log_folder }}/systemd_resolve_status.txt"
         - name: "Get DNS servers from command systemd-resolve"
-          shell: cat "{{ testcase_info_collect_path }}/systemd_resolve_status" | sed -n '/DNS Servers/,/DNS Domain/p' | head -n -1
+          shell: cat "{{ current_test_log_folder }}/systemd_resolve_status.txt" | sed -n '/DNS Servers/,/DNS Domain/p' | head -n -1
           register: dns_servers
         - name: "Set fact of DNS servers from shell command output"
           set_fact:
@@ -152,7 +152,7 @@
           with_items: "{{ dns_servers.stdout_lines }}"
 
         - name: "Get DNS search domains from command systemd-resolve"
-          shell: cat "{{ testcase_info_collect_path }}/systemd_resolve_status" | sed -n '/DNS Domain/,/DNSSEC NTA/p' | head -n -1
+          shell: cat "{{ current_test_log_folder }}/systemd_resolve_status.txt" | sed -n '/DNS Domain/,/DNSSEC NTA/p' | head -n -1
           register: dns_domains
         - name: "Set fact of DNS search domains from shell command output"
           set_fact:

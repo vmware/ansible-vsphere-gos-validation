@@ -14,18 +14,18 @@
   vars:
     vm_shell_cmd: "/usr/bin/timedatectl"
     vm_shell_args: "status"
-    vm_shell_out: "/tmp/timedatectl_status"
+    vm_shell_out: "/tmp/timedatectl_status.txt"
 
 # If 'timedatectl' command succeed
 - block:
     - include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
-        src_path: "/tmp/timedatectl_status"
-        dest_path: "{{ testcase_info_collect_path }}/timedatectl_status"
+        src_path: "/tmp/timedatectl_status.txt"
+        dest_path: "{{ current_test_log_folder }}/timedatectl_status.txt"
 
     - name: "Get time zone from 'timedatectl status'"
-      shell: grep -i "^ *time zone:" "{{ testcase_info_collect_path }}/timedatectl_status" | awk '{print $3}'
+      shell: grep -i "^ *time zone:" "{{ current_test_log_folder }}/timedatectl_status.txt" | awk '{print $3}'
       register: tz_result
 
     - name: "Save guest timezone setting after GOSC"
@@ -36,7 +36,7 @@
         - name: "Get hwclock from 'timedatectl status'"
           include_tasks: ../utils/file_content_search.yml
           vars:
-            path: "{{ testcase_info_collect_path }}/timedatectl_status"
+            path: "{{ current_test_log_folder }}/timedatectl_status.txt"
             regexp: "^ *RTC in local TZ: no"
           register: hwclock_result
         - name: "Save guest hardware clock setting after GOSC"
@@ -52,16 +52,16 @@
       vars:
         vm_shell_cmd: "/usr/bin/readlink"
         vm_shell_args: "/etc/localtime"
-        vm_shell_out: "/tmp/readlink_etc_localtime"
+        vm_shell_out: "/tmp/readlink_etc_localtime.txt"
 
     - include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
-        src_path: "/tmp/readlink_etc_localtime"
-        dest_path: "{{ testcase_info_collect_path }}/readlink_etc_localtime"
+        src_path: "/tmp/readlink_etc_localtime.txt"
+        dest_path: "{{ current_test_log_folder }}/readlink_etc_localtime.txt"
 
     - name: "Get timezone info from /etc/localtime"
-      command: cat "{{ testcase_info_collect_path }}/readlink_etc_localtime"
+      command: cat "{{ current_test_log_folder }}/readlink_etc_localtime.txt"
       register: tz_result
       changed_when: False
 
@@ -75,16 +75,16 @@
           vars:
             vm_shell_cmd: "/usr/sbin/hwclock"
             vm_shell_args: "-D"
-            vm_shell_out: "/tmp/hwclock_D"
+            vm_shell_out: "/tmp/hwclock_D.txt"
         - include_tasks: ../../common/vm_guest_file_operation.yml
           vars:
             operation: "fetch_file"
-            src_path: "/tmp/hwclock_D"
-            dest_path: "{{ testcase_info_collect_path }}/hwclock_D"
+            src_path: "/tmp/hwclock_D.txt"
+            dest_path: "{{ current_test_log_folder }}/hwclock_D.txt"
         - name: "Get hwclock from 'hwclock -D'"
           include_tasks: ../utils/file_content_search.yml
           vars:
-            path: "{{ testcase_info_collect_path }}/hwclock_D"
+            path: "{{ current_test_log_folder }}/hwclock_D.txt"
             regexp: "^Hardware clock is on UTC time"
         - name: "Save hardware clock settting after GOSC"
           set_fact:
