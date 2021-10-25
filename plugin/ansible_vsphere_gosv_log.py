@@ -595,6 +595,14 @@ class CallbackModule(CallbackBase):
         delegated_vars = result._result.get('_ansible_delegated_vars', None)
         self._clean_results(result._result, result._task.action)
 
+        if not ignore_errors and \
+           self._last_test_name in self.testcases and \
+           self.testcases[self._last_test_name]['status'] == 'Running':
+            self.testcases[self._last_test_name]['status'] = 'Failed'
+            self.testcases[self._last_test_name]['finished_at'] = time.time()
+            self.testcases[self._last_test_name]['duration'] = int(self.testcases[self._last_test_name]['finished_at'] -
+                                                                   self.testcases[self._last_test_name]['started_at'])
+
         if result._task.loop and 'results' in result._result:
             self._process_items(result)
 
@@ -606,13 +614,6 @@ class CallbackModule(CallbackBase):
 
         self._print_task_details(result, 'failed', delegated_vars, ignore_errors=ignore_errors)
 
-        if not ignore_errors and \
-           self._last_test_name in self.testcases and \
-           self.testcases[self._last_test_name]['status'] == 'Running':
-            self.testcases[self._last_test_name]['status'] = 'Failed'
-            self.testcases[self._last_test_name]['finished_at'] = time.time()
-            self.testcases[self._last_test_name]['duration'] = int(self.testcases[self._last_test_name]['finished_at'] -
-                                                                   self.testcases[self._last_test_name]['started_at'])
 
     def v2_runner_on_ok(self, result):
         task = result._task
