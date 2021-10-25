@@ -185,6 +185,7 @@ class CallbackModule(CallbackBase):
         self.full_debug_log = "full_debug.log"
         self.failed_tasks_log = "failed_tasks.log"
         self.test_results_log = "results.log"
+        self.test_results_yml = "test_results.yml"
         self.os_release_info_file = None
 
         # Plays and Tasks
@@ -602,6 +603,8 @@ class CallbackModule(CallbackBase):
             self.testcases[self._last_test_name]['finished_at'] = time.time()
             self.testcases[self._last_test_name]['duration'] = int(self.testcases[self._last_test_name]['finished_at'] -
                                                                    self.testcases[self._last_test_name]['started_at'])
+            self.write_to_logfile(self.test_results_yml,
+                                  "{}: {}\n".format(self._last_test_name, self.testcases[self._last_test_name]['status']))
 
         if result._task.loop and 'results' in result._result:
             self._process_items(result)
@@ -673,6 +676,8 @@ class CallbackModule(CallbackBase):
                 self.testcases[test_name]['finished_at'] = time.time()
                 self.testcases[test_name]['duration'] = int(self.testcases[test_name]['finished_at'] -
                                                             self.testcases[test_name]['started_at'])
+                self.write_to_logfile(self.test_results_yml,
+                                      "{}: {}\n".format(self._last_test_name, self.testcases[self._last_test_name]['status']))
             elif 'var' in task_args:
                 debug_var_name = str(task_args['var'])
                 debug_var_value = str(task_result[debug_var_name])
@@ -735,6 +740,8 @@ class CallbackModule(CallbackBase):
             self.testcases[self._last_test_name]['finished_at'] = time.time()
             self.testcases[self._last_test_name]['duration'] = int(self.testcases[self._last_test_name]['finished_at'] -
                                                                    self.testcases[self._last_test_name]['started_at'])
+            self.write_to_logfile(self.test_results_yml,
+                                  "{}: {}\n".format(self._last_test_name, self.testcases[self._last_test_name]['status']))
 
     def v2_runner_retry(self, result):
         task_name = result.task_name or result._task
@@ -810,6 +817,8 @@ class CallbackModule(CallbackBase):
             self.testcases[self._last_test_name]['finished_at'] = time.time()
             self.testcases[self._last_test_name]['duration'] = int(self.testcases[self._last_test_name]['finished_at'] -
                                                                    self.testcases[self._last_test_name]['started_at'])
+            self.write_to_logfile(self.test_results_yml,
+                                  "{}: {}\n".format(self._last_test_name, self.testcases[self._last_test_name]['status']))
 
         if self._play_name:
             msg = self._banner("PLAY [{}]".format(self._play_name))
@@ -848,6 +857,8 @@ class CallbackModule(CallbackBase):
             self.testcases[self._last_test_name]['finished_at'] = time.time()
             self.testcases[self._last_test_name]['duration'] = int(self.testcases[self._last_test_name]['finished_at'] -
                                                                    self.testcases[self._last_test_name]['started_at'])
+            self.write_to_logfile(self.test_results_yml,
+                                  "{}: {}\n".format(self._last_test_name, self.testcases[self._last_test_name]['status']))
 
         # Log play stats
         msg = self._banner("PLAY RECAP")
