@@ -16,36 +16,21 @@
     - block:
         - include_tasks: ../setup/test_setup.yml
           vars:
-            vmtools_check: "True"
+            skip_test_no_vmtools: True
 
-        - block:
-            - include_tasks: ../../common/print_error_msg.yml
-              vars:
-                error_msg: "VMware tools is not installed or not running."
-            - include_tasks: ../../common/print_test_result.yml
-              vars:
-                test_result: "No Run"
-          when: not vmtools_is_running
+        - include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
+        - name: "Stat balloon on {{ vm_name }}"
+          shell: "{{ vmware_toolbox_cmd_path }} stat balloon"
+          register: stat_balloon_result
+          delegate_to: "{{ vm_guest_ip }}"
+        - debug:
+            msg: "Got balloon size: {{ stat_balloon_result.stdout }}"
 
-        - block:
-            - include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
-            - name: "Stat balloon on {{ vm_name }}"
-              shell: "{{ vmware_toolbox_cmd_path }} stat balloon"
-              register: stat_balloon_result
-              delegate_to: "{{ vm_guest_ip }}"
-            - debug:
-                msg: "Got balloon size: {{ stat_balloon_result.stdout }}"
-
-            - name: "Check balloon size is 0 MB"
-              assert:
-                that:
-                  - stat_balloon_result.stdout == "0 MB"
-                fail_msg: "Balloon size got from vmware-toolbox-cmd is not 0 MB."
-                success_msg: "Balloon size got from vmware-toolbox-cmd is 0 MB."
-            - include_tasks: ../../common/print_test_result.yml
-              vars:
-                test_result: "Passed"
-          when: vmtools_is_running
-
+        - name: "Check balloon size is 0 MB"
+          assert:
+            that:
+              - stat_balloon_result.stdout == "0 MB"
+            fail_msg: "Balloon size got from vmware-toolbox-cmd is not 0 MB."
+            success_msg: "Balloon size got from vmware-toolbox-cmd is 0 MB."
       rescue:
         - include_tasks: ../setup/test_rescue.yml

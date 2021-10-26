@@ -9,6 +9,11 @@
 #                 set it True once necessary, like deploy_vm fail or
 #                 ovt_install_verify_status fail
 #
+- name: "Set test case name for deploy VM testing case"
+  set_fact:
+    current_testcase_name: "{{ deploy_casename }}"
+  when: deploy_casename is defined and deploy_casename
+
 - name: "By default take failed snapshot"
   set_fact:
     take_fail_snapshot: True
@@ -19,18 +24,6 @@
     revert_to_base: True
   when: revert_to_base is undefined
 
-# Print fail test result
-- block:
-    - include_tasks: ../../common/print_test_result.yml
-      vars:
-        test_result: "Failed"
-    # Note: Ansible issue when using ansible_failed_task
-    # https://github.com/ansible/ansible/issues/57399 
-    # - include_tasks: ../../common/print_error_msg.yml
-    #   vars:
-    #     error_msg: "Failed at task {{ ansible_failed_task.name }}"
-    #   when: ansible_failed_task is defined and ansible_failed_task.name is defined
-
 # Take snapshot for failed case
 - block:
     - name: "Save current time"
@@ -38,7 +31,7 @@
         timestamp: "{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
     - include_tasks: ../../common/vm_take_snapshot.yml
       vars:
-        snapshot_name: "fail-{{ testcase }}-{{ timestamp }}"
+        snapshot_name: "fail-{{ current_testcase_name }}-{{ timestamp }}"
         dump_memory: "yes"
         vm_take_snapshot_ignore_err: True
   when: take_fail_snapshot
@@ -58,6 +51,6 @@
 # Exit ansible run if exit_testing_when_fail is True
 - name: "Exit testing when exit_testing_when_fail is set True"
   fail:
-    msg: "Failed to run test case {{ testcase }}"
+    msg: "Failed to run test case {{ current_testcase_name }}"
   when:
     - exit_testing_when_fail is defined and exit_testing_when_fail

@@ -15,18 +15,16 @@
     - block:
         - include_tasks: ../setup/test_setup.yml
           vars:
-            vmtools_check: "True"
+            skip_test_no_vmtools: True
         - name: "Set update VMware tools by default"
           set_fact:
             update_vmtools: True
           when: update_vmtools is undefined
         
         # VM has open-vm-tools installed and update_vmtools is set false
-        - block:
-            - include_tasks: ../../common/print_test_result.yml
-              vars:
-                test_result: "No Run"
-            - meta: end_play
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case due to condition for installing VMTools is not satisfied"
           when: >
             (guest_os_ansible_distribution == 'Flatcar') or
             (vmtools_is_installed is defined and
@@ -79,9 +77,5 @@
           when:
             - install_tools is defined
             - install_tools
-
-        - include_tasks: ../../common/print_test_result.yml
-          vars:
-            test_result: "Passed"
       rescue:
         - include_tasks: ../setup/test_rescue.yml

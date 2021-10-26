@@ -7,11 +7,11 @@
 # guest_reset_keyword2 number is vary, might fail
 #
 - block:
-    - name: Initialize guest reset keywords and the number of keywords  
+    - name: Initialize guest reset keywords and the number of keywords
       set_fact:
         guest_reset_keyword1: "Chipset: The guest has requested that the virtual machine be hard reset."
         guest_reset_keyword2: "GuestRpc: Reinitializing Channel 0(toolbox)"
-    
+
     - name: Search keyworks in vmware.log on ESXi host
       shell: "grep -c -e '{{ guest_reset_keyword1 }}' -e '{{ guest_reset_keyword2 }}' {{ vm_files_path }}/vmware.log"
       delegate_to: "{{ esxi_hostname }}"
@@ -19,11 +19,11 @@
       until: get_keystring.stdout_lines[0] | int >= 2
       retries: "{{ get_guest_reset_time_retries | default(60) }}"
       delay: 30
-    
+
     - name: Display the search result
       debug: var=get_keystring
   when: vm_files_path is defined and vm_files_path
 
-- debug: 
+- debug:
     msg: "Skip check guest reset time since 'vm_files_path' is not defined."
   when: vm_files_path is undefined or not vm_files_path

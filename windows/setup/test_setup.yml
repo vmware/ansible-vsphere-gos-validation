@@ -6,8 +6,9 @@
 # then revert to the a base snapshot firstly.
 # If base snapshot does not exist, then take a snapshot of VM as the base snapshot.
 #
-- name: "Set current test case log path on local machine"
+- name: "Set current test case name and log path on local machine"
   set_fact:
+    current_testcase_name: "{{ ansible_play_name }}"
     current_test_log_folder: "{{ testrun_log_path }}/{{ ansible_play_name }}"
 
 # Check and revert base snapshot
@@ -50,9 +51,9 @@
   when: not base_snapshot_exists
 
 # Skip test case run when VMware tools is required but not installed or not running
-- name: "Skip testcase: {{ ansible_play_name }}"
-  debug:
-    msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed | default(False) }}, running: {{ vmtools_is_running | default(False) }}"
+- include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed | default(False) }}, running: {{ vmtools_is_running | default(False) }}"
   when:
     - skip_test_no_vmtools is defined
     - skip_test_no_vmtools

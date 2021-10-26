@@ -13,67 +13,58 @@
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
-          vars:
-            vmtools_check: "True"
 
-        - include_tasks: ../../common/print_test_result.yml
+        - include_tasks: ../../common/skip_test_case.yml
           vars:
-            test_result: "No Run"
+            skip_msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed | default(False) }}"
           when: vmtools_is_installed is undefined or not vmtools_is_installed
 
+        # Check VMware Tools status is running
+        - include_tasks: check_vmtools_status.yml
+          vars:
+            expected_vmtools_status: "running"
+
+        # Set the fact of open-vm-tools processes and services
+        - include_tasks: set_ovt_facts.yml
+
+        # Add user 'vmware' to check vmusr process
         - block:
-            # Check VMware Tools status is running
-            - include_tasks: check_vmtools_status.yml
+            - include_tasks: ../utils/add_user.yml
               vars:
-                expected_vmtools_status: "running"
+                os_username: "vmware"
 
-            # Set the fact of open-vm-tools processes and services
-            - include_tasks: set_ovt_facts.yml
-
-            # Add user 'vmware' to check vmusr process
-            - block:
-                - include_tasks: ../utils/add_user.yml
-                  vars:
-                    os_username: "vmware"
-
-                - include_tasks: ../utils/enable_auto_login.yml
-                  vars:
-                    autologin_user: "vmware"
-
-                # Reboot to make changes take effect and wait for tools running
-                - include_tasks: ../utils/vm_reboot.yml
-              when: "'open-vm-tools-desktop' in ovt_packages"
-
-            # Check open-vm-tools packages are installed
-            - include_tasks: check_ovt_package.yml
+            - include_tasks: ../utils/enable_auto_login.yml
               vars:
-                expected_package_state: "present"
-              with_items: "{{ ovt_packages }}"
-              loop_control:
-                loop_var: package_name
-              when: guest_os_ansible_distribution != 'Flatcar'
+                autologin_user: "vmware"
 
-            # Check open-vm-tools processes are running
-            - include_tasks: ../utils/check_process_status.yml
-              vars:
-                expected_process_state: "present"
-                process_uid: "{{ ovt_process.uid }}"
-                process_name: "{{ ovt_process.cmd }}"
-              with_items: "{{ ovt_processes }}"
-              loop_control:
-                loop_var: ovt_process
+            # Reboot to make changes take effect and wait for tools running
+            - include_tasks: ../utils/vm_reboot.yml
+          when: "'open-vm-tools-desktop' in ovt_packages"
 
-            # Check open-vm-tools services are running
-            - include_tasks: ../utils/check_service_status.yml
-              vars:
-                service_name: "{{ ovt_service }}"
-                expected_service_state: "running"
-                expected_service_status: "enabled"
+        # Check open-vm-tools packages are installed
+        - include_tasks: check_ovt_package.yml
+          vars:
+            expected_package_state: "present"
+          with_items: "{{ ovt_packages }}"
+          loop_control:
+            loop_var: package_name
+          when: guest_os_ansible_distribution != 'Flatcar'
 
-            - include_tasks: ../../common/print_test_result.yml
-              vars:
-                test_result: "Passed"
-          when: vmtools_is_installed is defined and vmtools_is_installed
+        # Check open-vm-tools processes are running
+        - include_tasks: ../utils/check_process_status.yml
+          vars:
+            expected_process_state: "present"
+            process_uid: "{{ ovt_process.uid }}"
+            process_name: "{{ ovt_process.cmd }}"
+          with_items: "{{ ovt_processes }}"
+          loop_control:
+            loop_var: ovt_process
 
+        # Check open-vm-tools services are running
+        - include_tasks: ../utils/check_service_status.yml
+          vars:
+            service_name: "{{ ovt_service }}"
+            expected_service_state: "running"
+            expected_service_status: "enabled"
       rescue:
         - include_tasks: ../setup/test_rescue.yml

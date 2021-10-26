@@ -18,16 +18,16 @@
   vars:
     vm_shell_cmd: "{{ ip_command }}"
     vm_shell_args: "-br addr show"
-    vm_shell_out: "/tmp/ip_addr_show"
+    vm_shell_out: "/tmp/ip_addr_show.txt"
 
 - include_tasks: ../../common/vm_guest_file_operation.yml
   vars:
     operation: "fetch_file"
-    src_path: "/tmp/ip_addr_show"
-    dest_path: "{{ testcase_info_collect_path }}/ip_addr_show"
+    src_path: "/tmp/ip_addr_show.txt"
+    dest_path: "{{ current_test_log_folder }}/ip_addr_show.txt"
 
 - name: "Get IPv4 address"
-  shell: cat "{{ testcase_info_collect_path }}/ip_addr_show" | grep -v lo | grep -v virbr | awk '{print $1, $2, $3}'
+  shell: cat "{{ current_test_log_folder }}/ip_addr_show.txt" | grep -v lo | grep -v virbr | awk '{print $1, $2, $3}'
   changed_when: False
   register: result
 
@@ -42,16 +42,16 @@
   vars:
     vm_shell_cmd: "{{ ip_command }}"
     vm_shell_args: "-4 route show"
-    vm_shell_out: "/tmp/ip_route_show"
+    vm_shell_out: "/tmp/ip_route_show.txt"
 
 - include_tasks: ../../common/vm_guest_file_operation.yml
   vars:
     operation: "fetch_file"
-    src_path: "/tmp/ip_route_show"
-    dest_path: "{{ testcase_info_collect_path }}/ip_route_show"
+    src_path: "/tmp/ip_route_show.txt"
+    dest_path: "{{ current_test_log_folder }}/ip_route_show.txt"
 
 - name: "Get default gateway"
-  shell: cat "{{ testcase_info_collect_path }}/ip_route_show" | grep "^default"
+  shell: cat "{{ current_test_log_folder }}/ip_route_show.txt" | grep "^default"
   changed_when: False
   register: result
 - name: "Save GOSC network gateway"
@@ -147,7 +147,7 @@
 
     - name: "Set GOSC network configuration files on Photon OS"
       set_fact:
-        network_config_path: "{{ testcase_info_collect_path }}{{ src_network_file }}"
+        network_config_path: "{{ current_test_log_folder }}{{ src_network_file }}"
     - include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
@@ -163,23 +163,23 @@
       vars:
         vm_shell_cmd: "/usr/bin/ls"
         vm_shell_args: "/etc/systemd/network/*.network"
-        vm_shell_out: "/tmp/list_network_files"
+        vm_shell_out: "/tmp/list_network_files.txt"
 
     - include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
-        src_path: "/tmp/list_network_files"
-        dest_path: "{{ testcase_info_collect_path }}/list_network_files"
+        src_path: "/tmp/list_network_files.txt"
+        dest_path: "{{ current_test_log_folder }}/list_network_files.txt"
 
     - name: "Look for network file on Photon OS"
-      command: cat "{{ testcase_info_collect_path }}/list_network_files"
+      command: cat "{{ current_test_log_folder }}/list_network_files.txt"
       register: network_files
 
     - include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
         src_path: "{{ src_network_file }}"
-        dest_path: "{{ testcase_info_collect_path }}{{ src_network_file }}"
+        dest_path: "{{ current_test_log_folder }}{{ src_network_file }}"
       with_items: "{{ network_files.stdout_lines }}"
       loop_control:
         loop_var: "src_network_file"

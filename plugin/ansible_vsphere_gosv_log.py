@@ -185,6 +185,7 @@ class CallbackModule(CallbackBase):
         self.full_debug_log = "full_debug.log"
         self.failed_tasks_log = "failed_tasks.log"
         self.test_results_log = "results.log"
+        self.test_results_yml = "test_results.yml"
         self.os_release_info_file = None
 
         # Plays and Tasks
@@ -595,6 +596,16 @@ class CallbackModule(CallbackBase):
         delegated_vars = result._result.get('_ansible_delegated_vars', None)
         self._clean_results(result._result, result._task.action)
 
+        if not ignore_errors and \
+           self._last_test_name in self.testcases and \
+           self.testcases[self._last_test_name]['status'] == 'Running':
+            self.testcases[self._last_test_name]['status'] = 'Failed'
+            self.testcases[self._last_test_name]['finished_at'] = time.time()
+            self.testcases[self._last_test_name]['duration'] = int(self.testcases[self._last_test_name]['finished_at'] -
+                                                                   self.testcases[self._last_test_name]['started_at'])
+            self.write_to_logfile(self.test_results_yml,
+                                  "{}: {}\n".format(self._last_test_name, self.testcases[self._last_test_name]['status']))
+
         if result._task.loop and 'results' in result._result:
             self._process_items(result)
 
@@ -606,13 +617,6 @@ class CallbackModule(CallbackBase):
 
         self._print_task_details(result, 'failed', delegated_vars, ignore_errors=ignore_errors)
 
-        if not ignore_errors and \
-           self._last_test_name in self.testcases and \
-           self.testcases[self._last_test_name]['status'] == 'Running':
-            self.testcases[self._last_test_name]['status'] = 'Failed'
-            self.testcases[self._last_test_name]['finished_at'] = time.time()
-            self.testcases[self._last_test_name]['duration'] = int(self.testcases[self._last_test_name]['finished_at'] -
-                                                                   self.testcases[self._last_test_name]['started_at'])
 
     def v2_runner_on_ok(self, result):
         task = result._task
@@ -656,24 +660,15 @@ class CallbackModule(CallbackBase):
                if self.vm_info:
                    self.vm_info.Config_Guest_Id = set_fact_result.get("vm_guest_id", '')
                    self.vm_info.Hardware_Version = set_fact_result.get("vm_hardware_version", '')
+            if "vm_upgrade_hardware_version.yml" == task_file:
+               if self.vm_info:
+                   self.vm_info.Hardware_Version = set_fact_result.get("vm_hardware_version", '')
             if "vm_get_guest_info.yml" == task_file:
                if self.vm_info:
                    self.vm_info.GuestInfo_Guest_Id = set_fact_result.get("guestinfo_guest_id", '')
                    self.vm_info.GuestInfo_Guest_Full_Name = set_fact_result.get("guestinfo_guest_full_name", '')
                    self.vm_info.GuestInfo_Guest_Family = set_fact_result.get("guestinfo_guest_family", '')
                    self.vm_info.GuestInfo_Detailed_Data = set_fact_result.get("guestinfo_detailed_data", '')
-        elif 'print_test_result.yml' == task_file and str(task.action) == "lineinfile":
-            if 'invocation' in task_result and 'module_args' in task_result['invocation']:
-                test_result_line = task_result['invocation']['module_args']['line']
-                if test_result_line:
-                    [test_name, test_result] = test_result_line.split(':')
-                    test_name = test_name.strip()
-                    test_result = test_result.strip()
-                    if test_name in self.testcases:
-                        self.testcases[test_name]['status'] = test_result
-                        self.testcases[test_name]['finished_at'] = time.time()
-                        self.testcases[test_name]['duration'] = int(self.testcases[test_name]['finished_at'] -
-                                                                    self.testcases[test_name]['started_at'])
         elif str(task.action) == "debug":
             if re.match("skip\\s+testcase:", task.name.lower()):
                 test_name = task.name.split(':')[-1].strip()
@@ -681,6 +676,8 @@ class CallbackModule(CallbackBase):
                 self.testcases[test_name]['finished_at'] = time.time()
                 self.testcases[test_name]['duration'] = int(self.testcases[test_name]['finished_at'] -
                                                             self.testcases[test_name]['started_at'])
+                self.write_to_logfile(self.test_results_yml,
+                                      "{}: {}\n".format(self._last_test_name, self.testcases[self._last_test_name]['status']))
             elif 'var' in task_args:
                 debug_var_name = str(task_args['var'])
                 debug_var_value = str(task_result[debug_var_name])
@@ -743,6 +740,8 @@ class CallbackModule(CallbackBase):
             self.testcases[self._last_test_name]['finished_at'] = time.time()
             self.testcases[self._last_test_name]['duration'] = int(self.testcases[self._last_test_name]['finished_at'] -
                                                                    self.testcases[self._last_test_name]['started_at'])
+            self.write_to_logfile(self.test_results_yml,
+                                  "{}: {}\n".format(self._last_test_name, self.testcases[self._last_test_name]['status']))
 
     def v2_runner_retry(self, result):
         task_name = result.task_name or result._task
@@ -818,6 +817,8 @@ class CallbackModule(CallbackBase):
             self.testcases[self._last_test_name]['finished_at'] = time.time()
             self.testcases[self._last_test_name]['duration'] = int(self.testcases[self._last_test_name]['finished_at'] -
                                                                    self.testcases[self._last_test_name]['started_at'])
+            self.write_to_logfile(self.test_results_yml,
+                                  "{}: {}\n".format(self._last_test_name, self.testcases[self._last_test_name]['status']))
 
         if self._play_name:
             msg = self._banner("PLAY [{}]".format(self._play_name))
@@ -856,6 +857,8 @@ class CallbackModule(CallbackBase):
             self.testcases[self._last_test_name]['finished_at'] = time.time()
             self.testcases[self._last_test_name]['duration'] = int(self.testcases[self._last_test_name]['finished_at'] -
                                                                    self.testcases[self._last_test_name]['started_at'])
+            self.write_to_logfile(self.test_results_yml,
+                                  "{}: {}\n".format(self._last_test_name, self.testcases[self._last_test_name]['status']))
 
         # Log play stats
         msg = self._banner("PLAY RECAP")

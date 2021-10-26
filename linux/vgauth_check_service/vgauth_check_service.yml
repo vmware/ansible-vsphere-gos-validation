@@ -15,47 +15,36 @@
     - block:
         - include_tasks: ../setup/test_setup.yml
           vars:
-            vmtools_check: "True"
+            skip_test_no_vmtools: True
 
-        - name: "Skip this test case on Flatcar due to no VGAuth service"
-          block:
-            - include_tasks: ../../common/print_test_result.yml
-              vars:
-                test_result: "No Run"
-            - meta: end_play
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Flatcar doesn't have VGAuth service"
           when: >
-             (vmtools_is_running is undefined) or
-             (not vmtools_is_running) or
-             ((guest_os_ansible_distribution is defined) and
-             (guest_os_ansible_distribution == "Flatcar"))
+             (guest_os_ansible_distribution is defined) and
+             (guest_os_ansible_distribution == "Flatcar")
 
-        - block:
-            - name: "Initialize the variable for VGAuth process and service"
-              set_fact:
-                vgauth_process: "VGAuthService"
-                vgauth_service: "vgauthd"
+        - name: "Initialize the variable for VGAuth process and service"
+          set_fact:
+            vgauth_process: "VGAuthService"
+            vgauth_service: "vgauthd"
 
-            - name: "Set the vgauth service name for Ubuntu/Debian"
-              set_fact:
-                vgauth_service: "vgauth"
-              when: guest_os_family == "Debian"
+        - name: "Set the vgauth service name for Ubuntu/Debian"
+          set_fact:
+            vgauth_service: "vgauth"
+          when: guest_os_family == "Debian"
 
-            # Check VGAuth processe is running
-            - include_tasks: ../utils/check_process_status.yml
-              vars:
-                process_name: "{{ vgauth_process }}"
-                expected_process_state: "present"
+        # Check VGAuth processe is running
+        - include_tasks: ../utils/check_process_status.yml
+          vars:
+            process_name: "{{ vgauth_process }}"
+            expected_process_state: "present"
 
-            # Check VGAuth service is active and enabled
-            - include_tasks: ../utils/check_service_status.yml
-              vars:
-                service_name: "{{ vgauth_service }}"
-                expected_service_state: "running"
-                expected_service_status: "enabled"
-
-            - include_tasks: ../../common/print_test_result.yml
-              vars:
-                test_result: "Passed"
-          when: vmtools_is_running is defined and vmtools_is_running
+        # Check VGAuth service is active and enabled
+        - include_tasks: ../utils/check_service_status.yml
+          vars:
+            service_name: "{{ vgauth_service }}"
+            expected_service_state: "running"
+            expected_service_status: "enabled"
       rescue:
         - include: ../setup/test_rescue.yml

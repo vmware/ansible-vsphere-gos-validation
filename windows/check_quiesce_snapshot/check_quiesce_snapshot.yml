@@ -15,53 +15,48 @@
         - include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: True
-        - block:
-            - include_tasks: check_vmx_disk_enable_uuid.yml
-              when: guest_os_product_type | lower == "server"
- 
-            - name: Set fact of the remote path in guest OS
-              set_fact:
-                quiesce_scripts_freeze_thaw_path: "C:\\Windows\\"
-                quiesce_scripts_tools_path: "C:\\Program Files\\VMware\\VMware Tools\\backupScripts.d\\"
-            - include_tasks: ../utils/win_get_time.yml
-            - name: Set fact of the time before taking snapshot
-              set_fact:
-                before_snapshot_time: "{{ time_variable }}"
-            - name: Set fact of the snapshot name
-              set_fact:
-                qs_snapshot_name: "quiesce_{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
 
-            - include_tasks: copy_custom_scripts_to_guest.yml
-            - include_tasks: ../utils/win_enable_vss_log.yml
-              when:
-                - vmtools_version is defined and vmtools_version
-                - vmtools_version is version('11.0.0', '>=')
- 
-            - name: Set fact of collecting quiesce log file
-              set_fact:
-                collect_vss_logs: True
-            # Take quiesce snapshot of VM
-            - include_tasks: ../../common/vm_take_snapshot.yml
-              vars:
-                snapshot_name: "{{ qs_snapshot_name }}"
-                is_quiesce: yes
-                dump_memory: no
+        - include_tasks: check_vmx_disk_enable_uuid.yml
+          when: guest_os_product_type | lower == "server"
 
-            - include_tasks: ../../common/vm_take_screenshot.yml
-              vars:
-                vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
-            
-            - include_tasks: check_custom_scripts_executed.yml
-            - include_tasks: ../../common/vm_remove_snapshot.yml
-              vars:
-                snapshot_name: "{{ qs_snapshot_name }}"
+        - name: Set fact of the remote path in guest OS
+          set_fact:
+            quiesce_scripts_freeze_thaw_path: "C:\\Windows\\"
+            quiesce_scripts_tools_path: "C:\\Program Files\\VMware\\VMware Tools\\backupScripts.d\\"
+        - include_tasks: ../utils/win_get_time.yml
+        - name: Set fact of the time before taking snapshot
+          set_fact:
+            before_snapshot_time: "{{ time_variable }}"
+        - name: Set fact of the snapshot name
+          set_fact:
+            qs_snapshot_name: "quiesce_{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
+
+        - include_tasks: copy_custom_scripts_to_guest.yml
+        - include_tasks: ../utils/win_enable_vss_log.yml
           when:
-            - vmtools_is_running is defined
-            - vmtools_is_running | bool
+            - vmtools_version is defined and vmtools_version
+            - vmtools_version is version('11.0.0', '>=')
+
+        - name: Set fact of collecting quiesce log file
+          set_fact:
+            collect_vss_logs: True
+        # Take quiesce snapshot of VM
+        - include_tasks: ../../common/vm_take_snapshot.yml
+          vars:
+            snapshot_name: "{{ qs_snapshot_name }}"
+            is_quiesce: yes
+            dump_memory: no
+
+        - include_tasks: ../../common/vm_take_screenshot.yml
+          vars:
+            vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
+
+        - include_tasks: check_custom_scripts_executed.yml
+        - include_tasks: ../../common/vm_remove_snapshot.yml
+          vars:
+            snapshot_name: "{{ qs_snapshot_name }}"
       rescue:
         - include_tasks: collect_vss_logs.yml
           when: collect_vss_logs is defined and collect_vss_logs
 
         - include_tasks: ../setup/rescue_cleanup.yml
-          vars:
-            current_testcase_name: "{{ ansible_play_name }}"

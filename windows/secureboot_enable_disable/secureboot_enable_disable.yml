@@ -18,25 +18,20 @@
         - include_tasks: ../setup/test_setup.yml
         # Get VM firmware info
         - include_tasks: ../../common/vm_get_boot_info.yml
-        # Enable, disable secure boot test if VM uses EFI firmware
-        - block:
-            - include_tasks: change_secureboot_config.yml
-              vars:
-                change_secureboot: 'enable'
-            - include_tasks: change_secureboot_config.yml
-              vars:
-                change_secureboot: 'disable'
-          when:
-            - vm_firmware is defined and vm_firmware | lower == 'efi'
-            - vm_hardware_version_num | int >= 13
 
-        - name: "Skip testcase: {{ ansible_play_name }}"
-          debug:
-            msg: "Skip test case due to VM firmware is not EFI: {{ vm_firmware | default('NA') }}"
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case due to VM firmware is not EFI: {{ vm_firmware | default('NA') }}"
           when: >
             (vm_firmware is undefined or vm_firmware | lower != 'efi') or
             (vm_hardware_version_num | int < 13)
+
+        # Enable, disable secure boot test if VM uses EFI firmware
+        - include_tasks: change_secureboot_config.yml
+          vars:
+            change_secureboot: 'enable'
+        - include_tasks: change_secureboot_config.yml
+          vars:
+            change_secureboot: 'disable'
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
-          vars:
-            current_testcase_name: "{{ ansible_play_name }}"

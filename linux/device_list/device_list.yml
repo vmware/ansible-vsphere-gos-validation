@@ -19,46 +19,33 @@
     - block:
         - include_tasks: ../setup/test_setup.yml
           vars:
-            vmtools_check: "True"
+            skip_test_no_vmtools: True
 
-        - block:
-            - include_tasks: ../utils/device_connectable_enable.yml
-            - include_tasks: ../../common/vm_set_power_state.yml
-              vars:
-                vm_power_state_set: 'powered-on'
-            - include_tasks: ../../common/vm_wait_guest_ip.yml
-            - include_tasks: ../../common/update_inventory.yml
-
-            - include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
-
-            - name: "List devices in guest OS"
-              command: "{{ vmware_toolbox_cmd_path }} device list"
-              register: device_list
-              delegate_to: "{{ vm_guest_ip }}"
-
-            - debug:
-                msg: "Devices detected by VMware Tools in guest OS: {{ device_list.stdout_lines }}"
-
-            # Get VM's hardware devices
-            - include_tasks: ../../common/vm_get_config.yml
-              vars:
-                property_list: ['config.hardware.device']
-            # Check devices connection status
-            - include_tasks: device_connection_validate.yml
-              with_items: "{{ device_list.stdout_lines }}"
-              loop_control:
-                loop_var: device_status
-
-            - include_tasks: ../../common/print_test_result.yml
-              vars:
-                test_result: "Passed"
-          when: vmtools_is_running is defined and vmtools_is_running
-
-        # Skip this test case if VMware tools is not running
-        - include_tasks: ../../common/print_test_result.yml
+        - include_tasks: ../utils/device_connectable_enable.yml
+        - include_tasks: ../../common/vm_set_power_state.yml
           vars:
-            test_result: "No Run"
-          when: vmtools_is_running is defined and not vmtools_is_running
+            vm_power_state_set: 'powered-on'
+        - include_tasks: ../../common/vm_wait_guest_ip.yml
+        - include_tasks: ../../common/update_inventory.yml
 
+        - include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
+
+        - name: "List devices in guest OS"
+          command: "{{ vmware_toolbox_cmd_path }} device list"
+          register: device_list
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - debug:
+            msg: "Devices detected by VMware Tools in guest OS: {{ device_list.stdout_lines }}"
+
+        # Get VM's hardware devices
+        - include_tasks: ../../common/vm_get_config.yml
+          vars:
+            property_list: ['config.hardware.device']
+        # Check devices connection status
+        - include_tasks: device_connection_validate.yml
+          with_items: "{{ device_list.stdout_lines }}"
+          loop_control:
+            loop_var: device_status
       rescue:
         - include_tasks: ../setup/test_rescue.yml
