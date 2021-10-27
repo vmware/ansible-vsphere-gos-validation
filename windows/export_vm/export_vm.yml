@@ -15,8 +15,22 @@
     # Check VM power status
     - include_tasks: ../../common/vm_get_power_state.yml
     # Power off VM if it's not in poweredOff state
-    - include_tasks: ../utils/shutdown.yml
-      when: vm_power_state_get != 'poweredOff'
+    - include_tasks: ../utils/shutdown_vm.yml
+
+    - include_tasks: ../../common/vm_get_cdrom_devices.yml
+    - include_tasks: ../../common/vm_configure_cdrom.yml
+      vars:
+        cdrom_state: absent
+        cdrom_controller_type: "{{ item.controllerKey }}"
+        cdrom_controller_num: "{{ item.controllerKey }}"
+        cdrom_unit_num: "{{ item.unitNumber }}"
+      with_items: "{{ cdrom_device_list }}"
+      when:
+        - cdrom_device_list is defined
+        - cdrom_device_list | length > 1
+
+    # Change to 'client device' for CDROM devices which have ISO images connected
+
     # Export VM to ovf template to the specified path
     # Please make sure enough disk space in specified path
     - include_tasks: ../../common/ovf_export.yml
