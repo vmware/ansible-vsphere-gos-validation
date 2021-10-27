@@ -1,0 +1,15 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# VM guest ID 'Windows9_64Guest' and 'Windows9Guest' is used for
+# 'Windows 10' when ESXi >= 6.0.0 and hardware version >= 11.
+#
+- block:
+    - name: "Set fact of guest fullname for Windows 10 on ESXi >= 6.0.0"
+      set_fact:
+        expected_guest_fullname: "{{ 'Microsoft Windows 10 (' ~ guest_os_ansible_architecture ~ ')' }}"
+    - debug:
+        msg: "Expected guest fullname for Windows 10 on ESXi '{{ esxi_version }}': {{ expected_guest_fullname }}"
+  when:
+    - esxi_version is version('6.0.0', '>=')
+    - vm_guest_id == "Windows9_64Guest" or vm_guest_id == "Windows9Guest"
