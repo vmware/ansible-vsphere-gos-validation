@@ -14,15 +14,29 @@
     device_is_connected: "{{ device_status.split(':')[-1].strip(' ') | lower == 'enabled' }}"
   when: device_status.split(':') | length > 2
 
-- name: "Map '{{ device_name }}' to 'Network adapter {{ device_name | int + 1 }}'"
-  set_fact:
-    device_label: "Network adapter {{ device_name | int + 1 }}"
-  when: "'Ethernet' in device_name"
+- block:
+    - name: "Set device number in VM config"
+      set_fact:
+        device_num: "{{ device_name | regex_search('[0-9]+$') | int + 1 }}"
 
-- name: "Map '{{ device_name }}' to 'Floppy drive {{ device_name | int + 1 }}'"
-  set_fact:
-    device_label: "Floppy drive {{ device_name | int + 1 }}"
-  when: "'floppy' in device_name"
+    - name: "Map '{{ device_name }}' to 'Network adapter {{ device_num }}'"
+      set_fact:
+        device_label: "Network adapter {{ device_num }}"
+      when: "'Ethernet' in device_name"
+
+    - name: "Map '{{ device_name }}' to 'Floppy drive {{ device_num }}'"
+      set_fact:
+        device_label: "Floppy drive {{ device_num }}"
+      when: "'floppy' in device_name"
+
+    - name: "Map '{{ device_name }}' to 'Serial port {{ device_num }}'"
+      set_fact:
+        device_label: "Serial port {{ device_num }}"
+      when: "'serial' in device_name"
+  when: >
+    ('Ethernet' in device_name) or
+    ('floppy' in device_name) or
+    ('serial' in device_name)
 
 - block:
     - name: "Map '{{ device_name }}' to '{{ device_name | regex_replace('ide', 'IDE ') }}'"
