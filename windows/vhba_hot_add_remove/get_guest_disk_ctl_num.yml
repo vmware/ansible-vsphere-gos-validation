@@ -4,12 +4,17 @@
 # Get the number of disk controllers and disks in guest OS
 # with specific type
 #
-- include_tasks: ../utils/win_get_disk_ctl.yml
-- name: Set fact of the disk controller number got in guest OS
-  set_fact:
-    ctl_num_guest: "{{ ctls_in_guest_dict[test_disk_controller_type] }}"
-- debug:
-    msg: "Get the number of '{{ test_disk_controller_type }}' controller in guest OS: {{ ctl_num_guest }}"
+- include_tasks: ../utils/win_get_nvme_ctl_num.yml
+  when: test_disk_controller_type == 'nvme'
+
+- include_tasks: ../utils/win_get_pvscsi_ctl_num.yml
+  when: test_disk_controller_type == 'paravirtual'
+
+- include_tasks: ../utils/win_get_lsi_ctl_num.yml
+  when: test_disk_controller_type == 'lsilogicsas'
+
+- include_tasks: ../utils/win_get_sata_ctl.num.yml
+  when: test_disk_controller_type == 'sata'
 
 - include_tasks: ../utils/win_execute_cmd.yml
   vars:
