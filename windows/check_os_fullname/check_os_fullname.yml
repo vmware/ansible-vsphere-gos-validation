@@ -17,12 +17,7 @@
           vars:
             skip_test_no_vmtools: True
 
-        - name: Set fact of the supported guest IDs in this test case
-          set_fact:
-            support_client_guest: ['windows9Guest', 'windows9_64Guest']
-            support_server_guest: ['windows9Server64Guest', 'windows2019srv_64Guest', 'windows2019srvNext_64Guest']
-
-        # Get guest OS info inside guest OS
+        # Get OS info inside guest OS
         - include_tasks: ../utils/win_get_fullname.yml
         - debug:
             msg:
@@ -48,26 +43,25 @@
 
         - name: Initialize the expected guest fullname
           set_fact:
-            expected_guest_fullname: ""
+            expected_guest_fullname: "" 
         # Set expected guest fullname for Windows client
-        - name: "Set fact of expected guest fullname for Windows 10"
-          set_fact:
-            expected_guest_fullname: "{{ 'Microsoft Windows 10 (' ~ guest_os_ansible_architecture ~ ')' }}"
-            os_fullname_guest: "{{ (' ').join(os_fullname_guest.split(' ')[0:3]) ~ ' (' ~ guest_os_ansible_architecture ~ ')' }}"
-          when: vm_guest_id in support_client_guest
+        - block:
+            - include_tasks: win10_fullname.yml
+            - include_tasks: win11_fullname.yml
+              when: expected_guest_fullname == ""
+          when: guest_os_product_type == "client"
 
         # Set expected guest fullname for Windows Server
         - block:
-            # Check if guest OS is Windows Server Core
-            - include_tasks: ../utils/win_is_servercore.yml
             - include_tasks: winsrv2016orlater_fullname.yml
             - include_tasks: winsrv2019_fullname.yml
+              when: expected_guest_fullname == ""
             - include_tasks: winsrv2022_fullname.yml
-            - name: "Set fact of the guest fullname from guest OS for Windows Server"
-              set_fact:
-                os_fullname_guest: "{{ (' ').join(os_fullname_guest.split(' ')[0:-1]) ~ ' (' ~ guest_os_ansible_architecture ~ ')' }}"
-              when: not win_guest_is_servercore
-          when: vm_guest_id in support_server_guest
+              when: expected_guest_fullname == ""
+          when: guest_os_product_type != "client"
+
+        - debug:
+            msg: "Expected guest fullname on ESXi '{{ esxi_version }}': {{ expected_guest_fullname }}"
 
         - name: "Verify guest fullname in guest info is expected"
           assert:
@@ -75,16 +69,5 @@
               - os_fullname_guestinfo == expected_guest_fullname
             fail_msg: "Guest fullname in guest info: {{ os_fullname_guestinfo }}, is not the same as expected one: {{ expected_guest_fullname }}."
             success_msg: "Guest fullname in guest info: {{ os_fullname_guestinfo }} is the same as expected one."
-
-        # This check is used for reference, what is the actual guest OS inside VM,
-        # what is the guest fullname reported by VMware tools. This check will fail
-        # if ESXi host does not support this guest OS type yet.
-        - name: "Check if guest fullname in guest info is the same as got from guest OS"
-          assert:
-            that:
-              - os_fullname_guestinfo == os_fullname_guest
-            fail_msg: "Guest fullname in guest info: {{ os_fullname_guestinfo }}, got from guest OS: {{ os_fullname_guest }}."
-            success_msg: "Guest fullname in guest info: {{ os_fullname_guestinfo }} is the same as the one got from guest OS."
-          ignore_errors: True
       rescue:
         - include_tasks: ../setup/rescue_cleanup.yml
