@@ -15,7 +15,6 @@
 - name: Display the check file existence result
   debug: var=diskpart_file_stat
   when: enable_debug is defined and enable_debug
-
 - name: Check if diskpart file exists
   assert:
     that:
@@ -24,7 +23,6 @@
     fail_msg: "diskpart script file not exist: {{ diskpart_file_path }}"
 
 - include_tasks: ../utils/win_get_raw_disk_num.yml
-- include_tasks: ../utils/win_get_unused_drive_letter.yml
 - include_tasks: ../utils/win_check_disk_online.yml
   vars:
     win_check_disk_online_num: "{{ win_get_raw_disk_num }}"
@@ -54,16 +52,6 @@
     regexp: 'select disk *'
     line: "select disk {{ win_get_raw_disk_num }}"
   delegate_to: "{{ vm_guest_ip }}"
-
-- name: Modify new drive letter in diskpart script file
-  win_lineinfile:
-    path: "{{ diskpart_file_path_win }}"
-    regexp: 'assign letter*'
-    line: "assign letter={{ drive_letter_new }}"
-  delegate_to: "{{ vm_guest_ip }}"
-  when: drive_letter_new is defined
-
-# New added disk is already online while in Windows Server Core it's not online
 - name: Remove online disk if disk is already online
   win_lineinfile:
     path: "{{ diskpart_file_path_win }}"
@@ -74,25 +62,22 @@
 
 - include_tasks: ../utils/win_create_disk_partition.yml
 
+# Check new file creation and content write to the new disk
 - name: Set fact of the file path to do disk write test
   set_fact:
     write_test_file_path_win: "{{ drive_letter_new }}:\\test_disk_write.txt"
-- name: Create new file on disk drive in guest OS
-  include_tasks: ../utils/win_create_file.yml
+- include_tasks: ../utils/win_create_file.yml
   vars:
     new_empty_file_path: "{{ write_test_file_path_win }}"
-
 - name: Generate string content to write to disk drive
   set_fact:
     test_line: "This is the test line to write to the file. "
 - name: Set fact of the content to write to file
   set_fact:
     write_file_content: "{% for i in range(0, 20) %} '{{ test_line }}\n{{ test_line }}' {% endfor %}"
-- name: Write content to file created on disk drive
-  include_tasks: ../utils/win_write_to_file.yml
+- include_tasks: ../utils/win_write_to_file.yml
   vars:
     write_file_path: "{{ write_test_file_path_win }}"
-
 - include_tasks: ../utils/win_check_file_exist.yml
   vars:
     win_check_file_exist_file: "{{ write_test_file_path_win }}"
