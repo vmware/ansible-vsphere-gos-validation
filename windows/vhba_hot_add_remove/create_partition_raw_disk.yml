@@ -2,9 +2,12 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Copy diskpart script to Windows guest and run it to create partition on raw disk
+#
 - name: Set fact of the diskpart file path
   set_fact:
     diskpart_file_path: "{{ playbook_dir }}/diskpart.txt"
+    diskpart_file_path_current: "{{ current_test_log_folder }}/diskpart.txt"
+    diskpart_file_path_win: "C:\\test_diskpart\\diskpart.txt"
 - name: Check diskpart script file exists in current path
   stat:
     path: "{{ diskpart_file_path }}"
@@ -12,29 +15,54 @@
     get_checksum: no
     get_mime: no
   register: diskpart_file_stat
-- name: Display the check file existence result
-  debug: var=diskpart_file_stat
-  when: enable_debug is defined and enable_debug
 - name: Check if diskpart file exists
   assert:
     that:
       - "{{ diskpart_file_stat.stat.isreg is defined and diskpart_file_stat.stat.isreg }}"
     success_msg: "diskpart script file exists"
     fail_msg: "diskpart script file not exist: {{ diskpart_file_path }}"
+- name: Copy diskpart file to current test case log folder
+  copy:
+    src: "{{ diskpart_file_path }}"
+    dest: "{{ current_test_log_folder }}/"
 
 - include_tasks: ../utils/win_get_raw_disk_num.yml
+- include_tasks: ../utils/win_get_unused_drive_letter.yml
 - include_tasks: ../utils/win_check_disk_online.yml
   vars:
     win_check_disk_online_num: "{{ win_get_raw_disk_num }}"
 
+# Edit diskpart script file in remote Windows guest OS
+- name: Modify raw disk number in diskpart script file
+  lineinfile:
+    path: "{{ diskpart_file_path_current }}"
+    regexp: 'select disk *'
+    line: "select disk {{ win_get_raw_disk_num }}"
+  when:
+    - win_get_raw_disk_num is defined
+    - win_get_raw_disk_num
+- name: Modify new drive letter in diskpart script file
+  lineinfile:
+    path: "{{ diskpart_file_path_current }}"
+    regexp: 'assign letter*'
+    line: "assign letter={{ drive_letter_new }}"
+  when:
+    - drive_letter_new is defined
+    - drive_letter_new
+- name: Remove online disk if disk is already online
+  lineinfile:
+    path: "{{ diskpart_file_path_current }}"
+    regexp: 'online disk'
+    state: absent
+  when:
+    - win_check_disk_online_result is defined
+    - win_check_disk_online_result
+
 # Transfer diskpart script file from local to remote Windows guest OS
 - include_tasks: ../utils/win_copy_file_from_local.yml
   vars:
-    src_path_local: "{{ diskpart_file_path }}"
+    src_path_local: "{{ diskpart_file_path_current }}"
     dest_path_remote: "C:\\test_diskpart\\"
-- name: Set fact of the remote diskpart file path
-  set_fact:
-    diskpart_file_path_win: "C:\\test_diskpart\\diskpart.txt"
 - include_tasks: ../utils/win_check_file_exist.yml
   vars:
     win_check_file_exist_file: "{{ diskpart_file_path_win }}"
@@ -45,39 +73,21 @@
     success_msg: "diskpart file found in guest OS"
     fail_msg: "diskpart file not found in guest OS: {{ diskpart_file_path_win }}"
 
-# Edit diskpart script file in remote Windows guest OS
-- name: Modify raw disk number in diskpart script file
-  win_lineinfile:
-    path: "{{ diskpart_file_path_win }}"
-    regexp: 'select disk *'
-    line: "select disk {{ win_get_raw_disk_num }}"
-  delegate_to: "{{ vm_guest_ip }}"
-- name: Remove online disk if disk is already online
-  win_lineinfile:
-    path: "{{ diskpart_file_path_win }}"
-    regexp: 'online disk'
-    state: absent
-  delegate_to: "{{ vm_guest_ip }}"
-  when: win_check_disk_online_result
-
 - include_tasks: ../utils/win_create_disk_partition.yml
 
 # Check new file creation and content write to the new disk
 - name: Set fact of the file path to do disk write test
   set_fact:
     write_test_file_path_win: "{{ drive_letter_new }}:\\test_disk_write.txt"
+    test_line: "This is the test line to write to the file. "
+
 - include_tasks: ../utils/win_create_file.yml
   vars:
     new_empty_file_path: "{{ write_test_file_path_win }}"
-- name: Generate string content to write to disk drive
-  set_fact:
-    test_line: "This is the test line to write to the file. "
-- name: Set fact of the content to write to file
-  set_fact:
-    write_file_content: "{% for i in range(0, 20) %} '{{ test_line }}\n{{ test_line }}' {% endfor %}"
 - include_tasks: ../utils/win_write_to_file.yml
   vars:
     write_file_path: "{{ write_test_file_path_win }}"
+    write_file_content: "{% for i in range(0, 20) %} '{{ test_line }}\n{{ test_line }}' {% endfor %}"
 - include_tasks: ../utils/win_check_file_exist.yml
   vars:
     win_check_file_exist_file: "{{ write_test_file_path_win }}"
