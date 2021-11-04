@@ -1,9 +1,14 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Set new base snapshot after VMware tools installed
+# Rename or remove old base snapshot and take a new base snapshot
+# Parameters:
+#   remove_old_base_snapshot: if set to 'False', will rename old
+#   base snapshot with a timestamp sufix, if set to 'True', will
+#   remove old base snapshot.
+#
 # Check old base snapshot exists or not
-- include_tasks: ../../common/vm_check_snapshot_exist.yml
+- include_tasks: vm_check_snapshot_exist.yml
   vars:
     snapshot_name: "{{ base_snapshot_name }}"
 
@@ -13,14 +18,24 @@
     old_snapshot_new_name: "{{ base_snapshot_name }}-{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
 
 # Rename old snapshot with a timestamp
-- include_tasks: ../../common/vm_rename_snapshot.yml
+- include_tasks: vm_rename_snapshot.yml
   vars:
     current_snapshot_name: "{{ base_snapshot_name }}"
     new_snapshot_name: "{{ old_snapshot_new_name }}"
-  when: old_base_snapshot_exist
+  when:
+    - old_base_snapshot_exist
+    - not remove_old_base_snapshot | default(False)
+
+# Remove old base snapshot
+- include_tasks: vm_remove_snapshot.yml
+  vars:
+    snapshot_name: "{{ base_snapshot_name }}"
+  when:
+    - old_base_snapshot_exist
+    - remove_old_base_snapshot | default(False) 
 
 # Take a new snapshot as base snapshot
-- include_tasks: ../../common/vm_take_snapshot.yml
+- include_tasks: vm_take_snapshot.yml
   vars:
     snapshot_name: "{{ base_snapshot_name }}"
 
