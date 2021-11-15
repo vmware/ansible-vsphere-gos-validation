@@ -32,7 +32,7 @@
 - block:
     - name: "Set the fact of guest CDROM devices with ISO connected"
       set_fact:
-        guest_cdroms: "{{ guest_cdroms | union([lsblk_item.split()[0]]) }}"
+        guest_cdroms: "{{ guest_cdroms | union(['/dev/' ~ lsblk_item.split()[0]]) }}"
       when:
         - lsblk_item.split() | length == 3
         - lsblk_item.split()[1] | lower == 'rom'
@@ -49,18 +49,37 @@
     - lsblk_result.stdout_lines | length > 0
 
 - block:
+    - include_tasks: ../../common/get_system_info.yml
+      vars:
+        filter: "ansible_mounts"
+
+    - name: "Get the fact about all OS mounts"
+      set_fact:
+        guest_os_ansible_mounts: "{{ guest_system_info.ansible_mounts | selectattr('device', 'in', guest_cdroms) | map(attribute='mount') }}"
+
+    # Unmount ISO images before ejecting them
+    - name: "Umount CDROM devices"
+      mount:
+        path: "{{ guest_cdrom_mount }}"
+        state: absent
+      delegate_to: "{{ vm_guest_ip }}"
+      become: True
+      with_items: "{{ guest_os_ansible_mounts }}"
+      loop_control:
+        loop_var: guest_cdrom_mount
+      when: guest_os_ansible_mounts | length > 0
+
     # Eject connected CDROM
-    - block:
-        - name: "Eject CDROM device '/dev/{{ guest_cdrom }}'"
-          command: "eject -v /dev/{{ guest_cdrom }}"
-          delegate_to: "{{ vm_guest_ip }}"
-          register: eject_cdrom_result
-          when: >
-            not eject_cdrom_name or
-            guest_cdrom == eject_cdrom_name
-          with_items: "{{ guest_cdroms }}"
-          loop_control:
-            loop_var: guest_cdrom
+    - name: "Eject CDROM device {{ guest_cdrom_device }}"
+      command: "eject -v {{ guest_cdrom_device }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: eject_cdrom_result
+      when: >
+        not eject_cdrom_name or
+        guest_cdrom_device.split('/')[-1] == eject_cdrom_name
+      with_items: "{{ guest_cdroms }}"
+      loop_control:
+        loop_var: guest_cdrom_device
 
     - name: "Print CDROM eject result"
       debug: var=eject_cdrom_result

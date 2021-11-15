@@ -1,12 +1,19 @@
 # Copyright 2021 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Wait for guest customization completed
-# Check guest customization state keyword in vmware.log
+# Wait for guest customization completed state keyword in vmware.log
+# Parameter:
+#   check_gosc_state_keyword: True to check GOSC state keyword exists in vmware.log.
 #
 - name: Initialize the key string status
   set_fact:
     get_keystring: 0
+
+- name: Initialize the fact to check GOSC state keyword
+  set_fact:
+    check_gosc_state_keyword: true
+  when: check_gosc_state_keyword is undefined
+
 - name: Set fact of the key strings
   set_fact:
     gosc_state_keyword: "ToolsDeployPkgPublishState: state=5, code=0"
@@ -26,11 +33,15 @@
   debug: var=get_keystring
   when: enable_debug is defined and enable_debug
 
+- name: "Set the result of getting GOSC state code"
+  set_fact:
+    gosc_state_keyword_found: "{{ not get_keystring.failed and get_keystring.stdout_lines | length > 0 and get_keystring.stdout_lines[0] | int > 0 }}"
+
 # Fail when not get VM gosc state keyword in vmware.log
 - name: Check guest customization state
   fail:
     msg: "Not found '{{ gosc_state_keyword }}' in vmware.log"
-  when: >
-    (get_keystring.failed) or
-    (get_keystring.stdout_lines | length == 0) or
-    (get_keystring.stdout_lines[0] | int == 0)
+  when:
+    - check_gosc_state_keyword is defined
+    - check_gosc_state_keyword | bool
+    - not gosc_state_keyword_found | bool
