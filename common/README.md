@@ -10,6 +10,7 @@
 * get_guest_system_info.yml: Get guest system info
 * vm_get_device_with_key.yml: Get VM device with a specific key
 * vm_get_device_with_label.yml: Get VM device with a specific label
+* vm_get_video_card.yml: Get VM video card settings
 
 ### Tasks for VM deploy or remove
 * vm_create.yml: Create a new VM on ESXi host
@@ -26,6 +27,7 @@
 * vm_set_power_state.yml: Set VM power state
 * vm_wait_gosc_completed.yml: Wait for GOSC being completed
 * vm_add_serial_port.yml: Add a serial port to VM
+* vm_set_video_card.yml: Configure VM video card settings
 
 ### Tasks for VM CPU or Memory settings
 * vm_enable_cpu_hotadd.yml: Enable VM CPU hotadd

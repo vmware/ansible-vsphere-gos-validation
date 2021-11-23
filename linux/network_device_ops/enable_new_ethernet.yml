@@ -81,14 +81,16 @@
   shell: "ip link set {{ eth_dev }} down; ip link set {{ eth_dev }} up"
   delegate_to: "{{ vm_guest_ip }}"
   register: set_link_down_up
-  when: guest_os_ansible_distribution in ["VMware Photon OS", "Flatcar", "Ubuntu"]
+  when: >
+    (guest_os_ansible_distribution in ["VMware Photon OS", "Flatcar"]) or
+    (guest_os_ansible_distribution == "Ubuntu" and guest_os_with_gui is defined and guest_os_with_gui)
 
 - name: "Bring link '{{ eth_dev }}' up"
   shell: "ifdown {{ eth_dev }}; ifup {{ eth_dev }}"
   delegate_to: "{{ vm_guest_ip }}"
   register: set_link_down_up
   when: >
-    (guest_os_family == "RedHat" and guest_os_ansible_distribution_major_ver | int < 7) or
+    (guest_os_family == "RedHat" and guest_os_ansible_distribution_major_ver | int < 8) or
     (guest_os_family != "RedHat" and guest_os_ansible_distribution not in ["VMware Photon OS", "Ubuntu", "Flatcar", "Astra Linux (Orel)"])
 
 # Get IP address of new interface
