@@ -12,23 +12,11 @@
       set_fact:
         enable_cloudinit_gosc: "{% if gosc_workflow  == 'cloud-init' %}True{% else %}False{% endif %}"
 
-    - name: "Set default guest OS list not support GOSC"
-      set_fact:
-        gos_not_support_gosc: ["FreeBSD", "Flatcar", "Debian", "SLED", "Astra Linux (Orel)"]
-
     - include_tasks: ../setup/test_setup.yml
       vars:
         skip_test_no_vmtools: True
 
-    - include_tasks: ../../common/skip_test_case.yml
-      vars:
-        skip_msg: "Skip this test case as guest OS status doesn't meet GOSC requirements"
-      when: >
-        (vcenter_is_defined is undefined) or
-        (not vcenter_is_defined) or
-        (enable_cloudinit_gosc and not vmtools_is_ovt) or
-        ((guest_os_ansible_distribution is defined) and
-        (guest_os_ansible_distribution in gos_not_support_gosc))
+    - include_tasks: check_gosc_support_status.yml
 
     - block:
        # Traditional GOSC in Photon OS is implemented with cloud-init,
@@ -132,8 +120,6 @@
 
     # Modify cloud-init GOSC config in guest OS
     - include_tasks: ../utils/enable_disable_cloudinit_cfg.yml
-    # Get netplan config file for Ubuntu server
-    - include_tasks: ../utils/get_netplan_config_file.yml
     # Execute guest customization on VM
     - include_tasks: linux_gosc_start.yml
     # Check guest customization results

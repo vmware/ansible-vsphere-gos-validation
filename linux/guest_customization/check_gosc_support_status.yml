@@ -1,0 +1,44 @@
+# Copyright 2021 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Skip GOSC testing if no vCenter or no open-vm-tools
+- include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: "Skip this test case as guest OS status doesn't meet GOSC requirements"
+  when: >
+    (vcenter_is_defined is undefined) or
+    (not vcenter_is_defined) or
+    (enable_cloudinit_gosc and not vmtools_is_ovt)
+
+- block:
+    - name: "Initialize GOSC support status"
+      set_fact:
+        gosc_is_supported: True
+
+    - name: "Set default guest OS list not support GOSC"
+      set_fact:
+        gos_not_support_gosc: ["FreeBSD", "Flatcar", "Debian", "SLED", "Astra Linux (Orel)"]
+
+    - name: "Set fact of GOSC support status to False"
+      set_fact:
+        gosc_is_supported: False
+      when:  guest_os_ansible_distribution in gos_not_support_gosc
+
+    - name: "Set fact of GOSC support status to False"
+      set_fact:
+        gosc_is_supported: False
+      when:
+        - guest_os_ansible_distribution == 'Ubuntu'
+        - guest_os_ansible_distribution_ver is version ('21.04', '>=')
+        - vcenter_version is version ('7.0.1', '<')
+        - not enable_cloudinit_gosc | bool
+
+    - block:
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "GOSC is not supported for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} on vCenter Server {{ vcenter_version }}. See https://partnerweb.vmware.com/programs/guestOS/guest-os-customization-matrix.pdf."
+      when: not gosc_is_supported | bool
+  when:
+    - guest_os_ansible_distribution is defined
+    - guest_os_ansible_distribution_ver is defined
+    - vcenter_version is defined

@@ -28,6 +28,7 @@
 * vm_wait_gosc_completed.yml: Wait for GOSC being completed
 * vm_add_serial_port.yml: Add a serial port to VM
 * vm_set_video_card.yml: Configure VM video card settings
+* vm_remove_serial_port.yml: Remove a serial port from VM
 
 ### Tasks for VM CPU or Memory settings
 * vm_enable_cpu_hotadd.yml: Enable VM CPU hotadd

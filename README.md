@@ -73,8 +73,8 @@ This project supports below scenarios for end-to-end guest OS validation testing
 | SUSE Linux Enterprise 12 SP5, 15 SP0/SP1/SP2    |                                  |                          | :heavy_check_mark:                 |
 | Photon OS 3.x                                   | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Photon OS 4.0                                   |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
-| Ubuntu 18.04, 18.10, 20.04, 20.10, 21.04 live-server   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Ubuntu 20.04, 20.10, 21.04 cloud image                 |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
+| Ubuntu 18.04, 18.10, 20.04, 20.10, 21.04, 21.10 live-server   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Ubuntu 20.04, 20.10, 21.04, 21.10 cloud image                 |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Ubuntu 18.04, 18.10, 20.04, 20.10, 21.04 desktop       |                                  |                          | :heavy_check_mark:                 |
 | Flatcar 2592.0.0 and later                      |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Debian 9.x, 10.x                                |                                  |                          | :heavy_check_mark:                 |
