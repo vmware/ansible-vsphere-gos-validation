@@ -64,7 +64,7 @@ This project supports below scenarios for end-to-end guest OS validation testing
 
 | Guest OS types/versions                         | Automatic install from ISO image | Deploy from ova template | Existing VM and installed guest OS |
 | :---------------------------------------------- | :------------------------------: | :----------------------: | :--------------------------------: |
-| Red Hat Enterprise Linux 7.x, 8.x               | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Red Hat Enterprise Linux 7.x, 8.x, 9.x          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | CentOS 7.x, 8.x                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Oracle Linux 7.x, 8.x                           | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Rocky Linux 8.4                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |

@@ -19,6 +19,10 @@
   set_fact:
     deploy_casename: "deploy_vm_{{ firmware }}_{{ boot_disk_controller }}_{{ network_adapter_type }}"
 
+- name: "Initialize the fact whether to install guest OS with desktop"
+  set_fact:
+    install_guest_with_desktop: False
+
 - block:
     # Generate unattend install iso file
     - block:
@@ -41,6 +45,20 @@
 
     - include_tasks: ubuntu/reconfigure_ubuntu_iso_vm.yml
       when: guest_id == 'ubuntu64Guest'
+
+    - block:
+        - include_tasks: ../../common/vm_get_video_card.yml
+    
+        - name: Get VM default video memory size
+          set_fact:
+            vm_default_video_memory_mb: "{{ (vm_video_cart_facts.instance.video_memory | int) / 1024 }}"
+    
+        # Increase VM's video card memory to 8 MB in case desktop can't be loaded
+        - include_tasks: ../../common/vm_set_video_card.yml
+          vars:
+            video_memory_mb: 8
+          when: vm_default_video_memory_mb | int < 8
+      when: install_guest_with_desktop
 
     # Enable secureboot
     - include_tasks: ../../common/vm_set_boot_options.yml

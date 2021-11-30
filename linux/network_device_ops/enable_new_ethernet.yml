@@ -70,6 +70,14 @@
 
 # Bring up the new network interface
 - name: "Bring link '{{ eth_dev }}' up"
+  shell: "nmcli device connect {{ eth_dev }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: set_link_down_up
+  when:
+    - guest_os_family == "RedHat"
+    - guest_os_ansible_distribution_major_ver | int >= 8
+
+- name: "Bring link '{{ eth_dev }}' up"
   shell: "ip link set {{ eth_dev }} down; ip link set {{ eth_dev }} up"
   delegate_to: "{{ vm_guest_ip }}"
   register: set_link_down_up
@@ -81,7 +89,9 @@
   shell: "ifdown {{ eth_dev }}; ifup {{ eth_dev }}"
   delegate_to: "{{ vm_guest_ip }}"
   register: set_link_down_up
-  when: guest_os_ansible_distribution not in ["VMware Photon OS", "Ubuntu", "Flatcar", "Astra Linux (Orel)"]
+  when: >
+    (guest_os_family == "RedHat" and guest_os_ansible_distribution_major_ver | int < 8) or
+    (guest_os_family != "RedHat" and guest_os_ansible_distribution not in ["VMware Photon OS", "Ubuntu", "Flatcar", "Astra Linux (Orel)"])
 
 # Get IP address of new interface
 - name: "Get link '{{ eth_dev }}' status"

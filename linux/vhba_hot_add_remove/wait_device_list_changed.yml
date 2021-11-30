@@ -13,12 +13,12 @@
         - name: "Set SCSI command tools package name"
           set_fact:
             sg3_utils_pkg: "{{ 'sg3-utils' if guest_os_family in ['Debian', 'Astra Linux (Orel)'] else 'sg3_utils' }}"
-    
+
         # Install SCSI command tools
         - include_tasks: ../utils/get_installed_package_info.yml
           vars:
             package_name: "{{ sg3_utils_pkg }}"
-    
+
         - include_tasks: ../utils/install_uninstall_package.yml
           vars:
             package_name: "{{ sg3_utils_pkg }}"
@@ -26,12 +26,12 @@
           when:
             - package_info is defined
             - package_info | length == 0
-    
+
         - name: "Rescan all scsi devices"
           command: "/usr/bin/rescan-scsi-bus.sh -a -r"
           register: rescan_scsi_result
           delegate_to: "{{ vm_guest_ip }}"
-    
+
         - name: "Print result of rescanning scsi"
           debug: var=rescan_scsi_result.stdout_lines
           when:
@@ -50,11 +50,41 @@
 
 - block:
     - debug:
-        msg: "Hot adding or removing NVMe disks cannot be detected by guest OS on VMs with hardware version of {{ vm_hardware_version }}. An workaround is to unload and reload nvme driver to see these changes."
+        msg: "Hot adding or removing NVMe disks cannot be detected by guest OS on VMs with hardware version of {{ vm_hardware_version }}."
 
-    - name: "Unload and reload nvme driver"
-      shell: "rmmod nvme && modprobe nvme"
-      delegate_to: "{{ vm_guest_ip }}"
+    # Get boot disk controller
+    - name: "Set fact of VM's boot disk controller type"
+      set_fact:
+        vm_boot_disk_ctrl_type: "{{ boot_disk_controller if boot_disk_controller in ['sata', 'nvme'] else 'scsi' }}"
+      when: new_vm is defined and new_vm | bool
+
+    - block:
+        - include_tasks: ../../common/vm_get_device_with_label.yml
+          vars:
+            device_label: "Hard disk 1"
+        - include_tasks: ../../common/vm_get_device_with_key.yml
+          vars:
+            device_key: "{{ device_info_with_label.controllerKey }}"
+        - name: "Set fact of VM's boot disk controller type"
+          set_fact:
+            vm_boot_disk_ctrl_type: "{{ device_info_with_key.deviceInfo.label.split()[0] | lower }}"
+      when: new_vm is undefined or not new_vm | bool
+
+    - block:
+        - debug:
+            msg: "VM's boot disk controller is not NVMe controller, so unload and reload nvme driver to see NVMe device changes."
+
+        - name: "Unload and reload nvme driver"
+          shell: "rmmod nvme && modprobe nvme"
+          delegate_to: "{{ vm_guest_ip }}"
+      when: vm_boot_disk_ctrl_type != 'nvme'
+
+    - block:
+        - debug:
+            msg: "VM's boot disk controller is NVMe controller, so reboot OS to see NVMe device changes."
+
+        - include_tasks: ../utils/vm_reboot.yml
+      when: vm_boot_disk_ctrl_type == 'nvme'
   when:
     - new_disk_ctrl_type == 'nvme'
     - vm_hardware_version_num | int < 19
