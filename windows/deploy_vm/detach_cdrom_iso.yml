@@ -1,21 +1,20 @@
 # Copyright 2021 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# After OS install, detach the unattend install ISO and
-# remove it on ESXi host datastore.
-# Change CDROM type from iso to client
+# After OS install, detach the OS image and unattend install ISO file,
+# remove it on ESXi host datastore. Change CDROM type from iso to client.
+#
 - include_tasks: ../../common/vm_configure_cdrom.yml
   vars:
     cdrom_type: client
-    cdrom_controller_type: "{{ new_vm_cdrom_ctl_type }}"
-    cdrom_controller_num: "{{ unattend_iso_cdrom_ctl_num | int }}"
-    cdrom_unit_num: "{{ unattend_iso_cdrom_unit_num | int }}"
+    cdrom_controller_type: "{{ item.controller_type }}"
+    cdrom_controller_num: "{{ item.controller_number | int }}"
+    cdrom_unit_num: "{{ item.unit_number | int }}"
     cdrom_state: present
+  with_items: "{{ vm_cdroms }}"
   when:
-    - unattend_iso_cdrom_ctl_num is defined
-    - unattend_iso_cdrom_ctl_num
-    - unattend_iso_cdrom_unit_num is defined
-    - unattend_iso_cdrom_unit_num
+    - vm_cdroms is defined
+    - vm_cdroms
 
 # Delete unattend install iso on ESXi datastore
 - include_tasks: ../../common/esxi_check_delete_datastore_file.yml

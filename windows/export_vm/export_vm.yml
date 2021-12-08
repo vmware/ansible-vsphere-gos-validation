@@ -21,15 +21,14 @@
     - include_tasks: ../../common/vm_configure_cdrom.yml
       vars:
         cdrom_state: absent
-        cdrom_controller_type: "{{ item.controllerKey }}"
-        cdrom_controller_num: "{{ item.controllerKey }}"
-        cdrom_unit_num: "{{ item.unitNumber }}"
+        cdrom_controller_type: "{{ item.controller_label.split(' ')[0] | lower }}"
+        cdrom_controller_num: "{{ item.bus_num }}"
+        cdrom_unit_num: "{{ item.unit_num }}"
+      when: item.label != "CD/DVD drive 1"
       with_items: "{{ cdrom_device_list }}"
       when:
         - cdrom_device_list is defined
         - cdrom_device_list | length > 1
-
-    # Change to 'client device' for CDROM devices which have ISO images connected
 
     # Export VM to ovf template to the specified path
     # Please make sure enough disk space in specified path
