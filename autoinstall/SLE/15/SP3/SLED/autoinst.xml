@@ -38,7 +38,11 @@
       <update_nvram>true</update_nvram>
       <xen_kernel_append>vga=gfx-1024x768x16 crashkernel=280M\&lt;4G</xen_kernel_append>
     </global>
+{% if firmware is defined and firmware | lower == 'efi' %}
     <loader_type>grub2-efi</loader_type>
+{% else %}
+    <loader_type>grub2</loader_type>
+{% endif %}
   </bootloader>
   <firewall t="map">
     <default_zone>public</default_zone>
@@ -636,6 +640,7 @@
   <networking t="map">
     <dns t="map">
       <dhcp_hostname t="boolean">false</dhcp_hostname>
+      <hostname>localhost</hostname>
       <resolv_conf_policy>auto</resolv_conf_policy>
     </dns>
     <ipv6 t="boolean">true</ipv6>
@@ -670,9 +675,11 @@
           <create t="boolean">true</create>
           <filesystem t="symbol">vfat</filesystem>
           <format t="boolean">true</format>
+{% if firmware is defined and firmware | lower == 'efi' %}
           <fstopt>utf8</fstopt>
           <mount>/boot/efi</mount>
           <mountby t="symbol">uuid</mountby>
+{% endif %}
           <partition_id t="integer">259</partition_id>
           <partition_nr t="integer">1</partition_nr>
           <resize t="boolean">false</resize>
@@ -847,7 +854,11 @@
       <package>kexec-tools</package>
       <package>kdump</package>
       <package>irqbalance</package>
+{% if firmware is defined and firmware | lower == 'efi' %}
       <package>grub2-x86_64-efi</package>
+{% else %}
+      <package>grub2</package>
+{% endif %}
       <package>glibc</package>
       <package>e2fsprogs</package>
       <package>dosfstools</package>
