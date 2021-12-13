@@ -2,11 +2,24 @@
 
 ## Description
 A new Windows VM will be deployed on your configured vCenter or ESXi host, after guest OS installed automatically using Autounattend.xml, specified VMware tools will be installed, then this VM will be exported to an OVF template saved in the specified path on your local machine.
-* Configuration file: vars/create_windows_template_vars.yml
-* Windows template creation playbook list file: windows/create_template_playbook_list.yml
-* Windows Autounattend file path: autoinstall/Windows/,
-  or you can put your customized Autounattend file into this path and configure it in file 'vars/export_windows_template_vars.yml' using variable 'unattend_install_conf'.
-* VM user name and password for Windows client is 'test/B1gd3m0z', for Windows Server is 'Administrator/B1gd3m0z', which are hardcoded in Autounattend.xml files in this path 'autoinstall/Windows/'.
+* Configuration file:
+```
+  vars/create_windows_template_vars.yml
+```
+* Windows template creation playbook list file:
+```
+  windows/create_template_playbook_list.yml
+```
+* Windows Autounattend install file path:
+```
+  autoinstall/Windows/
+```
+or you can put customized Autounattend file into this path and configure it in file 'vars/export_windows_template_vars.yml' using variable 'unattend_install_conf'.
+* VM user name and password are hardcoded in Autounattend.xml files in above path.
+```
+  For Windows client: test/B1gd3m0z
+  For Windows Server: Administrator/B1gd3m0z
+```
 
 ## Steps to Launch the Windows Template Creation
 1. Copy the Windows ISO image to the datastore of ESXi host, on which you want to deploy a new virtual machine.
