@@ -12,6 +12,7 @@
 * vm_get_device_with_label.yml: Get VM device with a specific label
 * vm_get_video_card.yml: Get VM video card settings
 * vm_get_cdrom_devices.yml: Get VM CDROM devices info list
+* vm_get_vbs_status.yml: Get Windows VM VBS enablement status
 
 ### Tasks for VM deploy or remove
 * vm_create.yml: Create a new VM on ESXi host
