@@ -59,8 +59,10 @@
         - include_tasks: ../../linux/deploy_vm/compose_vm_cdroms.yml
         # Check configured OS install ISO file and unattend ISO file exist
         - include_tasks: ../../linux/deploy_vm/check_configured_cdrom_iso.yml
-
-        # Created VM is in power off state
+        
+        - name: Set Windows VM disk size at least 64GB
+          set_fact:
+            boot_disk_size_gb: "{{ [64, boot_disk_size_gb | default(64) | int] | max }}"
         - include_tasks: ../../common/vm_create.yml
         # When firmware is EFI, configure force EFI setup once
         - name: Enable force setup once when VM firmware is EFI and send keys to VM
