@@ -16,15 +16,30 @@
     - include_tasks: ../../common/vm_get_power_state.yml
     # Power off VM if it's not in poweredOff state
     - include_tasks: ../utils/shutdown_vm.yml
+      when: vm_power_state_get != "poweredOff"
+ 
     # Remove other CDROM devices except 'CD/DVD drive 1'
     - include_tasks: ../../common/vm_get_cdrom_devices.yml
     - include_tasks: ../../common/vm_configure_cdrom.yml
       vars:
         cdrom_state: absent
         cdrom_controller_type: "{{ item.controller_label.split(' ')[0] | lower }}"
-        cdrom_controller_num: "{{ item.bus_num }}"
-        cdrom_unit_num: "{{ item.unit_num }}"
+        cdrom_controller_num: "{{ item.bus_num | int }}"
+        cdrom_unit_num: "{{ item.unit_num | int }}"
       when: item.label != "CD/DVD drive 1"
+      with_items: "{{ cdrom_device_list }}"
+      when:
+        - cdrom_device_list is defined
+        - cdrom_device_list | length > 1
+    # Set 'CD/DVD drive 1' type to client device
+    - include_tasks: ../../common/vm_configure_cdrom.yml
+      vars:
+        cdrom_type: client
+        cdrom_controller_type: "{{ item.controller_label.split(' ')[0] | lower }}"
+        cdrom_controller_num: "{{ item.bus_num | int }}"
+        cdrom_unit_num: "{{ item.unit_num | int }}"
+        cdrom_state: present
+      when: item.label == "CD/DVD drive 1"
       with_items: "{{ cdrom_device_list }}"
       when:
         - cdrom_device_list is defined
