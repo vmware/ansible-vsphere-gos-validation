@@ -57,53 +57,85 @@
     - debug: var=network_config.stdout_lines
   when: guest_os_ansible_distribution not in ["VMware Photon OS", "Astra Linux (Orel)"]
 
-# Apply netplan network config changes in Ubuntu server
-- block:
-    - name: "Apply netplan configuration file for new added nic {{ eth_dev }}"
-      command: "netplan apply"
-      delegate_to: "{{ vm_guest_ip }}"
-      become: yes
-    - include_tasks: ../../common/vm_wait_connection.yml
-  when:
-    - guest_os_ansible_distribution == "Ubuntu"
-    - guest_os_with_gui is defined and not guest_os_with_gui
-
-# Bring up the new network interface
-- name: "Bring link '{{ eth_dev }}' up"
-  shell: "nmcli device connect {{ eth_dev }}"
-  delegate_to: "{{ vm_guest_ip }}"
-  register: set_link_down_up
-  when:
-    - guest_os_family == "RedHat"
-    - guest_os_ansible_distribution_major_ver | int >= 8
-
-- name: "Bring link '{{ eth_dev }}' up"
-  shell: "ip link set {{ eth_dev }} down; ip link set {{ eth_dev }} up"
-  delegate_to: "{{ vm_guest_ip }}"
-  register: set_link_down_up
-  when: >
-    (guest_os_ansible_distribution in ["VMware Photon OS", "Flatcar"]) or
-    (guest_os_ansible_distribution == "Ubuntu" and guest_os_with_gui is defined and guest_os_with_gui)
-
-- name: "Bring link '{{ eth_dev }}' up"
-  shell: "ifdown {{ eth_dev }}; ifup {{ eth_dev }}"
-  delegate_to: "{{ vm_guest_ip }}"
-  register: set_link_down_up
-  when: >
-    (guest_os_family == "RedHat" and guest_os_ansible_distribution_major_ver | int < 8) or
-    (guest_os_family != "RedHat" and guest_os_ansible_distribution not in ["VMware Photon OS", "Ubuntu", "Flatcar", "Astra Linux (Orel)"])
-
-# Get IP address of new interface
-- name: "Get link '{{ eth_dev }}' status"
-  shell: "ip -br addr show {{ eth_dev }} | awk '{print $3}'"
-  register: link_status
-  changed_when: False
-  until: '"192.168" in link_status.stdout'
-  retries: 20
-  delay: 5
-  delegate_to: "{{ vm_guest_ip }}"
-- debug: var=link_status
-
+# Check new ethernet device status to see whether it has been bring up automatically
 - include_tasks: ../utils/ethernet_ip_get.yml
+  vars:
+    all_ip: False
+
+- name: "Set fact of ethernet device status and IP"
+  set_fact:
+    eth_dev_status: "{{ ethernets[eth_dev] if ethernets | length > 0 else {} }}"
+
+- block:
+    - include_tasks: ../utils/get_service_info.yml
+      vars:
+        service_name: "NetworkManager.service"
+
+    # RHEL/SLED/Ubuntu Desktop network interfaces are managed by NetworkManager
+    - name: "Bring link '{{ eth_dev }}' up"
+      shell: "nmcli device connect {{ eth_dev }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      when: service_info
+
+    - block:
+        # Ubuntu server is using netplan to manage network interfaces
+        - block:
+            - name: "Apply netplan configuration file for new added nic {{ eth_dev }} in Ubuntu"
+              command: "netplan apply"
+              delegate_to: "{{ vm_guest_ip }}"
+              become: yes
+            - include_tasks: ../../common/vm_wait_connection.yml
+          when: guest_os_ansible_distribution == "Ubuntu"
+
+        # SLES is using Wicked to manage network interface
+        - block:
+            # Bring down new ethernet device if no IP assigned
+            - name: "Bring link '{{ eth_dev }}' down for {{ guest_os_ansible_distribution }}"
+              shell: "wicked ifdown {{ eth_dev }}"
+              delegate_to: "{{ vm_guest_ip }}"
+              when:
+                - eth_dev_status.status is defined
+                - eth_dev_status.status | lower == 'up'
+                - not eth_dev_status.ipv4
+
+            - name: "Bring link '{{ eth_dev }}' up for {{ guest_os_ansible_distribution }}"
+              shell: "wicked ifup {{ eth_dev }}"
+              delegate_to: "{{ vm_guest_ip }}"
+              when: not service_info
+          when: guest_os_family == "Suse"
+
+        # Old RHEL is using ifdown/ifup to manage network interfaces
+        - name: "Bring link '{{ eth_dev }}' up for {{ guest_os_ansible_distribution }}"
+          shell: "ifdown {{ eth_dev }}; ifup {{ eth_dev }}"
+          delegate_to: "{{ vm_guest_ip }}"
+          register: set_link_down_up
+          when: guest_os_family == "RedHat"
+
+        # Photon OS/Flatcar is using systemd-networkd to manage network interface
+        - name: "Bring link '{{ eth_dev }}' up for {{ guest_os_ansible_distribution }}"
+          shell: "ip link set {{ eth_dev }} down; ip link set {{ eth_dev }} up"
+          delegate_to: "{{ vm_guest_ip }}"
+          register: set_link_down_up
+          when: guest_os_ansible_distribution in ["VMware Photon OS", "Flatcar"]
+      when: not service_info
+
+    # Get IP address of new interface
+    - name: "Get link '{{ eth_dev }}' status"
+      shell: "ip -br addr show {{ eth_dev }} | awk '{print $3}'"
+      register: link_status
+      changed_when: False
+      until: '"192.168" in link_status.stdout'
+      retries: 20
+      delay: 5
+      delegate_to: "{{ vm_guest_ip }}"
+    - debug: var=link_status
+
+    - include_tasks: ../utils/ethernet_ip_get.yml
+  when: >
+    (eth_dev_status.status is undefined or
+     eth_dev_status.status | lower != 'up' or
+     eth_dev_status.ipv4 is undefined or
+     not eth_dev_status.ipv4)
+
 - debug:
-    msg: "Get IPv4 address of '{{ eth_dev }}': {{ ethernets[eth_dev] }}"
+    msg: "Get IPv4 address of '{{ eth_dev }}': {{ ethernets[eth_dev] | default('') }}"
