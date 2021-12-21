@@ -75,7 +75,10 @@
     - name: "Bring link '{{ eth_dev }}' up"
       shell: "nmcli device connect {{ eth_dev }}"
       delegate_to: "{{ vm_guest_ip }}"
-      when: service_info
+      when:
+        - service_info
+        - service_info.state is defined
+        - service_info.state in ['active', 'running']
 
     - block:
         # Ubuntu server is using netplan to manage network interfaces
@@ -101,23 +104,23 @@
             - name: "Bring link '{{ eth_dev }}' up for {{ guest_os_ansible_distribution }}"
               shell: "wicked ifup {{ eth_dev }}"
               delegate_to: "{{ vm_guest_ip }}"
-              when: not service_info
           when: guest_os_family == "Suse"
 
-        # Old RHEL is using ifdown/ifup to manage network interfaces
+        # Old RHEL or Debian is using ifdown/ifup to manage network interfaces
         - name: "Bring link '{{ eth_dev }}' up for {{ guest_os_ansible_distribution }}"
           shell: "ifdown {{ eth_dev }}; ifup {{ eth_dev }}"
           delegate_to: "{{ vm_guest_ip }}"
-          register: set_link_down_up
-          when: guest_os_family == "RedHat"
+          when: guest_os_family == "RedHat" or guest_os_ansible_distribution == "Debian"
 
         # Photon OS/Flatcar is using systemd-networkd to manage network interface
         - name: "Bring link '{{ eth_dev }}' up for {{ guest_os_ansible_distribution }}"
           shell: "ip link set {{ eth_dev }} down; ip link set {{ eth_dev }} up"
           delegate_to: "{{ vm_guest_ip }}"
-          register: set_link_down_up
           when: guest_os_ansible_distribution in ["VMware Photon OS", "Flatcar"]
-      when: not service_info
+      when: >
+        (not service_info or
+         service_info.state is undefined or
+         service_info.state not in ['active', 'running'])
 
     # Get IP address of new interface
     - name: "Get link '{{ eth_dev }}' status"
