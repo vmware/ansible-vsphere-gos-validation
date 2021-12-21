@@ -10,9 +10,11 @@
 #     running: the service is active and running
 #     stopped: the service is active and exited
 #     absent: the service doesn't exist
-#   expected_service_status: ['enabled', 'disabled']
+#   expected_service_status: ['enabled', 'disabled', 'static', ..., etc]
 #     enabled: the service is enabled to start at boot
 #     disabled: the service is disabled to start at boot
+#     static: the service is not enabled and has no provisions for enabling in the [Install] unit file section.
+#     ...
 
 
 - name: "Ignore expected_service_status when service '{{ service_name }}' is expected to be '{{ expected_service_state }}'"
@@ -20,15 +22,12 @@
     expected_service_status: ""
   when: expected_service_state == 'absent'
 
-- name: "Check the value of 'expected_service_state' and 'expected_service_status'"
+- name: "Check the value of 'expected_service_state'"
   fail:
-    msg: "Invalid parameters: expected_service_state={{ expected_service_state | default('undefined') }}, expected_service_status={{ expected_service_status | default('undefined') }}"
+    msg: "Invalid parameters: expected_service_state={{ expected_service_state | default('undefined') }}"
   when: >
     (expected_service_state is undefined) or
-    (expected_service_state not in ['active', 'inactive', 'running', 'stopped', 'absent']) or
-    (expected_service_state != 'absent' and
-     (expected_service_status is undefined or
-     expected_service_status not in ['enabled', 'disabled']))
+    (expected_service_state not in ['active', 'inactive', 'running', 'stopped', 'absent'])
 
 - include_tasks: get_service_info.yml
 
@@ -52,6 +51,7 @@
     success_msg: "Service '{{ service_name }}' is {{ expected_service_state }}"
   when: expected_service_state in  ['running', 'stopped']
 
+# If expected_service_status is undefined, not check it
 - name: "Check service '{{ service_name }}' is {{ expected_service_status }}"
   assert:
     that:
@@ -60,7 +60,7 @@
       - service_info.status == expected_service_status
     fail_msg: "Serivce '{{ service_name }}' is not {{ expected_service_status }}"
     success_msg: "Service '{{ service_name }}' is {{ expected_service_status }}"
-  when: expected_service_status in ['enabled', 'disabled']
+  when: expected_service_status is defined and expected_service_status
 
 - name: "Check service '{{ service_name }}' is {{ expected_service_state }}"
   assert:
@@ -70,5 +70,3 @@
     fail_msg: "Serivce '{{ service_name }}' exists"
     success_msg: "Service '{{ service_name }}' doesn't exist"
   when: expected_service_state == 'absent'
-
-

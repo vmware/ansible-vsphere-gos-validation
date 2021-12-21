@@ -3,25 +3,35 @@
 # This task is used to enable/disable service
 # Parameters:
 #   service_name: The service name to be configured
-#   service_enabled: True of false to enable or disable service
+#   service_status: The service status: enabled or disabled
 #   service_state: The service state: reloaded, restarted, started, or stopped
 #
 - name: "Validate service state"
   fail:
-    msg: "Invalid parameter service_enabled or service_state. service_enabled: {{ service_enabled }}, service_state: {{ service_state }}"
+    msg: "Invalid parameter service_status or service_state. service_status: {{ service_status }}, service_state: {{ service_state }}"
   when: >
-    (service_enabled is undefined and service_state is undefined) or
-    (service_enabled is defined and service_enabled | bool not in [true, false]) or
+    (service_status is undefined and service_state is undefined) or
+    (service_status is defined and service_status not in ['enabled', 'disabled']) or
     (service_state is defined and service_state not in ['reloaded', 'restarted', 'started', 'stopped'])
 
-- name: "Update service {{ service_name }}, enabled: {{ service_enabled }}, state: {{ service_state }}"
+- name: "Set fact of whether to enable service"
+  set_fact:
+    service_enabled: "{{ True if service_status == 'enabled' else False }}"
+  when: service_status is defined
+
+- name: "Set fact of not changing service status"
+  set_fact:
+    service_enabled: ""
+  when: service_status is undefined
+
+- name: "Update service {{ service_name }}, enabled: {{ service_enabled | default(omit) }}, state: {{ service_state }}"
   service:
     name: "{{ service_name }}"
-    enabled: "{{ service_enabled }}"
+    enabled: "{{ service_status | default(omit) }}"
     state: "{{ service_state }}"
   delegate_to: "{{ vm_guest_ip }}"
 
 - include_tasks: check_service_status.yml
   vars:
     expected_service_state: "{{ 'active' if service_state in ['started', 'restarted'] else 'inactive' }}"
-    expected_service_status: "{{ 'enabled' if service_enabled else 'disabled' }}"
+    expected_service_status: "{{ service_status if service_status is defined else '' }}"
