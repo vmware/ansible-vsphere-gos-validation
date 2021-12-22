@@ -90,12 +90,12 @@
 
         # SLED installation would retrieve DHCP ip during installation,
         # which might be confusing for update_inventory.yml. So,
-        # Here waits for vmtools running as SLES minimal install
-        # will also install open-vm-tools
+        # Here waits for vmtools running.
         - include_tasks: ../../common/vm_wait_vmtools_status.yml
           vars:
             vm_wait_vmtools_running: True
             vm_wait_vmtools_timeout: 3600
+          when: "'SLED/autoinst.xml' in unattend_install_conf"
       when: "'sle' in guest_id"
 
     # For RHEL, CentOS, RockyLinux, OracleLinux, sendkey to boot screen to not do
@@ -147,14 +147,13 @@
         - guest_os_ansible_distribution == "VMware Photon OS"
         - new_user is defined and new_user
 
-    - include_tasks: ../../common/vm_wait_vmtools_status.yml
-      vars:
-        vm_wait_vmtools_running: True
-        vm_wait_vmtools_ignore_error: True
-      when: guest_os_family == "RedHat"
-
     # If guest is not Photon OS, check guest has desktop or not
     - block:
+        - include_tasks: ../../common/vm_wait_vmtools_status.yml
+          vars:
+            vm_wait_vmtools_running: True
+            vm_wait_vmtools_ignore_error: True
+
         # OS with desktop:
         # For RHEL7/CentOS7/OracleLinux7 with desktop: initial-setup service
         # running at the end of installation, after click 'FINISH CONFIGURATION',
