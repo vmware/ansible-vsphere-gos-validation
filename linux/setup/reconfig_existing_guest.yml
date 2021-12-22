@@ -35,3 +35,31 @@
         - package_info is defined
         - package_info | length == 0
   when: guest_os_ansible_distribution == "VMware Photon OS"
+
+- block:
+    - include_tasks: ../utils/get_service_info.yml
+      vars:
+        service_name: "packagekit.service"
+
+    - name: "Stop PackageKit Service"
+      service:
+        name: 'packagekit.service'
+        state: 'stopped'
+      delegate_to: "{{ vm_guest_ip }}"
+      when:
+        - service_info
+        - service_info.state is defined
+        - service_info.state in ['active', 'running']
+
+    - include_tasks: ../utils/get_installed_package_info.yml
+      vars:
+        package_name: "PackageKit"
+
+    - include_tasks: ../utils/install_uninstall_package.yml
+      vars:
+        package_name: "PackageKit"
+        package_state: "absent"
+      when:
+        - package_info is defined
+        - package_info | length > 0
+  when: guest_os_ansible_distribution == "SLED"
