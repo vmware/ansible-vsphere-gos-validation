@@ -14,6 +14,15 @@
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
+        
+        # Refer to KB article https://kb.vmware.com/s/article/52584
+        - include_tasks: ../../common/vm_get_vbs_status.yml
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case due to memory hotadd not supported for VM with VBS enabled."
+          when:
+            - vm_vbs_enanled is defined and vm_vbs_enanled | bool
+        
         - name: "Set fact of initial memory size 2048MB for 32bit client"
           set_fact:
             vm_initial_mem_mb: 2048

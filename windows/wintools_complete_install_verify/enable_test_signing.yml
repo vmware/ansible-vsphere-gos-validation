@@ -3,6 +3,14 @@
 ---
 # Enable test signing in Windows guest OS for testing on VMware tools
 # containing not MS WHQL signed drivers
+#
+# If secure boot is enabled, disable secure boot firstly
+- include_tasks: ../../common/vm_get_boot_info.yml
+- include_tasks: ../secureboot_enable_disable/change_secureboot_config.yml
+  vars:
+    change_secureboot: 'disable'
+  when: vm_secureboot_enabled is defined and vm_secureboot_enabled | bool 
+
 - include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "bcdedit.exe -set TESTSIGNING ON"
