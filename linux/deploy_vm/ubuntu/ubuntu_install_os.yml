@@ -6,8 +6,6 @@
   when: ubuntu_install_method == "simulation"
 
 - block:
-    - include_tasks: ../../../common/vm_wait_guest_ip.yml
-
     - name: "Wait for autoinstall early commands"
       command: "grep -c -e '{{ autoinstall_start_msg }}' {{ vm_serial_port_output_file }}"
       until:
@@ -15,9 +13,11 @@
         - autoinstall_started.stdout is defined
         - autoinstall_started.stdout == "1"
       delay: 5
-      retries: 120
+      retries: 150
       delegate_to: "{{ esxi_hostname }}"
       register: autoinstall_started
+
+    - include_tasks: ../../../common/vm_wait_guest_ip.yml
 
     - name: Sleep 200 seconds to wait confirm message for ubuntu
       pause:
@@ -70,4 +70,15 @@
         # cdrom_unit_num: "{{ unattend_iso_cdrom_unit_num | int }}"
         cdrom_controller_num: 0
         cdrom_unit_num: 1
+
+    # Remove serial port
+    - block:
+        - include_tasks: ../utils/shutdown.yml
+
+        - include_tasks: ../../../common/vm_remove_serial_port.yml
+
+        - include_tasks: ../../common/vm_set_power_state.yml
+          vars:
+            vm_power_state_set: 'powered-on'
+      when: vm_serial_port_file_path is defined and vm_serial_port_file_path
   when: ubuntu_install_method == "cloud-init"

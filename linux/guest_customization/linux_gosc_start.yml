@@ -46,6 +46,16 @@
   vars:
     check_gosc_state_keyword: False
 
+# Traditional GOSC will reboot guest OS (except for Photon) after all customization done
+- name: Sleep 30 seconds to wait guest reboot for traditional GOSC
+  pause:
+    seconds: 30
+  when:
+    - guest_os_ansible_distribution != "VMware Photon OS"
+    - not enable_cloudinit_gosc | bool
+    - gosc_state_keyword_found is defined
+    - gosc_state_keyword_found | bool
+
 - block:
     - include_tasks: ../../common/vm_wait_guest_ip.yml
     # In case VM get new DHCP IP address after GOSC

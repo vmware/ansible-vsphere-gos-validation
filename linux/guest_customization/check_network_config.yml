@@ -108,28 +108,42 @@
   debug: var=guest_gateway_success
 
 # Collect network config files for non-Photon Linux
+# On Ubuntu Desktop 19.10 and later or Ubuntu Server 17.10 and later, network configure files
+# are /etc/netplan/*.yaml
 - block:
-    - name: "Set fact of the network configure file for Ubuntu server"
+    - name: "Set traditional GOSC network configuration file on Ubuntu {{ guest_os_ansible_distribution_ver }}"
       set_fact:
-        src_network_file: "{{ netplan_config_file }}"
-      when:
-        - guest_os_ansible_distribution == "Ubuntu"
-        - guest_os_with_gui is defined and not guest_os_with_gui
-        - netplan_config_file is defined
-    - block:
-        - name: "Set traditional GOSC network configuration files on Ubuntu Desktop/Debian OS"
-          set_fact:
-            src_network_file: "/etc/network/interfaces"
-          when: "gosc_workflow == 'perl'"
+        src_network_file: "/etc/netplan/99-netcfg-vmware.yaml"
+      when: "gosc_workflow == 'perl'"
 
-        - name: "Set cloud-init GOSC network configuration files on Ubuntu/Debian OS"
-          set_fact:
-            src_network_file: "/etc/network/interfaces.d/50-cloud-init.cfg"
-          when: "gosc_workflow == 'cloud-init'"
-      when: >
-        (guest_os_ansible_distribution == "Ubuntu" and guest_os_with_gui is defined and guest_os_with_gui) or
-        (guest_os_ansible_distribution != "Ubuntu")
-  when: guest_os_family == "Debian"
+    - name: "Set cloud-init GOSC network configuration file on Ubuntu {{ guest_os_ansible_distribution_ver }}"
+      set_fact:
+        src_network_file: "/etc/netplan/50-cloud-init.yaml"
+      when: "gosc_workflow == 'cloud-init'"
+  when: >
+    (guest_os_ansible_distribution == "Ubuntu") and
+    (((guest_os_with_gui is undefined or not guest_os_with_gui | bool) and
+      guest_os_ansible_distribution_ver is version('17.10', '>=')) or
+     (guest_os_with_gui is defined and guest_os_with_gui | bool and
+      guest_os_ansible_distribution_ver is version('19.10', '>=')))
+
+# On Debian 10/11 or Ubuntu Desktop eariler than 19.10, the network configure file is
+# /etc/network/interfaces
+- block:
+    - name: "Set traditional GOSC network configuration files on Ubuntu Desktop/Debian OS"
+      set_fact:
+        src_network_file: "/etc/network/interfaces"
+      when: "gosc_workflow == 'perl'"
+
+    - name: "Set cloud-init GOSC network configuration files on Ubuntu/Debian OS"
+      set_fact:
+        src_network_file: "/etc/network/interfaces.d/50-cloud-init.cfg"
+      when: "gosc_workflow == 'cloud-init'"
+  when: >
+    (guest_os_ansible_distribution == "Debian") or
+    (guest_os_ansible_distribution == "Ubuntu" and
+     guest_os_ansible_distribution_ver is version('19.10', '<') and
+     guest_os_with_gui is defined and guest_os_with_gui | bool)
 
 - name: "Set GOSC network configuration files on RedHat"
   set_fact:
@@ -155,7 +169,7 @@
         dest_path: "{{ network_config_path }}"
   when:
     - guest_os_ansible_distribution != "VMware Photon OS"
-    - src_network_file is defined and not src_network_file
+    - src_network_file is defined and src_network_file
 
 # Collect network config files for Photon OS
 - block:
