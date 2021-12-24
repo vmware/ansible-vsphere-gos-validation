@@ -66,3 +66,11 @@ guest_customization/gosc_cloudinit_staticip.yml
 ```
 vhba_hot_add_remove/nvme_vhba_device_ops.yml
 ```
+
+6. SLES 15 SP1 and later
+* Failure: Perl GOSC would fail to customize DNS servers and search domains on vSphere 6.5 and 6.7. See https://kb.vmware.com/s/article/70682.
+* Workaround: Upgrade vSphere to 6.5 U3, 6.7 U3 or 7.0 and later.
+```
+guest_customization/gosc_perl_dhcp.yml
+guest_customization/gosc_perl_staticip.yml
+```

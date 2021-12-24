@@ -31,13 +31,15 @@
 - include_tasks: set_proxy.yml
   when: package_state == "present"
 
-# Add a local repo from ISO image for RHEL/SLES/SLED
-- include_tasks: ../utils/add_local_dvd_repo.yml
-  when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat']
+- block:
+    # Add a local repo from ISO image for RHEL/SLES/SLED
+    - include_tasks: ../utils/add_local_dvd_repo.yml
+      when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat']
 
-# Add online repo for RockyLinux, CentOS, OracleLinux, Ubuntu, Debian and Photon
-- include_tasks: ../utils/add_official_online_repo.yml
-  when: guest_os_ansible_distribution in ['Rocky', 'CentOS', 'OracleLinux', 'Ubuntu', 'Debian', 'VMware Photon OS']
+    # Add online repo for RockyLinux, CentOS, OracleLinux, Ubuntu, Debian and Photon
+    - include_tasks: ../utils/add_official_online_repo.yml
+      when: guest_os_ansible_distribution in ['Rocky', 'CentOS', 'OracleLinux', 'Ubuntu', 'Debian', 'VMware Photon OS']
+  when: package_state in ['installed', 'latest', 'present']
 
 - block:
     - name: "Convert packages name list to a string"

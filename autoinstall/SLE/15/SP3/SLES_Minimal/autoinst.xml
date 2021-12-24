@@ -33,7 +33,11 @@
       <update_nvram>true</update_nvram>
       <xen_kernel_append>vga=gfx-1024x768x16 crashkernel=215M\&lt;4G</xen_kernel_append>
     </global>
+{% if firmware is defined and firmware | lower == 'efi' %}
     <loader_type>grub2-efi</loader_type>
+{% else %}
+    <loader_type>grub2</loader_type>
+{% endif %}
   </bootloader>
   <general t="map">
     <ask-list t="list"/>
@@ -426,9 +430,11 @@
           <create t="boolean">true</create>
           <filesystem t="symbol">vfat</filesystem>
           <format t="boolean">true</format>
+{% if firmware is defined and firmware | lower == 'efi' %}
           <fstopt>utf8</fstopt>
           <mount>/boot/efi</mount>
           <mountby t="symbol">uuid</mountby>
+{% endif %}
           <partition_id t="integer">259</partition_id>
           <partition_nr t="integer">1</partition_nr>
           <resize t="boolean">false</resize>
@@ -590,8 +596,13 @@
       <package>kexec-tools</package>
       <package>kdump</package>
       <package>irqbalance</package>
+{% if firmware is defined and firmware | lower == 'efi' %}
       <package>grub2-x86_64-efi</package>
+{% else %}
+      <package>grub2</package>
+{% endif %}
       <package>glibc</package>
+      <package>glib2-devel</package>
       <package>e2fsprogs</package>
       <package>dosfstools</package>
       <package>cloud-init</package>
@@ -800,6 +811,7 @@
       <uid>0</uid>
       <user_password>{{ vm_password_hash }}</user_password>
       <username>root</username>
+    </user>
 {% if new_user is defined and new_user != 'root' %}
     <user t="map">
       <authorized_keys t="list">
@@ -824,7 +836,6 @@
       <username>{{ new_user }}</username>
     </user>
 {% endif %}
-    </user>
     <user t="map">
       <encrypted t="boolean">true</encrypted>
       <fullname>Mailer daemon</fullname>
