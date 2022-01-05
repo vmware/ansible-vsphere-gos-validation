@@ -1,6 +1,15 @@
-# Copyright 2021 VMware, Inc.
+# Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+# Export a VM to an OVF template
+# Parameters
+#   ovf_export_timeout: A timeout for exporting OVF. Default is 30 min.
+
+- name: "Initialize OVF export timeout"
+  set_fact:
+    ovf_export_timeout: 1800
+  when: ovf_export_timeout is undefined or not ovf_export_timeout
+
 - name: Export VM to ovf template
   vmware_export_ovf:
     hostname: "{{ vsphere_host_name }}"
@@ -12,6 +21,13 @@
     export_with_images: "{{ ovf_export_with_iso | default(False) }}"
     export_dir: "{{ ovf_export_dst_path }}"
   register: ovf_export
+  until:
+    - ovf_export is defined
+    - ovf_export.failed is defined
+    - not ovf_export.failed
+  retries: "{{ ((ovf_export_timeout | int) / 5) | int }}"
+  delay: 5
+
 - name: Display the result of ovf template export
   debug: var=ovf_export
   when: enable_debug is defined and enable_debug
