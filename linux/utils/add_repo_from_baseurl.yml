@@ -1,4 +1,4 @@
-# Copyright 2021 VMware, Inc.
+# Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Add a package repository with given baseurl
@@ -14,8 +14,8 @@
   assert:
     that:
       - repo_name is defined and repo_name
-      - repo_baseurl is defined and repo_baseurl
-    fail_msg: "Invalid parameters: repo_name={{ repo_name | default('undefined') }}, repo_baseurl={{ repo_baseurl | default('undefined') }}"
+      - (repo_baseurl is defined and repo_baseurl) or (repo_mirrorlist is defined and repo_mirrorlist)
+    fail_msg: "Invalid parameters: repo_name={{ repo_name | default('undefined') }}, repo_baseurl={{ repo_baseurl | default('undefined') }}, repo_mirrorlist = {{ repo_mirrorlist | default('undefined') }}"
 
 - name: "Set default GPG key"
   set_fact:
@@ -47,7 +47,7 @@
       yum_repository:
         name: "{{ repo_name }}"
         description: "{{ repo_description | default(repo_name) }}"
-        baseurl: "{{ repo_baseurl_prefix }}{{ repo_baseurl }}"
+        baseurl: "{{ (repo_baseurl_prefix ~ repo_baseurl) | default(omit) }}"
         mirrorlist: "{{ repo_mirrorlist | default(omit) }}"
         enabled: True
         gpgcheck: "{{ gpg_check | default(False) }}"
