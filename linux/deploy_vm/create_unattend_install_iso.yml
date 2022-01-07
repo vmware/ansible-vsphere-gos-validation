@@ -1,85 +1,120 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Set fact of the timestamp"
+- name: "Set fact of the absolute path to unattend install config file template"
   set_fact:
-    iso_timestamp: "{{ lookup('pipe','date +%s') }}"
-
-- name: "Set facts of unattend install cache and file names"
-  set_fact:
-    unattend_iso_cache: "{{ main_playbook_path }}/cache/{{ iso_timestamp }}"
-    unattend_iso_file_name: "{{ guest_id }}{{ '_'.join(''.join(unattend_install_conf.split('.')[:-1]).split('/')) }}-{{ iso_timestamp }}.iso"
     unattend_install_template: "{{ main_playbook_path }}/autoinstall/{{ unattend_install_conf }}"
 
-- name: "Set fact about installing desktop"
-  set_fact:
-    install_guest_with_desktop: True
-  when:
-    - guest_id in ['rhel8_64Guest', 'rhel9_64Guest']
-    - unattend_install_conf is match('RHEL/8/server_with_GUI/')
-
 - debug:
-    msg: "The unattend install config file is {{ unattend_install_template }}"
+    msg:
+     - "The unattend install config file is {{ unattend_install_template }}"
 
-- name: "Set fact of the absolute path of unattend install config file and ISO"
-  set_fact:
-    new_unattend_install_conf: "{{ unattend_iso_cache }}/{{ unattend_install_template.split('/')[-1] }}"
-    generated_unattend_iso: "{{ unattend_iso_cache }}/{{ unattend_iso_file_name }}"
+# unattend_install_conf is not for Ubuntu
+- block:
+    - name: "Create temp folder for generating unattend install ISO file"
+      include_tasks: ../../common/create_temp_file_dir.yml
+      vars:
+        tmp_dir: "{{ local_cache }}"
+        tmp_state: "directory"
+        tmp_prefix: "unattend_iso_"
 
-- debug:
-    msg: "The unattend install ISO to be generated is {{ generated_unattend_iso }}"
+    - name: "Set facts of unattend install cache and file names"
+      set_fact:
+        unattend_iso_cache: "{{ tmp_path }}"
+        unattend_iso_file_name: "{{ guest_id }}{{ '_'.join(''.join(unattend_install_conf.split('.')[:-1]).split('/')) }}-{{ lookup('pipe','date +%s') }}.iso"
 
-- name: "Create temp folder for generating unattend install ISO file"
-  file:
-    path: "{{ unattend_iso_cache }}"
-    mode: "0777"
-    state: directory
+    - name: "Set fact about installing desktop"
+      set_fact:
+        install_guest_with_desktop: True
+      when:
+        - guest_id in ['rhel8_64Guest', 'rhel9_64Guest']
+        - unattend_install_conf is match('RHEL/8/server_with_GUI/')
 
-# For nvme boot disk, boot device name shoule be nvme0n1 instead of sda
-- name: "Set boot disk name"
-  set_fact:
-    boot_disk_name: "{{ 'nvme0n1' if boot_disk_controller == 'nvme' else 'sda' }}"
+    - name: "Set fact of the absolute path of unattend install config file and ISO"
+      set_fact:
+        new_unattend_install_conf: "{{ unattend_iso_cache }}/{{ unattend_install_template.split('/')[-1] }}"
+        generated_unattend_iso: "{{ unattend_iso_cache }}/{{ unattend_iso_file_name }}"
 
-# Get SSH public key
-- include_tasks: ../utils/get_local_ssh_public_key.yml
-- name: "Get SSH public key"
-  set_fact:
-    ssh_public_key: "{{ lookup('file', ssh_public_key_file) }}"
+    - debug:
+        msg:
+          - "The unattend install config file to be generated is {{ new_unattend_install_conf }}"
 
-- name: "Create unattend config file from template"
-  template:
-    src: "{{ unattend_install_template }}"
-    dest: "{{ new_unattend_install_conf }}"
-    mode: "0644"
+    # For nvme boot disk, boot device name shoule be nvme0n1 instead of sda
+    - name: "Set boot disk name"
+      set_fact:
+        boot_disk_name: "{{ 'nvme0n1' if boot_disk_controller == 'nvme' else 'sda' }}"
 
-- name: "Print the content of unattend install config file"
-  debug:
-    msg: "{{  lookup('file', new_unattend_install_conf) | split('\n') }}"
+    - name: "Create unattend config file from template"
+      template:
+        src: "{{ unattend_install_template }}"
+        dest: "{{ new_unattend_install_conf }}"
+        mode: "0644"
 
-- name: "Create a guest OS unattend install ISO file"
-  include_tasks: ../../common/create_iso.yml
-  vars:
-    create_iso_src: ["{{ new_unattend_install_conf }}"]
-    create_iso_dest: "{{ generated_unattend_iso }}"
-    create_iso_vol_ident: 'OEMDRV'
+    - name: "Print the content of unattend install config file"
+      debug:
+        msg: "{{ lookup('file', new_unattend_install_conf) | split('\n') }}"
 
-- name: "Set fact of the dest path of unattend install iso on ESXi host"
-  set_fact:
-    transferred_unattend_iso: "{{ vm_datastore_path }}/{{ unattend_iso_file_name }}"
+    - name: "Create a guest OS unattend install ISO file"
+      include_tasks: ../../common/create_iso.yml
+      vars:
+        create_iso_src: ["{{ new_unattend_install_conf }}"]
+        create_iso_dest: "{{ generated_unattend_iso }}"
+        create_iso_vol_ident: 'OEMDRV'
+      when: unattend_install_conf is not match('Photon')
 
-- debug:
-    msg: "The unattend install ISO will be transferred to {{ transferred_unattend_iso }} on ESXi host"
+    # Build unattend install config file into OS ISO image
+    - include_tasks: rebuild_unattend_install_iso.yml
+      vars:
+        rebuilt_unattend_iso_path: "{{ generated_unattend_iso }}"
+      when: unattend_install_conf is match('Photon')
+  when: unattend_install_conf is not match('Ubuntu')
 
-- name: "Transfer generated unattend install ISO to ESXi host"
-  include_tasks: ../../common/transfer_file_remote.yml
-  vars:
-    transfer_file_remote_src: "{{ generated_unattend_iso }}"
-    transfer_file_remote_dest: "{{ transferred_unattend_iso }}"
-    transfer_file_remote_server: "{{ esxi_hostname }}"
+# unattend_install_conf is for Ubuntu
+- block:
+    - name: "Set fact for autoinstall start message to be printed to VM serial port"
+      set_fact:
+        autoinstall_start_msg: "Ubuntu autoinstall is started at {{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
+
+    # Create the Ubuntu seed ISO to modify login information
+    - include_tasks: ../utils/create_seed_iso.yml
+      vars:
+        user_data_template: "{{ unattend_install_template }}"
+        local_hostname: "ubuntu-{{ hostname_timestamp }}"
+
+    - name: "Set fact of Ubuntu seed file"
+      set_fact:
+        unattend_iso_cache: "{{ tmp_seed_dir }}"
+        generated_unattend_iso: "{{ seed_iso_path }}"
+        unattend_iso_file_name: "{{ lookup('pipe','date +%s') }}-{{ seed_iso_path | basename }}"
+  when: unattend_install_conf is match('Ubuntu')
 
 - name: "Set fact of unattended install ISO path on datastore {{ datastore }}"
   set_fact:
     transferred_unattend_iso: "[{{ datastore }}] {{ unattend_iso_file_name }}"
+
+- debug:
+    msg:
+      - "The unattend install ISO generated is {{ generated_unattend_iso }}"
+      - "The unattend install ISO will be uploaded to '{{ transferred_unattend_iso }}' on ESXi host"
+
+# Upload unattend install ISO to VM path on ESXi server
+- include_tasks: ../../common/esxi_upload_datastore_file.yml
+  vars:
+    src_file_path: "{{ generated_unattend_iso }}"
+    dest_file_path: "{{ unattend_iso_file_name }}"
+    upload_file_timeout: 600
+
+- name: "Append generated unattend ISO file to the list"
+  set_fact:
+    os_installation_iso_list: "{{ os_installation_iso_list + [transferred_unattend_iso] }}"
+    os_install_iso_list_len: "{{ os_install_iso_list_len | int + 1 }}"
+  when: unattend_install_conf is not match('Photon')
+
+- name: "Replace original install ISO file with unattend install ISO file"
+  set_fact:
+    os_installation_iso_list: "{{ [transferred_unattend_iso] }}"
+    os_install_iso_list_len: 1
+  when: unattend_install_conf is match('Photon')
 
 - name: "Remove cache folder {{ unattend_iso_cache }}"
   file:

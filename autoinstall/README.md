@@ -8,3 +8,5 @@
 7. For Windows 10 or later unattend auto-install, please use files under Windows/win10.
 8. For Windows Server LTSC unattend auto-install, please use files under Windows/win_server.
 9. For Windows Server SAC unattend auto-install, please use files under Windows/win_server_sac.
+10. For Photon OS 3.0 or later unattend auto-install, please use file Photon/ks.cfg.
+10. For Ubuntu Server 20.04 or later unattend auto-install, please use file Ubuntu/Server/user-data.j2.

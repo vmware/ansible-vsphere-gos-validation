@@ -1,0 +1,16 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Wait for autoinstall completed message"
+  command: "grep -e '{{ autoinstall_complete_msg }}' {{ vm_serial_port_output_file }}"
+  until:
+    - autoinstall_completed is defined
+    - autoinstall_completed.stdout_lines is defined
+    - autoinstall_completed.stdout_lines | length > 0
+  delay: 5
+  retries: 720
+  delegate_to: "{{ esxi_hostname }}"
+  register: autoinstall_completed
+
+- debug:
+    msg: "{{ autoinstall_completed.stdout_lines[0] }}"

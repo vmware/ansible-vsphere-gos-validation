@@ -1,7 +1,7 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Create a temporary directory for creating seed.iso
+# Create seed ISO file for cloud-init config
 # Parameters:
 # user_data_template: the path to cloud-init user-data template
 # local_hostname: the VM hostname to be set via cloud-init
@@ -9,8 +9,9 @@
 - name: "Create a temporary directory for creating cloud-init seed.iso"
   include_tasks: ../../common/create_temp_file_dir.yml
   vars:
+    tmp_dir: "{{ local_cache }}"
     tmp_state: "directory"
-    tmp_prefix: "ansible_"
+    tmp_prefix: "seed_"
 
 - name: "Set fact of temp path of the seed file"
   set_fact:
@@ -23,6 +24,7 @@
     seed_iso_path: "{{ tmp_seed_dir }}/seed.iso"
 
 - include_tasks: get_local_ssh_public_key.yml
+  when: ssh_public_key is undefined or not ssh_public_key
 
 - name: "Create user-data file for cloud-init local datasource"
   template:
@@ -31,7 +33,6 @@
     mode: "0644"
   vars:
     vm_password_hash: "{{ vm_password | password_hash('sha512') }}"
-    ssh_public_key: "{{ lookup('file', ssh_public_key_file) }}"
 
 - name: "Create meta-data file for cloud-init local datasource"
   file:

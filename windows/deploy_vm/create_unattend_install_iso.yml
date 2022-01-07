@@ -25,7 +25,7 @@
 - name: Get configure remote Windows guest for Ansible script
   get_url:
     url: "{{ config_remote_windows }}"
-    dest: "{{ main_playbook_path }}/cache/{{ config_remote_windows.split('/')[-1] }}"
+    dest: "{{ local_cache }}/{{ config_remote_windows.split('/')[-1] }}"
     validate_certs: False
     use_proxy: "{{ use_localhost_proxy | default(False) }}"
   environment:
@@ -34,10 +34,10 @@
 - block:
     - name: Set fact of the copied Autounattend.xml path
       set_fact:
-        copied_unattend_file: "{{ main_playbook_path }}/cache/{{ iso_timestamp }}/Autounattend.xml"
+        copied_unattend_file: "{{ local_cache }}/{{ iso_timestamp }}/Autounattend.xml"
     - name: Create a new directory in cache using timestamp
       file:
-        path: "{{ main_playbook_path }}/cache/{{ iso_timestamp }}/"
+        path: "{{ local_cache }}/{{ iso_timestamp }}/"
         mode: '0777'
         state: directory
     - name: Copy specified Autounattend.xml file to cache
@@ -62,7 +62,7 @@
   set_fact:
     unattend_install_file_list:
       - "{{ copied_unattend_file | default(unattend_install_conf) }}"
-      - "{{ main_playbook_path }}/cache/{{ config_remote_windows.split('/')[-1] }}"
+      - "{{ local_cache }}/{{ config_remote_windows.split('/')[-1] }}"
 
 - block:
     - include_tasks: get_pvscsi_driver.yml
@@ -77,7 +77,7 @@
 - include_tasks: ../../common/create_iso.yml
   vars:
     create_iso_src: "{{ unattend_install_file_list }}"
-    create_iso_dest: "{{ main_playbook_path }}/cache/{{ unattend_install_iso }}"
+    create_iso_dest: "{{ local_cache }}/{{ unattend_install_iso }}"
 
 - name: Set fact of the dest path of unattend install ISO on ESXi host
   set_fact:
@@ -88,10 +88,15 @@
 - name: Copy generated unattend install ISO file to ESXi host
   include_tasks: ../../common/transfer_file_remote.yml
   vars:
-    transfer_file_remote_src: "{{ main_playbook_path }}/cache/{{ unattend_install_iso }}"
+    transfer_file_remote_src: "{{ local_cache }}/{{ unattend_install_iso }}"
     transfer_file_remote_dest: "{{ transferred_unattend_iso }}"
     transfer_file_remote_server: "{{ esxi_hostname }}"
 
 - name: Produce unattended ISO path
   set_fact:
     transferred_unattend_iso: "[{{ datastore }}] {{ unattend_install_iso }}"
+
+- name: "Append generated unattend ISO file to the list"
+  set_fact:
+    os_installation_iso_list: "{{ os_installation_iso_list + [transferred_unattend_iso] }}"
+    os_install_iso_list_len: "{{ os_install_iso_list_len | int + 1 }}"

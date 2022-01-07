@@ -14,22 +14,19 @@
     - vm_guest_id != "vmwarePhoton64Guest"
     - vm_hardware_version_num | int >= 13
 
-# Create the seed.iso to modify login information
+# Create the seed ISO to modify login information
 - include_tasks: ../../utils/create_seed_iso.yml
   vars:
     user_data_template: "photon-user-data.j2"
     local_hostname: "photon-{{ hostname_timestamp }}"
 
-# Upload seed.iso to VM path on ESXi server
-- name: "Copy {{ seed_iso_path }} to VM folder"
-  copy:
-    src: "{{ seed_iso_path }}"
-    dest: "{{ vm_files_path }}/{{ seed_iso_path | basename }}"
-    force: yes
-    mode: 0755
-  delegate_to: "{{ esxi_hostname }}"
+# Upload seed ISO to VM path on ESXi server
+- include_tasks: ../../../common/esxi_upload_datastore_file.yml
+  vars:
+    src_file_path: "{{ seed_iso_path }}"
+    dest_file_path: "{{ vm_files_path_ds.split()[-1] }}/{{ seed_iso_path | basename }}"
 
-# Attach seed.iso to Photon OS VM
+# Attach seed ISO to Photon OS VM
 - include_tasks: ../../../common/vm_configure_cdrom.yml
   vars:
     cdrom_type: iso
@@ -43,21 +40,18 @@
     vm_power_state_set: 'powered-on'
 - include_tasks: ../../../common/vm_wait_guest_fullname.yml
 
-# Change root password for VM deployed from OVA
-- include_tasks: change_root_password.yml
-
 # Get guest ip
 - include_tasks: ../../../common/update_inventory.yml
   vars:
     update_inventory_timeout: 300
 
-# Eject seed.iso from guest
-- name: "Eject seed.iso from Photon OS"
+# Eject seed ISO from guest
+- name: "Eject seed ISO from Photon OS"
   include_tasks: ../../utils/eject_cdrom_in_guest.yml
   vars:
     guest_cdrom_device_num: 0
 
-# Disconnect seed.iso from Photon OS VM
+# Disconnect seed ISO from Photon OS VM
 - name: "Change VM's CD/DVD Drive 1 to client device"
   include_tasks: ../../../common/vm_configure_cdrom.yml
   vars:

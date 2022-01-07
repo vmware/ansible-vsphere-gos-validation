@@ -114,6 +114,7 @@
 * esxi_get_datastores.yml: Get ESXi server datastores info
 * esxi_get_datastore_info.yml: Get specified datastore info on ESXi server
 * esxi_check_delete_datastore_file.yml: Get datastore file status or delete file
+* esxi_upload_datastore_file.yml: Upload file to datastore
 
 ### Tasks for server information
 * esxi_get_host_facts.yml: Get ESXi server host facts
@@ -131,8 +132,8 @@
 
 ## Localhost tasks
 ### Tasks for NFS mount and unmount
-* nfs_mount.yml: Mount an NFS share folder on localhost
-* nfs_unmount.yml: Unmount a NFS share folder
+* local_mount.yml: Mount an NFS share folder or ISO image on localhost
+* local_unmount.yml: Unmount a NFS share folder or ISO image from localhost
 * delete_local_file.yml: Delete local file or directory
 * skip_test_case.yml: Tasks for skipping testcase and ending play
 
