@@ -1,20 +1,62 @@
 # Copyright 2021 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Initialize guest IP address list"
-  set_fact:
-    all_ip_by_tools: []
-# Get all guest IP addresses reported by VMware tools
-- name: "Get VM guest info"
-  include_tasks: ../../common/vm_get_guest_facts.yml
-- name: "Get all IP addresses in VM guest info"
-  set_fact:
-    all_ip_by_tools: "{{ all_ip_by_tools | union(vm_guest_facts['instance']['hw_%s'|format(hw_interface)].ipaddresses) }}"
+- block:
+    - include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
+
+    - name: "Immediately refresh networking information in guest info"
+      command: "{{ vmware_toolbox_cmd_path }} info update network"
+      delegate_to: "{{ vm_guest_ip }}"
   when:
-    - "'instance' in vm_guest_facts"
-    - vm_guest_facts['instance']['hw_%s'|format(hw_interface)].ipaddresses != None
-  with_items: "{{ vm_guest_facts.instance.hw_interfaces }}"
-  loop_control:
-    loop_var: hw_interface
+    - vmtools_version is defined
+    - vmtools_version is version('10.1.0', '>=')
+    
+- block:
+    # Restart VMTools service to refresh networking information in guest info
+    # Restart vmtoolsd to refresh guest info
+    - include_tasks: ../utils/set_ovt_facts.yml
+    - include_tasks: ../utils/service_operation.yml
+      vars:
+        service_name: "{{ ovt_service }}"
+        service_enabled: True
+        service_state: "restarted"
+  when:
+    - vmtools_version is defined
+    - vmtools_version is version('10.1.0', '<')
+
+- name: "Wait for all guest OS IP addresses are collected in guest info"
+  vmware_guest_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    schema: "vsphere"
+    properties: ['guest.net']
+  register: vm_guestinfo_net
+  until:
+    - vm_guestinfo_net is defined
+    - vm_guestinfo_net.instance is defined
+    - vm_guestinfo_net.instance.guest is defined
+    - vm_guestinfo_net.instance.guest.net is defined
+    - all_ip_in_guest | difference(vm_guestinfo_net.instance.guest.net | map(attribute='ipAddress') | flatten) | length == 0
+  retries: 10
+  delay: 5
+  ignore_errors: True
+
+- name: "Set fact of IP addresses in guest info"
+  set_fact:
+    all_ip_in_guestinfo: "{{ vm_guestinfo_net.instance.guest.net | map(attribute='ipAddress') | flatten }}"
+
 - debug:
-    msg: "Get VM '{{ vm_name }}' IP address in guest info: {{ vm_guest_ip }}, all IP addresses: {{ all_ip_by_tools }}"
+    msg: 
+      - "VM IP addresses in guest OS: {{ all_ip_in_guest }}"
+      - "VM IP addresses in guest info: {{ all_ip_in_guestinfo }}"
+
+- fail:
+    msg: "Failed to collect all guest OS IP addresses in guest info"
+  when: >
+    (vm_guestinfo_net is undefined) or
+    (vm_guestinfo_net.failed)

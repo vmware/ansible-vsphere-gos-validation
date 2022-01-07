@@ -22,22 +22,7 @@
           vars:
             all_ip: "True"
 
-        # Loop to get VM IP address from guest info until IP addresses
-        # got from VMware tools is equal to IP addresses got in guest OS
-        - name: "Initialize VM guest IP/IP list variables"
-          set_fact:
-            all_ip_by_tools: []
-        - block:
-            # Wait VMware tools report guest IPv4 address
-            - include_tasks: ../../common/vm_wait_guest_ip.yml
-            # Loop to wait for VMware tools reporting all guest IPv4 and
-            # IPv6 addresses
-            - include_tasks: vm_wait_guest_all_ip.yml
-              loop: "{{ range(0, 10)|list }}"
-          when:
-            - all_ip_in_guest|sort != all_ip_by_tools|sort
-
-        # Compare IP addresses got in guest info and from guest OS
-        - include_tasks: validate_ip_address.yml
+        # Wait for all guest IP are collected
+        - include_tasks: vm_wait_guest_all_ip.yml
       rescue:
         - include_tasks: ../setup/test_rescue.yml
