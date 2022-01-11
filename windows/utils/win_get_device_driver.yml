@@ -1,0 +1,26 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the driver info for specified device in Windows guest OS.
+# Parameters:
+#   device_desc_keyword: the keyword in device description, e.g.,
+#   vmxnet3, pvscsi.
+#
+- name: Check device keyword is specified
+  fail:
+    msg: "Keyword in device description must be specified by parameter 'device_desc_keyword'."
+  when: device_desc_keyword is undefined or not device_desc_keyword
+
+- name: Initialize device driver info
+  set_fact:
+    win_guest_device_driver: {}
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-CimInstance Win32_PnpSignedDriver | where-object {$_.Description -like '*{{ device_desc_keyword }}*'} | select DeviceName, DriverDate, DriverProviderName, DriverVersion, InfName, IsSigned, Manufacturer, Signer"
+    win_execute_cmd_ignore_error: True
+
+- name: Set fact of device driver info
+  set_fact:
+    win_guest_device_driver: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+- debug:
+    msg: "Get device '{{ device_desc_keyword }}' driver info: {{ win_guest_device_driver }}"
