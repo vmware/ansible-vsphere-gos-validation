@@ -74,3 +74,11 @@ vhba_hot_add_remove/nvme_vhba_device_ops.yml
 guest_customization/gosc_perl_dhcp.yml
 guest_customization/gosc_perl_staticip.yml
 ```
+
+7. Windows 11
+* Failure: Guest customization test cases would fail with SYSPREP error "Package Microsoft.OneDriveSync_21180.905.7.0_neutral__8wekyb3d8bbwe was installed for a user, but not provisioned for all users. This package will not function properly in the sysprep image." due to the known Windows issue.
+* Workaround: Uninstall OneDrive in guest OS.
+```
+guest_customization/gosc_sanity_staticip.yml
+guest_customization/gosc_sanity_dhcp.yml
+```

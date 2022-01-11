@@ -83,6 +83,8 @@ This project supports below scenarios for end-to-end guest OS validation testing
 | Windows Server 2019, 2022                       | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Windows Server SAC releases                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 
+Note: This supported guest OS list is used for this project only. For guest OS support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
+
 ### Docker images
 * Latest (Release v1.2):
   * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
