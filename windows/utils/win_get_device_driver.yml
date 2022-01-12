@@ -13,7 +13,7 @@
 
 - name: Initialize device driver info
   set_fact:
-    win_guest_device_driver: {}
+    win_guest_device_driver: []
 - include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Get-CimInstance Win32_PnpSignedDriver | where-object {$_.Description -like '*{{ device_desc_keyword }}*'} | select DeviceName, DriverDate, DriverProviderName, DriverVersion, InfName, IsSigned, Manufacturer, Signer"
@@ -21,6 +21,9 @@
 
 - name: Set fact of device driver info
   set_fact:
-    win_guest_device_driver: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+    win_guest_device_driver: "{{ win_powershell_cmd_output.stdout_lines }}"
+  when:
+    - win_powershell_cmd_output is defined
+    - win_powershell_cmd_output.stdout_lines is defined
 - debug:
     msg: "Get device '{{ device_desc_keyword }}' driver info: {{ win_guest_device_driver }}"

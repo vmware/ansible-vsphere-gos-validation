@@ -4,28 +4,40 @@
 # From Windows Server 2022, there are inboxed PVSCSI and VMXNET3
 # drivers. Here to get inbox drivers info.
 #
-- name: Initialize inbox drivers info dict
+- name: Initialize inbox driver info variables
   set_fact:
-    inbox_drivers_info: {}
+    inbox_drivers_info: []
+    inbox_pvscsi_info: {}
+    inbox_vmxnet3_info: {}
 
 - block:
-    - include_tasks: win_get_device_driver.yml
+    - include_tasks: ../utils/win_get_device_driver.yml
       vars:
         device_desc_keyword: "pvscsi"
-    - name: Add PVSCSI driver info
+    - name: Set fact of pvscsi driver info
       set_fact:
-        inbox_drivers_info: "{{ inbox_drivers_info | combine({'pvscsi': win_guest_device_driver}) }}"
+        inbox_pvscsi_info: "{{ inbox_pvscsi_info | combine({item.split(' : ')[0].strip(): item.split(' : ')[1].strip()}) }}"
+      when: item
+      loop: "{{ win_guest_device_driver }}"
+    - name: Add pvscsi driver info to list
+      set_fact:
+        inbox_drivers_info: "{{ [inbox_pvscsi_info] }}"
+      when: inbox_pvscsi_info | length != 0
   when:
     - boot_disk_controller is defined
     - boot_disk_controller == "paravirtual" 
 
 - block:
-    - include_tasks: win_get_device_driver.yml
+    - include_tasks: ../utils/win_get_device_driver.yml
       vars:
         device_desc_keyword: "vmxnet3"
-    - name: Add VMXNET3 driver info
+    - name: Set fact of vmxnet3 driver info
       set_fact:
-        inbox_drivers_info: "{{ inbox_drivers_info | combine({'vmxnet3': win_guest_device_driver}) }}"
+        inbox_vmxnet3_info: "{{ win_guest_device_driver }}"
+    - name: Add vmxnet3 driver info to list
+      set_fact:
+        inbox_drivers_info: "{{ inbox_drivers_info + [inbox_vmxnet3_info] }}"
+      when: inbox_vmxnet3_info | length != 0
   when:
     - network_adapter_type is defined
     - network_adapter_type == "vmxnet3"
@@ -42,5 +54,5 @@
     - name: Dump inbox drivers info to json file
       copy:
         dest: "{{ drivers_info_file_path }}"
-        content: "{{ [inbox_drivers_info] | to_nice_json }}"
+        content: "{{ inbox_drivers_info | to_nice_json }}"
   when: inbox_drivers_info | length != 0
