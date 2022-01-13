@@ -1,4 +1,4 @@
-# Copyright 2021 VMware, Inc.
+# Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
@@ -25,7 +25,7 @@
           set_fact:
             boot_disk_controller: "{{ boot_disk_controller if (boot_disk_controller is defined and boot_disk_controller) else 'lsilogicsas' }}"
             secureboot_enabled: "{{ secureboot_enabled if (secureboot_enabled is defined and secureboot_enabled) else False }}"
-            network_adapter_type: "e1000e"
+            network_adapter_type: "{{ 'e1000e' if (windows_has_inbox_driver is undefined or not windows_has_inbox_driver) else network_adapter_type }}"
             cdrom_controller_type: "{{ cdrom_controller_type if (cdrom_controller_type is defined and cdrom_controller_type) else 'ide' }}"
             firmware: "{{ firmware if (firmware is defined and firmware) else 'efi' }}"
 
@@ -103,12 +103,12 @@
         - include_tasks: ../utils/win_check_winrm.yml
           vars:
             win_check_winrm_timeout: 1800
-
         - name: "Wait another 1 minute after OS becomes connectable"
           pause:
             minutes: 1
         - name: "Print VM guest IP address"
           debug: var=vm_guest_ip
+        - include_tasks: ../utils/add_windows_host.yml
 
         # Take screenshot of VM after guest OS install
         - include_tasks: ../../common/vm_take_screenshot.yml
@@ -117,6 +117,7 @@
 
         - include_tasks: ../../common/vm_get_vm_info.yml
         - include_tasks: detach_cdrom_iso.yml
+        - include_tasks: get_inbox_driver_info.yml
       rescue:
         - name: "Set fact of rescue tasks required parameter"
           set_fact:

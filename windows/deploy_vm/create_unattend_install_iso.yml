@@ -1,4 +1,4 @@
-# Copyright 2021 VMware, Inc.
+# Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # This task is used for generating ISO file containing OS unattend auto install
@@ -69,7 +69,10 @@
     - name: Add PVSCSI driver files to unattend install file list
       set_fact:
         unattend_install_file_list: "{{ unattend_install_file_list + pvscsi_file_path_list }}"
-  when: boot_disk_controller is defined and boot_disk_controller == 'paravirtual'
+  when:
+    - boot_disk_controller is defined
+    - boot_disk_controller == 'paravirtual'
+    - windows_has_inbox_driver is undefined or not windows_has_inbox_driver
 
 - include_tasks: ../../common/create_iso.yml
   vars:
