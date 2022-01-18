@@ -1,0 +1,33 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Windows Update will cause poweroff or restart taking a long time,
+# or GOSC test cases failure, so here try to disable auto pdate
+# and pause update 7 days.
+#
+# Transfer powershell script to guest OS
+- name: Set fact of powershell script file path
+  set_fact:
+    local_ps_file: "scripts/pause_windows_update.ps1"
+    remote_ps_file: "C:\\pause_windows_update.ps1"
+- include_tasks: win_copy_file_from_local.yml
+  vars:
+    src_path_local: "{{ local_ps_file }}"
+    dest_path_remote: "C:\\"
+- include_tasks: win_check_file_exist.yml
+  vars:
+    win_check_file_exist_file: "{{ remote_ps_file }}"
+
+# Pause Windows update is not a demand task, so ignore errors
+- block:
+    - name: Execute powershell script in guest OS
+      ansible.windows.win_command: "powershell.exe -ExecutionPolicy bypass -File {{ remote_ps_file }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: True
+      register: pause_update_result
+    - name: Display the script execute result
+      debug: var=pause_update_result
+      when: enable_debug
+  when:
+    - win_check_file_exist_result is defined
+    - win_check_file_exist_result | bool
