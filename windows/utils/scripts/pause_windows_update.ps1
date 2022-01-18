@@ -1,4 +1,9 @@
-﻿# Script to disable Windows auto update in registry and set pause Windows update
+﻿# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# Script to disable Windows Auto Update in registry and
+# set pause Windows Update for 7 days.
+#
 $win_update_reg_path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
 $win_pause_update_reg_path = "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"
 $win_update_policy_path = 'HKLM:\SOFTWARE\Microsoft\PolicyManager\current\device\Update'
