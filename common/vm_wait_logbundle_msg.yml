@@ -11,7 +11,7 @@
 
 - name: "Set fact of VM log bundle file path in datastore"
   set_fact:
-    vm_logbundle_file_path: "{{ vm_files_path_ds.split()[-1] }}/{{ vm_wait_logbundle_name }}"
+    vm_logbundle_file_path: "{{ vm_dir_name }}/{{ vm_wait_logbundle_name }}"
 
 - include_tasks: esxi_check_delete_datastore_file.yml
   vars:
@@ -46,14 +46,10 @@
     vm_wait_log_bundle_success: "{{ get_vm_logbundle_content is defined and get_vm_logbundle_content.content is defined and vm_wait_logbundle_msg in get_vm_logbundle_content.content }}"
 
 - debug:
-    msg: "Found '{{ vm_wait_logbundle_msg }}' in VM log bundle {{ vm_wait_logbundle_name }}"
-  when:
-    - vm_wait_logbundle_ignore_errors is defined
-    - vm_wait_logbundle_ignore_errors | bool
-    - vm_wait_log_bundle_success | bool
+    msg: "Found '{{ vm_wait_logbundle_msg }}' in VM log bundle {{ vm_wait_logbundle_name }}: {{ 'Success' if vm_wait_log_bundle_success | bool else 'Failure' }}"
 
 - fail:
-    msg: "Failed to found '{{ vm_wait_logbundle_msg }}' in VM log bundle {{ vm_wait_logbundle_name }}"
+    msg: "Failed to find '{{ vm_wait_logbundle_msg }}' in VM log bundle {{ vm_wait_logbundle_name }}"
   when:
     - vm_wait_logbundle_ignore_errors is undefined or not (vm_wait_logbundle_ignore_errors | bool)
     - not (vm_wait_log_bundle_success | bool)
