@@ -7,21 +7,21 @@
 #
 - name: "Set fact of the absolute path of source ISO file on ESXi server"
   set_fact:
-    iso_file_path_on_esxi: "{{ os_installation_iso_list[0] | replace('[', '/vmfs/volumes/') | replace('] ', '/') }}"
+    iso_file_datastore: "{{ os_installation_iso_list[0].split()[0] | regex_replace('\\[|\\]', '') }}"
+    iso_file_path_in_datastore: "{{ os_installation_iso_list[0].split()[1] }}"
 
 # Fetch ISO file from ESXi datastore
-- name: "Download ISO image from ESXi server datastore"
-  fetch:
-    src: "{{ iso_file_path_on_esxi }}"
-    dest: "{{ unattend_iso_cache }}/"
-    flat: yes
-  delegate_to: "{{ esxi_hostname }}"
-  register: fetch_iso_result
+- include_tasks: ../../common/esxi_download_datastore_file.yml
+  vars:
+    src_datastore: "{{ iso_file_datastore }}"
+    src_file_path: "{{ iso_file_path_in_datastore }}"
+    dest_file_path: "{{ unattend_iso_cache }}/{{ iso_file_path_in_datastore | basename }}"
+    download_file_timeout: 600
 
 - name: "Set fact of source ISO image file name and path at local"
   set_fact:
-    src_iso_file_name: "{{ fetch_iso_result.dest | basename }}"
-    src_iso_file_path: "{{ fetch_iso_result.dest }}"
+    src_iso_file_name: "{{ datastore_file_download_result.dest | basename }}"
+    src_iso_file_path: "{{ datastore_file_download_result.dest }}"
 
 # Create a temporary directory to mount ISO image
 - name: "Create a temporary directory to mount ISO image"

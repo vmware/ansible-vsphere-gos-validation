@@ -83,8 +83,9 @@
 * vm_shell_in_guest.yml: Execute shell command in guest
 * vm_guest_file_operation.yml: Create/delete directory or fetch/copy files in guest with VMware tools installed
 
-### Tasks for vmware.log
+### Tasks for VM log bundles
 * vm_search_vmware_log.yml: Search vmware.log with a keyword
+* vm_wait_logbundle_msg.yml: Wait for a message appear in VM's log bundle
 
 ### Tasks for VM vmx config
 * vm_get_extra_config.yml: Get all configs in the vmx file
@@ -114,7 +115,8 @@
 * esxi_get_datastores.yml: Get ESXi server datastores info
 * esxi_get_datastore_info.yml: Get specified datastore info on ESXi server
 * esxi_check_delete_datastore_file.yml: Get datastore file status or delete file
-* esxi_upload_datastore_file.yml: Upload file to datastore
+* esxi_upload_datastore_file.yml: Upload file to ESXi datastore
+* esxi_download_datastore_file.yml: Download file from ESXi datastore
 
 ### Tasks for server information
 * esxi_get_host_facts.yml: Get ESXi server host facts

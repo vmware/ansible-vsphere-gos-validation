@@ -1,0 +1,34 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Download file from ESXi datastore
+# Parameters:
+#   src_datastore: the datastore name of the file. e.g. datastore1
+#   src_file_path: the relative file path in datastore. e.g. vm_name/vmware.log
+#   dest_file_path: the downloaded file path at localhost. e.g. /tmp/downloaded_vmware.log
+#   download_file_timeout: timeout in seconds for downloading datastore file. Default is 300s.
+
+- include_tasks: esxi_check_delete_datastore_file.yml
+  vars:
+    file_in_datastore_ops: file
+    file_in_datastore: "{{ src_datastore }}"
+    file_in_datastore_path: "{{ src_file_path }}"
+    file_in_datastore_failed_ignore: False
+
+- name: "Set fact of downloading URL for the src datastore file"
+  set_fact:
+    datastore_file_url: "{{ ds_file_result.url }}"
+
+- name: "Download datastore file"
+  get_url:
+    url: "{{ datastore_file_url }}"
+    dest: "{{ dest_file_path }}"
+    url_username: "{{ vsphere_host_user }}"
+    url_password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    mode: "0644"
+    timeout: "{{ download_file_timeout | default(300) }}"
+  register: datastore_file_download_result
+
+- name: "Print datastore file download result"
+  debug: var=datastore_file_download_result

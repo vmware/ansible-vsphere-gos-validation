@@ -1,0 +1,49 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Wait for message appear in VM's log bundle
+# Parameters:
+#   vm_wait_logbundle_name: the log bundle file name in VM folder. e.g. vmware.log
+#   vm_wait_logbundle_msg: the message to wait for appearing
+#   vm_wait_logbundle_retries: how many times to re-check log bundle about waiting message
+#   vm_wait_logbundle_delay: seconds to delay for a retry
+#   vm_wait_logbundle_ignore_errors: True to ignore task failure. Default is False.
+
+- name: "Set fact of VM log bundle file path in datastore"
+  set_fact:
+    vm_logbundle_file_path: "{{ vm_files_path_ds.split()[-1] }}/{{ vm_wait_logbundle_name }}"
+
+- include_tasks: esxi_check_delete_datastore_file.yml
+  vars:
+    file_in_datastore_ops: file
+    file_in_datastore: "{{ datastore }}"
+    file_in_datastore_path: "{{ vm_logbundle_file_path }}"
+    file_in_datastore_failed_ignore: False
+
+- name: "Set fact of the url of datastore file"
+  set_fact:
+    vm_wait_logbundle_url: "{{ ds_file_result.url }}"
+
+- name: "Wait for message '{{ vm_wait_logbundle_msg }}' appear in VM log bundle {{ vm_wait_logbundle_name }}"
+  uri:
+    url: "{{ vm_wait_logbundle_url }}"
+    method: GET
+    return_content: yes
+    user: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+  register: get_vm_logbundle_content
+  until:
+    - get_vm_logbundle_content is defined
+    - get_vm_logbundle_content.content is defined
+    - vm_wait_logbundle_msg in get_vm_logbundle_content.content
+  delay: "{{ vm_wait_logbundle_delay | default(5) }}" 
+  retries:  "{{ vm_wait_logbundle_retries | default(60) }}"
+  ignore_errors: "{{ vm_wait_logbundle_ignore_errors | default(False) }}"
+
+- debug:
+    msg: "Not found '{{ vm_wait_logbundle_msg }}' in VM log bundle {{ vm_wait_logbundle_name }}"
+  when:
+    - vm_wait_logbundle_ignore_errors is defined
+    - vm_wait_logbundle_ignore_errors | bool
+    - get_vm_logbundle_content is undefined or get_vm_logbundle_content.content is undefined or vm_wait_logbundle_msg not in get_vm_logbundle_content.content
