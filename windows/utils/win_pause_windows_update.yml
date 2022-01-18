@@ -18,9 +18,16 @@
   vars:
     win_check_file_exist_file: "{{ remote_ps_file }}"
 
-- name: Execute powershell script in guest OS
-  ansible.windows.win_command: "powershell.exe -ExecutionPolicy bypass -File {{ remote_ps_file }}"
-  delegate_to: "{{ vm_guest_ip }}"
-  register: pause_update_result
-- debug: var=pause_update_result
-  when: enable_debug
+# Pause Windows update is not a demand task, so ignore errors
+- block:
+    - name: Execute powershell script in guest OS
+      ansible.windows.win_command: "powershell.exe -ExecutionPolicy bypass -File {{ remote_ps_file }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: True
+      register: pause_update_result
+    - name: Display the script execute result
+      debug: var=pause_update_result
+      when: enable_debug
+  when:
+    - win_check_file_exist_result is defined
+    - win_check_file_exist_result | bool
