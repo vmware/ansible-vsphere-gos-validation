@@ -55,9 +55,12 @@
 
         - include_tasks: ../../common/update_inventory.yml
 
-        - include_tasks: ../../common/vm_search_vmware_log.yml
+        - include_tasks: ../../common/vm_wait_logbundle_msg.yml
           vars:
-            keyword: "Image APPROVED"
+            vm_wait_logbundle_name: "vmware.log"
+            vm_wait_logbundle_msg: "Image APPROVED"
+            vm_wait_logbundle_retries: 1
+            vm_wait_logbundle_ignore_errors: True
 
         - include_tasks: ../utils/get_system_firmware.yml
 
@@ -65,7 +68,7 @@
           set_fact:
             secureboot_enabled_pass: True
           when:
-            - vmware_log_search
+            - vm_wait_log_bundle_success
             - guest_firmware == "EFI"
 
         # Disable secureboot

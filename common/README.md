@@ -84,8 +84,7 @@
 * vm_guest_file_operation.yml: Create/delete directory or fetch/copy files in guest with VMware tools installed
 
 ### Tasks for VM log bundles
-* vm_search_vmware_log.yml: Search vmware.log with a keyword
-* vm_wait_logbundle_msg.yml: Wait for a message appear in VM's log bundle
+* vm_wait_logbundle_msg.yml: Check or wait for a message appear in VM's log bundle
 
 ### Tasks for VM vmx config
 * vm_get_extra_config.yml: Get all configs in the vmx file

@@ -28,17 +28,11 @@
           set_fact:
             bitness: "{% if guest_os_ansible_architecture == 'x86_64' %}64-bit{% else %}32-bit{% endif %}"
 
-        - include_tasks: ../../common/vm_search_vmware_log.yml
+        - include_tasks: ../../common/vm_wait_logbundle_msg.yml
           vars:
-            keyword: "The EFI ROM is {{ bitness }}"
-
-        - include_tasks: ../utils/get_system_firmware.yml
-
-        - name: "Assert guest system firmware is EFI"
-          assert:
-            that:
-              - guest_firmware == "EFI"
-              - vmware_log_search
-            fail_msg: "Guest system is not using EFI"
+            vm_wait_logbundle_name: "vmware.log"
+            vm_wait_logbundle_msg: "The EFI ROM is {{ bitness }}"
+            vm_wait_logbundle_retries: 1
+            vm_wait_logbundle_ignore_errors: False
       rescue:
         - include_tasks: ../setup/test_rescue.yml
