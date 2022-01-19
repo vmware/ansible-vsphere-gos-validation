@@ -3,9 +3,12 @@
 ---
 - name: "Initialize timezone check result"
   set_fact:
+    guest_timezone: ""
     timezone_success: ""
+
 - name: "Initialize hardware clock check result for perl GOSC"
   set_fact:
+    guest_hwclockUTC: ""
     hwclock_success: ""
   when: gosc_workflow == "perl"
 
@@ -27,10 +30,14 @@
     - name: "Get time zone from 'timedatectl status'"
       shell: grep -i "^ *time zone:" "{{ current_test_log_folder }}/timedatectl_status.txt" | awk '{print $3}'
       register: tz_result
+      failed_when: False
 
     - name: "Save guest timezone setting after GOSC"
       set_fact:
         guest_timezone: "{{ tz_result.stdout }}"
+      when:
+        - tz_result is defined
+        - tz_result.stdout is defined
 
     - block:
         - name: "Get hwclock from 'timedatectl status'"
@@ -61,13 +68,16 @@
         dest_path: "{{ current_test_log_folder }}/readlink_etc_localtime.txt"
 
     - name: "Get timezone info from /etc/localtime"
-      command: cat "{{ current_test_log_folder }}/readlink_etc_localtime.txt"
+      command: "cat {{ current_test_log_folder }}/readlink_etc_localtime.txt"
       register: tz_result
-      changed_when: False
+      failed_when: False
 
     - name: "Save guest timezone setting after GOSC"
       set_fact:
         guest_timezone: "{{ tz_result.stdout.replace('/usr/share/zoneinfo/','') }}"
+      when:
+        - tz_result is defined
+        - tz_result.stdout is defined
 
     # Get hwclock by running command "hwclock -D" when test perl GOSC
     - block:

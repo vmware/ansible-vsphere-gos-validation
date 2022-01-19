@@ -9,6 +9,7 @@
     etc_hosts_success: False
     expected_ips: ['::1']
     ipv6_hostname_check: False
+    actual_ips: []
 
 - include_tasks: ../../common/vm_guest_file_operation.yml
   vars:
@@ -18,11 +19,15 @@
 
 - name: "Get IP bindings for hostname {{ linux_gosc_spec['hostname'] }} in /etc/hosts"
   shell: grep "{{ linux_gosc_spec['hostname'] }}.{{ linux_gosc_spec['domain'] }} *{{ linux_gosc_spec['hostname'] }}" {{ hosts_file_path }} | awk '{print $1}'
-  changed_when: False
+  failed_when: False
   register: etc_hosts_result
+
 - name: "Save hostname binding list"
   set_fact:
     actual_ips: "{{ etc_hosts_result.stdout_lines }}"
+  when:
+    - etc_hosts_result is defined
+    - etc_hosts_result.stdout_lines is defined
 
 # Perl GOSC:
 #   1. When ip assignment is dhcp, hostname will be bound to 127.0.1.1 and ::1

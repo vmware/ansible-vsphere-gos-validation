@@ -3,6 +3,8 @@
 ---
 - name: "Initialize hostname and domain check result"
   set_fact:
+    guest_hostname: ""
+    guest_dns_domain: ""
     hostname_success: ""
     dns_domain_success: ""
 
@@ -27,14 +29,18 @@
     dest_path: "{{ current_test_log_folder }}/hostname_f.txt"
 
 - name: "Get guest FQDN"
-  command: cat "{{ current_test_log_folder }}/hostname_f.txt"
-  changed_when: False
+  command: "cat {{ current_test_log_folder }}/hostname_f.txt"
+  failed_when: False
   register: result
 
 - name: "Save hostname and domain check result"
   set_fact:
     guest_hostname: "{{ result.stdout.split('.')[0] }}"
     guest_dns_domain: "{{ result.stdout.split('.')[1:] | join('.') }}"
+  when:
+    - result is defined
+    - result.stdout is defined
+    - result.stdout.split('.') | length >= 2
 
 # Check hostname
 - name: Check guest hostname is customized
