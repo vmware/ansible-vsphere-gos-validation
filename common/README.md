@@ -83,8 +83,8 @@
 * vm_shell_in_guest.yml: Execute shell command in guest
 * vm_guest_file_operation.yml: Create/delete directory or fetch/copy files in guest with VMware tools installed
 
-### Tasks for vmware.log
-* vm_search_vmware_log.yml: Search vmware.log with a keyword
+### Tasks for VM log files
+* vm_wait_log_msg.yml: Check or wait for a message appear in VM's log file
 
 ### Tasks for VM vmx config
 * vm_get_extra_config.yml: Get all configs in the vmx file
@@ -114,6 +114,8 @@
 * esxi_get_datastores.yml: Get ESXi server datastores info
 * esxi_get_datastore_info.yml: Get specified datastore info on ESXi server
 * esxi_check_delete_datastore_file.yml: Get datastore file status or delete file
+* esxi_upload_datastore_file.yml: Upload file to ESXi datastore
+* esxi_download_datastore_file.yml: Download file from ESXi datastore
 
 ### Tasks for server information
 * esxi_get_host_facts.yml: Get ESXi server host facts
@@ -131,8 +133,8 @@
 
 ## Localhost tasks
 ### Tasks for NFS mount and unmount
-* nfs_mount.yml: Mount an NFS share folder on localhost
-* nfs_unmount.yml: Unmount a NFS share folder
+* local_mount.yml: Mount an NFS share folder or ISO image on localhost
+* local_unmount.yml: Unmount a NFS share folder or ISO image from localhost
 * delete_local_file.yml: Delete local file or directory
 * skip_test_case.yml: Tasks for skipping testcase and ending play
 

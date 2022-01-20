@@ -26,22 +26,19 @@
 #    - vm_guest_id != guest_id
 #    - vm_hardware_version_num | int >= 18
 
-# Create the seed.iso to modify login information
+# Create the seed ISO to modify login information
 - include_tasks: ../../utils/create_seed_iso.yml
   vars:
     user_data_template: "amazon-user-data.j2"
     local_hostname: "amazon-{{ hostname_timestamp }}"
 
-# Upload seed.iso to VM path on ESXi server
-- name: "Copy {{ seed_iso_path }} to VM folder"
-  copy:
-    src: "{{ seed_iso_path }}"
-    dest: "{{ vm_files_path }}/{{ seed_iso_path | basename }}"
-    force: yes
-    mode: 0755
-  delegate_to: "{{ esxi_hostname }}"
+# Upload seed ISO to VM path on ESXi server
+- include_tasks: ../../../common/esxi_upload_datastore_file.yml
+  vars:
+    src_file_path: "{{  seed_iso_path }}"
+    dest_file_path: "{{ vm_dir_name }}/{{ seed_iso_path | basename }}"
 
-# Attach seed.iso to Amazon Linux VM
+# Attach seed ISO to Amazon Linux VM
 - include_tasks: ../../../common/vm_configure_cdrom.yml
   vars:
     cdrom_type: iso
@@ -63,13 +60,13 @@
 # Post configuration for ssh, cloud-init and vmtools
 - include_tasks: amazon_post_config.yml
 
-# Eject seed.iso from guest
-- name: "Eject seed.iso from Amazon Linux"
+# Eject seed ISO from guest
+- name: "Eject seed ISO from Amazon Linux"
   include_tasks: ../../utils/eject_cdrom_in_guest.yml
   vars:
     guest_cdrom_device_num: 0
 
-# Disconnect seed.iso from Amazon Linux VM
+# Disconnect seed ISO from Amazon Linux VM
 - name: "Change VM's CD/DVD Drive 1 to client device"
   include_tasks: ../../../common/vm_configure_cdrom.yml
   vars:

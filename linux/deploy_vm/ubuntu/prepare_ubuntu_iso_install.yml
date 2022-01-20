@@ -1,0 +1,33 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of ISO file name"
+  set_fact:
+    ubuntu_iso_file_name: "{{ os_installation_iso_list[0].split('/')[-1] }}"
+
+- name: "Get Ubuntu OS version and edition from ISO file name"
+  set_fact:
+    ubuntu_version: "{{ ubuntu_iso_file_name | regex_search('\\d+.\\d+(.\\d+)?') }}"
+    ubuntu_edition: |-
+      {%- if "'server' in ubuntu_iso_file_name" -%}server
+      {%- elif "'desktop' is ubuntu_iso_file_name" -%}desktop
+      {%- else -%}unknown
+      {%- endif -%}
+
+- fail:
+    msg: "Ubuntu {{ ubuntu_edition }} is not supported by now"
+  when: ubuntu_edition != 'server'
+
+- name: "Set Ubuntu autoinstall method"
+  set_fact:
+    ubuntu_install_method: |-
+      {%- if ubuntu_version is version('20.04', '>=') -%}cloud-init
+      {%- elif ubuntu_version is version('20.04', '<') -%}simulation
+      {%- else -%}cloud-init
+      {%- endif -%}
+  when: ubuntu_edition == 'server'
+
+- name: "Set fact of Ubuntu unattend install file"
+  set_fact:
+    unattend_install_conf: "Ubuntu/Server/user-data.j2"
+  when: ubuntu_install_method == "cloud-init"

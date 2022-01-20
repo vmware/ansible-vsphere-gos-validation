@@ -19,23 +19,17 @@
     gosc_state_keyword: "ToolsDeployPkgPublishState: state=5, code=0"
 
 # Note: gosc_state_keyword means guest custmization is completed
-- name: Get key strings in vmware.log
-  shell: "grep -c -e '{{ gosc_state_keyword }}' {{ vm_files_path }}/vmware.log"
-  delegate_to: "{{ esxi_hostname }}"
-  register: get_keystring
-  changed_when: False
-  failed_when: False
-  until: get_keystring.stdout_lines|length != 0 and get_keystring.stdout_lines[0]|int == 1
-  retries: "{{ get_guest_reset_time_retries | default(40) }}"
-  delay: 30
-
-- name: Display the result of getting key strings
-  debug: var=get_keystring
-  when: enable_debug is defined and enable_debug
+- include_tasks: vm_wait_log_msg.yml
+  vars:
+    vm_wait_log_name: "vmware.log"
+    vm_wait_log_msg: "{{ gosc_state_keyword }}"
+    vm_wait_log_retries: "{{ get_guest_reset_time_retries | default(40) }}"
+    vm_wait_log_delay: 30
+    vm_wait_log_ignore_errors: True
 
 - name: "Set the result of getting GOSC state code"
   set_fact:
-    gosc_state_keyword_found: "{{ not get_keystring.failed and get_keystring.stdout_lines | length > 0 and get_keystring.stdout_lines[0] | int > 0 }}"
+    gosc_state_keyword_found: "{{ vm_wait_log_msg_success }}"
 
 # Fail when not get VM gosc state keyword in vmware.log
 - name: Check guest customization state

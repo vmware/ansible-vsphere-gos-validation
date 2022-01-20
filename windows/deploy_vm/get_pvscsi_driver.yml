@@ -14,14 +14,14 @@
 - name: Get VMware tools ISO file URL for Windows
   get_url:
     url: "{{ win_vmtools_url }}"
-    dest: "{{ main_playbook_path }}/cache/windows_iso_page"
+    dest: "{{ local_cache }}/windows_iso_page"
     validate_certs: False
     use_proxy: "{{ use_localhost_proxy | default(False) }}"
   environment:
     HTTPS_PROXY: "{{ http_proxy_localhost | default(omit) }}"
 
 - name: Get VMware tools ISO file name
-  command: "cat {{ main_playbook_path }}/cache/windows_iso_page"
+  command: "cat {{ local_cache }}/windows_iso_page"
   register: get_vmtools_iso_file_result
 - name: Set fact of the full path of VMware tools ISO URL
   set_fact:
@@ -30,7 +30,7 @@
     msg: "Will download VMware tools install ISO file from: {{ win_vmtools_url }}/{{ win_vmtools_iso }}, for '{{ win_vmtools_bit }}' guest"
 - name: Set fact of VMware tools ISO file path
   set_fact:
-    download_vmtools_iso_path: "{{ main_playbook_path }}/cache/{{ win_vmtools_iso }}"
+    download_vmtools_iso_path: "{{ local_cache }}/{{ win_vmtools_iso }}"
 - name: Download latest VMware tools ISO to local
   get_url:
     url: "{{ win_vmtools_url }}/{{ win_vmtools_iso }}"
@@ -55,7 +55,7 @@
 - name: Extract ISO file to get PVSCSI driver
   iso_extract:
     image: "{{ download_vmtools_iso_path }}"
-    dest: "{{ main_playbook_path }}/cache/"
+    dest: "{{ local_cache }}/"
     files:
       - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/pvscsi.cat"
       - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/pvscsi.inf"
@@ -69,7 +69,7 @@
 - name: Set fact of the PVSCSI file path list
   set_fact:
     pvscsi_file_path_list:
-      - "{{ main_playbook_path }}/cache/pvscsi.cat"
-      - "{{ main_playbook_path }}/cache/pvscsi.inf"
-      - "{{ main_playbook_path }}/cache/pvscsi.sys"
-      - "{{ main_playbook_path }}/cache/txtsetup.oem"
+      - "{{ local_cache }}/pvscsi.cat"
+      - "{{ local_cache }}/pvscsi.inf"
+      - "{{ local_cache }}/pvscsi.sys"
+      - "{{ local_cache }}/txtsetup.oem"

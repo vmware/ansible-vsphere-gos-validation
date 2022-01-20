@@ -6,16 +6,13 @@
   when: ubuntu_install_method == "simulation"
 
 - block:
-    - name: "Wait for autoinstall early commands"
-      command: "grep -c -e '{{ autoinstall_start_msg }}' {{ vm_serial_port_output_file }}"
-      until:
-        - autoinstall_started is defined
-        - autoinstall_started.stdout is defined
-        - autoinstall_started.stdout == "1"
-      delay: 5
-      retries: 150
-      delegate_to: "{{ esxi_hostname }}"
-      register: autoinstall_started
+    # Wait for autoinstall start message in serial port output file
+    - include_tasks: ../../../common/vm_wait_log_msg.yml
+      vars:
+        vm_wait_log_name: "{{ vm_serial_port_output_file | basename }}"
+        vm_wait_log_msg: "{{ autoinstall_start_msg }}"
+        vm_wait_log_retries: 150
+        vm_wait_log_delay: 5
 
     - include_tasks: ../../../common/vm_wait_guest_ip.yml
 
@@ -32,53 +29,4 @@
       vars:
         keys_send:
           - ENTER
-    - name: sleep 360 seconds to wait installation and rebooting
-      pause:
-        seconds: 360
-  when: ubuntu_install_method == "cloud-init"
-
-- include_tasks: ../../../common/vm_wait_guest_fullname.yml
-  vars:
-    wait_guest_fullname: "Ubuntu Linux (64-bit)"
-
-# Wait for cloud-init configs taking effect
-- include_tasks: wait_ubuntu_autoinstall_completed.yml
-
-# Get guest ip
-- include_tasks: ../../../common/update_inventory.yml
-  vars:
-    update_inventory_timeout: 300
-
-- name: "Eject all ISO connected CDROMs"
-  include_tasks: ../../utils/eject_cdrom_in_guest.yml
-
-# Disconnect OS image from Ubuntu Linux VM and change to client device
-- name: "Change VM's CD/DVD Drive 1 to client device"
-  include_tasks: ../../../common/vm_configure_cdrom.yml
-  vars:
-    cdrom_type: client
-    cdrom_controller_num: 0
-    cdrom_unit_num: 0
-
-- block:
-    # Disconnect seed.iso from Ubuntu Linux VM and change it to client device
-    - include_tasks: ../../../common/vm_configure_cdrom.yml
-      vars:
-        cdrom_type: client
-        # there is Ansible issue filed here, so hardcode to cdrom 0:1,
-        # will change this after fix merged
-        # cdrom_unit_num: "{{ unattend_iso_cdrom_unit_num | int }}"
-        cdrom_controller_num: 0
-        cdrom_unit_num: 1
-
-    # Remove serial port
-    - block:
-        - include_tasks: ../utils/shutdown.yml
-
-        - include_tasks: ../../../common/vm_remove_serial_port.yml
-
-        - include_tasks: ../../common/vm_set_power_state.yml
-          vars:
-            vm_power_state_set: 'powered-on'
-      when: vm_serial_port_file_path is defined and vm_serial_port_file_path
   when: ubuntu_install_method == "cloud-init"

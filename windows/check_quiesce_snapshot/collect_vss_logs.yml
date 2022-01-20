@@ -2,18 +2,11 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Get vmware.log containing vss logs
-- name: Get vmware.log from ESXi host
-  fetch:
-    src: "{{ vm_files_path }}/vmware.log"
-    dest: "{{ current_test_log_folder }}/vmware.log"
-    flat: yes
-    validate_checksum: no
-  delegate_to: "{{ esxi_hostname }}"
-  register: get_vmware_log
-
-- name: Display the result of getting vmware.log file
-  debug: var=get_vmware_log
-  when: enable_debug
+- include_tasks: ../../common/esxi_download_datastore_file.yml
+  vars:
+    src_datastore: "{{ datastore }}"
+    src_file_path: "{{ vm_dir_name }}/vmware.log"
+    dest_file_path: "{{ current_test_log_folder }}/vmware.log"
 
 - name: Set fact of the saved event log files
   set_fact:

@@ -32,15 +32,18 @@
           include_tasks: ../utils/win_get_firmware.yml
 
         - name: Search EFI ROM keyword in vmware.log
-          include_tasks: ../../common/vm_search_vmware_log.yml
+          include_tasks: ../../common/vm_wait_log_msg.yml
           vars:
-            keyword: "{{ vmware_log_keyword }}"
+            vm_wait_log_name: "vmware.log"
+            vm_wait_log_msg: "{{ vmware_log_keyword }}"
+            vm_wait_log_retries: 1
+            vm_wait_log_ignore_errors: True
 
         - name: "Verify EFI firmware info in guest OS and vmware.log"
           assert:
             that:
               - firmware_os == "efi"
-              - vmware_log_search
+              - vm_wait_log_msg_success | bool
             fail_msg: "Firmware got in guest OS is not EFI, or EFI info not found in vmware.log."
             success_msg: "Firmware got in guest OS is EFI, and EFI info got in vmware.log."
       rescue:

@@ -1,0 +1,122 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Rebuild OS ISO image with unattended install file
+# Parameter:
+#   rebuilt_unattend_iso_path: Local path to the rebuilt ISO image with unattend install config file
+#
+- name: "Set fact of the absolute path of source ISO file on ESXi server"
+  set_fact:
+    iso_file_datastore: "{{ os_installation_iso_list[0].split()[0] | regex_replace('\\[|\\]', '') }}"
+    iso_file_path_in_datastore: "{{ os_installation_iso_list[0].split()[1] }}"
+
+# Fetch ISO file from ESXi datastore
+- include_tasks: ../../common/esxi_download_datastore_file.yml
+  vars:
+    src_datastore: "{{ iso_file_datastore }}"
+    src_file_path: "{{ iso_file_path_in_datastore }}"
+    dest_file_path: "{{ unattend_iso_cache }}/{{ iso_file_path_in_datastore | basename }}"
+    download_file_timeout: 600
+
+- name: "Set fact of source ISO image file name and path at local"
+  set_fact:
+    src_iso_file_name: "{{ datastore_file_download_result.dest | basename }}"
+    src_iso_file_path: "{{ datastore_file_download_result.dest }}"
+
+# Create a temporary directory to mount ISO image
+- name: "Create a temporary directory to mount ISO image"
+  include_tasks: ../../common/create_temp_file_dir.yml
+  vars:
+    tmp_dir: "{{ unattend_iso_cache }}"
+    tmp_state: "directory"
+    tmp_prefix: "expand_{{ src_iso_file_name | replace('.iso', '') }}_"
+
+- name: "Set fact of the temp dir to mount OS ISO image"
+  set_fact:
+    tmp_iso_mount_dir: "{{ tmp_path }}"
+
+# Mount original ISO image at local
+- include_tasks: ../../common/local_mount.yml
+  vars:
+    mount_path: "{{ tmp_iso_mount_dir }}"
+    mount_src: "{{ src_iso_file_path }}"
+    mount_opts: "ro,noauto"
+    mount_fstype: "iso9660"
+
+# Copy files and directories in original ISO to a new folder
+# And add unattended install file
+- block:
+    - name: "Create a temporary directory to rebuild unattended install ISO image"
+      include_tasks: ../../common/create_temp_file_dir.yml
+      vars:
+        tmp_dir: "{{ unattend_iso_cache }}"
+        tmp_state: "directory"
+        tmp_prefix: "rebuild_iso_"
+
+    - name: "Set facts for rebuilding unattend install ISO image"
+      set_fact:
+        rebuilt_unattend_iso_dir: "{{ tmp_path }}"
+
+    - name: "Set fact of unattend install config file name"
+      set_fact:
+        unattend_install_file_name: "{{ new_unattend_install_conf | basename }}"
+
+    - name: "Set fact of boot menu config file"
+      set_fact:
+        boot_menu_cfg_file_paths:
+          - "{{ rebuilt_unattend_iso_dir }}/isolinux/menu.cfg"
+          - "{{ rebuilt_unattend_iso_dir }}/boot/grub2/grub.cfg"
+        isolinux_cfg_file_path: "{{ rebuilt_unattend_iso_dir }}/isolinux/isolinux.cfg"
+
+    - block:
+        # Ansible copy module would fail while copying read-only files
+        - name: "Copy ISO content from {{ tmp_iso_mount_dir }} to {{ rebuilt_unattend_iso_dir }}"
+          shell: "cp -rf {{ tmp_iso_mount_dir }}/* {{ rebuilt_unattend_iso_dir }}"
+
+        - name: "Copy unattend install config file to {{ rebuilt_unattend_iso_dir }}"
+          copy:
+            src: "{{ new_unattend_install_conf }}"
+            dest: "{{ rebuilt_unattend_iso_dir }}/isolinux"
+            force: yes
+            mode: 0644
+
+        - name: "Update timeout for autoboot"
+          replace:
+            path: "{{ isolinux_cfg_file_path }}"
+            regexp: "timeout 0"
+            replace: "timeout 1"
+
+        - name: "Update boot menu with kickstart"
+          replace:
+            path: "{{ item }}"
+            regexp: '(.*)(root=[^ ]+)(.*)'
+            replace: "\\1\\2 ks=cdrom:/isolinux/{{ unattend_install_file_name }} \\3"
+          with_items: "{{ boot_menu_cfg_file_paths }}"
+
+        - name: "Set facts for rebuilding ISO options"
+          set_fact:
+            unattend_iso_label: "-V {{ src_iso_file_name | splitext | first }}"
+            boot_info_opts: "-R -l -L -D -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot --eltorito-boot boot/grub2/efiboot.img -no-emul-boot"
+
+        # Create the unattended install ISO image
+        - name: "Rebuild ISO image with unattend install config file"
+          shell: "xorriso -as mkisofs {{ boot_info_opts }} {{ unattend_iso_label }} . > {{ rebuilt_unattend_iso_path }}"
+          args:
+            chdir: "{{ rebuilt_unattend_iso_dir }}"
+
+        # Unmount original ISO file
+        - include_tasks: ../../common/local_unmount.yml
+          vars:
+            mount_path: "{{ tmp_iso_mount_dir }}"
+
+        - name: "Cleanup original ISO files and copied files"
+          file:
+            path: "{{ item }}"
+            state: absent
+          with_items:
+            - "{{ src_iso_file_path }}"
+            - "{{ rebuilt_unattend_iso_dir }}"
+            - "{{ tmp_iso_mount_dir }}"
+      become: yes
+  when:
+    - mount_result is defined and not mount_result.failed

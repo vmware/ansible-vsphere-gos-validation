@@ -1,0 +1,24 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Mount a NFS storage or an ISO image on local machine
+# Parameters:
+#   mount_src: The mount point source, which could be an ISO image path or NFS server path
+#   mount_path: The local path to mount the source
+#   mount_fstype: The fstype of mount point, such as nfs, iso9660, etc
+#   mount_opts: options for mounting filesystem
+#
+- name: "Mount {{ mount_src }} to {{ mount_path }} on localhost"
+  mount:
+    path: "{{ mount_path }}"
+    src: "{{ mount_src }}"
+    opts: "{{ mount_opts | default('ro,nolock') }}"
+    fstab: "/tmp/temp.fstab"
+    fstype: "{{ mount_fstype }}"
+    boot: false
+    state: mounted
+  register: mount_result
+  become: yes
+
+- name: "Display the mount result"
+  debug: var=mount_result

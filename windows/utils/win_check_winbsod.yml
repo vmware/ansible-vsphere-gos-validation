@@ -7,18 +7,13 @@
   set_fact:
     guest_bsod_keyword: "WinBSOD:"
 
-- name: Get key string in vmware.log
-  shell: "grep -c -e '{{ guest_bsod_keyword }}' {{ vm_files_path }}/vmware.log"
-  delegate_to: "{{ esxi_hostname }}"
-  register: get_keystring
-  changed_when: False
-  failed_when: False
-  until: get_keystring.stdout_lines | length != 0 and get_keystring.stdout_lines[0] | int != 0
-  retries: 20
-  delay: 3
-- name: Display the result of getting key strings
-  debug: var=get_keystring
-  when: enable_debug is defined and enable_debug
+- include_tasks: ../../common/vm_wait_log_msg.yml
+  vars:
+    vm_wait_log_name: "vmware.log"
+    vm_wait_log_msg: "{{ guest_bsod_keyword }}"
+    vm_wait_log_retries: 20
+    vm_wait_log_delay: 3
+    vm_wait_log_ignore_errors: True
 
 # Fail when get Windows guest BSOD keyword in vmware.log
 - block:
@@ -28,6 +23,4 @@
     - name: Check the number of key strings
       fail:
         msg: "Get Windows guest BSOD keyword '{{ guest_bsod_keyword }}' in vmware.log."
-  when:
-    - get_keystring.stdout_lines | length != 0
-    - get_keystring.stdout_lines[0] | int != 0
+  when: vm_wait_log_msg_success | bool
