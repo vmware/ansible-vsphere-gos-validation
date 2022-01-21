@@ -8,7 +8,9 @@
 #   vm_wait_log_retries: how many times to re-check log about waiting message
 #   vm_wait_log_delay: seconds to delay for a retry
 #   vm_wait_log_ignore_errors: True to ignore task failure. Default is False.
-
+#   vm_wait_log_hide_output: True to hide the output, False will print the
+#   output of log content. Default is True.
+#
 - name: "Set fact of VM log file path in datastore"
   set_fact:
     vm_log_file_path: "{{ vm_dir_name }}/{{ vm_wait_log_name }}"
@@ -33,6 +35,7 @@
     password: "{{ vsphere_host_user_password }}"
     validate_certs: "{{ validate_certs | default(False) }}"
   register: get_vm_log_content
+  no_log: "{{ vm_wait_log_hide_output | default(True) }}"
   until:
     - get_vm_log_content is defined
     - get_vm_log_content.content is defined
