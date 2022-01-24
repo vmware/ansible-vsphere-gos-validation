@@ -32,8 +32,8 @@
 - name: "Set facts of guest network interface names and IPv4 address"
   set_fact:
     guest_iface_name: "{{ guest_ip_addr_show[0].split()[0] }}"
-    guest_ipv4_address: "{{ guest_ip_addr_show[0].split()[-1] | ipaddr('address') }}"
-    guest_ipv4_netmask: "{{ guest_ip_addr_show[0].split()[-1] | ipaddr('netmask') }}"
+    guest_ipv4_address: "{{ guest_ip_addr_show[0] | regex_search('(\\d+\\.){3}(\\d+)/(\\d+)') | ipaddr('address') }}"
+    guest_ipv4_netmask: "{{ guest_ip_addr_show[0] | regex_search('(\\d+\\.){3}(\\d+)/(\\d+)') | ipaddr('netmask') }}"
   when: guest_ip_addr_show | length > 0
 
 # Get default gateway
@@ -57,8 +57,8 @@
   set_fact:
     guest_ipv4_gateway: "{{ guest_default_gateway[0].split()[2] }}"
   when:
-    - guest_ipv4_gateway | length > 0
-    - guest_ipv4_gateway.split() | length >= 3
+    - guest_default_gateway | length > 0
+    - guest_default_gateway[0].split() | length >= 3
 
 # Check IP address, netmaks, gateway settings for GOSC with DHCP IP
 - block:
