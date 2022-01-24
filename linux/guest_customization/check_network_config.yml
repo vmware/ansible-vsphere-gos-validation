@@ -26,19 +26,15 @@
     dest_path: "{{ current_test_log_folder }}/ip_addr_show.txt"
 
 - name: "Get IPv4 address"
-  shell: "cat {{ current_test_log_folder }}/ip_addr_show.txt | grep -v lo | grep -v virbr | awk '{print $1, $2, $3}'"
-  failed_when: False
-  register: result
-
-- name: "Save GOSC network facts from command output"
   set_fact:
-    guest_iface_name: "{{ result.stdout.split()[0] }}"
-    guest_ipv4_address: "{{ result.stdout.split()[-1] | ipaddr('address') }}"
-    guest_ipv4_netmask: "{{ result.stdout.split()[-1] | ipaddr('netmask') }}"
-  when:
-    - result is defined
-    - result.stdout is defined
-    - result.stdout.split() | length >= 3
+    guest_ip_addr_show: "{{ lookup('file', current_test_log_folder ~ '/ip_addr_show.txt').split('\n') | select('search', '^e(n|th).*') }}"
+
+- name: "Set facts of guest network interface names and IPv4 address"
+  set_fact:
+    guest_iface_name: "{{ guest_ip_addr_show[0].split()[0] }}"
+    guest_ipv4_address: "{{ guest_ip_addr_show[0].split()[-1] | ipaddr('address') }}"
+    guest_ipv4_netmask: "{{ guest_ip_addr_show[0].split()[-1] | ipaddr('netmask') }}"
+  when: guest_ip_addr_show | length > 0
 
 # Get default gateway
 - include_tasks: ../../common/vm_shell_in_guest.yml
@@ -54,17 +50,15 @@
     dest_path: "{{ current_test_log_folder }}/ip_route_show.txt"
 
 - name: "Get default gateway"
-  shell: "cat {{ current_test_log_folder }}/ip_route_show.txt | grep '^default'"
-  failed_when: False
-  register: result
-
-- name: "Save GOSC network gateway"
   set_fact:
-    guest_ipv4_gateway: "{{ result.stdout.split()[2] }}"
+    guest_default_gateway: "{{ lookup('file', current_test_log_folder ~ '/ip_route_show.txt').split('\n') | select('match', '^default') }}"
+
+- name: "Set fact of GOSC network gateway"
+  set_fact:
+    guest_ipv4_gateway: "{{ guest_default_gateway[0].split()[2] }}"
   when:
-    - result is defined
-    - result.stdout is defined
-    - result.stdout.split() | length >= 3
+    - guest_ipv4_gateway | length > 0
+    - guest_ipv4_gateway.split() | length >= 3
 
 # Check IP address, netmaks, gateway settings for GOSC with DHCP IP
 - block:
@@ -194,20 +188,15 @@
         dest_path: "{{ current_test_log_folder }}/list_network_files.txt"
 
     - name: "Look for network file on Photon OS"
-      command: "cat {{ current_test_log_folder }}/list_network_files.txt"
-      failed_when: False
-      register: network_files
-
+      set_fact:
+        guest_network_files: "{{ lookup('file', current_test_log_folder ~ '/list_network_files.txt').split('\n') }}"
     - include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
         src_path: "{{ src_network_file }}"
         dest_path: "{{ current_test_log_folder }}{{ src_network_file }}"
-      with_items: "{{ network_files.stdout_lines }}"
+      with_items: "{{ guest_network_files }}"
       loop_control:
         loop_var: "src_network_file"
-      when:
-        - network_files is defined
-        - network_files.stdout_lines is defined 
-        - network_files.stdout_lines | length > 0
+      when: guest_network_files | length > 0
   when: guest_os_ansible_distribution == "VMware Photon OS"

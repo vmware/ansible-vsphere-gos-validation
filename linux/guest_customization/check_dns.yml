@@ -44,18 +44,9 @@
             src_path: "/tmp/resolvectl_dns.txt"
             dest_path: "{{ current_test_log_folder }}/resolvectl_dns.txt"
 
-        - name: "Get output of 'resolvectl dns'"
-          command: "cat {{ current_test_log_folder }}/resolvectl_dns.txt"
-          register: dns_servers
-          failed_when: False
-
         - name: "Set fact of guest DNS servers"
           set_fact:
-            guest_dns_servers: "{{ dns_servers.stdout_lines | select('match', '^Link') |
-                               regex_findall('\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b') }}"
-          when:
-            - dns_servers is defined
-            - dns_servers.stdout_lines is defined
+            guest_dns_servers: "{{ lookup('file', current_test_log_folder ~ '/resolvectl_dns.txt').split('\n') | select('match', '^link') | regex_findall('\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b') }}" 
       when: resolvectl_dns_result | bool
 
     # Run command 'resolvectl domain' to get DNS servers
@@ -76,18 +67,9 @@
             src_path: "/tmp/resolvectl_domain.txt"
             dest_path: "{{ current_test_log_folder }}/resolvectl_domain.txt"
 
-        - name: "Get output of 'resolvectl domain'"
-          command: "cat {{ current_test_log_folder }}/resolvectl_domain.txt"
-          register: dns_domains
-          failed_when: False
-
         - name: "Set fact of guest DNS searching domains"
           set_fact:
-            guest_dns_search: "{{ dns_domains.stdout_lines | select('match', '^Link') |
-                              regex_findall('\\b(?:[a-zA-Z0-9-]{1,}\\.){1,}[a-zA-Z0-9-]{1,}\\b') }}"
-          when:
-            - dns_domains is defined
-            - dns_domains.stdout_lines is defined
+            guest_dns_search: "{{ lookup('file', current_test_log_folder ~ '/resolvectl_domain.txt').split('\n') | select('match', '^link') | regex_findall('\\b(?:[a-zA-Z0-9-]{1,}\\.){1,}[a-zA-Z0-9-]{1,}\\b') }}"
       when: resolvectl_domain_result | bool
   when: resolvectl_status_result
 
@@ -109,36 +91,14 @@
         src_path: "/tmp/resolv.conf"
         dest_path: "{{ current_test_log_folder }}/etc/resolv.conf"
 
-    - name: "Get DNS servers from /etc/resolv.conf"
-      shell: cat "{{ current_test_log_folder }}/etc/resolv.conf" | grep -i "^nameserver\s*" | awk '{print $2}'
-      register: dns_servers
-      failed_when: False
-
-    - name: "Get guest DNS servers from shell command output"
+    - name: "Get content of /etc/resolv.conf in guest OS"
       set_fact:
-        guest_dns_servers: "{{ dns_servers.stdout_lines }}"
-      when:
-        - dns_servers is defined
-        - dns_servers.stdout_lines is defined
+        guest_resolv_conf: "{{ lookup('file', current_test_log_folder ~ '/etc/resolv.conf').split('\n') }}"
 
-    - name: "Get DNS search domains from /etc/resolv.conf"
-      shell: cat "{{ current_test_log_folder }}/etc/resolv.conf" | grep -i "^search" | awk '{i=2;while(i<=NF) {print $i; i++ }}'
-      register: dns_search
-      failed_when: False
-
-    - block:
-        - name: "Save guest DNS search list to tmp variable"
-          set_fact:
-            tmp_dns_search: "{{ dns_search.stdout_lines }}"
-
-        # In Amazon Linux 2 guest, a period after each DNS search domain would be added, so remove it
-        - name: "Get guest DNS search list"
-          set_fact:
-            guest_dns_search: "{{ guest_dns_search + [item | regex_replace('\\.$','')] }}"
-          with_items: "{{ tmp_dns_search }}"
-      when:
-        - dns_search is defined
-        - dns_search.stdout_lines is defined
+    - name: "Get guest DNS servers and search domains from /etc/resolv.conf"
+      set_fact:
+        guest_dns_servers: "{{ guest_resolv_conf | select('match', '^nameserver\s*') | map('regex_replace', 'nameserver\s*', '') }}"
+        guest_dns_search: "{{ guest_resolv_conf | select('match', '^search\s*') | map('regex_replace', '^search\s*', '') | split() | map('regex_replace', '\\.$', '') }}"
   when:
     - not resolvectl_status_result
     - guest_os_ansible_distribution != 'Ubuntu'
@@ -160,31 +120,15 @@
             operation: "fetch_file"
             src_path: "/tmp/systemd_resolve_status"
             dest_path: "{{ current_test_log_folder }}/systemd_resolve_status.txt"
-        - name: "Get DNS servers from command systemd-resolve"
-          shell: cat "{{ current_test_log_folder }}/systemd_resolve_status.txt" | sed -n '/DNS Servers/,/DNS Domain/p' | head -n -1
-          register: dns_servers
-          failed_when: False
 
-        - name: "Set fact of DNS servers from shell command output"
+        - name: "Set fact of guest systemd resolve status"
           set_fact:
-            guest_dns_servers: "{{ (guest_dns_servers + [item.strip().split(':')[1].strip()]) if 'DNS Servers' in item else (guest_dns_servers + [item.strip()]) }}"
-          with_items: "{{ dns_servers.stdout_lines }}"
-          when:
-            - dns_servers is defined
-            - dns_servers.stdout_lines is defined
+            guest_resolve_status: "{{ lookup('file', current_test_log_folder ~ '/systemd_resolve_status.txt') | regex_replace('\\n\\s*','\\n') }}"
 
-        - name: "Get DNS search domains from command systemd-resolve"
-          shell: cat "{{ current_test_log_folder }}/systemd_resolve_status.txt" | sed -n '/DNS Domain/,/DNSSEC NTA/p' | head -n -1
-          register: dns_domains
-          failed_when: False
-
-        - name: "Set fact of DNS search domains from shell command output"
+        - name: "Set fact of DNS servers and search domains from systemd resolve status"
           set_fact:
-            guest_dns_search: "{{ (guest_dns_search + [item.strip().split(':')[1].strip()]) if 'DNS Domain' in item else (guest_dns_search + [item.strip()]) }}"
-          with_items: "{{ dns_domains.stdout_lines }}"
-          when:
-            - dns_domains is defined
-            - dns_domains.stdout_lines is defined
+            guest_dns_servers: "{{ guest_resolve_status | regex_search('DNS Servers:\\s*(([0-9]+\\.){3}([0-9]+)\\n?)+') | regex_replace('DNS Servers:\\s*', '') | split('\n') | reject('equalto', '') }}"
+            guest_dns_search: "{{ guest_resolve_status | regex_search('DNS Domain:\\s*(([0-9a-zA-Z_\\-]+\\.){1,}([0-9a-zA-Z_\\-]+)\\n?)+') | regex_replace('DNS Domain:\\s*', '') | split('\n') | reject('equalto', '') }}" 
       when: systemd_resolve_result
   when:
     - not resolvectl_status_result

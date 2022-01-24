@@ -18,16 +18,13 @@
     dest_path: "{{ hosts_file_path }}"
 
 - name: "Get IP bindings for hostname {{ linux_gosc_spec['hostname'] }} in /etc/hosts"
-  shell: grep "{{ linux_gosc_spec['hostname'] }}.{{ linux_gosc_spec['domain'] }} *{{ linux_gosc_spec['hostname'] }}" {{ hosts_file_path }} | awk '{print $1}'
-  failed_when: False
-  register: etc_hosts_result
-
-- name: "Save hostname binding list"
   set_fact:
-    actual_ips: "{{ etc_hosts_result.stdout_lines }}"
-  when:
-    - etc_hosts_result is defined
-    - etc_hosts_result.stdout_lines is defined
+    guest_host_ip_bindings: "{{ lookup('file', hosts_file_path).split('\n') | select('match', '.*\\s*' ~ linux_gosc_spec['hostname'] ~ '.' ~ linux_gosc_spec['domain'] ~ ' *' ~ linux_gosc_spec['hostname']) }}"
+
+- name: "Set fact of hostnam and IP binding"
+  set_fact:
+    actual_ips: "{{ guest_host_ip_bindings | map('regex_replace', '\\s*' ~ linux_gosc_spec['hostname'] ~ '.*', '') }}"
+  when: guest_host_ip_bindings | length > 0
 
 # Perl GOSC:
 #   1. When ip assignment is dhcp, hostname will be bound to 127.0.1.1 and ::1

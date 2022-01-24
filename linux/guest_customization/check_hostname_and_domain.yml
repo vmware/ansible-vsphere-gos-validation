@@ -29,18 +29,13 @@
     dest_path: "{{ current_test_log_folder }}/hostname_f.txt"
 
 - name: "Get guest FQDN"
-  command: "cat {{ current_test_log_folder }}/hostname_f.txt"
-  failed_when: False
-  register: result
-
-- name: "Save hostname and domain check result"
   set_fact:
-    guest_hostname: "{{ result.stdout.split('.')[0] }}"
-    guest_dns_domain: "{{ result.stdout.split('.')[1:] | join('.') }}"
-  when:
-    - result is defined
-    - result.stdout is defined
-    - result.stdout.split('.') | length >= 2
+    guest_fqdn: "{{ lookup('file', current_test_log_folder ~ '/hostname_f.txt') }}"
+
+- name: "Set fact of guest OS hostname and domain"
+  set_fact:
+    guest_hostname: "{{ guest_fqdn.split('.')[0] }}"
+    guest_dns_domain: "{{ (guest_fqdn.split('.')[1:] | join('.')) if guest_fqdn.split('.') | length > 1 else '' }}"
 
 # Check hostname
 - name: Check guest hostname is customized
