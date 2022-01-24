@@ -98,7 +98,7 @@
     - name: "Get guest DNS servers and search domains from /etc/resolv.conf"
       set_fact:
         guest_dns_servers: "{{ guest_resolv_conf | select('match', '^nameserver\\s*') | map('regex_replace', 'nameserver\\s*', '') }}"
-        guest_dns_search: "{{ guest_resolv_conf | select('match', '^search\\s*') | map('regex_replace', '^search\\s*', '') | split() | map('regex_replace', '\\.$', '') }}"
+        guest_dns_search: "{{ guest_resolv_conf | select('match', '^search\\s*') | join('\\n') | regex_replace('^search\\s*', '') | split() | map('regex_replace', '\\.$', '') }}"
   when:
     - not resolvectl_status_result
     - guest_os_ansible_distribution != 'Ubuntu'
