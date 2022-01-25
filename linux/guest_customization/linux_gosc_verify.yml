@@ -43,9 +43,69 @@
 - name: "Print GOSC validation errors"
   debug: var=gosc_validation_errors
 
-- name: "Assert {{ gosc_workflow }} guest customization checks all PASS"
-  assert:
-    that:
-      - "{{ item.value }}"
-    fail_msg: "{{ gosc_validation_errors[item.key] }}"
-  with_dict: "{{ gosc_validation_result }}"
+- name: "Get failed customization items"
+  set_fact:
+    gosc_failed_items: "{{ gosc_validation_result | dict2items | selectattr('value', 'equalto', false) | map(attribute='key') }}"
+
+# Warn about below known issues but not fail the task
+- block:
+    - name: "Ignore DNS customization failures"
+      set_fact:
+        ignored_gosc_failed_items: ['dns_servers_success', 'dns_suffix_success']
+
+    - name: "Ignore DNS customization failures when performing cloud-init GOSC with DHCP IP on Ubuntu"
+      debug:
+        msg: "{{ (gosc_validation_errors | dict2items | selectattr('key', 'in', ignored_gosc_failed_items) | map(attribute='value') | flatten) + ['WARNING: DNS customization failed due to https://bugs.launchpad.net/ubuntu/+source/cloud-init/+bug/1776452. Ignore this failure.'] }}"
+      when: (gosc_failed_items | length) > (gosc_failed_items | difference(ignored_gosc_failed_items) | length)
+
+    - name: "Update failed customization items"
+      set_fact:
+        gosc_failed_items: "{{ gosc_failed_items | difference(ignored_gosc_failed_items) }}"
+  when:
+    - gosc_failed_items | length > 0
+    - guest_os_ansible_distribution == "Ubuntu"
+    - enable_cloudinit_gosc
+    - ip_assignment == "dhcp"
+
+# User cannot customize the vCenter Server Appliance guest operating system to set a virtual NIC as a primary.
+# The issue was fixed on vCenter Server 6.5 U3, 6.7U2, and later releases.
+- block:
+    - name: "Ignore default gateway customization failure"
+      set_fact:
+        ignored_gosc_failed_items: ['guest_gateway_success']
+
+    - name: "cloud-init GOSC with static IP couldn't set default gateway"
+      debug:
+        msg: "{{ (gosc_validation_errors | dict2items | selectattr('key', 'in', ignored_gosc_failed_items) | map(attribute='value') | flatten) + ['WARNING: default gateway customization failure has been fixed on vCenter Server 6.5 U3 and 6.7U2. See https://docs.vmware.com/en/VMware-vSphere/6.5/rn/vsphere-vcenter-server-65u3-release-notes.html#guest-os-issues-resolved and https://docs.vmware.com/en/VMware-vSphere/6.7/rn/vsphere-vcenter-server-67u2-release-notes.html#guest-os-issues-resolved. Ignore this failure.'] }}"
+      when: (gosc_failed_items | length) > (gosc_failed_items | difference(ignored_gosc_failed_items) | length)
+
+    - name: "Update failed customization items"
+      set_fact:
+        gosc_failed_items: "{{ gosc_failed_items | difference(ignored_gosc_failed_items) }}"
+  when:
+    - gosc_failed_items | length > 0
+    - enable_cloudinit_gosc
+    - ip_assignment == "static"
+    - (vcenter_version is version('6.5.0', '==') and vcenter_build | int < 14020092) or (vcenter_version is version('6.7.0', '==') and vcenter_build | int < 13010631)
+
+- block:
+    - name: "Ignore GOSC state keyword failure"
+      set_fact:
+        ignored_gosc_failed_items: ['gosc_state_keyword_found']
+
+    - name: "GOSC doesn't send complete state code to vmware.log when vCenter Server version is 6.5 U3 and earlier"
+      debug:
+        msg: "{{ (gosc_validation_errors | dict2items | selectattr('key', 'in', ignored_gosc_failed_items) | map(attribute='value') | flatten) + ['WARNING: No GOSC complete state keyword in vmware.log from vCenter Server 6.5 U3 and earlier. Ignore this failure.'] }}"
+      when: (gosc_failed_items | length) > (gosc_failed_items | difference(ignored_gosc_failed_items) | length)
+
+    - name: "Update failed customization items"
+      set_fact:
+        gosc_failed_items: "{{ gosc_failed_items | difference(ignored_gosc_failed_items) }}"
+  when:
+    - gosc_failed_items | length > 0
+    - vcenter_version is version('6.5.0', '==')
+
+- name: "GOS customization failed"
+  fail:
+    msg: "{{ gosc_validation_errors | dict2items | selectattr('key', 'in', gosc_failed_items) | map(attribute='value') | flatten }}"
+  when: gosc_failed_items | length > 0
