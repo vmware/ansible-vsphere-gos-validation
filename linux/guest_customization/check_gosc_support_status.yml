@@ -42,16 +42,17 @@
           set_fact:
             gosc_is_supported: False
           when:
-            - not enable_cloudinit_gosc | bool
             - package_info is defined
             - package_info.Release is defined
             - "'ph' not in package_info.Release | string"
 
         - include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "GOSC is not supported for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} with open-vm-tools {{ vmtools_version }}."
+            skip_msg: "Perl GOSC is not supported for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} with not bundled open-vm-tools {{ vmtools_version }}."
           when: not gosc_is_supported | bool
-      when: guest_os_ansible_distribution == 'VMware Photon OS'
+      when:
+        - guest_os_ansible_distribution == 'VMware Photon OS'
+        - not enable_cloudinit_gosc | bool
 
     - block:
         - include_tasks: ../../common/skip_test_case.yml
