@@ -19,18 +19,39 @@
       set_fact:
         gos_not_support_gosc: ["FreeBSD", "Flatcar", "Debian", "SLED", "Astra Linux (Orel)"]
 
-    - name: "Set fact of GOSC support status to False"
+    - name: "Set fact of GOSC support status to False for {{ guest_os_ansible_distribution }}"
       set_fact:
         gosc_is_supported: False
       when:  guest_os_ansible_distribution in gos_not_support_gosc
 
-    - name: "Set fact of GOSC support status to False"
+    - name: "Set fact of GOSC support status to False for Ubuntu {{ guest_os_ansible_distribution_ver }} from {{ vcenter_version }}"
       set_fact:
         gosc_is_supported: False
       when:
         - guest_os_ansible_distribution == 'Ubuntu'
         - guest_os_ansible_distribution_ver is version ('21.04', '>=')
         - vcenter_version is version ('7.0.1', '<')
+        - not enable_cloudinit_gosc | bool
+
+    - block:
+        - include_tasks: ../utils/get_installed_package_info.yml
+          vars:
+            package_name: "open-vm-tools"
+
+        - name: "Set fact of GOSC support status to False for Photon OS with not bundled open-vm-tools"
+          set_fact:
+            gosc_is_supported: False
+          when:
+            - package_info is defined
+            - package_info.Release is defined
+            - "'ph' not in package_info.Release | string"
+
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Perl GOSC is not supported for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} with not bundled open-vm-tools {{ vmtools_version }}."
+          when: not gosc_is_supported | bool
+      when:
+        - guest_os_ansible_distribution == 'VMware Photon OS'
         - not enable_cloudinit_gosc | bool
 
     - block:
