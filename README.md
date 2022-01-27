@@ -86,14 +86,10 @@ This project supports below scenarios for end-to-end guest OS validation testing
 Note: This supported guest OS list is used for this project only. For guest OS support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
 
 ### Docker images
-* Latest (Release v1.2):
+* Latest (Release v1.3):
   * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
-* Release v1.2:
-  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v1.2
-* Release v1.1:
-  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v1.1
-* Release v1.0:
-  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v1.0
+* Release v1.3:
+  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v1.3
 
 Launch testing using Docker image
 1. Execute below commands in your machine
