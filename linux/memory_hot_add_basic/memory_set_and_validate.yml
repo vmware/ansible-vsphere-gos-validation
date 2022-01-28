@@ -24,20 +24,29 @@
     - include_tasks: ../../common/vm_set_memory_size.yml
       vars:
         memory_mb: "{{ mem_after_hotadd }}"
-    - include_tasks: ../../common/vm_set_power_state.yml
-      vars:
-        vm_power_state_set: 'powered-on'
+
+    - block:
+        - include_tasks: ../../common/vm_set_power_state.yml
+          vars:
+            vm_power_state_set: 'powered-on'
+
+        - include_tasks: ../../common/update_inventory.yml
       when:
         - mem_before_hotadd | int <= 3072
         - mem_after_hotadd | int > 3072
     
-    # Check VM connection is not broken and/or VM boots up after cold add
-    - name: "Pause 5 seconds then check VM connection status"
-      pause:
-        seconds: 5
-    - include_tasks: ../../common/vm_wait_connection.yml
-      vars:
-        vm_wait_connection_timeout: 900
+    # Check VM connection is not broken after memory hot add
+    - block:
+        - name: "Pause 5 seconds then check VM connection status"
+          pause:
+            seconds: 5
+        - include_tasks: ../../common/vm_wait_connection.yml
+          vars:
+            vm_wait_connection_timeout: 900
+      when: >
+        mem_before_hotadd | int > 3072 or
+        mem_after_hotadd | int <= 3072
+
 
     # Get VM memory size in guest OS
     - include_tasks: ../utils/wait_for_memory_blocks.yml
