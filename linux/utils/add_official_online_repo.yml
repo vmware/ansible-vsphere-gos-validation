@@ -3,35 +3,64 @@
 ---
 # Add official online package repository
 - block:
-    - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
-      set_fact:
-        online_repos:
-          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}"
-            baseurl: "http://mirror.centos.org/$contentdir/$releasever/os/$basearch"
-            mirrorlist: "http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=os&infra=$infra"
-            gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7"
-      when:
-        - guest_os_ansible_distribution == "CentOS"
-        - guest_os_ansible_distribution_major_ver | int < 8
+    - block:
+        - name: "List deprecated repositories"
+          shell: "grep -rGl 'mirror\\(list\\)\\?.centos.org' /etc/yum.repos.d/"
+          delegate_to: "{{ vm_guest_ip }}"
+          register: list_centos_repos
 
-    - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
-      set_fact:
-        online_repos:
-          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
-            baseurl: "http://mirror.centos.org/$contentdir/$releasever/BaseOS/$basearch/os/"
-            mirrorlist: "http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=BaseOS&infra=$infra"
-            gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
-          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
-            baseurl: "http://mirror.centos.org/$contentdir/$releasever/AppStream/$basearch/os/"
-            mirrorlist: "http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=AppStream&infra=$infra"
-            gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
-          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
-            baseurl: "http://mirror.centos.org/$contentdir/$releasever/PowerTools/$basearch/os/"
-            mirrorlist: "http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=PowerTools&infra=$infra"
-            gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
-      when:
-        - guest_os_ansible_distribution == "CentOS"
-        - guest_os_ansible_distribution_major_ver | int >= 8
+        - name: "Display repositories which use CentOS mirrors"
+          debug: var=list_centos_repos
+  
+        - name: "Remove deprecated repositories"
+          file:
+            path: "{{ centos_repo_path }}"
+            state: absent
+          delegate_to: "{{ vm_guest_ip }}"
+          with_items: "{{ list_centos_repos.stdout_lines }}"
+          loop_control:
+            loop_var: centos_repo_path
+          when:
+            - list_centos_repos is defined
+            - list_centos_repos.stdout_lines is defined
+            - list_centos_repos.stdout_lines | length > 0
+
+        - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
+          set_fact:
+            online_repos:
+              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}"
+                baseurl: "http://vault.centos.org/$contentdir/$releasever/os/$basearch"
+                gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7"
+          when: guest_os_ansible_distribution_major_ver | int < 8
+
+        - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
+          set_fact:
+            online_repos:
+              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
+                baseurl: "http://vault.centos.org/$contentdir/$releasever/BaseOS/$basearch/os/"
+                gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
+              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
+                baseurl: "http://vault.centos.org/$contentdir/$releasever/AppStream/$basearch/os/"
+                gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
+              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
+                baseurl: "http://vault.centos.org/$contentdir/$releasever/PowerTools/$basearch/os/"
+                gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
+          when: guest_os_ansible_distribution_major_ver | int == 8
+
+        - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
+          set_fact:
+            online_repos:
+              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
+                baseurl: "http://mirror.stream.centos.org/9-stream/BaseOS/$basearch/os/"
+                gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
+              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
+                baseurl: "http://mirror.stream.centos.org/9-stream/AppStream/$basearch/os/"
+                gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
+              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
+                baseurl: "http://mirror.stream.centos.org/9-stream/CRB/$basearch/os/"
+                gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
+          when: guest_os_ansible_distribution_major_ver | int >= 9
+      when: guest_os_ansible_distribution == "CentOS"
 
     - name: "Set online repositories for Rocky Linux {{ guest_os_ansible_distribution_ver }}"
       set_fact:
@@ -54,7 +83,7 @@
       vars:
         repo_name: "{{ online_repo.name }}"
         repo_baseurl: "{{ online_repo.baseurl }}"
-        repo_mirrorlist: "{{ online_repo.mirrorlist }}"
+        repo_mirrorlist: "{{ online_repo.mirrorlist | default(omit) }}"
         gpg_check: True
         gpg_key_path: "{{ online_repo.gpg_key_path }}"
       with_list: "{{ online_repos }}"
