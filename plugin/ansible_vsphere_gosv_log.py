@@ -41,10 +41,10 @@ class VmInfo(object):
         self.Name = vm_name
         self.IP = ''
         self.Guest_OS_Type = ''
+        self.Hardware_Version = ''
         self.VMTools_Version = ''
         self.CloudInit_Version = ''
         self.Config_Guest_Id = ''
-        self.Hardware_Version = ''
         self.GuestInfo_Guest_Id = ''
         self.GuestInfo_Guest_Full_Name = ''
         self.GuestInfo_Guest_Family = ''
@@ -56,15 +56,15 @@ class VmInfo(object):
 
         VM information:
         +---------------------------------------------------------------+
-        | VM Name                   | photon-os-4.0-ansible-test        |
+        | Name                      | test_vm                           |
         +---------------------------------------------------------------+
-        | VM IP                     | 192.168.10.125                    |
+        | IP                        | 192.168.10.125                    |
         +---------------------------------------------------------------+
         | Guest OS Type             | VMware Photon OS 4.0 x86_64       |
         +---------------------------------------------------------------+
-        | VM Tools                  | 11.2.5.26209 (build-17337674)     |
+        | VMTools Version           | 11.2.5.26209 (build-17337674)     |
         +---------------------------------------------------------------+
-        | Cloud-Init                | 20.4.1                            |
+        | CloudInit Version         | 20.4.1                            |
         +---------------------------------------------------------------+
         | Config Guest Id           | vmwarePhoton64Guest               |
         +---------------------------------------------------------------+
@@ -74,12 +74,14 @@ class VmInfo(object):
         +---------------------------------------------------------------+
         | GuestInfo Guest Full Name | VMware Photon OS (64-bit)         |
         +---------------------------------------------------------------+
+        | GuestInfo Guest Family    | linuxGuest                        |
+        +---------------------------------------------------------------+
         | GuestInfo Detailed Data   | architecture='X86'                |
         |                           | bitness='64'                      |
         |                           | distroName='VMware Photon OS'     |
         |                           | distroVersion='4.0'               |
         |                           | familyName='Linux'                |
-        |                           | kernelVersion='5.10.4-13.ph4-esx' |
+        |                           | kernelVersion='5.10.61-1.ph4-esx' |
         |                           | prettyName='VMware Photon OS 4.0' |
         +---------------------------------------------------------------+
         """
