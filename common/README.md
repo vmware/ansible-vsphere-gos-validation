@@ -16,6 +16,7 @@
 
 ### Tasks for VM deploy or remove
 * vm_create.yml: Create a new VM on ESXi host
+* vm_create_with_ide_disk.yml: Create a new VM which boot from an IDE disk on ESXi host
 * ovf_deploy.yml: Deploy OVF template to VM
 * ovf_export.yml: Export VM to OVF template
 * vm_remove.yml: Delete VM from ESXi host

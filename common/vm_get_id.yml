@@ -1,6 +1,10 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+- name: "Initialize VM ID"
+  set_fact:
+    vm_id: ''
+
 - name: "Get VM '{{ vm_name }}' facts from ESXi host"
   vmware_guest_info:
     hostname: "{{ esxi_hostname }}"
@@ -9,13 +13,23 @@
     validate_certs: "{{ validate_certs | default(False) }}"
     datacenter: "ha-datacenter"
     name: "{{ vm_name }}"
-  register: vm_guest_facts
+  register: vm_moid_facts
 - name: Display the VM guest facts
-  debug: var=vm_guest_facts
+  debug: var=vm_moid_facts
   when: enable_debug is defined and enable_debug
 
 - name: "Set fact of the VM ID of VM '{{ vm_name }}'"
   set_fact:
-    vm_id: "{{ vm_guest_facts.instance.moid | default(0) }}"
+    vm_id: "{{ vm_moid_facts.instance.moid | int }}"
+  when:
+    - vm_moid_facts is defined
+    - vm_moid_facts.instance is defined
+    - vm_moid_facts.instance.moid is defined
+    - vm_moid_facts.instance.moid
+
+- fail:
+    msg: "Failed to get VM ID"
+  when: not vm_id
+
 - debug:
-    msg: "Get VM '{{ vm_name }}' moid from ESXi host '{{ esxi_hostname }}': {{ vm_id }}"
+    msg: "Get VM '{{ vm_name }}' ID from ESXi host '{{ esxi_hostname }}': {{ vm_id }}"
