@@ -12,6 +12,7 @@
       set_fact:
         cleanup_vm: False
       when: cleanup_vm is undefined
+
     - block:
         # Need to revert to base snapshot of target VM firstly, or removing portgroup would fail
         - include_tasks: ../common/vm_revert_snapshot.yml
@@ -24,43 +25,15 @@
       when:
         - deploy_router_vm is defined and deploy_router_vm
 
-    # Print test result at the end of testing
-    - name: "Get if test result file exists"
-      stat:
-        path: "{{ test_result_file }}"
-      register: stat_result
-      ignore_errors: True
-    - debug: var=stat_result
-      when: enable_debug is defined and enable_debug
-    - block:
-        - name: "Retrieve all test results"
-          command: cat "{{ test_result_file }}"
-          register: all_test_results
-          ignore_errors: True
-        - block:
-            - name: "Print test results on VM {{ vm_name }}"
-              debug:
-                msg: "{{ all_test_results.stdout_lines }}"
-            - name: Cleanup new deployed VM if there is no failed case
-              block:
-                - include_tasks: ../common/vm_set_power_state.yml
-                  vars:
-                    vm_power_state_set: 'powered-off'
-                - include_tasks: ../common/vm_remove.yml
-                - name: "Set VM cleaned flag is True"
-                  set_fact:
-                    vm_cleaned_up: True
-              when:
-                - cleanup_vm | bool
-                - new_vm is defined and new_vm | bool
-                - all_test_results.stdout.find('Failed') == -1
-          when: all_test_results.stdout_lines | length > 0
-        - debug:
-            msg: "No test results in {{ test_result_file }}"
-          when: all_test_results.stdout_lines | length == 0
+    - name: Cleanup new deployed VM
+      block:
+        - include_tasks: ../common/vm_set_power_state.yml
+          vars:
+            vm_power_state_set: 'powered-off'
+        - include_tasks: ../common/vm_remove.yml
+        - name: "Set VM cleaned flag is True"
+          set_fact:
+            vm_cleaned_up: True
       when:
-        - not stat_result.failed
-        - "'exists' in stat_result.stat and stat_result.stat.exists"
-    - debug:
-        msg: "Get test result file '{{ test_result_file }}' status failed or test result file does not exist."
-      when: stat_result.failed or ('exists' in stat_result.stat and not stat_result.stat.exists)
+        - cleanup_vm | bool
+        - new_vm is defined and new_vm | bool
