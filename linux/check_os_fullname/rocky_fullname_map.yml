@@ -1,0 +1,17 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Map Rocky Linux when ESXi version > 7.0.3 and VMware Tools version > 11.3.5
+- name: "Set guest_fullname variable for Rocky Linux on ESXi 7.0.3 later and VMTools 11.3.5 later"
+  set_fact:
+    guest_fullname: "Rocky Linux {{ bitness }}"
+  when:
+    - esxi_version is version('7.0.3', '>')
+    - vmtools_version is version('11.3.5', '>')
+
+# Map Rocky Linux when ESXi version <= 7.0.3 or VMware Tools version <= 11.3.5
+- name: "Set guest_fullname variable for Rocky Linux on ESXi 7.0.3 and earlier, or VMTools 11.3.5 and earlier"
+  include_tasks: otherlinux_fullname_map.yml
+  when: >
+    esxi_version is version('7.0.3', '<=') or
+    vmtools_version is version('11.3.5', '<=')
