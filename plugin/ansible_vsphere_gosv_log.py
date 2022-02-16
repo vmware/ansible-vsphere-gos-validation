@@ -674,12 +674,13 @@ class CallbackModule(CallbackBase):
         elif str(task.action) == "debug":
             if re.match("skip\\s+testcase:", task.name.lower()):
                 test_name = task.name.split(':')[-1].strip()
-                self.testcases[test_name]['status'] = "No Run"
-                self.testcases[test_name]['finished_at'] = time.time()
-                self.testcases[test_name]['duration'] = int(self.testcases[test_name]['finished_at'] -
-                                                            self.testcases[test_name]['started_at'])
-                self.write_to_logfile(self.test_results_yml,
-                                      "{}: {}\n".format(self._last_test_name, self.testcases[self._last_test_name]['status']))
+                if test_name in self.testcases:
+                    self.testcases[test_name]['status'] = "No Run"
+                    self.testcases[test_name]['finished_at'] = time.time()
+                    self.testcases[test_name]['duration'] = int(self.testcases[test_name]['finished_at'] -
+                                                                self.testcases[test_name]['started_at'])
+                    self.write_to_logfile(self.test_results_yml,
+                                          "{}: {}\n".format(self._last_test_name, self.testcases[self._last_test_name]['status']))
             elif 'var' in task_args:
                 debug_var_name = str(task_args['var'])
                 debug_var_value = str(task_result[debug_var_name])
@@ -814,7 +815,9 @@ class CallbackModule(CallbackBase):
         self._play_path = self._get_play_path(play)
 
         # Update the previous test case result
-        if self._last_test_name and self.testcases[self._last_test_name]['status'] == 'Running':
+        if (self._last_test_name and
+           self._last_test_name in self.testcases and
+           self.testcases[self._last_test_name]['status'] == 'Running'):
             self.testcases[self._last_test_name]['status'] = 'Passed'
             self.testcases[self._last_test_name]['finished_at'] = time.time()
             self.testcases[self._last_test_name]['duration'] = int(self.testcases[self._last_test_name]['finished_at'] -
