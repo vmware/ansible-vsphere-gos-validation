@@ -66,6 +66,10 @@
           set_fact:
             boot_disk_size_gb: "{{ [64, boot_disk_size_gb | default(64) | int] | max }}"
         - include_tasks: ../../common/vm_create.yml
+          when: boot_disk_controller != 'ide'
+        - include_tasks: ../../common/vm_create_with_ide_disk.yml
+          when: boot_disk_controller == 'ide'
+
         # When firmware is EFI, configure force EFI setup once
         - name: Enable force setup once when VM firmware is EFI and send keys to VM
           block:
