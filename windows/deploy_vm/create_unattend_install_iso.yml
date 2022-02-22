@@ -9,9 +9,12 @@
 - name: Set fact of the timestamp suffix of ISO file name
   set_fact:
     iso_timestamp: "{{ lookup('pipe','date +%s') }}"
-- name: Set fact of unattend install ISO file name and remote datastore path
+- name: Set fact of unattend install ISO file name
   set_fact:
     unattend_install_iso: "{{ guest_id }}-{{ firmware }}-{{ boot_disk_controller }}-{{ iso_timestamp }}.iso"
+- name: Set fact of unattend install ISO file path on ESXi host
+  set_fact:
+    transferred_unattend_iso: "[{{ datastore }}] {{ unattend_install_iso }}"
 
 - name: "Set fact of the absolute path of unattend install config file"
   set_fact:
@@ -79,22 +82,14 @@
     create_iso_src: "{{ unattend_install_file_list }}"
     create_iso_dest: "{{ local_cache }}/{{ unattend_install_iso }}"
 
-- name: Set fact of the dest path of unattend install ISO on ESXi host
-  set_fact:
-    transferred_unattend_iso: "{{ vm_datastore_path }}/{{ unattend_install_iso }}"
-- debug:
-    msg: "Will transfer unattend install ISO to: {{ transferred_unattend_iso }}"
-
 # Copy generated unattend install ISO file to ESXi host 
 - include_tasks: ../../common/esxi_upload_datastore_file.yml
   vars:
     src_file_path: "{{ local_cache }}/{{ unattend_install_iso }}"
-    dest_file_path: "{{ transferred_unattend_iso }}"
+    dest_file_path: "{{ unattend_install_iso }}"
     upload_file_timeout: 600
-
-- name: Produce unattended ISO path
-  set_fact:
-    transferred_unattend_iso: "[{{ datastore }}] {{ unattend_install_iso }}"
+- debug:
+    msg: "Unattend install ISO file is uploaded to ESXi host: {{ transferred_unattend_iso }}"
 
 - name: "Append generated unattend ISO file to the list"
   set_fact:

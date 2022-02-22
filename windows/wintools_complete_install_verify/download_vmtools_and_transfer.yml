@@ -2,11 +2,14 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Download VMware tools from specified URL and transfer to ESXi host datastore
-- name: Set fact of VMware tools ISO file name and remote datastore path
+- name: Set fact of VMware tools ISO file name
   set_fact:
     win_vmtools_iso_download: "{{ vmtools_url_path.split('/')[-1] }}"
+- name: Set fact of the VMware tools ISO path on ESXi host datatore
+  set_fact:
+    vmtools_iso_path: "[{{ datastore }}] {{ win_vmtools_iso_download }}"
 
-- name: Download VMware tools
+- name: Download VMware tools ISO file
   get_url:
     url: "{{ vmtools_url_path }}"
     dest: "{{ local_cache }}/{{ win_vmtools_iso_download }}"
@@ -17,19 +20,12 @@
     HTTP_PROXY: "{{ http_proxy_localhost | default(omit) }}"
     FTP_PROXY: "{{ http_proxy_localhost | default(omit) }}"
 
-- name: Set fact of the dest path of VMware tools ISO on ESXi host
-  set_fact:
-    transferred_vmtools_iso: "{{ vm_datastore_path }}/{{ win_vmtools_iso_download }}"
-- debug:
-    msg: "Will transfer VMware tools install ISO to: {{ transferred_vmtools_iso }}"
-
 # Copy downloaded VMware tools ISO file to ESXi host
 - include_tasks: ../../common/esxi_upload_datastore_file.yml
   vars:
     src_file_path: "{{ local_cache }}/{{ win_vmtools_iso_download }}"
-    dest_file_path: "{{ transferred_vmtools_iso }}"
+    dest_file_path: "{{ win_vmtools_iso_download }}"
     upload_file_timeout: 900
 
-- name: Set fact of the VMware tools ISO path on ESXi host
-  set_fact:
-    vmtools_iso_path: "[{{ datastore }}] {{ win_vmtools_iso_download }}"
+- debug:
+    msg: "VMware tools ISO file is uploaded to ESXi host: {{ vmtools_iso_path }}"
