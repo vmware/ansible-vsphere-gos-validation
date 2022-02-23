@@ -4,13 +4,18 @@
 # Wait for message appear in VM's log file
 # Parameters:
 #   vm_wait_log_name: the log file name in VM folder. e.g. vmware.log
-#   vm_wait_log_msg: the message to wait for appearing
+#   vm_wait_log_msg: the regular expression of message to wait for appearing
 #   vm_wait_log_retries: how many times to re-check log about waiting message
 #   vm_wait_log_delay: seconds to delay for a retry
 #   vm_wait_log_ignore_errors: True to ignore task failure. Default is False.
 #   vm_wait_log_hide_output: True to hide the output, False will print the
 #   output of log content. Default is True.
 #
+- name: "Initialize the logs list found and the log message wait result"
+  set_fact:
+    vm_wait_log_msg_list: []
+    vm_wait_log_msg_success: False
+
 - name: "Set fact of VM log file path in datastore"
   set_fact:
     vm_log_file_path: "{{ vm_dir_name }}/{{ vm_wait_log_name }}"
@@ -21,7 +26,6 @@
     file_in_datastore: "{{ datastore }}"
     file_in_datastore_path: "{{ vm_log_file_path }}"
     file_in_datastore_failed_ignore: False
-
 - name: "Set fact of the url of datastore file"
   set_fact:
     vm_wait_log_url: "{{ ds_file_result.url }}"
@@ -39,17 +43,26 @@
   until:
     - get_vm_log_content is defined
     - get_vm_log_content.content is defined
-    - vm_wait_log_msg in get_vm_log_content.content
+    - get_vm_log_content.content | regex_findall(vm_wait_log_msg) | length != 0
   delay: "{{ vm_wait_log_delay | default(5) }}"
   retries:  "{{ vm_wait_log_retries | default(60) }}"
   failed_when: False
 
-- name: "Set fact of result about waiting for message in VM log"
+- name: "Set fact of the logs list found for specified log message"
   set_fact:
-    vm_wait_log_msg_success: "{{ get_vm_log_content is defined and get_vm_log_content.content is defined and vm_wait_log_msg in get_vm_log_content.content }}"
+    vm_wait_log_msg_list: "{{ get_vm_log_content.content | regex_findall(vm_wait_log_msg) }}"
+  when:
+    - get_vm_log_content is defined
+    - get_vm_log_content.content is defined
+- name: "Set fact of log message wait result"
+  set_fact:
+    vm_wait_log_msg_success: True
+  when: vm_wait_log_msg_list | length != 0
 
 - debug:
-    msg: "Found '{{ vm_wait_log_msg }}' in VM log {{ vm_wait_log_name }}: {{ 'Success' if vm_wait_log_msg_success | bool else 'Failure' }}"
+    msg:
+     - "Found '{{ vm_wait_log_msg }}' message in VM log {{ vm_wait_log_name }}: {{ 'Success' if vm_wait_log_msg_success | bool else 'Failure' }}"
+     - "Found logs list: {{ vm_wait_log_msg_list }}"
 
 - fail:
     msg: "Failed to find '{{ vm_wait_log_msg }}' in VM log {{ vm_wait_log_name }}"
