@@ -61,12 +61,23 @@
       set_fact:
         unattend_install_file_name: "{{ new_unattend_install_conf | basename }}"
 
-    - name: "Set fact of boot menu config file"
+    - name: "Set fact of isolinux config file"
       set_fact:
-        boot_menu_cfg_file_paths:
-          - "{{ rebuilt_unattend_iso_dir }}/isolinux/menu.cfg"
-          - "{{ rebuilt_unattend_iso_dir }}/boot/grub2/grub.cfg"
         isolinux_cfg_file_path: "{{ rebuilt_unattend_iso_dir }}/isolinux/isolinux.cfg"
+
+    - name: "Set facts of boot menu config files for Photon OS autoinstall"
+      set_fact:
+        isolinux_menu_cfg_file_path: "{{ rebuilt_unattend_iso_dir }}/isolinux/menu.cfg"
+        grub_cfg_file_path: "{{ rebuilt_unattend_iso_dir }}/boot/grub2/grub.cfg"
+        efi_boot_image_path: "boot/grub2/efiboot.img"
+      when: unattend_install_conf is match('Photon')
+
+    - name: "Set facts of boot menu config files for Debian autoinstall"
+      set_fact:
+        isolinux_menu_cfg_file_path: "{{ rebuilt_unattend_iso_dir }}/isolinux/gtk.cfg"
+        grub_cfg_file_path: "{{ rebuilt_unattend_iso_dir }}/boot/grub/grub.cfg"
+        efi_boot_image_path: "boot/grub/efi.img"
+      when: unattend_install_conf is match('Debian')
 
     - block:
         # Ansible copy module would fail while copying read-only files
@@ -86,17 +97,40 @@
             regexp: "timeout 0"
             replace: "timeout 1"
 
-        - name: "Update boot menu with kickstart"
+        - block:
+            - name: "Remove default menu entry for Debian autoinstall"
+              lineinfile:
+                path: "{{ isolinux_cfg_file_path }}"
+                regexp: "default vesamenu.c32"
+                state: absent
+
+            - name: "Update Debian autoinstall boot menu for BIOS boot"
+              replace:
+                path: "{{ isolinux_menu_cfg_file_path }}"
+                regexp: '(.*)(initrd=[^ ]+)(.*)'
+                replace: "\\1\\2 auto=true file==/cdrom/isolinux/{{ unattend_install_file_name }} \\3"
+
+            - name: "Update Debian autoinstall boot menu for EFI boot"
+              replace:
+                path: "{{ grub_cfg_file_path }}"
+                regexp: '(.*/install.amd/vmlinuz)(.*)'
+                replace: "\\1 auto=true file==/cdrom/isolinux/{{ unattend_install_file_name }} \\2"
+          when: unattend_install_conf is match('Debian')
+
+        - name: "Update boot menu with kickstart for Photon OS autoinstall"
           replace:
             path: "{{ item }}"
             regexp: '(.*)(root=[^ ]+)(.*)'
             replace: "\\1\\2 ks=cdrom:/isolinux/{{ unattend_install_file_name }} \\3"
-          with_items: "{{ boot_menu_cfg_file_paths }}"
+          with_items:
+            - "{{ isolinux_menu_cfg_file_path }}"
+            - "{{ grub_cfg_file_path }}"
+          when: unattend_install_conf is match('Photon')
 
-        - name: "Set facts for rebuilding ISO options"
+        - name: "Set fact of rebuilt ISO label and rebuild options"
           set_fact:
             unattend_iso_label: "-V {{ src_iso_file_name | splitext | first }}"
-            boot_info_opts: "-R -l -L -D -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot --eltorito-boot boot/grub2/efiboot.img -no-emul-boot"
+            boot_info_opts: "-R -l -L -D -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot --eltorito-boot {{ efi_boot_image_path }} -no-emul-boot"
 
         # Create the unattended install ISO image
         - name: "Rebuild ISO image with unattend install config file"

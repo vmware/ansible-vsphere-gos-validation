@@ -60,13 +60,17 @@
         create_iso_src: ["{{ new_unattend_install_conf }}"]
         create_iso_dest: "{{ generated_unattend_iso }}"
         create_iso_vol_ident: 'OEMDRV'
-      when: unattend_install_conf is not match('Photon')
+      when:
+        - unattend_install_conf is not match('Photon')
+        - unattend_install_conf is not match('Debian')
 
     # Build unattend install config file into OS ISO image
     - include_tasks: rebuild_unattend_install_iso.yml
       vars:
         rebuilt_unattend_iso_path: "{{ generated_unattend_iso }}"
-      when: unattend_install_conf is match('Photon')
+      when: >
+        unattend_install_conf is match('Photon') or
+        unattend_install_conf is match('Debian')
   when: unattend_install_conf is not match('Ubuntu')
 
 # unattend_install_conf is for Ubuntu
@@ -108,13 +112,17 @@
   set_fact:
     os_installation_iso_list: "{{ os_installation_iso_list + [transferred_unattend_iso] }}"
     os_install_iso_list_len: "{{ os_install_iso_list_len | int + 1 }}"
-  when: unattend_install_conf is not match('Photon')
+  when:
+    - unattend_install_conf is not match('Photon')
+    - unattend_install_conf is not match('Debian')
 
 - name: "Replace original install ISO file with unattend install ISO file"
   set_fact:
     os_installation_iso_list: "{{ [transferred_unattend_iso] }}"
     os_install_iso_list_len: 1
-  when: unattend_install_conf is match('Photon')
+  when: >
+    unattend_install_conf is match('Photon') or
+    unattend_install_conf is match('Debian')
 
 - name: "Remove cache folder {{ unattend_iso_cache }}"
   file:
