@@ -1,0 +1,37 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for getting inboxed VMware drivers
+# info in Windows Server 2022 and later, or Windows 11 2022 and
+# later releases.
+#
+- name: check_inbox_driver
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+          vars:
+            skip_test_no_vmtools: True
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip this test case due to guest OS version '{{ guest_os_ansible_distribution_ver }}' does not contain inboxed VMware drivers."
+          when: >
+            (guest_os_ansible_distribution_major_ver is defined and guest_os_ansible_distribution_major_ver | int < 10 ) or
+            (guest_os_product_type is defined and guest_os_product_type | lower == 'server' and guest_os_ansible_distribution_ver is defined and guest_os_ansible_distribution_ver.split('.')[2] | int < 20348) or
+            (guest_os_product_type is defined and guest_os_product_type | lower == 'clinet' and guest_os_ansible_distribution_ver is defined and guest_os_ansible_distribution_ver.split('.')[2] | int < 22449)
+        
+        - include_tasks: get_inbox_driver_info.yml
+        - name: "Check driver inbox status is True"
+          assert:
+            that:
+              - item.Inbox | bool == True
+            success_msg: "Driver '{{ item.Driver | default('') }}' inbox status is: {{ item.Inbox }}"
+            fail_msg: "Driver '{{ item.Driver | default('') }}' inbox status is: {{ item.Inbox }}, not True"
+          when: item.Inbox is defined
+          loop: "{{ inbox_drivers_info }}"
+      rescue:
+        - include_tasks: ../setup/test_rescue.yml
