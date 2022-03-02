@@ -11,17 +11,24 @@
     iso_file_path_in_datastore: "{{ os_installation_iso_list[0].split()[1] }}"
 
 # Fetch ISO file from ESXi datastore
-- include_tasks: ../../common/esxi_download_datastore_file.yml
-  vars:
-    src_datastore: "{{ iso_file_datastore }}"
-    src_file_path: "{{ iso_file_path_in_datastore }}"
-    dest_file_path: "{{ unattend_iso_cache }}/{{ iso_file_path_in_datastore | basename }}"
-    download_file_timeout: 600
+#- include_tasks: ../../common/esxi_download_datastore_file.yml
+#  vars:
+#    src_datastore: "{{ iso_file_datastore }}"
+#    src_file_path: "{{ iso_file_path_in_datastore }}"
+#    dest_file_path: "{{ unattend_iso_cache }}/{{ iso_file_path_in_datastore | basename }}"
+#    download_file_timeout: 600
+#
+#- name: "Set fact of source ISO image file name and path at local"
+#  set_fact:
+#    src_iso_file_name: "{{ datastore_file_download_result.dest | basename }}"
+#    src_iso_file_path: "{{ datastore_file_download_result.dest }}"
+- name: Copy ISO
+  shell: "cp -rf /mnt/pek-exit15/OS/Linux/Debian/11/11.2/GA/64/debian-11.2.0-amd64-DVD-1.iso {{ unattend_iso_cache }}/{{ iso_file_path_in_datastore | basename }}"
 
 - name: "Set fact of source ISO image file name and path at local"
   set_fact:
-    src_iso_file_name: "{{ datastore_file_download_result.dest | basename }}"
-    src_iso_file_path: "{{ datastore_file_download_result.dest }}"
+    src_iso_file_name: "{{ iso_file_path_in_datastore | basename }}"
+    src_iso_file_path: "{{ unattend_iso_cache }}/{{ iso_file_path_in_datastore | basename }}"
 
 # Create a temporary directory to mount ISO image
 - name: "Create a temporary directory to mount ISO image"
@@ -115,6 +122,14 @@
                 path: "{{ grub_cfg_file_path }}"
                 regexp: '(.*/install.amd/vmlinuz)(.*)'
                 replace: "\\1 auto=true file==/cdrom/isolinux/{{ unattend_install_file_name }} \\2"
+
+            - name: "Update MD5 checksum"
+              shell: |
+                chmod a+w md5sum.txt
+                md5sum `find -follow -type f` > md5sum.txt
+                chmod a-w md5sum.txt
+              args:
+                chdir: "{{ rebuilt_unattend_iso_dir }}"
           when: unattend_install_conf is match('Debian')
 
         - name: "Update boot menu with kickstart for Photon OS autoinstall"
@@ -127,14 +142,23 @@
             - "{{ grub_cfg_file_path }}"
           when: unattend_install_conf is match('Photon')
 
-        - name: "Set fact of rebuilt ISO label and rebuild options"
+        - name: "Set fact of rebuilt ISO label"
           set_fact:
             unattend_iso_label: "-V {{ src_iso_file_name | splitext | first }}"
-            boot_info_opts: "-R -l -L -D -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot --eltorito-boot {{ efi_boot_image_path }} -no-emul-boot"
+
+        - name: "Set fact of rebuilding ISO options for Debian"
+          set_fact:
+            rebuild_iso_opts: "-r -J -joliet-long -cache-inodes -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot --eltorito-boot {{ efi_boot_image_path }} -no-emul-boot"
+          when: unattend_install_conf is match('Debian')
+
+        - name: "Set fact of rebuilding ISO options for Photon OS"
+          set_fact:
+            rebuild_iso_opts: "-R -l -L -D -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot --eltorito-boot {{ efi_boot_image_path }} -no-emul-boot"
+          when: unattend_install_conf is match('Photon')
 
         # Create the unattended install ISO image
         - name: "Rebuild ISO image with unattend install config file"
-          shell: "xorriso -as mkisofs {{ boot_info_opts }} {{ unattend_iso_label }} . > {{ rebuilt_unattend_iso_path }}"
+          shell: "xorriso -as mkisofs {{ unattend_iso_label }} -o {{ rebuilt_unattend_iso_path }} {{ rebuild_iso_opts }} ."
           args:
             chdir: "{{ rebuilt_unattend_iso_dir }}"
 

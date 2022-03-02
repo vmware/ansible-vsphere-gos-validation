@@ -1,0 +1,110 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Rebuild OS ISO image with unattended install file
+# Parameter:
+#   rebuilt_unattend_iso_path: Local path to the rebuilt ISO image with unattend install config file
+#
+- name: "Set fact of the absolute path of source ISO file on ESXi server"
+  set_fact:
+    iso_file_datastore: "{{ os_installation_iso_list[0].split()[0] | regex_replace('\\[|\\]', '') }}"
+    iso_file_path_in_datastore: "{{ os_installation_iso_list[0].split()[1] }}"
+
+# Fetch ISO file from ESXi datastore
+#- include_tasks: ../../common/esxi_download_datastore_file.yml
+#  vars:
+#    src_datastore: "{{ iso_file_datastore }}"
+#    src_file_path: "{{ iso_file_path_in_datastore }}"
+#    dest_file_path: "{{ unattend_iso_cache }}/{{ iso_file_path_in_datastore | basename }}"
+#    download_file_timeout: 600
+#
+#- name: "Set fact of source ISO image file name and path at local"
+#  set_fact:
+#    src_iso_file_name: "{{ datastore_file_download_result.dest | basename }}"
+#    src_iso_file_path: "{{ datastore_file_download_result.dest }}"
+- name: Copy ISO
+  shell: "cp -rf /mnt/pek-exit15/OS/Linux/Debian/11/11.2/GA/64/debian-11.2.0-amd64-DVD-1.iso {{ unattend_iso_cache }}/{{ iso_file_path_in_datastore | basename }}"
+
+- name: "Set fact of source ISO image file name and path at local"
+  set_fact:
+    src_iso_file_name: "{{ iso_file_path_in_datastore | basename }}"
+    src_iso_file_path: "{{ unattend_iso_cache }}/{{ iso_file_path_in_datastore | basename }}"
+
+# Create a temporary directory to mount ISO image
+- name: "Create a temporary directory for updating ISO files"
+  include_tasks: ../../common/create_temp_file_dir.yml
+  vars:
+    tmp_dir: "{{ unattend_iso_cache }}"
+    tmp_state: "directory"
+    tmp_prefix: "temp_{{ src_iso_file_name | replace('.iso', '') }}_"
+
+- name: "Set fact of the temp dir to mount OS ISO image"
+  set_fact:
+    tmp_iso_files_dir: "{{ tmp_path }}"
+
+# Copy files and directories in original ISO to a new folder
+# And add unattended install file
+- block:
+    - name: "Set fact of unattend install config file name"
+      set_fact:
+        unattend_install_file_name: "{{ new_unattend_install_conf | basename }}"
+
+    - block:
+        - name: "Extract ISO files to be udpated into {{ tmp_iso_files_dir }}"
+          shell: "xorriso -osirrox on -dev {{ src_iso_file_path }} -extract '/isolinux/isolinux.cfg' {{ tmp_iso_files_dir }}/isolinux.cfg  -extract '/install.amd/gtk/initrd.gz' {{ tmp_iso_files_dir }}/initrd.gz -extract '/md5sum.txt' {{ tmp_iso_files_dir }}/md5sum.txt -extract '/boot/grub/grub.cfg' {{ tmp_iso_files_dir }}/grub.cfg"
+
+        - name: "Copy unattend install config file to {{ tmp_iso_files_dir }}"
+          copy:
+            src: "{{ new_unattend_install_conf }}"
+            dest: "{{ tmp_iso_files_dir }}"
+            force: yes
+            mode: 0644
+
+        - name: "Update Debian grub.cfg for autoinstall"
+          blockinfile:
+            path: "{{ tmp_iso_files_dir }}/grub.cfg"
+            block: |
+              set default="autoinstall"
+              set timeout=5
+              menuentry "Automated installation" --id autoinstall {
+                  set background_color=black
+                  linux    /install.amd/vmlinuz auto=true vga=788 --- quiet
+                  initrd   /install.amd/gtk/initrd.gz
+              }
+
+        - name: "Update Debian initrd with preseed.cfg"
+          shell: "{{ item }}"
+          with_items:
+            - "gunzip initrd.gz"
+            - "chmod +w initrd"
+            - "echo 'preseed.cfg' | cpio -o -H newc -A -F initrd"
+            - "gzip initrd"
+            - "sed -i 's/timeout 0/timeout 1/' isolinux.cfg"
+            - "sed -i '#./install.amd/gtk/initrd.gz#d' md5sum.txt"
+            - "echo \"`md5sum initrd.gz | awk '{print $1}'` ./install.amd/gtk/initrd.gz\" >>md5sum.txt"
+            - "sed -i '#./isolinux/isolinux.cfg#d' md5sum.txt"
+            - "echo \"`md5sum isolinux.cfg | awk '{print $1}'` ./isolinux/isolinux.cfg\" >>md5sum.txt"
+            - "sed -i '#./boot/grub/grub.cfg#d' md5sum.txt"
+            - "echo \"`md5sum grub.cfg | awk '{print $1}'` ./boot/grub/grub.cfg\" >>md5sum.txt"
+          args:
+            chdir: "{{ tmp_iso_files_dir }}"
+          register: update_initrd_output
+
+        - name: "Print command output for updating initrd"
+          debug: var=update_initrd_output
+
+        - name: "Rebuild ISO image with unattend install config file"
+          shell: "xorriso -indev {{ src_iso_file_path }} -map {{ tmp_iso_files_dir }}/isolinux.cfg '/isolinux/isolinux.cfg' -map {{ tmp_iso_files_dir }}/grub.cfg '/boot/grub/grub.cfg' -map {{ tmp_iso_files_dir }}/md5sum.txt '/md5sum.txt' -map {{ tmp_iso_files_dir }}/initrd.gz '/install.amd/gtk/initrd.gz' -boot_image isolinux dir=/isolinux -boot_image any next -boot_image any efi_path=boot/grub/efi.img -outdev {{ rebuilt_unattend_iso_path }}"
+          when: unattend_install_conf is match('Debian')
+
+        - name: "Cleanup original ISO files and copied files"
+          file:
+            path: "{{ item }}"
+            state: absent
+          with_items:
+            - "{{ src_iso_file_path }}"
+            - "{{ tmp_iso_files_dir }}"
+      become: yes
+
+
+- meta: end_play
