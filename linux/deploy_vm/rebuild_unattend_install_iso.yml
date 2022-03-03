@@ -67,23 +67,12 @@
 
 # Update files for autoinstall in BIOS/UEFI mode
 - block:
-    - name: "Get path of initrd.gz in ISO"
-      shell: "find {{ tmp_iso_mount_dir }} -name 'initrd.gz' | grep gtk"
-      register: initrd_path
-
-    - fail:
-        msg: "Failed to find initrd.gz for graphical install"
-      when: >
-        initrd_path is undefined or
-        initrd_path.stdout_lines is undefined or
-        initrd_path.stdout_lines | length == 0
-      
     - name: "Set fact of files to be update for unattended install"
       set_fact:
         iso_files_to_update: 
           - '/boot/grub/grub.cfg'
           - '/isolinux/isolinux.cfg'
-          - "{{ initrd_path.stdout_lines[0] | replace(tmp_iso_mount_dir, '') }}"
+          - '/isolinux/gtk.cfg'
           - '/md5sum.txt'
 
     - name: "Initialize fact of command to rebuild unattended install ISO for Debian"
@@ -93,7 +82,7 @@
     - name: "Add command options to rebuild unattended install ISO for Debian"
       set_fact:
         cmd_to_map_files: "{{ cmd_to_map_files }} -map {{ unattend_iso_cache }}/{{ item | basename }} '{{ item }}'"
-      with_items: "{{ iso_files_to_update }}"
+      with_items: "{{ iso_files_to_update | union([unattend_install_file_name]) }}"
   when: unattend_install_conf is match('Debian')
 
 - name: "Copy unattend install config files to {{ unattend_iso_cache }}"
@@ -105,14 +94,14 @@
   with_items: "{{ iso_files_to_update }}"
 
 - block:
+    - name: "Update timeout for boot menu"
+      replace:
+        path: "{{ unattend_iso_cache }}/isolinux.cfg"
+        regexp: "timeout 0"
+        replace: "timeout 1"
+
     # Update autoinstall config files for Photon
     - block:
-        - name: "Update timeout for boot menu"
-          replace:
-            path: "{{ unattend_iso_cache }}/isolinux.cfg"
-            regexp: "timeout 0"
-            replace: "timeout 1"
-
         - name: "Update boot menu with kickstart for Photon OS"
           replace:
             path: "{{ unattend_iso_cache }}/{{ item }}"
@@ -125,6 +114,12 @@
 
     # Update autoinstall config files for Debian
     - block:
+        - name: "Update timeout for boot menu"
+          replace:
+            path: "{{ unattend_iso_cache }}/isolinux.cfg"
+            regexp: "default .*"
+            replace: "default installgui"
+
         - name: "Update Debian grub.cfg for autoinstall"
           blockinfile:
             path: "{{ unattend_iso_cache }}/grub.cfg"
@@ -133,20 +128,19 @@
               set timeout=5
               menuentry "Automated installation" --id autoinstall {
                   set background_color=black
-                  linux    /install.amd/vmlinuz auto=true vga=788 --- quiet
+                  linux    /install.amd/vmlinuz auto=true file=/cdrom/{{ unattend_install_file_name }} vga=788 --- quiet
                   initrd   /install.amd/gtk/initrd.gz
               }
 
-        - name: "Update Debian initrd with preseed.cfg"
+        - name: "Update boot menu with preseed.cfg for Debian"
+          replace:
+            path: "{{ unattend_iso_cache }}/gtk.cfg"
+            regexp: '(.*)(initrd.gz )(.*)'
+            replace: "\\1\\2 auto=true file=/cdrom/{{ unattend_install_file_name }} \\3"
+
+        - name: "Update md5sum for Debian ISO files"
           shell: "{{ item }}"
           with_items:
-            - "gunzip initrd.gz"
-            - "chmod +w initrd"
-            - "echo 'preseed.cfg' | cpio -o -H newc -A -F initrd"
-            - "gzip initrd"
-            - "sed -i 's/timeout 0/timeout 1/' isolinux.cfg"
-            - "sed -i '#./install.amd/gtk/initrd.gz#d' md5sum.txt"
-            - "echo \"`md5sum initrd.gz | awk '{print $1}'` ./install.amd/gtk/initrd.gz\" >>md5sum.txt"
             - "sed -i '#./isolinux/isolinux.cfg#d' md5sum.txt"
             - "echo \"`md5sum isolinux.cfg | awk '{print $1}'` ./isolinux/isolinux.cfg\" >>md5sum.txt"
             - "sed -i '#./boot/grub/grub.cfg#d' md5sum.txt"
@@ -165,11 +159,16 @@
         - cmd_to_map_files is defined
         - cmd_to_map_files
 
+    # Unmount the original ISO
+    - include_tasks: ../../common/local_unmount.yml
+      vars:
+        mount_path: "{{ tmp_iso_mount_dir }}"
+
     - name: "Cleanup original ISO files and copied files"
       file:
         path: "{{ item }}"
         state: absent
       with_items:
         - "{{ src_iso_file_path }}"
-        - "{{ unattend_iso_cache }}"
+        - "{{ tmp_iso_mount_dir }}"
   become: yes
