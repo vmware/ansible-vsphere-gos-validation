@@ -76,6 +76,7 @@
       shell: "nmcli device connect {{ eth_dev }}"
       delegate_to: "{{ vm_guest_ip }}"
       when:
+        - guest_os_ansible_distribution != "Debian"
         - service_info
         - service_info.state is defined
         - service_info.state in ['active', 'running']
@@ -118,7 +119,8 @@
           delegate_to: "{{ vm_guest_ip }}"
           when: guest_os_ansible_distribution in ["VMware Photon OS", "Flatcar"]
       when: >
-        (not service_info or
+        (guest_os_ansible_distribution == "Debian" or
+         not service_info or
          service_info.state is undefined or
          service_info.state not in ['active', 'running'])
 
