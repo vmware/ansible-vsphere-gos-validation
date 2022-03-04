@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Add Windows guest IP address to in-memory host inventory
+# Parameters:
+#   win_ansible_connection: 'winrm' or 'psrp', default is 'psrp'.
+#
 - name: "Add specified Windows IP to the hosts"
   add_host:
     hostname: "{{ vm_guest_ip }}"
@@ -12,8 +15,34 @@
     ansible_port: "{{ guest_os_winrm_port | default(5986) }}"
     ansible_connection: winrm
     ansible_winrm_server_cert_validation: ignore
-    ansible_ssh_pipelining: False
+    ansible_winrm_connection_timeout: 300
     ansible_winrm_transport: basic
   register: add_host_result
+  when:
+    - win_ansible_connection is defined
+    - win_ansible_connection | lower == 'winrm'
+
+- name: "Add specified Windows IP to the hosts"
+  add_host:
+    hostname: "{{ vm_guest_ip }}"
+    groups:
+      - "{{ vm_guest_group | default('target_vm') }}"
+    ansible_user: "{{ vm_username }}"
+    ansible_password: "{{ vm_password }}"
+    ansible_port: "{{ guest_os_winrm_port | default(5986) }}"
+    ansible_connection: psrp
+    ansible_psrp_auth: basic
+    ansible_psrp_cert_validation: ignore
+    ansible_psrp_connection_timeout: 300
+    ansible_psrp_operation_timeout: 300
+    ansible_psrp_read_timeout: 600
+    ansible_psrp_reconnection_backoff: 5
+    ansible_psrp_reconnection_retries: 5
+    ansible_pipelining: yes
+  register: add_host_result
+  when: >
+    (win_ansible_connection is undefined) or
+    (win_ansible_connection | lower == 'psrp')
+
 - debug: var=add_host_result
   when: enable_debug is defined and enable_debug
