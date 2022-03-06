@@ -57,16 +57,14 @@
     - gosc_state_keyword_found is defined
     - gosc_state_keyword_found | bool
 
-- block:
-    - include_tasks: ../../common/vm_wait_guest_ip.yml
-    # In case VM get new DHCP IP address after GOSC
-    - include_tasks: ../../common/update_inventory.yml
-  when: ip_assignment == "dhcp"
-
+# Wait for guest IP not empty no matter GOSC with DHCP IP or static IP
+# Otherwise incorrect static IP will fail the task and quit test without
+# collecting information
 - include_tasks: ../../common/vm_wait_guest_ip.yml
-  vars:
-    wait_ipv4: "{{ linux_gosc_spec.ip }}"
-  when: ip_assignment == "static"
+
+# In case VM get new DHCP IP address after GOSC
+- include_tasks: ../../common/update_inventory.yml
+  when: ip_assignment == "dhcp"
 
 - name: "Set fact of GOSC log files"
   set_fact:

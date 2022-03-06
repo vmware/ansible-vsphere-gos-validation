@@ -137,9 +137,16 @@
         src_network_file: "/etc/network/interfaces"
       when: "gosc_workflow == 'perl'"
 
-    - name: "Set cloud-init GOSC network configuration files on Ubuntu/Debian OS"
-      set_fact:
-        src_network_file: "/etc/network/interfaces.d/50-cloud-init.cfg"
+    - block:
+        - name: "Set cloud-init GOSC network configuration files on Ubuntu/Debian OS"
+          set_fact:
+            src_network_file: "/etc/network/interfaces.d/50-cloud-init.cfg"
+          when: guest_os_ansible_distribution == "Ubuntu"
+
+        - name: "Set cloud-init GOSC network configuration files on Ubuntu/Debian OS"
+          set_fact:
+            src_network_file: "/etc/network/interfaces.d/50-cloud-init"
+          when: guest_os_ansible_distribution == "Debian"
       when: "gosc_workflow == 'cloud-init'"
   when: >
     (guest_os_ansible_distribution == "Debian") or
