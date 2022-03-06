@@ -650,14 +650,10 @@ class CallbackModule(CallbackBase):
                     self._last_test_name = deploy_casename
                     self.testcases[self._last_test_name] = self.testcases[old_test_name]
                     del self.testcases[old_test_name]
-            if "get_guest_system_info.yml" == task_file:
-                self.os_distribution = set_fact_result.get("guest_os_ansible_distribution", '')
-                self.os_distribution_ver = set_fact_result.get("guest_os_ansible_distribution_ver", '')
-                self.os_arch = set_fact_result.get("guest_os_ansible_architecture", '')
-                if self.vm_info:
-                    self.vm_info.Guest_OS_Type = "{} {} {}".format(self.os_distribution,
-                                                                   self.os_distribution_ver,
-                                                                   self.os_arch)
+            if "get_windows_system_info.yml" == task_file or "get_linux_system_info.yml" == task_file:
+                vm_guest_os_type = set_fact_result.get("vm_guest_os_type", None)
+                if vm_guest_os_type and self.vm_info:
+                    self.vm_info.Guest_OS_Type = vm_guest_os_type
             if "vm_get_vm_info.yml" == task_file:
                if self.vm_info:
                    self.vm_info.Config_Guest_Id = set_fact_result.get("vm_guest_id", '')
