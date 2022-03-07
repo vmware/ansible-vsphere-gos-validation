@@ -114,6 +114,21 @@
 
     # Update autoinstall config files for Debian
     - block:
+        - name: "Get initrd.gz path"
+          shell: "find {{ tmp_iso_mount_dir }} -name initrd.gz | grep gtk"
+          register: gtk_path
+
+        - fail:
+            msg: "Failed to find initrd.gz in {{ tmp_iso_mount_dir }}"
+          when: >
+            gtk_path is undefined or
+            gtk_path.stdout is undefined or
+            not gtk_path.stdout
+
+        - name: "Set fact of Debian install type"
+          set_fact:
+            debian_install_type: "{{ gtk_path.stdout | dirname | dirname | basename }}"
+
         - name: "Update timeout for boot menu"
           replace:
             path: "{{ unattend_iso_cache }}/isolinux.cfg"
@@ -128,8 +143,8 @@
               set timeout=5
               menuentry "Automated installation" --id autoinstall {
                   set background_color=black
-                  linux    /install.amd/vmlinuz auto=true file=/cdrom/{{ unattend_install_file_name }} vga=788 --- quiet
-                  initrd   /install.amd/gtk/initrd.gz
+                  linux    /{{ debian_install_type }}/vmlinuz auto=true file=/cdrom/{{ unattend_install_file_name }} vga=788 --- quiet
+                  initrd   /{{ debian_install_type }}/gtk/initrd.gz
               }
 
         - name: "Update boot menu with preseed.cfg for Debian"
