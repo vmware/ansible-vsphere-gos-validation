@@ -9,6 +9,20 @@
 
 # Get VM vmx config
 - include_tasks: ../../common/vm_get_extra_config.yml
+
+# On vSphere 7.0.3c, there is known issue of no
+# 'disk.EnableUUID = TRUE' in vmx for Windows Server 2022
+- debug:
+    msg: "Known issue of absence of 'disk.EnableUUID' in Windows Server 2022 VM vmx file by default on vSphere 7.0.3c."
+  when:
+    - esxi_version is defined
+    - esxi_version == '7.0.3'
+    - esxi_build is defined
+    - esxi_build == '19193900'
+    - vm_guest_id is defined
+    - vm_guest_id == 'windows2019srvNext_64Guest'
+    - vm_advanced_settings[0].key not in vm_extra_config
+
 - name: Check if get expected config in vmx
   assert:
     that:
@@ -16,3 +30,5 @@
       - vm_extra_config[vm_advanced_settings[0].key] | lower == vm_advanced_settings[0].value | lower
     fail_msg: "'disk.EnableUUID = TRUE' is not in VM vmx file."
     success_msg: "'disk.EnableUUID = TRUE' is in VM vmx file."
+  when: >
+    not (esxi_version == '7.0.3' and esxi_build == '19193900' and vm_guest_id == 'windows2019srvNext_64Guest' and vm_advanced_settings[0].key not in vm_extra_config)
