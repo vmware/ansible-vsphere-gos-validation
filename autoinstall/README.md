@@ -10,4 +10,4 @@
 9. For Windows Server SAC unattend auto-install, please use files under Windows/win_server_sac.
 10. For Photon OS 3.0 or later unattend auto-install, please use file Photon/ks.cfg.
 10. For Ubuntu Server 20.04 or later unattend auto-install, please use file Ubuntu/Server/user-data.j2.
-10. For Debian 10.x or 11.x unattend auto-install, please use file Debian/10/preseed.cfg
+10. For Debian 10.1x or 11.x unattend auto-install, please use file Debian/10/preseed.cfg
