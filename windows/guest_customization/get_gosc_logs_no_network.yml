@@ -35,13 +35,11 @@
 - name: Display the GOSC log files to be fetched
   debug: var=gosc_win_log_src_dest
 
-- name: Set VM password to the one GOSC changed
-  set_fact:
-    vm_password_after_gosc: "{{ customize_logon_password if (vm_username | lower == 'administrator') else vm_password }}"
 - include_tasks: ../../common/vm_guest_file_operation.yml
   vars:
     operation: "fetch_file"
     src_path: "{{ item.key }}"
     dest_path: "{{ item.value }}"
-    vm_password: "{{ vm_password_after_gosc }}"
+    vm_username: 'Administrator'
+    vm_password: "{{ customize_logon_password }}"
   loop: "{{ gosc_win_log_src_dest | dict2items }}"
