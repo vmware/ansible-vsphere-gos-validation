@@ -77,7 +77,9 @@ This project supports below scenarios for end-to-end guest OS validation testing
 | Ubuntu 20.04, 20.10, 21.04, 21.10 cloud image                 |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Ubuntu 18.04, 18.10, 20.04, 20.10, 21.04, 21.10 desktop       |                                  |                          | :heavy_check_mark:                 |
 | Flatcar 2592.0.0 and later                      |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
-| Debian 9.x, 10.x                                |                                  |                          | :heavy_check_mark:                 |
+| Debian 11.x                                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Debian 10.10 and later                          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Debian 9, 10.9 and earlier                      |                                  |                          | :heavy_check_mark:                 |
 | Astra Linux (Orel) 2.12.43                      |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Windows 10, 11                                  | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Windows Server 2019, 2022                       | :heavy_check_mark:               |                          | :heavy_check_mark:                 |

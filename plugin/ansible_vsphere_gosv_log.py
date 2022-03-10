@@ -40,7 +40,7 @@ class VmInfo(object):
     def __init__(self, vm_name):
         self.Name = vm_name
         self.IP = ''
-        self.Guest_OS_Type = ''
+        self.Guest_OS_Distribution = ''
         self.Hardware_Version = ''
         self.VMTools_Version = ''
         self.CloudInit_Version = ''
@@ -105,7 +105,7 @@ class VmInfo(object):
                         wrapped_vm_info[attr_name] = textwrap.wrap(attr_value)
                 elif (attr_name == 'CloudInit_Version' and
                       ('windows' in self.Config_Guest_Id.lower() or
-                       'windows' in self.Guest_OS_Type.lower() or
+                       'windows' in self.Guest_OS_Distribution.lower() or
                        'windows' in self.GuestInfo_Guest_Id.lower())):
                     continue
                 else:
@@ -650,14 +650,10 @@ class CallbackModule(CallbackBase):
                     self._last_test_name = deploy_casename
                     self.testcases[self._last_test_name] = self.testcases[old_test_name]
                     del self.testcases[old_test_name]
-            if "get_guest_system_info.yml" == task_file:
-                self.os_distribution = set_fact_result.get("guest_os_ansible_distribution", '')
-                self.os_distribution_ver = set_fact_result.get("guest_os_ansible_distribution_ver", '')
-                self.os_arch = set_fact_result.get("guest_os_ansible_architecture", '')
-                if self.vm_info:
-                    self.vm_info.Guest_OS_Type = "{} {} {}".format(self.os_distribution,
-                                                                   self.os_distribution_ver,
-                                                                   self.os_arch)
+            if "get_windows_system_info.yml" == task_file or "get_linux_system_info.yml" == task_file:
+                vm_guest_os_distribution = set_fact_result.get("vm_guest_os_distribution", None)
+                if vm_guest_os_distribution and self.vm_info:
+                    self.vm_info.Guest_OS_Distribution = vm_guest_os_distribution
             if "vm_get_vm_info.yml" == task_file:
                if self.vm_info:
                    self.vm_info.Config_Guest_Id = set_fact_result.get("vm_guest_id", '')

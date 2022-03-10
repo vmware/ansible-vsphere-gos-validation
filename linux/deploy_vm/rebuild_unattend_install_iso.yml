@@ -43,80 +43,147 @@
     mount_opts: "ro,noauto"
     mount_fstype: "iso9660"
 
-# Copy files and directories in original ISO to a new folder
-# And add unattended install file
+- name: "Set fact of unattend install config file name"
+  set_fact:
+    unattend_install_file_name: "{{ new_unattend_install_conf | basename }}"
+
 - block:
-    - name: "Create a temporary directory to rebuild unattended install ISO image"
-      include_tasks: ../../common/create_temp_file_dir.yml
-      vars:
-        tmp_dir: "{{ unattend_iso_cache }}"
-        tmp_state: "directory"
-        tmp_prefix: "rebuild_iso_"
-
-    - name: "Set facts for rebuilding unattend install ISO image"
+    - name: "Set fact of files to be update for unattended install"
       set_fact:
-        rebuilt_unattend_iso_dir: "{{ tmp_path }}"
+        iso_files_to_update:
+          - '/boot/grub2/grub.cfg'
+          - '/isolinux/isolinux.cfg'
+          - '/isolinux/menu.cfg'
 
-    - name: "Set fact of unattend install config file name"
+    - name: "Initialize fact of command to rebuild unattended install ISO for Debian"
       set_fact:
-        unattend_install_file_name: "{{ new_unattend_install_conf | basename }}"
+        cmd_to_map_files: "xorriso -indev {{ src_iso_file_path }} -outdev {{ rebuilt_unattend_iso_path }} -boot_image isolinux dir=/isolinux -boot_image any next -boot_image any efi_path=boot/grub2/efiboot.img"
 
-    - name: "Set fact of boot menu config file"
+    - name: "Add command options to rebuild unattended install ISO for Debian"
       set_fact:
-        boot_menu_cfg_file_paths:
-          - "{{ rebuilt_unattend_iso_dir }}/isolinux/menu.cfg"
-          - "{{ rebuilt_unattend_iso_dir }}/boot/grub2/grub.cfg"
-        isolinux_cfg_file_path: "{{ rebuilt_unattend_iso_dir }}/isolinux/isolinux.cfg"
+        cmd_to_map_files: "{{ cmd_to_map_files }} -map {{ unattend_iso_cache }}/{{ item | basename }} '{{ item }}'"
+      with_items: "{{ iso_files_to_update | union(['/isolinux/ks.cfg'])}}"
+  when: unattend_install_conf is match('Photon')
 
+# Update files for autoinstall in BIOS/UEFI mode
+- block:
+    - name: "Set fact of files to be update for unattended install"
+      set_fact:
+        iso_files_to_update:
+          - '/boot/grub/grub.cfg'
+          - '/isolinux/isolinux.cfg'
+          - '/isolinux/gtk.cfg'
+          - '/md5sum.txt'
+
+    - name: "Initialize fact of command to rebuild unattended install ISO for Debian"
+      set_fact:
+        cmd_to_map_files: "xorriso -indev {{ src_iso_file_path }} -outdev {{ rebuilt_unattend_iso_path }} -boot_image isolinux dir=/isolinux -boot_image any next -boot_image any efi_path=boot/grub/efi.img"
+
+    - name: "Add command options to rebuild unattended install ISO for Debian"
+      set_fact:
+        cmd_to_map_files: "{{ cmd_to_map_files }} -map {{ unattend_iso_cache }}/{{ item | basename }} '{{ item }}'"
+      with_items: "{{ iso_files_to_update | union([unattend_install_file_name]) }}"
+  when: unattend_install_conf is match('Debian')
+
+- name: "Copy unattend install config files to {{ unattend_iso_cache }}"
+  copy:
+    src: "{{ tmp_iso_mount_dir }}{{ item }}"
+    dest: "{{ unattend_iso_cache }}"
+    force: yes
+    mode: 0644
+  with_items: "{{ iso_files_to_update }}"
+
+- block:
+    - name: "Update timeout for boot menu"
+      replace:
+        path: "{{ unattend_iso_cache }}/isolinux.cfg"
+        regexp: "timeout 0"
+        replace: "timeout 1"
+
+    # Update autoinstall config files for Photon
     - block:
-        # Ansible copy module would fail while copying read-only files
-        - name: "Copy ISO content from {{ tmp_iso_mount_dir }} to {{ rebuilt_unattend_iso_dir }}"
-          shell: "cp -rf {{ tmp_iso_mount_dir }}/* {{ rebuilt_unattend_iso_dir }}"
-
-        - name: "Copy unattend install config file to {{ rebuilt_unattend_iso_dir }}"
-          copy:
-            src: "{{ new_unattend_install_conf }}"
-            dest: "{{ rebuilt_unattend_iso_dir }}/isolinux"
-            force: yes
-            mode: 0644
-
-        - name: "Update timeout for autoboot"
+        - name: "Update boot menu with kickstart for Photon OS"
           replace:
-            path: "{{ isolinux_cfg_file_path }}"
-            regexp: "timeout 0"
-            replace: "timeout 1"
-
-        - name: "Update boot menu with kickstart"
-          replace:
-            path: "{{ item }}"
+            path: "{{ unattend_iso_cache }}/{{ item }}"
             regexp: '(.*)(root=[^ ]+)(.*)'
             replace: "\\1\\2 ks=cdrom:/isolinux/{{ unattend_install_file_name }} \\3"
-          with_items: "{{ boot_menu_cfg_file_paths }}"
-
-        - name: "Set facts for rebuilding ISO options"
-          set_fact:
-            unattend_iso_label: "-V {{ src_iso_file_name | splitext | first }}"
-            boot_info_opts: "-R -l -L -D -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot --eltorito-boot boot/grub2/efiboot.img -no-emul-boot"
-
-        # Create the unattended install ISO image
-        - name: "Rebuild ISO image with unattend install config file"
-          shell: "xorriso -as mkisofs {{ boot_info_opts }} {{ unattend_iso_label }} . > {{ rebuilt_unattend_iso_path }}"
-          args:
-            chdir: "{{ rebuilt_unattend_iso_dir }}"
-
-        # Unmount original ISO file
-        - include_tasks: ../../common/local_unmount.yml
-          vars:
-            mount_path: "{{ tmp_iso_mount_dir }}"
-
-        - name: "Cleanup original ISO files and copied files"
-          file:
-            path: "{{ item }}"
-            state: absent
           with_items:
-            - "{{ src_iso_file_path }}"
-            - "{{ rebuilt_unattend_iso_dir }}"
-            - "{{ tmp_iso_mount_dir }}"
-      become: yes
-  when:
-    - mount_result is defined and not mount_result.failed
+            - "menu.cfg"
+            - "grub.cfg"
+      when: unattend_install_conf is match('Photon')
+
+    # Update autoinstall config files for Debian
+    - block:
+        - name: "Get initrd.gz path"
+          shell: "find {{ tmp_iso_mount_dir }} -name initrd.gz | grep gtk"
+          register: gtk_path
+
+        - fail:
+            msg: "Failed to find initrd.gz in {{ tmp_iso_mount_dir }}"
+          when: >
+            gtk_path is undefined or
+            gtk_path.stdout is undefined or
+            not gtk_path.stdout
+
+        - name: "Set fact of Debian install type"
+          set_fact:
+            debian_install_type: "{{ gtk_path.stdout | dirname | dirname | basename }}"
+
+        - name: "Update timeout for boot menu"
+          replace:
+            path: "{{ unattend_iso_cache }}/isolinux.cfg"
+            regexp: "default .*"
+            replace: "default installgui"
+
+        - name: "Update Debian grub.cfg for autoinstall"
+          blockinfile:
+            path: "{{ unattend_iso_cache }}/grub.cfg"
+            block: |
+              set default="autoinstall"
+              set timeout=5
+              menuentry "Automated installation" --id autoinstall {
+                  set background_color=black
+                  linux    /{{ debian_install_type }}/vmlinuz auto=true file=/cdrom/{{ unattend_install_file_name }} vga=788 --- quiet
+                  initrd   /{{ debian_install_type }}/gtk/initrd.gz
+              }
+
+        - name: "Update boot menu with preseed.cfg for Debian"
+          replace:
+            path: "{{ unattend_iso_cache }}/gtk.cfg"
+            regexp: '(.*)(initrd.gz )(.*)'
+            replace: "\\1\\2 auto=true file=/cdrom/{{ unattend_install_file_name }} \\3"
+
+        - name: "Update md5sum for Debian ISO files"
+          shell: "{{ item }}"
+          with_items:
+            - "sed -i '#./isolinux/isolinux.cfg#d' md5sum.txt"
+            - "echo \"`md5sum isolinux.cfg | awk '{print $1}'` ./isolinux/isolinux.cfg\" >>md5sum.txt"
+            - "sed -i '#./boot/grub/grub.cfg#d' md5sum.txt"
+            - "echo \"`md5sum grub.cfg | awk '{print $1}'` ./boot/grub/grub.cfg\" >>md5sum.txt"
+          args:
+            chdir: "{{ unattend_iso_cache }}"
+          register: update_initrd_output
+
+        - name: "Print command output for updating initrd"
+          debug: var=update_initrd_output
+      when: unattend_install_conf is match('Debian')
+
+    - name: "Rebuild ISO image with unattend install config file"
+      shell: "{{ cmd_to_map_files }}"
+      when:
+        - cmd_to_map_files is defined
+        - cmd_to_map_files
+
+    # Unmount the original ISO
+    - include_tasks: ../../common/local_unmount.yml
+      vars:
+        mount_path: "{{ tmp_iso_mount_dir }}"
+
+    - name: "Cleanup original ISO files and copied files"
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "{{ src_iso_file_path }}"
+        - "{{ tmp_iso_mount_dir }}"
+  become: yes
