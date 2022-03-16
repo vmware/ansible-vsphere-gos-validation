@@ -22,13 +22,20 @@
           set_fact:
             update_vmtools: True
           when: update_vmtools is undefined
-        
+
+        # Flatcar doesn't support to install open-vm-tools
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case due to condition for installing VMTools is not satisfied"
+            skip_reason: "Not Supported"
+          when: "'Flatcar' in guest_os_ansible_distribution"
+
         # VM has open-vm-tools installed and update_vmtools is set false
         - include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Skip test case due to condition for installing VMTools is not satisfied"
+            skip_reason: "Not Applicable"
           when: >
-            ('Flatcar' in guest_os_ansible_distribution) or
             (vmtools_is_installed is defined and
             vmtools_is_installed and
             not update_vmtools)

@@ -180,6 +180,7 @@ class CallbackModule(CallbackBase):
         self.finished_at = None
 
         self.testing_vars_file = None
+        self.testing_testcase_file = None
         self.testing_vars = {}
 
         self.plugin_dir = os.path.dirname(os.path.realpath(__file__))
@@ -402,6 +403,22 @@ class CallbackModule(CallbackBase):
         with open(self.testing_vars_file, 'r') as fd:
             self.testing_vars = yaml.load(fd, Loader=yaml.Loader)
 
+    # Get all of test cases at play start and set status to "No Run"
+    def _get_testcase_list(self):
+        if not self.testing_testcase_file or not os.path.exists(self.testing_testcase_file):
+            self.logger.error("Failed to get test cases file")
+            return
+
+        with open(self.testing_testcase_file, 'r') as fd:
+            lines = yaml.load(fd, Loader=yaml.Loader)
+            for line in lines:
+                test_name = os.path.basename(line['import_playbook']).replace('.yml', '')
+                self.testcases[test_name] = {"status":"No Run",
+                                             "started_at": None,
+                                             "finished_at": None,
+                                             "duration": 0}
+
+
     def _get_play_path(self, play):
         path = ""
         if hasattr(play, "_ds") and hasattr(play._ds, "_data_source"):
@@ -512,7 +529,9 @@ class CallbackModule(CallbackBase):
         total_exec_time = ""
         total_count = len(self.testcases)
         failed_count = 0
+        blocked_count = 0
         skipped_count = 0
+        norun_count = 0
 
 
         if self.started_at and self.finished_at:
@@ -550,14 +569,21 @@ class CallbackModule(CallbackBase):
                 msg += row_format.format(testname.ljust(name_col_width), ("* " + test_status).rjust(status_col_width), test_exec_time)
                 if test_status.lower() == 'failed':
                     failed_count += 1
-                else:
+                else if test_status.lower() == 'blocked':
+                    blocked_count += 1
+                else if test_status.lower() != 'no run':
                     skipped_count += 1
+                else:
+                    norun_count += 1
 
         msg += row_border
 
         # Test summary
-        test_summary = "Test Results (Total: {}, Failed: {}, No Run: {}, Elapsed Time: {}):\n".format(total_count,
-                        failed_count, skipped_count, time.strftime("%H:%M:%S", time.gmtime(total_exec_time)))
+        test_summary = "Test Results (Total: {}, Failed: {}, " + \
+                       "Blocked: {}, Skipped: {}, No Run: {}, " + \
+                       "Elapsed Time: {}):\n".format(total_count, \
+                        failed_count, blocked_count, skipped_count, \
+                        norun_count, time.strftime("%H:%M:%S", time.gmtime(total_exec_time)))
 
         msg = test_summary + msg
         self.logger.info(msg)
@@ -675,10 +701,12 @@ class CallbackModule(CallbackBase):
                    self.vm_info.GUI_Installed = str(set_fact_result.get("guest_os_with_gui", ''))
 
         elif str(task.action) == "debug":
-            if re.match("skip\\s+testcase:", task.name.lower()):
-                test_name = task.name.split(':')[-1].strip()
+            if "skip_test_case.yml" == task_file and "Skip testcase:" in task.name:
+                [test_name, test_result] = task.name.split(',')
+                test_name = test_name.split(':')[-1].strip()
+                test_result = test_result.split(':')[-1].strip()
                 if test_name in self.testcases:
-                    self.testcases[test_name]['status'] = "No Run"
+                    self.testcases[test_name]['status'] = test_result
                     self.testcases[test_name]['finished_at'] = time.time()
                     self.testcases[test_name]['duration'] = int(self.testcases[test_name]['finished_at'] -
                                                                 self.testcases[test_name]['started_at'])
@@ -799,6 +827,16 @@ class CallbackModule(CallbackBase):
 
         self._get_testing_vars()
 
+        if 'main.yml' in os.path.basename(playbook_path):
+            #Use user-defined testcase file
+            if 'testing_testcase_file' in extra_vars.keys():
+                self.testing_testcase_file = extra_vars['testing_testcase_file']
+            else:
+                #Use default testing vars file
+                self.testing_testcase_file = os.path.join(self.cwd, "linux/gosv_testcase_list.yml")
+
+            self._get_testcase_list()
+
         if (self.testing_vars and
             'vm_name' in self.testing_vars and
             self.testing_vars['vm_name']):
@@ -808,10 +846,12 @@ class CallbackModule(CallbackBase):
         msg = self._banner("PLAYBOOK: {}".format(playbook_path))
         msg += "Positional arguments: {}\n".format(' '.join(context.CLIARGS['args']))
         msg += "Tesing vars file: {}\n".format(self.testing_vars_file)
+        msg += "Tesing testcase file: {}\n".format(self.testing_testcase_file)
         msg += "Playbook dir: {}\n".format(self.cwd)
         msg += "Plugin dir: {}\n".format(self.plugin_dir)
         msg += "Log dir: {}".format(self.log_dir)
         self.logger.info(msg)
+        self._display.display(msg, color=C.COLOR_VERBOSE)
 
     def v2_playbook_on_play_start(self, play):
         self._play_name = play.get_name()
@@ -843,14 +883,10 @@ class CallbackModule(CallbackBase):
         # Clear failed tasks cache
         self._failed_tasks_cache.clear()
 
-        testcase = {}
-        # Add a test case into test case dictionary
+        # Update testcase status to Running and set its start time
         if self._play_name and ('linux' in self._play_path or 'windows' in self._play_path):
-            testcase["status"] = "Running"
-            testcase["started_at"] = time.time()
-            testcase["finished_at"] = None
-            testcase["duration"] = 0
-            self.testcases[self._play_name] = testcase
+            self.testcases[self._play_name]["status"] = "Running"
+            self.testcases[self._play_name]["started_at"] = time.time()
             self._last_test_name = self._play_name
 
     def v2_playbook_on_stats(self, stats):
@@ -900,7 +936,9 @@ class CallbackModule(CallbackBase):
         self.logger.info(vm_info_str)
         self._display.display(vm_info_str, color=C.COLOR_VERBOSE)
 
-        self._print_test_results()
+        if len(self.testcases) > 0:
+            self._print_test_results()
+
         self.remove_logger_file_handler(self.test_results_log)
 
         if self.testrun_log_dir and self.log_dir != self.testrun_log_dir:

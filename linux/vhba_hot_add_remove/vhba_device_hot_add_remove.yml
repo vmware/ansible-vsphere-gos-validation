@@ -7,6 +7,7 @@
     - include_tasks: ../../common/skip_test_case.yml
       vars:
         skip_msg: "Skip test case because guest OS doesn't support {{ new_disk_ctrl_type }} controller"
+        skip_reason: "Not Supported"
       when:
         - new_disk_ctrl_type in ["lsilogic", "lsilogicsas"]
         - guest_os_family == "RedHat"
@@ -15,7 +16,8 @@
 
     - include_tasks: ../../common/skip_test_case.yml
       vars:
-        skip_msg: "Skip test case because VM with hardware version {{ vm_hardware_version_num }} doesn't support {{ new_disk_ctrl_type }} controller"
+        skip_msg: "Skip test case because VM with hardware version {{ vm_hardware_version_num }} doesn't support {{ new_disk_ctrl_type }} controller hot add or hot remove"
+        skip_reason: "Not Supported"
       when:
         - new_disk_ctrl_type == "nvme"
         - ((guest_os_ansible_distribution != "VMware Photon OS" and vm_hardware_version_num | int < 13) or
@@ -69,6 +71,7 @@
     - include_tasks: ../../common/skip_test_case.yml
       vars:
         skip_msg: "Not found available {{ new_vhba_type }} controllers bus number, skip testing on hot adding new {{ new_disk_ctrl_type }} disk."
+        skip_reason: "Blocked"
       when: new_vhba_bus_found is undefined or not new_vhba_bus_found | bool
 
     # Add a new disk controller and a new disk attaching to it

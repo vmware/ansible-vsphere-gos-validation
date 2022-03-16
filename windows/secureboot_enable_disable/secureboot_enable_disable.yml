@@ -21,10 +21,15 @@
 
         - include_tasks: ../../common/skip_test_case.yml
           vars:
+            skip_msg: "Secure boot is not supported on VM of {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} with hardware version {{ vm_hardware_version_num }}"
+            skip_reason: "Not Supported"
+          when: vm_hardware_version_num | int < 13
+
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
             skip_msg: "Skip test case due to VM firmware is not EFI: {{ vm_firmware | default('NA') }}"
-          when: >
-            (vm_firmware is undefined or vm_firmware | lower != 'efi') or
-            (vm_hardware_version_num | int < 13)
+            skip_reason: "Not Applicable"
+          when: vm_firmware is undefined or vm_firmware | lower != 'efi'
 
         # Enable, disable secure boot test if VM uses EFI firmware
         - include_tasks: change_secureboot_config.yml
