@@ -14,6 +14,17 @@
         skip_msg: "The variable new_vm is not defined or is set to False, so skip to deploy VM"
       when: new_vm is undefined or (new_vm is defined and not new_vm|bool)
 
+    - name: "Set current test case name and log path on local machine"
+      set_fact:
+        current_test_log_folder: "{{ testrun_log_path }}/{{ ansible_play_name }}"
+
+    - name: "Create the current test case log folder with mode '0755'"
+      file:
+        path: "{{ current_test_log_folder }}"
+        state: directory
+        mode: '0755'
+      register: create_log_path
+
     # Change vm_username to root if it is not. And add a new user after VM deployment
     - include_tasks: set_new_vm_user_account.yml
 

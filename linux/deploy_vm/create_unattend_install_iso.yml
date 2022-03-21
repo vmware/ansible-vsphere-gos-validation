@@ -85,8 +85,9 @@
         user_data_template: "{{ unattend_install_template }}"
         local_hostname: "ubuntu-{{ hostname_timestamp }}"
 
-    - name: "Set fact of Ubuntu seed file"
+    - name: "Set fact of generated unattend instal config file and seed ISO"
       set_fact:
+        new_unattend_install_conf: "{{ user_data_path }}"
         unattend_iso_cache: "{{ tmp_seed_dir }}"
         generated_unattend_iso: "{{ seed_iso_path }}"
         unattend_iso_file_name: "{{ lookup('pipe','date +%s') }}-{{ seed_iso_path | basename }}"
@@ -123,6 +124,11 @@
   when: >
     unattend_install_conf is match('Photon') or
     unattend_install_conf is match('Debian')
+
+- name: "Copy generated unattend install config file to log foler"
+  copy:
+    src: "{{ new_unattend_install_conf }}"
+    dest: "{{ current_test_log_folder }}/{{ new_unattend_install_conf | basename }}"
 
 - name: "Remove cache folder {{ unattend_iso_cache }}"
   file:

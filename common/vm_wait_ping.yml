@@ -5,6 +5,7 @@
 # Parameters:
 #   vm_wait_ping_ip: IP address of the host to connect to
 #   vm_wait_ping_timeout (optional): wait for timeout, default is 900s
+#   vm_wait_ping_ignore_errors (optional): True to ignore ping failure. Default is False
 #
 - name: "Required parameter not specified"
   fail:
@@ -17,6 +18,17 @@
   until: vm_wait_ping_result.rc == 0
   delay: 5
   retries: "{{ ((vm_wait_ping_timeout | default(900) | int) / 5) | int }}"
-  changed_when: false
-- debug: var=vm_wait_ping_result
-  when: enable_debug is defined and enable_debug
+  ignore_errors: True
+
+- name: "Print ping result"
+  debug: var=vm_wait_ping_result
+
+- name: "Set fact of ping success"
+  set_fact:
+    vm_wait_ping_success: "{{ vm_wait_ping_result.rc == 0 }}"
+
+- fail:
+    msg: "IP {{ vm_wait_ping_ip }} is not pingable"
+  when:
+    - vm_wait_ping_ignore_errors is undefined or not vm_wait_ping_ignore_errors | bool
+    - not vm_wait_ping_success

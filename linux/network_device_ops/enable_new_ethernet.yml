@@ -84,11 +84,19 @@
     - block:
         # Ubuntu server is using netplan to manage network interfaces
         - block:
+            # IP could be changed after netplan apply
             - name: "Apply netplan configuration file for new added nic {{ eth_dev }} in Ubuntu"
               command: "netplan apply"
               delegate_to: "{{ vm_guest_ip }}"
-              become: yes
-            - include_tasks: ../../common/vm_wait_connection.yml
+              async: 10
+              poll: 0
+
+            - name: "Sleep 30s for netplan taking effect"
+              pause:
+                seconds: 30
+
+            # Update VM's guest IP
+            - include_tasks: ../../common/update_inventory.yml
           when: guest_os_ansible_distribution == "Ubuntu"
 
         # SLES is using Wicked to manage network interface

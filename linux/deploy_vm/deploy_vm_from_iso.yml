@@ -146,10 +146,27 @@
         - unattend_install_conf is defined
         - unattend_install_conf is match('Photon') or unattend_install_conf is match('Ubuntu')
 
-    # Get guest IP
+    # VM IP might be changed at first boot. This is the first attempt to get VM IP and test it.
+    - include_tasks: ../../common/vm_get_ip.yml
+      vars:
+        vm_get_ip_timeout: 600
+
+    # Try to ping VM IP at the first boot
+    - include_tasks: ../../common/vm_wait_ping.yml
+      vars:
+        vm_wait_ping_ip: "{{ vm_guest_ip }}"
+        vm_wait_ping_timeout: 100
+        vm_wait_ping_ignore_errors: True
+
+    - name: "Wait 300 seconds for network connection ready"
+      pause:
+        seconds: 300
+      when: not vm_wait_ping_success | bool
+
+    # Add VM guest IP to inventory
     - include_tasks: ../../common/update_inventory.yml
       vars:
-        update_inventory_timeout: 600
+        update_inventory_timeout: 300
 
     # Retrieve guest system info
     - include_tasks: ../utils/get_linux_system_info.yml
