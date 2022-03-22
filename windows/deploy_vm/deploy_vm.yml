@@ -71,13 +71,15 @@
           when: boot_disk_controller == 'ide'
 
         # When firmware is EFI, configure force EFI setup once
-        - name: Enable force setup once when VM firmware is EFI and send keys to VM
-          block:
+        - block:
+            # Add virtual TPM device
+            - include_tasks: ../../linux/deploy_vm/add_vm_virtual_tpm.yml
+              when: virtual_tpm is defined and virtual_tpm | bool
             # Enable secureboot
             - include_tasks: ../../common/vm_set_boot_options.yml
               vars:
                 secure_boot_enabled_set: "{{ secureboot_enabled | default(False) }}"
-                enter_bios_setup: True
+                enter_bios_setup: True 
             - include_tasks: ../../common/vm_set_power_state.yml
               vars:
                 vm_power_state_set: "powered-on"
@@ -88,13 +90,13 @@
                   - DOWNARROW
                   - ENTER
                   - ENTER
-          when: firmware is defined and firmware|lower == "efi"
+          when: firmware is defined and firmware | lower == "efi"
 
         # Power on VM directly when VM firmware is BIOS
         - include_tasks: ../../common/vm_set_power_state.yml
           vars:
             vm_power_state_set: "powered-on"
-          when: firmware is defined and firmware|lower == "bios"
+          when: firmware is defined and firmware | lower == "bios"
         - name: "Wait 3 minutes while OS install"
           pause:
             minutes: 3

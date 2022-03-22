@@ -1,0 +1,37 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# The prerequsite of adding virtual TPM device to VM is
+# key provider configured on vCenter.
+#
+# When key provider type is configured, means need to add
+# a new key provider
+- block:
+    - name: Check key provider type value
+      assert:
+        that:
+          - key_provider_type | lower in ['standard', 'native']
+        fail_msg: "Parameter 'key_provider_type' valid value is 'standard' or 'native', but configured '{{ key_provider_type }}'."
+
+    - name: Set fact of new Standard key provider name
+      set_fact:
+        new_kp_name: "{{ key_provider_type | lower }} ~ {{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}"
+    - include_tasks: ../../common/vcenter_add_standard_kp.yml
+      vars:
+        standard_kp_name: "{{ new_kp_name }}"
+      when: key_provider_type | lower == 'standard'
+
+    - name: Parameter value not supported now
+      fail:
+        msg: "Parameter 'key_provider_type' value is set to '{{ key_provider_type }}', which is not supported yet."
+      when: key_provider_type | lower == 'native'
+  when: key_provider_type is defined
+
+# When key provider type is not configured, means use the existing configured one.
+# Will add get existing configured key provider info after new community.vmware module added
+#
+# TBD: add a new task to check key provider status when key_provider_type is not defined.
+
+- include_tasks: ../../common/vm_add_remove_vtpm.yml
+  vars:
+    vtpm_operation: 'present'
