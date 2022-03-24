@@ -7,7 +7,7 @@
 #   wait_device_diff: The difference length of device list, like  1 or -1.
 #
 
-# Rescan SCSI bus, see https://kb.vmware.com/s/article/76401
+# Rescan SCSI bus
 - block:
     - block:
         - name: "Set SCSI command tools package name"
@@ -37,9 +37,7 @@
           when:
             - rescan_scsi_result is defined
             - rescan_scsi_result.stdout_lines
-      when:
-        - guest_os_ansible_distribution != 'Flatcar'
-        - guest_os_ansible_distribution != 'Ubuntu'
+      when: guest_os_ansible_distribution != 'Flatcar'
 
     - block:
         - name: "Rescan all hard disks"
@@ -47,7 +45,7 @@
             for i in `find /sys/ -iname rescan`;do echo 1 >$i; done;
             for i in `find /sys/ -iname scan`;do echo "- - -" >$i; done;
           delegate_to: "{{ vm_guest_ip }}"
-      when: guest_os_ansible_distribution in ['Flatcar', 'Ubuntu']
+      when: guest_os_ansible_distribution == 'Flatcar'
   when: new_disk_ctrl_type == 'lsilogic'
 
 - block:
