@@ -14,10 +14,13 @@ autoinstall:
     package_upgrade: false
     disable_root: false
     ssh_pwauth: yes
+    timezone: America/New_York
     chpasswd:
       list: |
         root:{{ vm_password_hash }}
       expire: false
+    runcmd:
+      - echo '{{ autoinstall_complete_msg }}' >/dev/ttyS0
 {% if new_user is defined and new_user != 'root' %}
     users:
       - name: {{ new_user }}
@@ -26,6 +29,13 @@ autoinstall:
         ssh_authorized_keys:
           - {{ ssh_public_key }}
 {% endif %}
+  network:
+    network:
+      version: 2
+      ethernets:
+        en*:
+          dhcp4: true
+          dhcp-identifier: mac
   ssh:
     install-server: true
     allow-pw: yes
@@ -49,4 +59,3 @@ autoinstall:
     - echo 'Acquire::ForceIPv4 "true";' >>/etc/apt/apt.conf.d/99force-ipv4
     - sed -i 's/^#PermitRootLogin .*/PermitRootLogin yes/' /target/etc/ssh/sshd_config
     - sed -i 's/^#PasswordAuthentication .*/PasswordAuthentication yes/' /target/etc/ssh/sshd_config
-    - echo '{{ autoinstall_complete_msg }}' >/dev/ttyS0
