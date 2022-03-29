@@ -10,19 +10,20 @@
 #     kms_ip, kms_port.
 #   kms_client_cert: the path of client certificate file.
 #   kms_client_cert_key: the path of the corresponding key file.
-#   kms_proxy_server: the proxy server IP to connect to KMS server.
-#   kms_proxy_port: the proxy server port.
-#   kms_username: the username to authenticate to KMS server.
-#   kms_password: the user password to authenticate to KMS server.
+#   vc_cert_download_path: the path of downloaded vCenter certificate on local machine.
+#     Either set this parameter or 'kms_client_cert' and 'kms_client_cert_key' parameters.
+#   kms_proxy_server (optional): the proxy server IP to connect to KMS server.
+#   kms_proxy_port (optional): the proxy server port.
+#   kms_username (optional): the username to authenticate to KMS server.
+#   kms_password (optional): the user password to authenticate to KMS server.
 #
 - name: Check KMS server info list is set
   assert:
     that:
       - kms_info_list is defined
       - kms_info_list | length != 0
-      - kms_client_cert is defined and kms_client_cert
-      - kms_client_cert_key is defined and kms_client_cert_key
-    fail_msg: "Parameter 'kms_info_list', 'kms_client_cert' and 'kms_client_cert_key' must be set."
+      - (vc_cert_download_path is defined and vc_cert_download_path) or (kms_client_cert is defined and kms_client_cert_key is defined)
+    fail_msg: "'kms_info_list', either 'kms_client_cert' and 'kms_client_cert_key' or 'vc_cert_download_path' parameters are required."
 
 - name: Add Standard key provider to vCenter
   community.vmware.vcenter_standard_key_provider:
@@ -39,8 +40,9 @@
     kms_username: "{{ kms_username | default(omit) }}"
     kms_password: "{{ kms_password | default(omit) }}"
     make_kms_trust_vc:
-      upload_client_cert: "{{ kms_client_cert }}"
-      upload_client_key: "{{ kms_client_cert_key }}"
+      upload_client_cert: "{{ kms_client_cert | default(omit) }}"
+      upload_client_key: "{{ kms_client_cert_key | default(omit) }}"
+      download_self_signed_cert: "{{ vc_cert_download_path | default(omit) }}"
   register: add_standard_kms_result
 
 - name: Display the result of adding Standard key provider
