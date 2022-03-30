@@ -64,18 +64,18 @@ This project supports below scenarios for end-to-end guest OS validation testing
 
 | Guest OS types/versions                         | Automatic install from ISO image | Deploy from ova template | Existing VM and installed guest OS |
 | :---------------------------------------------- | :------------------------------: | :----------------------: | :--------------------------------: |
-| Red Hat Enterprise Linux 7.x, 8.x, 9.x          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Red Hat Enterprise Linux 7.x, 8.x          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | CentOS 7.x, 8.x                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Oracle Linux 7.x, 8.x                           | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Rocky Linux 8.4                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| AlmaLinux 8.4                                   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| SUSE Linux Enterprise 15 SP3, SP4               | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Rocky Linux 8.x                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| AlmaLinux 8.x                                   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| SUSE Linux Enterprise 15 SP3 and later               | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise 12 SP5, 15 SP0/SP1/SP2    |                                  |                          | :heavy_check_mark:                 |
 | Photon OS 3.x                                   | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Photon OS 4.x                                   | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
-| Ubuntu 18.04, 18.10, 20.04, 20.10, 21.04, 21.10, 22.04 live-server   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Ubuntu 20.04, 20.10, 21.04, 21.10, 22.04 cloud image                 |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
-| Ubuntu 18.04, 18.10, 20.04, 20.10, 21.04, 21.10 desktop       |                                  |                          | :heavy_check_mark:                 |
+| Ubuntu 18.04 and later live-server   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Ubuntu 20.04 and later cloud image                 |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
+| Ubuntu 18.04 and later desktop       |                                  |                          | :heavy_check_mark:                 |
 | Flatcar 2592.0.0 and later                      |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Debian 11.x                                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Debian 10.10 and later                          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
