@@ -17,10 +17,16 @@
 
     - name: Set fact of new key provider name
       set_fact:
-        new_kp_name: "{{ key_provider_type | lower }} ~ {{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}"
-    - include_tasks: ../../common/vcenter_add_standard_kp.yml
-      vars:
-        standard_kp_name: "{{ new_kp_name }}"
+        new_kp_name: "{{ key_provider_type | lower }}{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}"
+    - block:
+        # will change to current test log folder
+        - name: Set fact of download path of vCenter certificate
+          set_fact:
+            vc_cert_download_path: "/tmp/"
+          when: vc_cert_download_path is undefined or not vc_cert_download_path
+        - include_tasks: ../../common/vcenter_add_standard_kp.yml
+          vars:
+            standard_kp_name: "{{ new_kp_name }}"
       when: key_provider_type | lower == 'standard'
 
     - name: Parameter value not supported now
