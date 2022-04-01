@@ -47,30 +47,28 @@
         # Set expected guest fullname for Windows client
         - block:
             - include_tasks: win10_fullname.yml
+              when: "'Windows 10' in os_fullname_guest"
             - include_tasks: win11_fullname.yml
-              when: expected_guest_fullname == ""
+              when: "'Windows 11' in os_fullname_guest"
           when: guest_os_product_type == "client"
 
         # Set expected guest fullname for Windows Server
         - block:
-            - include_tasks: winsrv2016orlater_fullname.yml
-            - include_tasks: winsrv2019_fullname.yml
-              when: expected_guest_fullname == ""
+            - block:
+                - include_tasks: winsrv2016orlater_fullname.yml
+                - include_tasks: winsrv2019_fullname.yml
+              when: "'Windows Server 2022' not in os_fullname_guest"
             - include_tasks: winsrv2022_fullname.yml
-              when: expected_guest_fullname == ""
+              when: "'Windows Server 2022' in os_fullname_guest"
           when: guest_os_product_type != "client"
 
-        - name: Set expected guest fullname to OS fullname got in guest
-          set_fact:
-            expected_guest_fullname: "{{ (' ').join(os_fullname_guest.split()[:-1]) ~ ' (' ~ guest_os_ansible_architecture ~ ')' }}"
-          when: expected_guest_fullname == ""
         - debug:
             msg: "Expected guest fullname on ESXi '{{ esxi_version }}': {{ expected_guest_fullname }}"
-
         - name: "Verify guest fullname in guest info is expected"
           assert:
             that:
-              - os_fullname_guestinfo == expected_guest_fullname
+              - expected_guest_fullname != ""
+              - (os_fullname_guestinfo == expected_guest_fullname) or (expected_guest_fullname is string and expected_guest_fullname in os_fullname_guestinfo) or (expected_guest_fullname | type_debug == 'list' and os_fullname_guestinfo in expected_guest_fullname)
             fail_msg: "Guest fullname in guest info: {{ os_fullname_guestinfo }}, is not the same as expected one: {{ expected_guest_fullname }}."
             success_msg: "Guest fullname in guest info: {{ os_fullname_guestinfo }} is the same as expected one."
       rescue:
