@@ -129,6 +129,10 @@
   when: guest_os_ansible_distribution == "OracleLinux"
 
 - block:
+    - name: "Set fact of APT source list file"
+      set_fact:
+        apt_source_list: "/etc/apt/sources.list"
+
     - name: "Set the APT source for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_release }}"
       set_fact:
         apt_sources:
@@ -145,12 +149,26 @@
 
     - include_tasks: replace_or_add_line_in_file.yml
       vars:
-        file: "/etc/apt/sources.list"
+        file: "{{ apt_source_list }}"
         reg_exp: "{{ apt_source }}"
         line_content: "{{ apt_source }}"
       with_list: "{{ apt_sources }}"
       loop_control:
         loop_var: "apt_source"
+
+    # Remove repos from universe and multiverse
+    - name: "Remove repos from universe and multiverse"
+      replace:
+        path: "{{ apt_source_list }}"
+        regexp: "^(deb .*{{ apt_source }}.*)"
+        replace: "#\\1"
+      delegate_to: "{{ vm_guest_ip }}"
+      with_list:
+        - 'universe'
+        - 'multiverse'
+      loop_control:
+        loop_var: "apt_source"
+      when: guest_os_ansible_distribution == "Ubuntu"
   when: guest_os_ansible_distribution in ["Ubuntu", "Debian"]
 
 # Enable photon.repo, photon-release.repo and photon-updates.repo

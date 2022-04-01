@@ -23,6 +23,9 @@
     src_iso_file_name: "{{ datastore_file_download_result.dest | basename }}"
     src_iso_file_path: "{{ datastore_file_download_result.dest }}"
 
+# Get boot images from source ISO
+- include_tasks: get_boot_images_from_iso.yml
+
 # Create a temporary directory to mount ISO image
 - name: "Create a temporary directory to mount ISO image"
   include_tasks: ../../common/create_temp_file_dir.yml
@@ -47,7 +50,13 @@
   set_fact:
     unattend_install_file_name: "{{ new_unattend_install_conf | basename }}"
 
+- name: "Initialize fact of command to rebuild unattended install ISO"
+  set_fact:
+    rebuild_iso_cmd: "xorriso -indev {{ src_iso_file_path }} -outdev {{ rebuilt_unattend_iso_path }}"
+
+# Set facts about files and command for creating an autoinstall ISO for Photon
 - block:
+    # files for autoinstall in BIOS/UEFI mode
     - name: "Set fact of files to be update for unattended install"
       set_fact:
         iso_files_to_update:
@@ -55,18 +64,15 @@
           - '/isolinux/isolinux.cfg'
           - '/isolinux/menu.cfg'
 
-    - name: "Initialize fact of command to rebuild unattended install ISO for Debian"
-      set_fact:
-        cmd_to_map_files: "xorriso -indev {{ src_iso_file_path }} -outdev {{ rebuilt_unattend_iso_path }} -boot_image isolinux dir=/isolinux -boot_image any next -boot_image any efi_path=boot/grub2/efiboot.img"
-
     - name: "Add command options to rebuild unattended install ISO for Debian"
       set_fact:
-        cmd_to_map_files: "{{ cmd_to_map_files }} -map {{ unattend_iso_cache }}/{{ item | basename }} '{{ item }}'"
+        rebuild_iso_cmd: "{{ rebuild_iso_cmd }} -map {{ unattend_iso_cache }}/{{ item | basename }} '{{ item }}'"
       with_items: "{{ iso_files_to_update | union(['/isolinux/ks.cfg'])}}"
   when: unattend_install_conf is match('Photon')
 
-# Update files for autoinstall in BIOS/UEFI mode
+# Set facts about files and command for creating an autoinstall ISO for Debian
 - block:
+    # files for autoinstall in BIOS/UEFI mode
     - name: "Set fact of files to be update for unattended install"
       set_fact:
         iso_files_to_update:
@@ -75,15 +81,29 @@
           - '/isolinux/gtk.cfg'
           - '/md5sum.txt'
 
-    - name: "Initialize fact of command to rebuild unattended install ISO for Debian"
-      set_fact:
-        cmd_to_map_files: "xorriso -indev {{ src_iso_file_path }} -outdev {{ rebuilt_unattend_iso_path }} -boot_image isolinux dir=/isolinux -boot_image any next -boot_image any efi_path=boot/grub/efi.img"
-
     - name: "Add command options to rebuild unattended install ISO for Debian"
       set_fact:
-        cmd_to_map_files: "{{ cmd_to_map_files }} -map {{ unattend_iso_cache }}/{{ item | basename }} '{{ item }}'"
+        rebuild_iso_cmd: "{{ rebuild_iso_cmd }} -map {{ unattend_iso_cache }}/{{ item | basename }} '{{ item }}'"
       with_items: "{{ iso_files_to_update | union([unattend_install_file_name]) }}"
   when: unattend_install_conf is match('Debian')
+
+# Set facts about files and command for creating an autoinstall ISO for Ubuntu live server
+- block:
+    - name: "Set fact of files to be update for unattended install"
+      set_fact:
+        iso_files_to_update:
+          - '/boot/grub/grub.cfg'
+          - '/md5sum.txt'
+
+    - name: "Add command options to rebuild unattended install ISO for Ubuntu live server"
+      set_fact:
+        rebuild_iso_cmd: "{{ rebuild_iso_cmd }} -map {{ unattend_iso_cache }}/{{ item | basename }} '{{ item }}'"
+      with_items: "{{ iso_files_to_update }}"
+  when: unattend_install_conf is match('Ubuntu/Server')
+
+- name: "Add command options for boot images to rebuild unattend install ISO"
+  set_fact:
+    rebuild_iso_cmd: "{{ rebuild_iso_cmd }} {{ bios_boot_image }} -boot_image any next {{ efi_boot_image }}"
 
 - name: "Copy unattend install config files to {{ unattend_iso_cache }}"
   copy:
@@ -99,6 +119,9 @@
         path: "{{ unattend_iso_cache }}/isolinux.cfg"
         regexp: "timeout 0"
         replace: "timeout 1"
+      when: >
+        unattend_install_conf is match('Photon') or
+        unattend_install_conf is match('Debian')
 
     # Update autoinstall config files for Photon
     - block:
@@ -168,11 +191,34 @@
           debug: var=update_initrd_output
       when: unattend_install_conf is match('Debian')
 
+    # Update autoinstall config files for Ubuntu live server
+    - block:
+        - name: "Add autoinstall to kernel command for Ubuntu live server"
+          replace:
+            path: "{{ unattend_iso_cache }}/grub.cfg"
+            regexp: '(.*vmlinuz)(.*)'
+            replace: "\\1 autoinstall \\2"
+
+        - name: "Set timeout to 5 seconds at boot menu"
+          replace:
+            path: "{{ unattend_iso_cache }}/grub.cfg"
+            regexp: 'set timeout=.*'
+            replace: "set timeout=5"
+
+        - name: "Update md5sum for Ubuntu live server ISO files"
+          shell: "{{ item }}"
+          with_items:
+            - "sed -i '#./boot/grub/grub.cfg#d' md5sum.txt"
+            - "echo \"`md5sum grub.cfg | awk '{print $1}'` ./boot/grub/grub.cfg\" >>md5sum.txt"
+          args:
+            chdir: "{{ unattend_iso_cache }}"
+      when: unattend_install_conf is match('Ubuntu/Server')
+
     - name: "Rebuild ISO image with unattend install config file"
-      shell: "{{ cmd_to_map_files }}"
+      shell: "{{ rebuild_iso_cmd }}"
       when:
-        - cmd_to_map_files is defined
-        - cmd_to_map_files
+        - rebuild_iso_cmd is defined
+        - rebuild_iso_cmd
 
     # Unmount the original ISO
     - include_tasks: ../../common/local_unmount.yml

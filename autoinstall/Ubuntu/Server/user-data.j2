@@ -5,17 +5,21 @@ autoinstall:
     - echo '{{ autoinstall_start_msg }}' >/dev/ttyS0
   refresh-installer:
     update: no
-  locale: en_US
+  locale: en_US.UTF-8
   keyboard:
-    layout: en
-    variant: uk
+    layout: us
+    variant: us
   user-data:
+    package_update: false
+    package_upgrade: false
     disable_root: false
     ssh_pwauth: yes
     chpasswd:
       list: |
         root:{{ vm_password_hash }}
       expire: false
+    runcmd:
+      - echo '{{ autoinstall_complete_msg }}' >/dev/ttyS0
 {% if new_user is defined and new_user != 'root' %}
     users:
       - name: {{ new_user }}
@@ -36,6 +40,9 @@ autoinstall:
     hostname: ubuntu
     username: {{ vm_username }}
     password: {{ vm_password_hash }}
+  apt:
+    preserve_sources_list: false
+    geoip: true
   packages:
     - net-tools
     - sg3-utils
@@ -43,4 +50,4 @@ autoinstall:
     - rm -f /etc/cloud/cloud.cfg.d/*-installer.cfg 2>/dev/null
     - echo 'Acquire::ForceIPv4 "true";' >>/etc/apt/apt.conf.d/99force-ipv4
     - sed -i 's/^#PermitRootLogin .*/PermitRootLogin yes/' /target/etc/ssh/sshd_config
-    - echo '{{ autoinstall_complete_msg }}' >/dev/ttyS0
+    - sed -i 's/^#PasswordAuthentication .*/PasswordAuthentication yes/' /target/etc/ssh/sshd_config

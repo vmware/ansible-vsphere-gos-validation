@@ -10,23 +10,6 @@
 # Rescan SCSI bus
 - block:
     - block:
-        - name: "Set SCSI command tools package name"
-          set_fact:
-            sg3_utils_pkg: "{{ 'sg3-utils' if guest_os_family in ['Debian', 'Astra Linux (Orel)'] else 'sg3_utils' }}"
-
-        # Install SCSI command tools
-        - include_tasks: ../utils/get_installed_package_info.yml
-          vars:
-            package_name: "{{ sg3_utils_pkg }}"
-
-        - include_tasks: ../utils/install_uninstall_package.yml
-          vars:
-            package_name: "{{ sg3_utils_pkg }}"
-            package_state: "present"
-          when:
-            - package_info is defined
-            - package_info | length == 0
-
         - name: "Rescan all scsi devices"
           command: "/usr/bin/rescan-scsi-bus.sh -a -r"
           register: rescan_scsi_result
@@ -94,7 +77,7 @@
   set_fact:
     device_list_after_change: []
 
-- name: "Wait for device list changed"
+- name: "Wait for new device to be {% if wait_device_diff == 1 %}present{% else %}absent{% endif %}"
   shell: "lsblk -o NAME,TYPE --nodeps| grep disk | awk '{print $1}'"
   delegate_to: "{{ vm_guest_ip }}"
   register: lsblk_result

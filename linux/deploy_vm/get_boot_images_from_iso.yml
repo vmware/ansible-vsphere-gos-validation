@@ -1,0 +1,66 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Get boot images from source ISO"
+  shell: "xorriso -indev {{ src_iso_file_path }} -report_el_torito cmd"
+  register: get_boot_images_result
+
+- name: "Print all command options about boot images"
+  debug: var=get_boot_images_result
+
+- name: "Get BIOS and EFI boot images"
+  set_fact:
+    bios_boot_image_list: "{{ get_boot_images_result.stdout_lines | select('match', '-boot_image .* bin_path=./*') }}"
+    efi_boot_image_list: "{{ get_boot_images_result.stdout_lines | select('match', '-boot_image .* efi_path=./.*') }}"
+
+- fail:
+    msg: "Failed to get BIOS boot image from source ISO"
+  when: bios_boot_image_list | length == 0
+
+- name: "Set facts of BIOS boot image for rebuilding new ISO"
+  set_fact:
+    bios_boot_image: "{{ bios_boot_image_list[0] }}"
+
+- name: "Set facts of EFI boot image for rebuilding new ISO"
+  set_fact:
+    efi_boot_image: "{{ efi_boot_image_list[0] }}"
+  when: efi_boot_image_list | length > 0
+
+# Extract EFI boot image from ISO
+- block:
+    - name: "Set fact of EFI boot image path and partition info in source ISO"
+      set_fact:
+        extracted_efi_image: "{{ unattend_iso_cache }}/efi.img"
+        efi_part_start_block: 0
+        efi_part_block_count: 0
+
+    - name: "Get partition of EFI boot image from source ISO"
+      shell: "/sbin/fdisk -l '{{ src_iso_file_path }}' | fgrep '{{ src_iso_file_path }}'2"
+      register: get_efi_part_result
+
+    - fail:
+        msg: "Failed to get partitoin of EFI boot image from source ISO"
+      when: >
+        get_efi_part_result is undefined or
+        get_efi_part_result.stdout is undefined or
+        get_efi_part_result.stdout.split() | length < 3
+        
+    - name: "Set facts of the start block and block count of EFI boot image partition"
+      set_fact:
+        efi_part_start_block: "{{ get_efi_part_result.stdout.split()[1] }}"
+        efi_part_block_count: "{{ get_efi_part_result.stdout.split()[2] }}"
+    
+    - fail:
+        msg: "Failed to get partitoin blocks of EFI boot image from source ISO"
+      when: >
+        efi_part_start_block | int == 0 or
+        efi_part_block_count | int == 0
+
+    - name: "Extract EFI boot image from source ISO"
+      shell: "dd if='{{ src_iso_file_path }}' bs=512 skip='{{ efi_part_start_block }}' count='{{ efi_part_block_count }}' of='{{ extracted_efi_image }}'"
+      register: extract_efi_image_result
+
+    - name: "Set facts of EFI boot image for rebuilding new ISO"
+      set_fact:
+        efi_boot_image: "-append_partition 2 0xef '{{ extracted_efi_image }}' -boot_image any efi_path='--interval:appended_partition_2:all::'"
+  when: efi_boot_image_list | length == 0

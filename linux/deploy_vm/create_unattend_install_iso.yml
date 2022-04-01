@@ -85,11 +85,29 @@
         user_data_template: "{{ unattend_install_template }}"
         local_hostname: "ubuntu-{{ hostname_timestamp }}"
 
-    - name: "Set fact of Ubuntu seed file"
+    - name: "Set fact of generated unattend install config file and seed ISO"
       set_fact:
+        new_unattend_install_conf: "{{ user_data_path }}"
         unattend_iso_cache: "{{ tmp_seed_dir }}"
         generated_unattend_iso: "{{ seed_iso_path }}"
         unattend_iso_file_name: "{{ lookup('pipe','date +%s') }}-{{ seed_iso_path | basename }}"
+        new_os_installation_iso: "{{ lookup('pipe','date +%s') }}_{{ os_installation_iso_list[0].split()[1] | basename }}"
+
+    - include_tasks: rebuild_unattend_install_iso.yml
+      vars:
+        rebuilt_unattend_iso_path: "{{ unattend_iso_cache }}/{{ new_os_installation_iso }}"
+
+    # Upload Ubuntu fully automated install ISO to ESXi datastore
+    - include_tasks: ../../common/esxi_upload_datastore_file.yml
+      vars:
+        src_file_path: "{{ unattend_iso_cache }}/{{ new_os_installation_iso }}"
+        dest_file_path: "{{ new_os_installation_iso }}"
+        upload_file_timeout: 600
+
+    - name: "Replace original install ISO file with fully automated install ISO file"
+      set_fact:
+        os_installation_iso_list: ["[{{ datastore }}] {{ new_os_installation_iso }}"]
+        os_install_iso_list_len: 1
   when: unattend_install_conf is match('Ubuntu')
 
 - name: "Set fact of unattended install ISO path on datastore {{ datastore }}"
@@ -101,7 +119,7 @@
       - "The unattend install ISO generated is {{ generated_unattend_iso }}"
       - "The unattend install ISO will be uploaded to '{{ transferred_unattend_iso }}' on ESXi host"
 
-# Upload unattend install ISO to VM path on ESXi server
+# Upload unattend install ISO to ESXi datastore
 - include_tasks: ../../common/esxi_upload_datastore_file.yml
   vars:
     src_file_path: "{{ generated_unattend_iso }}"
@@ -123,6 +141,11 @@
   when: >
     unattend_install_conf is match('Photon') or
     unattend_install_conf is match('Debian')
+
+- name: "Copy generated unattend install config file to log folder"
+  copy:
+    src: "{{ new_unattend_install_conf }}"
+    dest: "{{ current_test_log_folder }}/{{ new_unattend_install_conf | basename }}"
 
 - name: "Remove cache folder {{ unattend_iso_cache }}"
   file:
