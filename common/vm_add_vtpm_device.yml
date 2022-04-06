@@ -12,23 +12,18 @@
     - name: Check key provider type value
       assert:
         that:
-          - key_provider_type | lower in ['standard', 'native']
-        fail_msg: "Parameter 'key_provider_type' valid value is 'standard' or 'native', but configured '{{ key_provider_type }}'."
+          - key_provider_type | lower == 'standard'
+        fail_msg: "Parameter 'key_provider_type' valid value is 'standard', but configured '{{ key_provider_type }}'."
 
     - name: Set fact of new key provider name
       set_fact:
         new_kp_name: "{{ key_provider_type | lower }}{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}"
 
-    - include_tasks: ../../common/vcenter_add_standard_kp.yml
+    - include_tasks: vcenter_add_standard_kp.yml
       vars:
         standard_kp_name: "{{ new_kp_name }}"
-        vc_cert_download_path: "{{ current_test_log_folder }}"
+        vc_cert_download_path: "{{ vc_cert_path }}"
       when: key_provider_type | lower == 'standard'
-
-    - name: Parameter value not supported now
-      fail:
-        msg: "Parameter 'key_provider_type' value is set to '{{ key_provider_type }}', which is not supported yet."
-      when: key_provider_type | lower == 'native'
   when:
     - key_provider_type is defined
     - key_provider_type
@@ -37,10 +32,10 @@
 # Will add get existing configured key provider info after new community.vmware module added
 # TBD: add a new task to check key provider status when key_provider_type is not defined.
 
-- include_tasks: ../../common/vm_add_remove_vtpm.yml
+- include_tasks: vm_add_remove_vtpm.yml
   vars:
     vtpm_operation: 'present'
-- include_tasks: ../../common/vm_get_device_with_label.yml
+- include_tasks: vm_get_device_with_label.yml
   vars:
     device_label: 'Virtual TPM'
 - name: Check Virtual TPM device on VM

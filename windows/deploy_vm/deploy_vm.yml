@@ -73,13 +73,15 @@
         # When firmware is EFI, configure force EFI setup once
         - block:
             # Add virtual TPM device
-            - include_tasks: ../../linux/deploy_vm/add_vm_virtual_tpm.yml
+            - include_tasks: ../../common/vm_add_vtpm_device.yml
+              vars:
+                vc_cert_path: "{{ current_test_log_folder }}"
               when: virtual_tpm is defined and virtual_tpm | bool
             # Enable secureboot
             - include_tasks: ../../common/vm_set_boot_options.yml
               vars:
                 secure_boot_enabled_set: "{{ secureboot_enabled | default(False) }}"
-                enter_bios_setup: True 
+                enter_bios_setup: True
             - include_tasks: ../../common/vm_set_power_state.yml
               vars:
                 vm_power_state_set: "powered-on"
