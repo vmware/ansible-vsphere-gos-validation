@@ -1,0 +1,28 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# This task is used for adding or removing virtual TPM
+# device from VM.
+# Parameters:
+#   vtpm_operation: add or remove virtual TPM device, valid
+#     values are 'present', 'absent'.
+#
+- name: Set fact of virtual TPM operation
+  set_fact:
+    vtpm_ops: "{{ 'Add' if vtpm_operation | lower == 'present' else 'Remove' }}"
+
+- name: "{{ vtpm_ops }} virtual TPM device to VM"
+  community.vmware.vmware_guest_tpm:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    state: "{{ vtpm_operation }}"
+  register: vtpm_ops_result
+
+- name: Display the result of virtual TPM device operation
+  debug: var=vtpm_ops_result
+  when: enable_debug

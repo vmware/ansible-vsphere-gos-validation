@@ -5,9 +5,10 @@
 4. For SLES 15 SP3 or later unattend auto-install, please use files under SLE/15/SP3/SLES or SLE/15/SP3/SLES_Minimal.
 5. For SLED 15 SP3 unattend auto-install, please use SLE/15/SP3/SLED/autoinst.xml.
 6. For SLED 15 SP4 unattend auto-install, please use SLE/15/SP4/SLED/autoinst.xml.
-7. For Windows 10 or later unattend auto-install, please use files under Windows/win10.
-8. For Windows Server LTSC unattend auto-install, please use files under Windows/win_server.
-9. For Windows Server SAC unattend auto-install, please use files under Windows/win_server_sac.
-10. For Photon OS 3.0 or later unattend auto-install, please use file Photon/ks.cfg.
-10. For Ubuntu Server 20.04 or later unattend auto-install, please use file Ubuntu/Server/user-data.j2.
-10. For Debian 10.1x or 11.x unattend auto-install, please use file Debian/10/preseed.cfg
+7. For Windows 10, or Windows 11 with TPM device unattend auto-install, please use files under Windows/win10.
+8. For Windows 11 without TPM device unattend auto-install, please use files under Windows/win11 to bypass TPM check during installation.
+9. For Windows Server LTSC unattend auto-install, please use files under Windows/win_server.
+10. For Windows Server SAC unattend auto-install, please use files under Windows/win_server_sac.
+11. For Photon OS 3.0 or later unattend auto-install, please use file Photon/ks.cfg.
+12. For Ubuntu Server 20.04 or later unattend auto-install, please use file Ubuntu/Server/user-data.j2.
+13. For Debian 10.1x or 11.x unattend auto-install, please use file Debian/10/preseed.cfg

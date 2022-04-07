@@ -32,7 +32,9 @@
 * vm_add_serial_port.yml: Add a serial port to VM
 * vm_set_video_card.yml: Configure VM video card settings
 * vm_remove_serial_port.yml: Remove a serial port from VM
-
+* vm_add_remove_vtpm.yml: Add or remove vTPM device from VM
+* vm_add_vtpm_device.yml: Add key provider on vCenter then add new vTPM device to VM
+  
 ### Tasks for VM CPU or Memory settings
 * vm_enable_cpu_hotadd.yml: Enable VM CPU hotadd
 * vm_set_cpu_number.yml: Set VM CPU number, cores per socket is 1 by default
@@ -117,6 +119,7 @@
 * esxi_check_delete_datastore_file.yml: Get datastore file status or delete file
 * esxi_upload_datastore_file.yml: Upload file to ESXi datastore
 * esxi_download_datastore_file.yml: Download file from ESXi datastore
+* vcenter_add_standard_kp.yml: Add Standard Key Provider on vCenter
 
 ### Tasks for server information
 * esxi_get_host_facts.yml: Get ESXi server host facts
