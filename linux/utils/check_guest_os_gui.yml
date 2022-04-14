@@ -1,6 +1,18 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+# Set default guest_os_with_gui by checking Xorg exists or not
+- name: "Check Xorg exists or not"
+  shell: "type Xorg"
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  register: xorg_result
+
+- name: "Set fact of guest OS with/without desktop experience"
+  set_fact:
+    guest_os_with_gui: "{% if xorg_result.rc == 0 %}True{% else %}False{% endif %}"
+
+# Update guest_os_with_gui based on different OS distribution
 - block:
   - name: "Check if guest OS has desktop environment"
     stat:
