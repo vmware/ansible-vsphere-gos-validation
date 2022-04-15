@@ -44,6 +44,7 @@ class VmInfo(object):
         self.Hardware_Version = ''
         self.VMTools_Version = ''
         self.CloudInit_Version = ''
+        self.GUI_Installed = ''
         self.Config_Guest_Id = ''
         self.GuestInfo_Guest_Id = ''
         self.GuestInfo_Guest_Full_Name = ''
@@ -65,6 +66,8 @@ class VmInfo(object):
         | VMTools Version           | 11.2.5.26209 (build-17337674)     |
         +---------------------------------------------------------------+
         | CloudInit Version         | 20.4.1                            |
+        +---------------------------------------------------------------+
+        | GUI Installed             | False                             |
         +---------------------------------------------------------------+
         | Config Guest Id           | vmwarePhoton64Guest               |
         +---------------------------------------------------------------+
@@ -667,6 +670,10 @@ class CallbackModule(CallbackBase):
                    self.vm_info.GuestInfo_Guest_Full_Name = set_fact_result.get("guestinfo_guest_full_name", '')
                    self.vm_info.GuestInfo_Guest_Family = set_fact_result.get("guestinfo_guest_family", '')
                    self.vm_info.GuestInfo_Detailed_Data = set_fact_result.get("guestinfo_detailed_data", '')
+            if "check_guest_os_gui.yml" == task_file:
+               if self.vm_info:
+                   self.vm_info.GUI_Installed = str(set_fact_result.get("guest_os_with_gui", ''))
+
         elif str(task.action) == "debug":
             if re.match("skip\\s+testcase:", task.name.lower()):
                 test_name = task.name.split(':')[-1].strip()
