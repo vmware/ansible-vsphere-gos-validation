@@ -3,7 +3,7 @@
 ---
 # Check Windows guest BSOD keyword in vmware.log,
 # default timeout is 60s
-- name: Set fact of the key strings
+- name: Set fact of the key string to be searched
   set_fact:
     guest_bsod_keyword: "WinBSOD:"
 
@@ -16,11 +16,7 @@
     vm_wait_log_ignore_errors: True
 
 # Fail when get Windows guest BSOD keyword in vmware.log
-- block:
-    - include_tasks: ../../common/vm_take_screenshot.yml
-      vars:
-        vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
-    - name: Check the number of key strings
-      fail:
-        msg: "Get Windows guest BSOD keyword '{{ guest_bsod_keyword }}' in vmware.log."
+- name: VM log info check failure
+  fail:
+    msg: "Get Windows guest BSOD keyword '{{ guest_bsod_keyword }}' in vmware.log."
   when: vm_wait_log_msg_success | bool
