@@ -39,7 +39,7 @@
       set_fact:
         network_conf_template: flatcar_network_conf.j2
         network_conf_path: "/etc/systemd/network/{{ eth_dev }}"
-      when: guest_os_ansible_distribution == "Flatcar"
+      when: "'Flatcar' in guest_os_ansible_distribution"
 
     # Create the network config file for new network interface
     - name: "Create/Update network configure file '{{ network_conf_path }}'"
@@ -125,7 +125,9 @@
         - name: "Bring link '{{ eth_dev }}' up for {{ guest_os_ansible_distribution }}"
           shell: "ip link set {{ eth_dev }} down; ip link set {{ eth_dev }} up"
           delegate_to: "{{ vm_guest_ip }}"
-          when: guest_os_ansible_distribution in ["VMware Photon OS", "Flatcar"]
+          when: >
+            (guest_os_ansible_distribution == "VMware Photon OS") or
+            ("Flatcar" in guest_os_ansible_distribution)
       when: >
         (guest_os_ansible_distribution == "Debian" or
          not service_info or

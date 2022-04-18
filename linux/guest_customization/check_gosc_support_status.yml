@@ -40,12 +40,14 @@
 
     - name: "Set default guest OS list not support GOSC"
       set_fact:
-        gos_not_support_gosc: ["FreeBSD", "Flatcar", "SLED", "Astra Linux (Orel)"]
+        gos_not_support_gosc: ["FreeBSD", "SLED", "Astra Linux (Orel)"]
 
     - name: "Set fact of GOSC support status to False for {{ guest_os_ansible_distribution }}"
       set_fact:
         gosc_is_supported: False
-      when: guest_os_ansible_distribution in gos_not_support_gosc
+      when: >
+        (guest_os_ansible_distribution in gos_not_support_gosc) or
+        ('Flatcar' in guest_os_ansible_distribution)
 
     - block:
         - name: "Get GOSC support matrix"
@@ -98,7 +100,9 @@
           when:
             - not enable_cloudinit_gosc | bool
             - gosc_support_matrix[guest_os_ansible_distribution] is defined
-      when: guest_os_ansible_distribution not in gos_not_support_gosc
+      when:
+        - guest_os_ansible_distribution not in gos_not_support_gosc
+        - "'Flatcar' not in guest_os_ansible_distribution"
 
     - debug:
         msg: "GOSC is supported for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} with open-vm-tools {{ vmtools_version }} on vCenter Server {{ vcenter_version }} build {{ vcenter_build }}. See https://partnerweb.vmware.com/programs/guestOS/guest-os-customization-matrix.pdf."
