@@ -1,48 +1,66 @@
-# Copyright 2021 VMware, Inc.
+# Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Get all supported guest ids for a hardware version on ESXi server
 # Parameter:
-#   hardware_version: The hardware version
+#   esxi_hardware_version: The hardware version on ESXi server, e.g. 13, 14, 15, etc.
 # Return:
 #   esxi_guest_ids: A list of all supported guest ids for hardware version
 
-- name: "Initialize variables for getting hardware version supported guest ids"
+- block:
+    - include_tasks: ../../common/esxi_get_hardware_versions.yml
+    - name: "Get guest ids with ESXi default hardware version"
+      set_fact:
+        esxi_hardware_version: "{{ esxi_default_hardware_version }}"
+  when: esxi_hardware_version is undefined or not esxi_hardware_version
+
+- name: "Initialize ESXi supported guest ids with hardware version {{ esxi_hardware_version }}"
   set_fact:
-    vm_config_option_esx_hw: "/etc/vmware/hostd/env/vmconfigoption-esx-hw{{ hardware_version }}.xml"
-    vm_default_config_xpath: "/ConfigRoot/ConfigurationOption/guestOSDescriptor/e/id"
     esxi_guest_ids: []
 
-- name: "Get hardware version {{ hardware_version }} supported guest ids on ESXi server"
-  xml:
-    path: "{{ vm_config_option_esx_hw }}"
-    xpath: "{{ vm_default_config_xpath }}"
-    content: text
-  delegate_to: "{{ esxi_hostname }}"
-  register: guest_os_desc_ids
+- name: "Get ESXi server supported hardware versions"
+  community.vmware.vmware_vm_config_option:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}" 
+    esxi_hostname: "{{ esxi_hostname }}"
+    get_guest_os_ids: True
+    hardware_version: "vmx-{{ esxi_hardware_version }}"
+  register: get_guest_os_ids_result
+  ignore_errors: True
 
-- name: "Set fact of supported guest ids for hardware version"
+- debug: var=get_guest_os_ids_result.instance
+- name: "Set fact of ESXi supported guest IDs for hardware version {{ esxi_hardware_version }}"
   set_fact:
-    esxi_guest_ids: "{{ guest_os_desc_ids.matches | map(attribute='id') | list }}"
+    esxi_guest_ids: "{{ get_guest_os_ids_result.instance | dict2items | map(attribute='value') | flatten }}"
+  when:
+    - get_guest_os_ids_result is defined
+    - get_guest_os_ids_result.instance is defined
+    - get_guest_os_ids_result.instance | length > 0
 
-- name: "Print hardware version {{ hardware_version }} supported guest id on ESXi server"
+- block:
+    - name: "Initialize variables for getting hardware version supported guest ids"
+      set_fact:
+        vm_config_option_esx_hw: "/etc/vmware/hostd/env/vmconfigoption-esx-hw{{ esxi_hardware_version }}.xml"
+        vm_default_config_xpath: "/ConfigRoot/ConfigurationOption/guestOSDescriptor/e/id"
+    
+    - name: "Get hardware version {{ esxi_hardware_version }} supported guest ids on ESXi server"
+      xml:
+        path: "{{ vm_config_option_esx_hw }}"
+        xpath: "{{ vm_default_config_xpath }}"
+        content: text
+        pretty_print: true
+      delegate_to: "{{ esxi_hostname }}"
+      register: guest_os_desc_ids_result
+    
+    - name: "Set fact of ESXi supported guest IDs for hardware version {{ esxi_hardware_version }}"
+      set_fact:
+        esxi_guest_ids: "{{ guest_os_desc_ids_result.matches | map(attribute='id') | list }}"
+  when: >
+    get_guest_os_ids_result is undefined or
+    get_guest_os_ids_result.failed
+
+- name: "Print ESXi server supported guest IDs on hardware version {{ esxi_hardware_version }}"
   debug: var=esxi_guest_ids
-
-# Example output
-#TASK [debug] *********************************************************************************************************
-#task path: /home/qiz/workspace/github/ansible-vsphere-gos-validation/common/esxi_get_guest_ids.yml:28
-#ok: [localhost] => {
-#    "esxi_guest_ids": [
-#        "amazonlinux3_64Guest",
-#        "amazonlinux2_64Guest",
-#        "windows2019srvNext_64Guest",
-#        "windows2019srv_64Guest",
-#        "windows9Server64Guest",
-#        ...
-#        "vmkernel65Guest",
-#        "vmkernel7Guest",
-#        "vmkernel6Guest",
-#        "vmkernel5Guest",
-#        "vmkernelGuest"
-#    ]
-#}

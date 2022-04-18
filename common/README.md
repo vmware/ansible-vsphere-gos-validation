@@ -13,7 +13,6 @@
 * vm_get_video_card.yml: Get VM video card settings
 * vm_get_cdrom_devices.yml: Get VM CDROM devices info list
 * vm_get_vbs_status.yml: Get Windows VM VBS enablement status
-* vm_get_default_config.yml: Get VM default config with a specific guest id
 
 ### Tasks for VM deploy or remove
 * vm_create.yml: Create a new VM on ESXi host
@@ -114,6 +113,7 @@
 * esxi_get_bundled_tools_path.yml: Get the bundled VMware tools path on ESXi host
 * esxi_get_hardware_versions.yml: Get supported hardware versions and default hardware version on ESXi host
 * esxi_get_guest_ids.yml: Get supported guest ids for a hardware version on ESXi host
+* esxi_get_guest_config_options.yml: Get VM config options for a guest id on a hardware version
 
 ### Tasks for ESXi datastores
 * esxi_add_datastore.yml: Add NFS or VMFS datastore to ESXi host

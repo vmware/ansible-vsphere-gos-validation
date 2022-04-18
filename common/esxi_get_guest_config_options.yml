@@ -1,0 +1,312 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get default VM config options for a specific guest id
+# Parameter
+#   guest_id: guest id
+#   esxi_hardware_version: ESXi hardware version
+# Return:
+#   guest_config_options: The guest ID config options for a hardware version
+
+- block:
+    - include_tasks: ../../common/esxi_get_hardware_versions.yml
+    - name: "Get guest ids with ESXi default hardware version"
+      set_fact:
+        esxi_hardware_version: "{{ esxi_default_hardware_version }}"
+  when: esxi_hardware_version is undefined or not esxi_hardware_version
+
+- name: "Initialize variables about guest ID config options"
+  set_fact:
+    guest_config_options: {}
+
+# Get config options from ansible module vmware_vm_config_option
+- name: "Get VM config options for guest id {{ guest_id }} on hardware version {{ esxi_hardware_version }}"
+  community.vmware.vmware_vm_config_option:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+    get_config_options: True
+    hardware_version: "vmx-{{ esxi_hardware_version }}"
+    guest_id: "{{ guest_id }}"
+  register: get_config_options_result
+  ignore_errors: True
+
+- name: "Set fact of guest ID {{ guest_id }} default config options on hardware version {{ hardware_version }}"
+  set_fact:
+    guest_config_options: >-
+      {{
+        get_config_options_result.instance["Recommended config options"].keys()
+        | map('lower')
+        | map("replace", " ", "_")
+        | zip(get_config_options_result.instance["Recommended config options"].values())
+        | items2dict(key_name=0, value_name=1)
+      }}
+  when:
+    - get_config_options_result is defined
+    - get_config_options_result.instance is defined
+    - get_config_options_result.instance["Recommended config options"] is defined
+
+# Get config options from config file
+- block:
+    - name: "Initialize variables for getting guest ID default configs"
+      set_fact:
+        vm_config_option_esx_hw: "/etc/vmware/hostd/env/vmconfigoption-esx-hw{{ esxi_hardware_version }}.xml"
+        guest_config_options_xpath: "/ConfigRoot/ConfigurationOption/guestOSDescriptor/e[id='{{ guest_id }}']"
+        vm_device_types:
+          vim.vm.device.VirtualLsiLogicController: 'lsilogic'
+          vim.vm.device.VirtualLsiLogicSASController: 'lsilogicsas'
+          vim.vm.device.ParaVirtualSCSIController: 'paravirtual'
+          vim.vm.device.VirtualAHCIController: 'sata'
+          vim.vm.device.VirtualNVMEController: 'nvme'
+          vim.vm.device.VirtualIDEController: 'ide'
+          vim.vm.device.VirtualVmxnet3: 'vmxnet3'
+          vim.vm.device.VirtualE1000e: 'e1000e'
+          vim.vm.device.VirtualE1000: 'e1000'
+          vim.vm.device.VirtualVmxnet3Vrdma: 'pvrdma'
+          vim.vm.device.VirtualSriovEthernetCard: 'sriov'
+          vim.vm.device.VirtualPCNet32: 'pcnet32'
+          vim.vm.device.VirtualVmxnet2: 'vmxnet2'
+          vim.vm.device.VirtualUSBController: 'usb2'
+          vim.vm.device.VirtualUSBXHCIController: 'usb3'
+        vm_config_name:
+          recommendedCdromController: "default_cdrom_controller"
+          numRecommendedCoresPerSocket: "default_cpu_cores_per_socket"
+          numRecommendedPhysicalSockets: "default_cpu_socket"
+          recommendedUSBController: "default_usb_controller"
+          recommendedDiskController: "default_disk_controller"
+          recommendedDiskSizeMB: "default_disk_size_in_mb"
+          recommendedFirmware: "default_firmware"
+          recommendedMemMB: "default_memory_in_mb"
+          recommendedEthernetCard: "default_network_adapter"
+          defaultSecureBoot: "default_secure_boot"
+          supportsSecureBoot: "support_secure_boot"
+          fullName: "guest_fullname"
+          recommendedPersistentMemoryMB: "rec_persistent_memory"
+          supportedMinPersistentMemoryMB: "support_min_persistent_mem_mb"
+          persistentMemorySupported: "support_persistent_memory"
+          supportsTPM20: "support_tpm_20"
+
+    - name: "Initialize VM default config options"
+      set_fact:
+        guest_config_options: >-
+          {{
+            vm_config_name.values() | zip_longest([]) 
+            | items2dict(key_name=0, value_name=1)
+          }}
+
+    # Create a temp file to store config options
+    - include_tasks: create_temp_file_dir.yml
+    - name: "Set fact of temp config option file"
+      set_fact:
+        tmp_config_option_file: "{{ tmp_path }}"
+
+    - name: "Fetch config option content from ESXi server"
+      shell: "cat {{ vm_config_option_esx_hw }}"
+      no_log: True
+      delegate_to: "{{ esxi_hostname }}"
+      register: config_option_file_content
+
+    - name: "Save config options to temp file"
+      copy:
+        content: "{{ config_option_file_content.stdout }}"
+        dest: "{{ tmp_config_option_file }}"
+
+    - name: "Get default config option from guest OS descriptor for guest id {{ guest_id }}"
+      xml:
+        path: "{{ tmp_config_option_file }}"
+        xpath: "{{ guest_config_options_xpath }}/{{ item }}"
+        content: text
+      register: guest_os_descriptor
+      ignore_errors: True
+      loop: "{{ vm_config_name.keys() }}"
+      
+    - name: "Set fact for VM default config with guest id {{ guest_id }}"
+      set_fact:
+        guest_config_options: >-
+          {{ 
+            guest_config_options 
+            | combine({vm_config_name[item.key]: 
+                       vm_device_types[item.value] if item.value in vm_device_types else item.value}) 
+          }}
+      with_items: "{{ guest_os_descriptor.results | map(attribute='matches') | select('defined') | flatten | map('dict2items') }}"
+
+    - name: "Get default video RAM size in KB for guest id {{ guest_id }}"
+      xml:
+        path: "{{ tmp_config_option_file }}"
+        xpath: "{{ guest_config_options_xpath }}/vRAMSizeInKB/defaultValue"
+        content: text
+      register: guest_vram_size
+      ignore_errors: True
+
+    - name: "Set default video RAM size in KB for guest id {{ guest_id }}"
+      set_fact:
+        guest_config_options: "{{ guest_config_options | combine({'rec_vram_kb': guest_vram_size.matches[0].defaultValue}) }}"
+      when:
+        - guest_vram_size is defined
+        - guest_vram_size.matches is defined
+        - guest_vram_size.matches | length > 0
+
+    - name: "Get supported disk controllers for guest id {{ guest_id }}"
+      xml:
+        path: "{{ tmp_config_option_file }}"
+        xpath: "{{ guest_config_options_xpath }}/supportedDiskControllerList/e"
+        content: text
+      register: guest_supported_disk_ctrls
+      ignore_errors: True
+
+    - name: "Set supported disk controllers for guest id {{ guest_id }}"
+      set_fact:
+        guest_config_options: >-
+          {{ 
+            guest_config_options
+            | combine({
+                 'support_disk_controller': 
+                 guest_supported_disk_ctrls.matches | map(attribute='e') | map('extract', vm_device_types) | list 
+              })
+           }}
+      when:
+        - guest_supported_disk_ctrls is defined
+        - guest_supported_disk_ctrls.matches is defined
+        - guest_supported_disk_ctrls.matches | length > 0
+
+    - name: "Get supported disk controllers for guest id {{ guest_id }}"
+      xml:
+        path: "{{ tmp_config_option_file }}"
+        xpath: "{{ guest_config_options_xpath }}/supportedEthernetCard/e"
+        content: text
+      register: guest_supported_ethernet_card
+      ignore_errors: True
+
+    - name: "Set supported network adapters for guest id {{ guest_id }}"
+      set_fact:
+        guest_config_options: >-
+          {{ 
+            guest_config_options
+            | combine({
+                 'support_ethernet_card': 
+                 guest_supported_ethernet_card.matches | map(attribute='e') | map('extract', vm_device_types) | list 
+              })
+           }}
+      when:
+        - guest_supported_ethernet_card is defined
+        - guest_supported_ethernet_card.matches is defined
+        - guest_supported_ethernet_card.matches | length > 0
+
+    - name: "Get supported USB controllers for guest id {{ guest_id }}"
+      xml:
+        path: "{{ tmp_config_option_file }}"
+        xpath: "{{ guest_config_options_xpath }}/supportedUSBControllerList/e"
+        content: text
+      register: guest_supported_usb_ctrls
+      ignore_errors: True
+
+    - name: "Set supported USB controllers for guest id {{ guest_id }}"
+      set_fact:
+        guest_config_options: >-
+          {{ 
+            guest_config_options
+            | combine({
+                 'support_usb_controller': 
+                 guest_supported_usb_ctrls.matches | map(attribute='e') | map('extract', vm_device_types) | list 
+              })
+           }}
+      when:
+        - guest_supported_usb_ctrls is defined
+        - guest_supported_usb_ctrls.matches is defined
+        - guest_supported_usb_ctrls.matches | length > 0
+
+    - name: "Combine guest_id and hardware version into guest_config_options"
+      set_fact:
+        guest_config_options: >-
+          {{ 
+            guest_config_options
+            | combine({
+                 'guest_id': guest_id,
+                 'hardware_version': 'vmx-' ~  esxi_hardware_version
+                 })
+           }}
+
+    - name: "Remove temporary config option file"
+      file:
+        path: "{{ tmp_config_option_file }}"
+        state: absent
+  when: >
+    (get_config_options_result is undefined) or
+    (get_config_options_result.instance is undefined) or
+    (get_config_options_result.instance["Recommended config options"]) is undefined
+
+- name: "Set default CPU number for VM with guest id {{ guest_id }}"
+  set_fact:
+    guest_config_options: "{{ guest_config_options | combine({'default_cpu_number': (guest_config_options.default_cpu_cores_per_socket | int) * (guest_config_options.default_cpu_socket | int) }) }}"
+  when:
+    - guest_config_options.default_cpu_cores_per_socket is defined
+    - guest_config_options.default_cpu_cores_per_socket | int >= 1
+    - guest_config_options.default_cpu_socket is defined
+    - guest_config_options.default_cpu_socket | int >= 1
+
+- name: "Set default CPU number for guest id {{ guest_id }}"
+  set_fact:
+    guest_config_options: "{{ guest_config_options | combine({'default_cpu_number': 1}) }}"
+  when: >
+    (guest_config_options.default_cpu_number is undefined) or
+    (not guest_config_options.default_cpu_number)
+
+- name: "Set default USB controller for guest id {{ guest_id }}"
+  set_fact:
+    guest_config_options: "{{ guest_config_options | combine({'default_usb_controller': 'usb2'}) }}"
+  when: >
+    (guest_config_options.default_usb_controller is undefined) or
+    (not guest_config_options.default_usb_controller)
+
+- name: "Set default CDROM controller for guest id {{ guest_id }}"
+  set_fact:
+    guest_config_options: "{{ guest_config_options | combine({'default_cdrom_controller': 'ide'}) }}"
+  when: >
+    (guest_config_options.default_cdrom_controller is undefined) or
+    (not guest_config_options.default_cdrom_controller)
+
+- name: "Print guest id {{ guest_id }} config options on hardware version {{ esxi_hardware_version }}"
+  debug: var=guest_config_options
+
+# Example output:
+#"guest_config_options": {
+#    "default_cdrom_controller": "sata",
+#    "default_cpu_cores_per_socket": "1",
+#    "default_cpu_number": 1,
+#    "default_cpu_socket": "1",
+#    "default_disk_controller": "paravirtual",
+#    "default_disk_size_in_mb": "16384",
+#    "default_firmware": "efi",
+#    "default_memory_in_mb": "2048",
+#    "default_network_adapter": "vmxnet3",
+#    "default_secure_boot": "true",
+#    "default_usb_controller": "usb2",
+#    "guest_fullname": "CentOS 8 (64-bit)",
+#    "guest_id": "centos8_64Guest",
+#    "hardware_version": "vmx-19",
+#    "rec_persistent_memory": "8192",
+#    "rec_vram_kb": "8192",
+#    "support_disk_controller": [
+#        "paravirtual",
+#        "ide",
+#        "sata",
+#        "nvme"
+#    ],
+#    "support_ethernet_card": [
+#        "e1000e",
+#        "sriov",
+#        "vmxnet3",
+#        "pvrdma"
+#    ],
+#    "support_min_persistent_mem_mb": "4",
+#    "support_persistent_memory": "true",
+#    "support_secure_boot": "true",
+#    "support_tpm_20": "true",
+#    "support_usb_controller": [
+#        "usb2",
+#        "usb3"
+#    ]
+#}
