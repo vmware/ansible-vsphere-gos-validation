@@ -45,12 +45,20 @@
         name: "{{ vm_name }}"
       register: get_vmtools_info_retry
       ignore_errors: yes
-      until: get_vmtools_info_retry.vmtools_info.vm_tools_running_status == 'guestToolsRunning'
+      until:
+        - get_vmtools_info_retry is defined
+        - get_vmtools_info_retry.vmtools_info is defined
+        - get_vmtools_info_retry.vmtools_info.vm_tools_running_status is defined
+        - get_vmtools_info_retry.vmtools_info.vm_tools_running_status == 'guestToolsRunning'
       retries: "{{ get_vmtools_status_retries | default(100) }}"
       delay: 3
     - name: Set fact of VMware Tools running status
       set_fact:
         vmtools_is_running: "{{ get_vmtools_info_retry.vmtools_info.vm_tools_running_status == 'guestToolsRunning' }}"
+      when:
+        - get_vmtools_info_retry is defined
+        - get_vmtools_info_retry.vmtools_info is defined
+        - get_vmtools_info_retry.vmtools_info.vm_tools_running_status is defined
   when:
     - vmtools_is_installed | default(False)
     - vmtools_not_ready | default(True)
