@@ -1,20 +1,20 @@
 # Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get all supported guest ids for a hardware version on ESXi server
+# Get all supported guest IDs for a hardware version on ESXi server
 # Parameter:
 #   esxi_hardware_version: The hardware version on ESXi server, e.g. 13, 14, 15, etc.
 # Return:
-#   esxi_guest_ids: A list of all supported guest ids for hardware version
+#   esxi_guest_ids: A list of all supported guest IDs for hardware version
 
-- block:
-    - include_tasks: ../../common/esxi_get_hardware_versions.yml
-    - name: "Get guest ids with ESXi default hardware version"
-      set_fact:
-        esxi_hardware_version: "{{ esxi_default_hardware_version }}"
-  when: esxi_hardware_version is undefined or not esxi_hardware_version
+- name: "Check esxi_hardware_version is set with valid value"
+  assert:
+    that:
+      - esxi_hardware_version is defined
+      - esxi_hardware_version is match('^\d+')
+    fail_msg: "Incorrect hardware version '{{ esxi_hardware_version }}'"
 
-- name: "Initialize ESXi supported guest ids with hardware version {{ esxi_hardware_version }}"
+- name: "Initialize ESXi supported guest IDs with hardware version {{ esxi_hardware_version }}"
   set_fact:
     esxi_guest_ids: []
 
@@ -31,7 +31,6 @@
   register: get_guest_os_ids_result
   ignore_errors: True
 
-- debug: var=get_guest_os_ids_result.instance
 - name: "Set fact of ESXi supported guest IDs for hardware version {{ esxi_hardware_version }}"
   set_fact:
     esxi_guest_ids: "{{ get_guest_os_ids_result.instance | dict2items | map(attribute='value') | flatten }}"
@@ -41,12 +40,12 @@
     - get_guest_os_ids_result.instance | length > 0
 
 - block:
-    - name: "Initialize variables for getting hardware version supported guest ids"
+    - name: "Initialize variables for getting hardware version supported guest IDs"
       set_fact:
         vm_config_option_esx_hw: "/etc/vmware/hostd/env/vmconfigoption-esx-hw{{ esxi_hardware_version }}.xml"
         vm_default_config_xpath: "/ConfigRoot/ConfigurationOption/guestOSDescriptor/e/id"
     
-    - name: "Get hardware version {{ esxi_hardware_version }} supported guest ids on ESXi server"
+    - name: "Get hardware version {{ esxi_hardware_version }} supported guest IDs on ESXi server"
       xml:
         path: "{{ vm_config_option_esx_hw }}"
         xpath: "{{ vm_default_config_xpath }}"

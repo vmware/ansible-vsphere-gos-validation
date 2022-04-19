@@ -7,13 +7,51 @@
 #   esxi_hardware_version: ESXi hardware version
 # Return:
 #   guest_config_options: The guest ID config options for a hardware version
-
-- block:
-    - include_tasks: ../../common/esxi_get_hardware_versions.yml
-    - name: "Get guest ids with ESXi default hardware version"
-      set_fact:
-        esxi_hardware_version: "{{ esxi_default_hardware_version }}"
-  when: esxi_hardware_version is undefined or not esxi_hardware_version
+# Example output:
+#  "guest_config_options": {
+#      "default_cdrom_controller": "sata",
+#      "default_cpu_cores_per_socket": "1",
+#      "default_cpu_number": 1,
+#      "default_cpu_socket": "1",
+#      "default_disk_controller": "paravirtual",
+#      "default_disk_size_in_mb": "16384",
+#      "default_firmware": "efi",
+#      "default_memory_in_mb": "2048",
+#      "default_network_adapter": "vmxnet3",
+#      "default_secure_boot": "true",
+#      "default_usb_controller": null,
+#      "guest_fullname": "CentOS 8 (64-bit)",
+#      "guest_id": "centos8_64Guest",
+#      "hardware_version": "vmx-19",
+#      "rec_persistent_memory": "8192",
+#      "rec_vram_kb": "8192",
+#      "support_disk_controller": [
+#          "paravirtual",
+#          "ide",
+#          "sata",
+#          "nvme"
+#      ],
+#      "support_ethernet_card": [
+#          "e1000e",
+#          "sriov",
+#          "vmxnet3",
+#          "pvrdma"
+#      ],
+#      "support_min_persistent_mem_mb": "4",
+#      "support_persistent_memory": "true",
+#      "support_secure_boot": "true",
+#      "support_tpm_20": "true",
+#      "support_usb_controller": [
+#          "usb2",
+#          "usb3"
+#      ]
+#  }
+- name: "Check esxi_hardware_version is set with valid value"
+  assert:
+    that:
+      - esxi_hardware_version is defined
+      - esxi_hardware_version is match('^\d+')
+    fail_msg: "Incorrect hardware version '{{ esxi_hardware_version }}'"
 
 - name: "Initialize variables about guest ID config options"
   set_fact:
@@ -103,16 +141,12 @@
       set_fact:
         tmp_config_option_file: "{{ tmp_path }}"
 
-    - name: "Fetch config option content from ESXi server"
-      shell: "cat {{ vm_config_option_esx_hw }}"
-      no_log: True
-      delegate_to: "{{ esxi_hostname }}"
-      register: config_option_file_content
-
-    - name: "Save config options to temp file"
-      copy:
-        content: "{{ config_option_file_content.stdout }}"
+    - name: "Fetch config option file from ESXi server"
+      fetch:
+        src: "{{ vm_config_option_esx_hw }}"
         dest: "{{ tmp_config_option_file }}"
+        flat: True
+      delegate_to: "{{ esxi_hostname }}"
 
     - name: "Get default config option from guest OS descriptor for guest id {{ guest_id }}"
       xml:
@@ -247,66 +281,6 @@
     - guest_config_options.default_cpu_socket is defined
     - guest_config_options.default_cpu_socket | int >= 1
 
-- name: "Set default CPU number for guest id {{ guest_id }}"
-  set_fact:
-    guest_config_options: "{{ guest_config_options | combine({'default_cpu_number': 1}) }}"
-  when: >
-    (guest_config_options.default_cpu_number is undefined) or
-    (not guest_config_options.default_cpu_number)
-
-- name: "Set default USB controller for guest id {{ guest_id }}"
-  set_fact:
-    guest_config_options: "{{ guest_config_options | combine({'default_usb_controller': 'usb2'}) }}"
-  when: >
-    (guest_config_options.default_usb_controller is undefined) or
-    (not guest_config_options.default_usb_controller)
-
-- name: "Set default CDROM controller for guest id {{ guest_id }}"
-  set_fact:
-    guest_config_options: "{{ guest_config_options | combine({'default_cdrom_controller': 'ide'}) }}"
-  when: >
-    (guest_config_options.default_cdrom_controller is undefined) or
-    (not guest_config_options.default_cdrom_controller)
-
 - name: "Print guest id {{ guest_id }} config options on hardware version {{ esxi_hardware_version }}"
   debug: var=guest_config_options
 
-# Example output:
-#"guest_config_options": {
-#    "default_cdrom_controller": "sata",
-#    "default_cpu_cores_per_socket": "1",
-#    "default_cpu_number": 1,
-#    "default_cpu_socket": "1",
-#    "default_disk_controller": "paravirtual",
-#    "default_disk_size_in_mb": "16384",
-#    "default_firmware": "efi",
-#    "default_memory_in_mb": "2048",
-#    "default_network_adapter": "vmxnet3",
-#    "default_secure_boot": "true",
-#    "default_usb_controller": "usb2",
-#    "guest_fullname": "CentOS 8 (64-bit)",
-#    "guest_id": "centos8_64Guest",
-#    "hardware_version": "vmx-19",
-#    "rec_persistent_memory": "8192",
-#    "rec_vram_kb": "8192",
-#    "support_disk_controller": [
-#        "paravirtual",
-#        "ide",
-#        "sata",
-#        "nvme"
-#    ],
-#    "support_ethernet_card": [
-#        "e1000e",
-#        "sriov",
-#        "vmxnet3",
-#        "pvrdma"
-#    ],
-#    "support_min_persistent_mem_mb": "4",
-#    "support_persistent_memory": "true",
-#    "support_secure_boot": "true",
-#    "support_tpm_20": "true",
-#    "support_usb_controller": [
-#        "usb2",
-#        "usb3"
-#    ]
-#}
