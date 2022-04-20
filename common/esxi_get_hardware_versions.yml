@@ -1,0 +1,47 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get all supported hardware versions on ESXi server
+# Return:
+#   esxi_hardware_versions: A list of all supported hardware versions on ESXi server
+#   esxi_default_hardware_version: The deafult hardware version on the ESXi server
+#   esxi_latest_hardware_version: The latest hardware version on the ESXi server
+
+- name: "Initialized ESXi server supported hardware version list and default hardware version"
+  set_fact:
+    esxi_hardware_versions: []
+    esxi_default_hardware_version: ""
+    esxi_latest_hardware_version: ""
+
+- name: "Get ESXi server supported hardware versions"
+  community.vmware.vmware_vm_config_option:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}" 
+    esxi_hostname: "{{ esxi_hostname }}"
+    get_hardware_versions: True
+  register: get_hardware_versions_result
+
+- block:
+    - name: "Set fact of ESXi server supported hardware versions and default hardware version"
+      set_fact:
+        esxi_hardware_versions: "{{ get_hardware_versions_result.instance['Supported hardware versions'] | map('regex_replace', 'vmx-0?', '') | map('int') }}"
+        esxi_default_hardware_version: "{{ get_hardware_versions_result.instance['Default hardware version'] | regex_replace('vmx-0?', '') }}"
+
+    - name: "Set fact of ESXi server latest hardware version"
+      set_fact:
+        esxi_latest_hardware_version: "{{ esxi_hardware_versions | max }}"
+      when: esxi_hardware_versions | length > 0
+  when:
+    - get_hardware_versions_result is defined
+    - get_hardware_versions_result.instance is defined
+    - get_hardware_versions_result.instance['Supported hardware versions'] is defined
+    - get_hardware_versions_result.instance['Default hardware version'] is defined
+
+- debug:
+    msg:
+      - "ESXi server supported hardware versions: {{ esxi_hardware_versions }}"
+      - "ESXi server latest hardware version: {{ esxi_latest_hardware_version }}"
+      - "ESXi server default hardware version: {{ esxi_default_hardware_version }}"

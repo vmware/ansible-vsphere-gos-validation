@@ -111,6 +111,9 @@
 * esxi_enable_guest_ip_hack.yml: Enable guest IP hack on ESXi host
 * esxi_get_property.yml: Get specified property of ESXi host
 * esxi_get_bundled_tools_path.yml: Get the bundled VMware tools path on ESXi host
+* esxi_get_hardware_versions.yml: Get supported hardware versions and default hardware version on ESXi host
+* esxi_get_guest_ids.yml: Get supported guest ids for a hardware version on ESXi host
+* esxi_get_guest_config_options.yml: Get VM config options for a guest id on a hardware version
 
 ### Tasks for ESXi datastores
 * esxi_add_datastore.yml: Add NFS or VMFS datastore to ESXi host
