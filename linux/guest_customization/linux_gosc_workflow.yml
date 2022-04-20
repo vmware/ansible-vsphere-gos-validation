@@ -83,14 +83,27 @@
     - include_tasks: ../utils/cloudinit_pkg_check.yml
 
     # Skip cloud-init GOSC if cloud-init version is lower than 18.5
-    - include_tasks: ../../common/skip_test_case.yml
-      vars:
-        skip_msg: >
-          "The guest OS doesn't have cloud-init (> 18.5) installed.
-          Skip to run this test case."
-      when:
-        - enable_cloudinit_gosc
-        - (not cloudinit_version) or (cloudinit_version is version('18.5', '<='))
+    - block:
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >
+              The guest OS doesn't have cloud-init (> 18.5) installed.
+              Skip to run this test case.
+          when:
+            - guest_os_ansible_distribution != "Debian"
+            - (not cloudinit_version) or (cloudinit_version is version('18.5', '<='))
+
+        # Debian 10 and 11 cloud-init GOSC depends on cloud-init 22.1 or later
+        # See https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1008039
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >
+              The guest OS doesn't have cloud-init (>= 22.1) installed.
+              Skip to run this test case.
+          when:
+            - guest_os_ansible_distribution == "Debian"
+            - (not cloudinit_version) or (cloudinit_version is version('22.1', '<='))
+      when: enable_cloudinit_gosc
 
     # Initialize the GOSC spec
     - name: Initialize the GOS customization spec
