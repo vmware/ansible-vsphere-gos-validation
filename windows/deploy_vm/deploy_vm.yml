@@ -69,6 +69,10 @@
           when: boot_disk_controller != 'ide'
         - include_tasks: ../../common/vm_create_with_ide_disk.yml
           when: boot_disk_controller == 'ide'
+        - include_tasks: ../../common/vm_get_vm_info.yml
+        - name: "Set fact of vm_exists to True"
+          set_fact:
+            vm_exists: True
 
         # When firmware is EFI, configure force EFI setup once
         - block:
@@ -104,7 +108,6 @@
             minutes: 3
 
         # Check Image APPROVED in vmware.log when VM secureboot is enabled
-        - include_tasks: ../../common/vm_get_vm_info.yml
         - include_tasks: ../../common/vm_wait_log_msg.yml
           vars:
             vm_wait_log_name: "vmware.log"
@@ -137,11 +140,6 @@
 
         - include_tasks: detach_cdrom_iso.yml
       rescue:
-        - name: "Set fact of rescue tasks required parameter"
-          set_fact:
-            rescue_take_failed_snapshot: False
-            rescue_revert_base_snapshot: False
-          when: vm_create_result is undefined or vm_create_result.failed or not vm_create_result.changed
-        - include_tasks: ../setup/rescue_cleanup.yml
+        - include_tasks: ../../common/test_rescue.yml
           vars:
             exit_testing_when_fail: True

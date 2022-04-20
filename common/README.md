@@ -140,7 +140,6 @@
 * local_mount.yml: Mount an NFS share folder or ISO image on localhost
 * local_unmount.yml: Unmount a NFS share folder or ISO image from localhost
 * delete_local_file.yml: Delete local file or directory
-* skip_test_case.yml: Tasks for skipping testcase and ending play
 
 ### Folder and file management
 * create_iso.yml: Create an iso file
@@ -149,9 +148,11 @@
 * transfer_file_remote.yml: Transfer file to specified remote host
 * update_ini_style_file.yml: Update INI-style file content
 
-## Testing configuration
+## Testing related
 * set_vmware_module_hostname.yml: Check and set configured vCenter or ESXi server info
 * add_host_in_memory_inventory.yml: Add host to in memory hosts inventory
 * router_vm_deploy.yml: Deploy a router VM for network testing or GOSC testing
 * network_testbed_setup.yml: Setup network adapter testing testbed
 * network_testbed_cleanup.yml: Cleanup network adapter testing testbed
+* test_rescue: Tasks executed when test case failure
+* skip_test_case.yml: Tasks for skipping testcase and ending play
