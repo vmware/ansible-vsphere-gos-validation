@@ -17,6 +17,18 @@
 - debug:
     msg: "Testcase: {{ current_testcase_name }} failed"
 
+- name: Check if current test case log folder exists
+  stat:
+    path: "{{ current_test_log_folder }}"
+  register: current_test_folder_result
+  ignore_errors: True
+- name: Create the current test case log folder
+  file:
+    path: "{{ current_test_log_folder }}"
+    state: "directory"
+    mode: "0777"
+  when: not current_test_folder_result.stat.exists
+
 - block:
     - include_tasks: ../../common/vm_take_screenshot.yml
       vars:
