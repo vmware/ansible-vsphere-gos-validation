@@ -8,15 +8,20 @@
 - debug:
     msg: "Will mount VMware tools to VM CDROM: {{ vmtools_iso_path }}"
 
+- include_tasks: ../../common/vm_get_cdrom_devices.yml
 # Mount VMware tools ISO file to VM first CDROM
-- include_tasks: ../../common/vm_configure_cdrom.yml
-  vars:
-    cdrom_type: 'client'
-    cdrom_controller_num: 0
-    cdrom_unit_num: 0
-- include_tasks: ../../common/vm_configure_cdrom.yml
-  vars:
-    cdrom_type: 'iso'
-    cdrom_iso_file: "{{ vmtools_iso_path }}"
-    cdrom_controller_num: 0
-    cdrom_unit_num: 0
+- block:
+    - include_tasks: ../../common/vm_configure_cdrom.yml
+      vars:
+        cdrom_type: 'client'
+        cdrom_controller_num: 0
+        cdrom_unit_num: 0
+    - include_tasks: ../../common/vm_configure_cdrom.yml
+      vars:
+        cdrom_type: 'iso'
+        cdrom_iso_file: "{{ vmtools_iso_path }}"
+        cdrom_controller_num: 0
+        cdrom_unit_num: 0
+  when:
+    - cdrom_device_list is defined
+    - cdrom_device_list | length >= 1
