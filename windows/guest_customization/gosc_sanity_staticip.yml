@@ -17,6 +17,7 @@
         - include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: True
+            deploy_router_vm: True
 
         - include_tasks: ../../common/skip_test_case.yml
           vars:
@@ -27,9 +28,10 @@
 
         # Use router VM as the default gateway hardcoded to 192.168.192.1,
         # use configured static IP address in this subnet
-        - name: Set fact of customize static network
+        - name: Set fact of customize static network and gosc start
           set_fact:
             customize_network_type: 'static'
+            vm_static_gosc_start: True
 
         - include_tasks: win_gosc_execution.yml
           vars:
@@ -86,11 +88,11 @@
             fail_msg: "Check guest IP address, hostname after GOSC failed."
 
       rescue:
-        - include_tasks: ../setup/rescue_cleanup.yml
-          vars:
-            rescue_revert_base_snapshot: False
+        - include_tasks: ../../common/test_rescue.yml
       always:
-        - include_tasks: ../../common/vm_get_power_state.yml
-        # Get GOSC log files
-        - include_tasks: get_gosc_logs_no_network.yml
-          when: vm_power_state_get == "poweredOn"
+        - block:
+            - include_tasks: ../../common/vm_get_power_state.yml
+            # Get GOSC log files
+            - include_tasks: get_gosc_logs_no_network.yml
+              when: vm_power_state_get == "poweredOn"
+          when: vm_static_gosc_start is defined and vm_static_gosc_start
