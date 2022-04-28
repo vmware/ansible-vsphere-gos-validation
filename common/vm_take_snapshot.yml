@@ -28,10 +28,18 @@
         that:
           - vm_snapshot_facts is defined
           - vm_snapshot_facts.guest_snapshots is defined
-          - vm_snapshot_facts.guest_snapshots.snapshots is defined
+          - vm_snapshot_facts.guest_snapshots.current_snapshot is defined
+          - vm_snapshot_facts.guest_snapshots.current_snapshot.name is defined
           - vm_snapshot_facts.guest_snapshots.current_snapshot.name == snapshot_name
         fail_msg: "Failed to take snapshot '{{ snapshot_name }}' on VM '{{ vm_name }}'."
         success_msg: "Take snapshot '{{ snapshot_name }}' on VM '{{ vm_name }}' succeed."
+    - name: "Check VM snapshot took is quiesced snapshot"
+      assert:
+        that:
+          - vm_snapshot_facts.guest_snapshots.current_snapshot.quiesced is defined
+          - vm_snapshot_facts.guest_snapshots.current_snapshot.quiesced | bool
+        fail_msg: "Snapshot '{{ snapshot_name }}' quiesced status is false."
+      when: is_quiesce | default(False) | bool
   when:
     - "'failed' in vm_take_snapshot_result"
     - not vm_take_snapshot_result.failed
