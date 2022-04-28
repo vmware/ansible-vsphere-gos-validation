@@ -16,26 +16,17 @@
     file_in_datastore_path: "{{ src_file_path }}"
     file_in_datastore_failed_ignore: "{{ download_file_fail_ignore | default(False) }}"
 
-- name: "VM datastore file check failure"
-  fail:
-    msg: "Failed to get file '{{ src_file_path }}' info in datastore '{{ src_datastore }}'"
-  when:
-    - download_file_fail_ignore is defined
-    - not download_file_fail_ignore
-    - file_in_datastore_result is defined
-    - file_in_datastore_result == 'Fail'
-
 - block:
     - name: "VM datastore file URL get failure"
       fail:
         msg: "Failed to get URL for file '{{ src_file_path }}' in datastore '{{ src_datastore }}'"
-      when: >
-        (ds_file_result is undefined) or
-        (ds_file_result.url is undefined) or
-        (not ds_file_result.url)
       when:
         - download_file_fail_ignore is defined
-        - not download_file_fail_ignore 
+        - not download_file_fail_ignore
+        - ((ds_file_result is undefined) or
+           (ds_file_result.url is undefined) or
+           (not ds_file_result.url))
+
     - block:
         - name: "Set fact of downloading URL for the src datastore file"
           set_fact:
