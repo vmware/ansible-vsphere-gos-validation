@@ -44,7 +44,7 @@ class VmInfo(object):
         self.Hardware_Version = ''
         self.VMTools_Version = ''
         self.CloudInit_Version = ''
-        self.GUI_Installed = ''
+        self.GUI_Installed = None
         self.Config_Guest_Id = ''
         self.GuestInfo_Guest_Id = ''
         self.GuestInfo_Guest_Full_Name = ''
@@ -98,7 +98,7 @@ class VmInfo(object):
         head_col_width = 0
         info_col_width = 0
         for attr_name, attr_value in vars(self).items():
-            if not attr_name.startswith('__'):
+            if not attr_name.startswith('__') and attr_value is not None:
                 head_col_width = max([head_col_width, len(attr_name)])
                 if len(attr_value) > wrap_width:
                     if attr_name == 'GuestInfo_Detailed_Data':
