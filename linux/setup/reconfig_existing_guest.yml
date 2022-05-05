@@ -41,25 +41,29 @@
       vars:
         service_name: "packagekit.service"
 
-    - name: "Stop PackageKit Service"
-      service:
-        name: 'packagekit.service'
-        state: 'stopped'
-      delegate_to: "{{ vm_guest_ip }}"
+    - block:
+        - name: "Disable and stop PackageKit Service"
+          service:
+            name: 'packagekit.service'
+            state: 'stopped'
+            enabled: False
+          delegate_to: "{{ vm_guest_ip }}"
+
+        # Reboot VM to make sure packagekit.service is disabled and stopped
+        - include_tasks: ../utils/vm_reboot.yml
       when:
         - service_info
         - service_info.state is defined
         - service_info.state in ['active', 'running']
 
-    - include_tasks: ../utils/get_installed_package_info.yml
-      vars:
-        package_name: "PackageKit"
-
+    # If packagekit.service exists, it means PackageKit is installed
     - include_tasks: ../utils/install_uninstall_package.yml
       vars:
         package_name: "PackageKit"
         package_state: "absent"
       when:
-        - package_info is defined
-        - package_info | length > 0
+        - service_info
+        - service_info.name == 'packagekit.service'
+        - service_info.status is defined
+        - service_info.status != 'not-found'
   when: guest_os_ansible_distribution == "SLED"
