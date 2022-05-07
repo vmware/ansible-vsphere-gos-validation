@@ -1,0 +1,44 @@
+# Copyright 2021-2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# This task will set the ISO file list for OS installation,
+# if os_installation_iso_url parameter is configured, will
+# download and transfer ISO file to ESXi host datastore.
+# Parameters:
+#   os_installation_iso_url: the URL for downloading OS installation ISO file. 
+#   os_installation_iso_list: the OS installation ISO files' paths list.
+#
+- block:
+    - name: "Check 'os_installation_iso_url' parameter value is valid"
+      assert:
+        that:
+          - os_installation_iso_url
+        fail_msg: "os_installation_iso_url parameter is not valid, please set it to the ftp/http/https URL for downloading OS installation ISO file."
+    - include_tasks: download_iso_and_transfer.yml
+    - name: "Set fact of ISO file list and length"
+      set_fact:
+        os_installation_iso_list: "{{ [transferred_install_iso] }}"
+        os_install_iso_list_len: 1
+  when: os_installation_iso_url is defined
+
+- block:
+    - name: "Check 'os_installation_iso_list' parameter value is valid"
+      assert:
+        that:
+          - os_installation_iso_list is defined
+          - os_installation_iso_list
+          - os_installation_iso_list | type_debug == "list"
+          - os_installation_iso_list | length != 0
+        fail_msg: "os_installation_iso_list parameter is not valid, please set it to a list of ISO files' paths."
+
+    - name: "Set fact of the length of configured 'os_installation_iso_list' parameter"
+      set_fact:
+        os_install_iso_list_len: "{{ os_installation_iso_list | length }}"
+
+    - name: "Check configured path in 'os_installation_iso_list' list is in valid format '[datastore] file_path1/file_name1'."
+      assert:
+        that:
+          - item is regex("^\[.*\]\s.+")
+        fail_msg: "ISO file's path in os_installation_iso_list parameter is not in the format of '[datastore_name] file_path/file_name'."
+      with_items: "{{ os_installation_iso_list }}"
+  when: os_installation_iso_url is undefined
