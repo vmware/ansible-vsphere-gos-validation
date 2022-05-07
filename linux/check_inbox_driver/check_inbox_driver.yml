@@ -12,7 +12,16 @@
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   vars:
-    inbox_drivers: ["vmxnet3", "vmw_vmci", "vsock", "vmw_vsock_vmci_transport", "vmw_pvscsi", "vmw_balloon", "vmwgfx"]
+    inbox_drivers:
+      - vmxnet3
+      - vmw_vmci
+      - vsock
+      - vmw_vsock_vmci_transport
+      - vmw_pvscsi
+      - vmw_balloon
+      - vmwgfx
+      - vmw_pvrdma
+      - ptp_vmw
   tasks:
     - name: "Initialized inbox drivers' versions dict"
       set_fact:
@@ -115,6 +124,15 @@
               set_fact:
                 inbox_drivers_versions: "{{ inbox_drivers_versions | combine(vmware_modules) }}"
               when: vmware_modules is defined and vmware_modules
+
+            - name: "Get srcversion for inbox drivers which has no version"
+              set_fact:
+                inbox_drivers_versions: "{{ inbox_drivers_versions | combine({item.module_name: item.srcversion}) }}"
+              when:
+                - item.module_name not in vmware_modules
+                - item.srcversion is defined
+              with_items: "{{ vmware_modules_info }}"
+
           when:
             - guest_os_ansible_system == "Linux"
             - guest_os_ansible_distribution != "VMware Photon OS"
