@@ -9,6 +9,20 @@
 
 # Get VM vmx config
 - include_tasks: ../../common/vm_get_extra_config.yml
+
+# Known issue on Windows Server 2022 guest ID on ESXi 7.0U3c build, fixed on ESXi 7.0.3P04, KB article will be published
+- block:
+    - debug:
+        msg: "'disk.EnableUUID = TRUE' is not in VM vmx file, ignore this known issue on ESXi 7.0U3c with guestID '{{ vm_guest_id }}'."
+      when: vm_advanced_settings[0].key not in vm_extra_config
+  when:
+    - esxi_version is defined and esxi_version
+    - esxi_version is version('7.0.3', '=')
+    - esxi_build is defined and esxi_build
+    - esxi_build == "19193900"
+    - vm_guest_id is defined and vm_guest_id
+    - vm_guest_id == "windows2019srvNext_64Guest"
+
 - name: Check if get expected config in vmx
   assert:
     that:
@@ -16,3 +30,7 @@
       - vm_extra_config[vm_advanced_settings[0].key] | lower == vm_advanced_settings[0].value | lower
     fail_msg: "'disk.EnableUUID = TRUE' is not in VM vmx file."
     success_msg: "'disk.EnableUUID = TRUE' is in VM vmx file."
+  when: >
+    (esxi_version is undefined or not (esxi_version is version('7.0.3', '='))) or
+    (esxi_version is version('7.0.3', '=') and (esxi_build is undefined or esxi_build != "19193900")) or
+    (vm_guest_id is undefined or vm_guest_id != "windows2019srvNext_64Guest")
