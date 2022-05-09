@@ -1,15 +1,14 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Add or update CDROM to connect to the datastore ISO file
+# Connect specified VM CDROM if CDROM device number is set, or the first
+# found CDROM if CDROM device number is not set to the datastore ISO file.
 # Parameters:
-#   vm_cdrom_device_num: The CDROM device number. Default is 1.
+#   vm_cdrom_device_num (optinal): The CDROM device number. Default is 1.
 #   vm_cdrom_iso_file: The datastore ISO file to connect to.
 #
-
 - name: "Initialize variables for CDROM config"
   set_fact:
-    vm_cdrom_device_label: "CD/DVD drive {{ vm_cdrom_device_num | int | default(1) }}"
     vm_cdrom_device_info: ""
     vm_cdrom_controller_info: ""
     vm_cdrom_controller_type: "{{ cdrom_controller_type | default('sata') }}"
@@ -17,10 +16,30 @@
     vm_cdrom_unit_num: 0
     vm_cdrom_current_connected: ""
 
-# Get CDROM device info
 - include_tasks: vm_get_device_with_label.yml
   vars:
-    device_label: "{{ vm_cdrom_device_label }}"
+    device_label: "CD/DVD drive {{ vm_cdrom_device_num | int }}"
+  when:
+    - vm_cdrom_device_num is defined
+    - vm_cdrom_device_num | int >= 1
+
+- block:
+    - name: "Initialize device info variable"
+      set_fact:
+        device_info_with_label: ""
+    - include_tasks: vm_get_device_with_label.yml
+      vars:
+        device_label: "CD/DVD drive {{ item }}"
+      loop: "{{ range(1, 5) | list }}" 
+      when: not device_info_with_label        
+  when: vm_cdrom_device_num is undefined
+
+- name: "Check VM has expected CDROM"
+  assert:
+    that:
+      - device_info_with_label is defined
+      - device_info_with_label
+    fail_msg: "Not get VM 'CD/DVD drive {{ vm_cdrom_device_num | int | default ('') }}' device info."
 
 # VM has existing CDROM
 - block:

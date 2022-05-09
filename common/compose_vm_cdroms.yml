@@ -20,7 +20,7 @@
   when: >
     (cdrom_controller_type is undefined) or
     (not cdrom_controller_type) or
-    (cdrom_controller_type not in ['ide', 'sata'])
+    (cdrom_controller_type | lower not in ['ide', 'sata'])
 
 - include_tasks: esxi_check_delete_datastore_file.yml
   vars:
@@ -38,7 +38,7 @@
   set_fact:
     loop_start: 0
     loop_end: "{{ os_install_iso_list_len }}"
-    iso_list_len_limit: 3
+    ide_iso_list_len_limit: 4
   when: >
     (cdrom_controller_type | lower == 'ide' and boot_disk_controller | lower != 'ide') or
     (cdrom_controller_type | lower == 'sata' and boot_disk_controller | lower != 'sata')
@@ -47,7 +47,7 @@
   set_fact:
     loop_start: 1
     loop_end: "{{ os_install_iso_list_len + 1 }}"
-    iso_list_len_limit: 2
+    ide_iso_list_len_limit: 3
   when: >
     (cdrom_controller_type | lower == 'ide' and boot_disk_controller | lower == 'ide') or
     (cdrom_controller_type | lower == 'sata' and boot_disk_controller | lower == 'sata')
@@ -56,8 +56,8 @@
     - name: "Check os_installation_iso_list length"
       assert:
         that:
-          - os_install_iso_list_len <= iso_list_len_limit
-        fail_msg: "The number of ISO files to be attached to IDE CDROMs is larger than '{{ iso_list_len_limit }}', please set cdrom_controller_type parameter to 'sata'."
+          - os_install_iso_list_len <= ide_iso_list_len_limit
+        fail_msg: "The number of ISO files to be attached to IDE CDROMs is larger than '{{ ide_iso_list_len_limit }}', please set cdrom_controller_type parameter to 'sata'."
     - name: "Compose the VM CDROMs list"
       set_fact:
         vm_cdroms: "{{ vm_cdroms + [{'type': 'iso', 'iso_path': os_installation_iso_list[item] if loop_end == os_install_iso_list_len else os_installation_iso_list[item-1], 'controller_type': 'ide', 'controller_number': (item / 2) | int, 'unit_number': (item % 2) | int}] }}"
@@ -71,16 +71,6 @@
   loop: "{{ range(loop_start | int, loop_end | int) | list }}"
   when: 
     - cdrom_controller_type | lower == 'sata'
-
-# For eject_del_unattend_install_iso.yml, set unattend ISO mounted CDROM controller number and unit number
-- block:
-    - name: "Set fact of the unattend ISO mounted CDROM controller number and unit number"
-      set_fact:
-        unattend_iso_cdrom_ctl_num: "{{ (loop_end | int / 2) | int if cdrom_controller_type == 'ide' else 0 }}"
-        unattend_iso_cdrom_unit_num: "{{ (loop_end | int % 2) | int if cdrom_controller_type == 'ide' else loop_end | int }}"
-    - debug:
-        msg: "Unattend ISO file mounted to CDROM '{{ cdrom_controller_type }}{{ unattend_iso_cdrom_ctl_num }}:{{ unattend_iso_cdrom_unit_num }}'"
-  when: transferred_unattend_iso is defined
 
 - name: "Display the generated VM CDROMs list"
   debug: var=vm_cdroms
