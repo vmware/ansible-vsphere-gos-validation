@@ -56,14 +56,16 @@
         - service_info.state is defined
         - service_info.state in ['active', 'running']
 
-    # If packagekit.service exists, it means PackageKit is installed
+    # Remove PackageKit
+    - include_tasks: ../utils/get_installed_package_info.yml
+      vars:
+        package_name: "PackageKit"
+
     - include_tasks: ../utils/install_uninstall_package.yml
       vars:
         package_name: "PackageKit"
         package_state: "absent"
       when:
-        - service_info
-        - service_info.name == 'packagekit.service'
-        - service_info.status is defined
-        - service_info.status != 'not-found'
+       - package_info is defined
+       - package_info | length > 0
   when: guest_os_ansible_distribution == "SLED"
