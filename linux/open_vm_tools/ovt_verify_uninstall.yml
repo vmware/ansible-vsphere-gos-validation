@@ -15,27 +15,18 @@
     - block:
         - include_tasks: ../setup/test_setup.yml
 
-        - name: "Set the fact to uninstall open-vm-tools"
-          set_fact:
-            uninstall_tools: |-
-              {%- if vmtools_is_installed is defined and vmtools_is_installed -%}True
-              {%- else %}False{%- endif -%}
-
         # Flatcar doesn't support to uninstall open-vm-tools
         - include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Skip test case because {{ guest_os_ansible_distribution }} doesn't support to uninstall open-vm-tools"
+            skip_msg: "Skip test case because {{ guest_os_ansible_distribution }} doesn't support uninstalling open-vm-tools"
             skip_reason: "Not Supported"
           when: "'Flatcar' in guest_os_ansible_distribution"
 
         - include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Skip test case because guest OS doesn't support uninstalling open-vm-tools or open-vm-tools is not installed"
-            skip_reason: "Not Supported"
-          when: >
-            (uninstall_tools is undefined) or
-            (not uninstall_tools)
-          when: (uninstall_tools is undefined) or (not uninstall_tools)
+            skip_msg: "Test case '{{ ansible_play_name }}' is blocked because guest OS doesn't has open-vm-tools"
+            skip_reason: "Blocked"
+          when: vmtools_is_installed is undefined or not (vmtools_is_installed | bool)
 
         - block:
             # Set the fact of open-vm-tools packages
@@ -45,7 +36,7 @@
             - include_tasks: uninstall_ovt.yml
           when:
             - "'Flatcar' not in guest_os_ansible_distribution"
-            - uninstall_tools is defined
-            - uninstall_tools
+            - vmtools_is_installed is defined
+            - vmtools_is_installed | bool
       rescue:
         - include_tasks: ../../common/test_rescue.yml

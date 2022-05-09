@@ -418,7 +418,6 @@ class CallbackModule(CallbackBase):
                                              "finished_at": None,
                                              "duration": 0}
 
-
     def _get_play_path(self, play):
         path = ""
         if hasattr(play, "_ds") and hasattr(play._ds, "_data_source"):
@@ -528,11 +527,6 @@ class CallbackModule(CallbackBase):
 
         total_exec_time = ""
         total_count = len(self.testcases)
-        failed_count = 0
-        blocked_count = 0
-        skipped_count = 0
-        norun_count = 0
-
 
         if self.started_at and self.finished_at:
             total_exec_time = int(self.finished_at - self.started_at)
@@ -551,39 +545,43 @@ class CallbackModule(CallbackBase):
                                 else len(test['status'])
                                 for test in self.testcases.values()])
 
+        status_mark = ""
+        if status_col_width > len('passed'):
+            status_mark = "  "
+
         row_border = "+{}+\n".format("".ljust(name_col_width + status_col_width + 17, "-"))
         row_format = "| {:<} | {:<} | {:<9} |\n"
 
         # Table head
         msg = row_border
-        msg += row_format.format("Name".ljust(name_col_width), "Status".rjust(status_col_width), "Exec Time")
+        msg += row_format.format("Name".ljust(name_col_width), (status_mark + "Status").ljust(status_col_width), "Exec Time")
         msg += row_border
 
         # Table rows
+        status_stats = OrderedDict([('Passed', 0), ('Failed', 0), ('Blocked', 0), ('Skipped', 0), ('No Run', 0)])
         for testname in self.testcases:
             test_exec_time = time.strftime('%H:%M:%S', time.gmtime(self.testcases[testname]['duration']))
             test_status = self.testcases[testname]['status']
             if test_status.lower() == 'passed':
-                msg += row_format.format(testname.ljust(name_col_width), test_status.rjust(status_col_width), test_exec_time)
+               msg += row_format.format(testname.ljust(name_col_width), \
+                                        (status_mark + test_status).ljust(status_col_width), test_exec_time)
             else:
-                msg += row_format.format(testname.ljust(name_col_width), ("* " + test_status).rjust(status_col_width), test_exec_time)
-                if test_status.lower() == 'failed':
-                    failed_count += 1
-                else if test_status.lower() == 'blocked':
-                    blocked_count += 1
-                else if test_status.lower() != 'no run':
-                    skipped_count += 1
+                msg += row_format.format(testname.ljust(name_col_width), \
+                                         ("* " + test_status).ljust(status_col_width), test_exec_time)
+                if test_status in ['Passed', 'Failed', 'Blocked', 'No Run']:
+                    status_stats[test_status] += 1
                 else:
-                    norun_count += 1
+                    status_stats['Skipped'] += 1
 
         msg += row_border
 
         # Test summary
-        test_summary = "Test Results (Total: {}, Failed: {}, " + \
-                       "Blocked: {}, Skipped: {}, No Run: {}, " + \
-                       "Elapsed Time: {}):\n".format(total_count, \
-                        failed_count, blocked_count, skipped_count, \
-                        norun_count, time.strftime("%H:%M:%S", time.gmtime(total_exec_time)))
+        test_summary = "Test Results (Total: " + str(total_count)
+        for key in status_stats:
+             if status_stats[key] > 0:
+                test_summary += ", {}: {}".format(key, status_stats[key])
+
+        test_summary += ", Elapsed Time: {})\n".format(time.strftime("%H:%M:%S", time.gmtime(total_exec_time)))
 
         msg = test_summary + msg
         self.logger.info(msg)
@@ -630,7 +628,10 @@ class CallbackModule(CallbackBase):
         if not ignore_errors and \
            self._last_test_name in self.testcases and \
            self.testcases[self._last_test_name]['status'] == 'Running':
-            self.testcases[self._last_test_name]['status'] = 'Failed'
+            if 'reason: Blocked' in result._task.name:
+                self.testcases[self._last_test_name]['status'] = 'Blocked'
+            else:
+                self.testcases[self._last_test_name]['status'] = 'Failed'
             self.testcases[self._last_test_name]['finished_at'] = time.time()
             self.testcases[self._last_test_name]['duration'] = int(self.testcases[self._last_test_name]['finished_at'] -
                                                                    self.testcases[self._last_test_name]['started_at'])
@@ -679,6 +680,7 @@ class CallbackModule(CallbackBase):
                     self._last_test_name = deploy_casename
                     self.testcases[self._last_test_name] = self.testcases[old_test_name]
                     del self.testcases[old_test_name]
+                    self.testcases.move_to_end(self._last_test_name, last=False)
             if "get_windows_system_info.yml" == task_file or "get_linux_system_info.yml" == task_file:
                 vm_guest_os_distribution = set_fact_result.get("vm_guest_os_distribution", None)
                 if vm_guest_os_distribution and self.vm_info:
