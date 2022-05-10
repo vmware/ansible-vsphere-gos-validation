@@ -34,12 +34,20 @@
         # Get guest fullname from VM guest info
         - include_tasks: ../../common/vm_get_config.yml
           vars:
-            property_list: ['guest.guestFullName']
+            property_list: ['guest.guestFullName', 'guest.guestId']
         - name: Set guest fullname got from VM guest info
           set_fact:
             os_fullname_guestinfo: "{{ vm_config.guest.guestFullName }}"
+            os_guestid_guestinfo: "{{ vm_config.guest.guestId }}"
         - debug:
-            msg: "Get guest fullname from VM guest info: {{ os_fullname_guestinfo }}"
+            msg:
+              - "Guest fullname from VM guest info: {{ os_fullname_guestinfo }}"
+              - "Guest ID from VM guest info: {{ os_guestid_guestinfo }}"
+        - name: "Check guest ID got from guest info is not empty"
+          assert:
+            that:
+              - os_guestid_guestinfo
+            fail_msg: "Guest ID in guest info is '{{ os_guestid_guestinfo }}', which should be a valid value firstly."
 
         - name: Initialize the expected guest fullname
           set_fact:
