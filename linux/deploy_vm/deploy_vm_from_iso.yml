@@ -25,7 +25,7 @@
     install_guest_with_desktop: False
 
 - block:
-    - include_tasks: get_iso_file_list.yml
+    - include_tasks: ../../common/get_iso_file_list.yml
 
     - include_tasks: ubuntu/prepare_ubuntu_iso_install.yml
       when: "'ubuntu' in guest_id"
@@ -51,9 +51,7 @@
       when: unattend_install_conf is defined and unattend_install_conf
 
     # Compose VM CDROMs to mount OS install ISO files
-    - include_tasks: compose_vm_cdroms.yml
-    # Check configured OS install ISO file and unattend ISO file exist
-    - include_tasks: check_configured_cdrom_iso.yml
+    - include_tasks: ../../common/compose_vm_cdroms.yml
     # Create a new VM
     - include_tasks: ../../common/vm_create.yml
       when: boot_disk_controller != 'ide'
@@ -202,8 +200,8 @@
       include_tasks: ../../common/vm_configure_cdrom.yml
       vars:
         cdrom_type: client
-        cdrom_controller_num: 0
-        cdrom_unit_num: 0
+        cdrom_controller_num: "{{ vm_cdroms[0].controller_number | int }}"
+        cdrom_unit_num: "{{ vm_cdroms[0].unit_number | int }}"
       when:  guest_os_ansible_distribution == "Ubuntu"
 
     - include_tasks: ../../common/vm_remove_serial_port.yml

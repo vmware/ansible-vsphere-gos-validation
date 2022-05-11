@@ -159,3 +159,8 @@
 * network_testbed_cleanup.yml: Cleanup network adapter testing testbed
 * test_rescue: Tasks executed when test case failure
 * skip_test_case.yml: Tasks for skipping testcase and ending play
+
+## Common tasks for Linux and Windows test cases
+* compose_vm_cdroms.yml: Generate VM CDROM device info list for creating new VM
+* download_iso_and_transfer.yml: Download ISO file and transfer to ESXi datastore
+* get_iso_file_list.yml: Generate and validate OS installation ISO file list 

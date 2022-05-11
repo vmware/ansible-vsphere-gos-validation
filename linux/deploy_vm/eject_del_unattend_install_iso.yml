@@ -5,14 +5,21 @@
 - include_tasks: ../utils/eject_cdrom_in_guest.yml
   vars:
     guest_cdrom_device_num: "{{ os_install_iso_list_len|int -1 }}"
+
+# By default, it's attached to the last CDROM in composed VM CDROMs list
+- name: "Set fact of the controller and unit number of CDROM attaching unattend install ISO"
+  set_fact:
+    unattend_iso_cdrom_ctl_num: "{{ vm_cdroms[os_install_iso_list_len|int - 1].controller_number }}"
+    unattend_iso_cdrom_unit_num: "{{ vm_cdroms[os_install_iso_list_len|int - 1].unit_number }}"
+
 # Change CDROM type from iso to client
 - include_tasks: ../../common/vm_configure_cdrom.yml
   vars:
     cdrom_type: client
-    cdrom_controller_type: "{{ new_vm_cdrom_ctl_type }}"
     cdrom_controller_num: "{{ unattend_iso_cdrom_ctl_num | int }}"
     cdrom_unit_num: "{{ unattend_iso_cdrom_unit_num | int }}"
     cdrom_state: present
+
 # Delete unattend install iso on ESXi datastore
 # It could fail but doesn't affect tests, see https://kb.vmware.com/s/article/78653
 - include_tasks: ../../common/esxi_check_delete_datastore_file.yml

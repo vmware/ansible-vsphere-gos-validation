@@ -28,17 +28,13 @@
 
 - name: Set fact of the dest path of OS installation ISO file on ESXi host
   set_fact:
-    transferred_install_iso: "{{ vm_datastore_path }}/{{ os_installation_iso_file }}"
+    transferred_install_iso: "[{{ datastore }}] {{ os_installation_iso_file }}"
 - name: Print the dest path of OS installation ISO file on ESXi host
   debug: var=transferred_install_iso
 
-- name: Copy downloaded OS installation ISO file to ESXi host
-  include_tasks: ../../common/transfer_file_remote.yml
+# Transfer downloaded OS installation ISO file to ESXi host
+- include_tasks: esxi_upload_datastore_file.yml
   vars:
-    transfer_file_remote_src: "{{ local_cache }}/{{ os_installation_iso_file }}"
-    transfer_file_remote_dest: "{{ transferred_install_iso }}"
-    transfer_file_remote_server: "{{ esxi_hostname }}"
-
-- name: Set fact of the transferred ISO file datastore path
-  set_fact:
-    transferred_install_iso: "[{{ datastore }}] {{ os_installation_iso_file }}"
+    src_file_path: "{{ local_cache }}/{{ os_installation_iso_file }}"
+    dest_file_path: "{{ os_installation_iso_file }}"
+    upload_file_timeout: 1200
