@@ -562,13 +562,14 @@ class CallbackModule(CallbackBase):
         for testname in self.testcases:
             test_exec_time = time.strftime('%H:%M:%S', time.gmtime(self.testcases[testname]['duration']))
             test_status = self.testcases[testname]['status']
-            if test_status.lower() == 'passed':
-               msg += row_format.format(testname.ljust(name_col_width), \
+            if test_status == 'Passed':
+                msg += row_format.format(testname.ljust(name_col_width), \
                                         (status_mark + test_status).ljust(status_col_width), test_exec_time)
+                status_stats[test_status] += 1
             else:
                 msg += row_format.format(testname.ljust(name_col_width), \
                                          ("* " + test_status).ljust(status_col_width), test_exec_time)
-                if test_status in ['Passed', 'Failed', 'Blocked', 'No Run']:
+                if test_status in ['Failed', 'Blocked', 'No Run']:
                     status_stats[test_status] += 1
                 else:
                     status_stats['Skipped'] += 1
