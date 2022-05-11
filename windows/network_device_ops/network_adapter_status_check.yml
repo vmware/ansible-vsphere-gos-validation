@@ -12,13 +12,17 @@
     ethernet_name: "{{ win_get_ethernet_name_result }}"
 - name: "Set fact of IP address of new added network adapter"
   set_fact:
-    new_nic_ip_address: "{{ ethernet_ip | ansible.netcommon.ipv4 if (ethernet_ip is defined and ethernet_ip | length != 0) else '' }}"
+    new_nic_ip_address: "{{ (ethernet_ip | ansible.netcommon.ipv4)[0] }}"
+  when:
+    - ethernet_ip is defined
+    - ethernet_ip | length != 0
+    - ethernet_ip | ansible.netcommon.ipv4 | length != 0
 
 # Ping vlan gateway after network adapter hotadd
 - include_tasks: ../utils/win_ping_target.yml
   vars:
     win_ping_target_ip: "{{ vlan_gateway }}"
-    win_ping_src_ip: "{{ new_nic_ip_address }}"
+    win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
 - name: Set fact of the ping vlan gateway result
   set_fact:
     ping_result_after_hotadd: "{{ win_ping_target_result }}"
@@ -31,7 +35,7 @@
 - include_tasks: ../utils/win_ping_target.yml
   vars:
     win_ping_target_ip: "{{ vlan_gateway }}"
-    win_ping_src_ip: "{{ new_nic_ip_address }}"
+    win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
 - name: Set fact of the ping vlan gateway result after disable
   set_fact:
     ping_result_after_disable: "{{ win_ping_target_result }}"
@@ -44,7 +48,7 @@
 - include_tasks: ../utils/win_ping_target.yml
   vars:
     win_ping_target_ip: "{{ vlan_gateway }}"
-    win_ping_src_ip: "{{ new_nic_ip_address }}"
+    win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
 - name: Set fact of the ping vlan gateway result after re-enable
   set_fact:
     ping_result_after_enable: "{{ win_ping_target_result }}"
@@ -62,7 +66,7 @@
 - include_tasks: ../utils/win_ping_target.yml
   vars:
     win_ping_target_ip: "{{ vlan_gateway }}"
-    win_ping_src_ip: "{{ new_nic_ip_address }}"
+    win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
 - name: Set fact of the ping vlan gateway result after disconnect
   set_fact:
     ping_result_after_disconnect: "{{ win_ping_target_result }}"
@@ -80,7 +84,7 @@
 - include_tasks: ../utils/win_ping_target.yml
   vars:
     win_ping_target_ip: "{{ vlan_gateway }}"
-    win_ping_src_ip: "{{ new_nic_ip_address }}"
+    win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
 - name: Set fact of the ping vlan gateway result after re-connect
   set_fact:
     ping_result_after_reconnect: "{{ win_ping_target_result }}"
