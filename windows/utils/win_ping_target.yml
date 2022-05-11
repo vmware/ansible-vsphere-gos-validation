@@ -4,6 +4,7 @@
 # Ping specified IP address on Windows guest OS
 # Parameters:
 #   win_ping_target_ip: the target IP address to ping
+#   win_ping_src_ip (optional): the source IP address to ping
 # Return:
 #   win_ping_target_result
 #
@@ -14,14 +15,26 @@
 - debug:
     msg: "Will ping this target IP address: {{ win_ping_target_ip }}"
 
+- name: "Set fact of the ping command"
+  set_fact:
+    win_ping_command: "ping -n 3 {{ win_ping_target_ip }}"
+  when: win_ping_src_ip is undefined or not win_ping_src_ip
+
+- name: "Set fact of the ping command"
+  set_fact:
+    win_ping_command: "ping -n 3 -S {{ win_ping_src_ip }} {{ win_ping_target_ip }}"
+  when:
+    - win_ping_src_ip is defined
+    - win_ping_src_ip
+
 - name: "Ping target IP address in Windows guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "ping -n 3 {{ win_ping_target_ip }}"
+    win_powershell_cmd: "{{ win_ping_command }}"
     win_execute_cmd_ignore_error: True
 
 - name: Set fact of the ping result
   set_fact:
-    win_ping_target_result: "{{ True if win_powershell_cmd_output.rc == 0 else False }}"
+    win_ping_target_result: "{{ True if (win_powershell_cmd_output.rc is defined and win_powershell_cmd_output.rc == 0) else False }}"
 - debug:
     msg: "Ping target IP address result: {{ win_ping_target_result }}"
