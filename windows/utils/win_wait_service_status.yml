@@ -1,0 +1,27 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Retry to get serivce status in Windows guest OS until it's running
+# Parameters:
+#   win_service_name: the service name
+#
+- name: Check required parameter
+  fail:
+    msg: "win_service_name must be defined before get service status"
+  when: win_service_name is undefined or not win_service_name
+
+- name: "Check specified service '{{ win_service_name }}' status in Windows"
+  win_shell: 'get-service -Name {{ win_service_name }} | foreach {$_.Status}'
+  delay: 5
+  retries: 10
+  delegate_to: "{{ vm_guest_ip }}"
+  register: get_service_status
+  until:
+    - get_service_status is defined
+    - get_service_status.stdout_lines is defined
+    - get_service_status.stdout_lines | length != 0
+    - get_service_status.stdout_lines[0] == 'Running'
+
+- name: Display the powershell command result
+  debug: var=get_service_status
+  when: enable_debug is defined and enable_debug

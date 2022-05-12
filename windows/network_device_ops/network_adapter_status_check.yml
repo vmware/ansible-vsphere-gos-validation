@@ -1,43 +1,60 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Disable, re-enable network adapter in guest
-- name: Get Ethernet name with specified MAC address
-  include_tasks: ../utils/win_get_ethernet_name.yml
+# Get Ethernet name of new added network adapter
+- include_tasks: ../utils/win_get_ethernet_name.yml
   vars:
     win_get_ethernet_name_mac: "{{ new_nic_mac_address }}"
 
-- name: Disable new added network adapter in guest OS
-  include_tasks: ../utils/win_set_netadapter_status.yml
+# Get IP address of new added network adapter
+- include_tasks: ../utils/win_get_ethernet_ip.yml
+  vars:
+    ethernet_name: "{{ win_get_ethernet_name_result }}"
+- name: "Set fact of IP address of new added network adapter"
+  set_fact:
+    new_nic_ip_address: "{{ (ethernet_ip | ansible.netcommon.ipv4)[0] }}"
+  when:
+    - ethernet_ip is defined
+    - ethernet_ip | length != 0
+    - ethernet_ip | ansible.netcommon.ipv4 | length != 0
+
+# Ping vlan gateway after network adapter hotadd
+- include_tasks: ../utils/win_ping_target.yml
+  vars:
+    win_ping_target_ip: "{{ vlan_gateway }}"
+    win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
+- name: Set fact of the ping vlan gateway result
+  set_fact:
+    ping_result_after_hotadd: "{{ win_ping_target_result }}"
+
+# Ping vlan gateway after network adapter disabled
+- include_tasks: ../utils/win_set_netadapter_status.yml
   vars:
     win_set_netadapter_operation: "Disabled"
     win_set_netadapter_name: "{{ win_get_ethernet_name_result }}"
-
-- name: Check router VM is not connectable after disable network adapter
-  include_tasks: ../utils/win_ping_target.yml
+- include_tasks: ../utils/win_ping_target.yml
   vars:
     win_ping_target_ip: "{{ vlan_gateway }}"
+    win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
 - name: Set fact of the ping vlan gateway result after disable
   set_fact:
     ping_result_after_disable: "{{ win_ping_target_result }}"
 
-- name: Re-enable new added network adapter in guest OS
-  include_tasks: ../utils/win_set_netadapter_status.yml
+# Ping vlan gateway after network adapter enabled
+- include_tasks: ../utils/win_set_netadapter_status.yml
   vars:
     win_set_netadapter_operation: "Up"
     win_set_netadapter_name: "{{ win_get_ethernet_name_result }}"
-
-- name: Check router VM is connectable after re-enable network adapter
-  include_tasks: ../utils/win_ping_target.yml
+- include_tasks: ../utils/win_ping_target.yml
   vars:
     win_ping_target_ip: "{{ vlan_gateway }}"
+    win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
 - name: Set fact of the ping vlan gateway result after re-enable
   set_fact:
     ping_result_after_enable: "{{ win_ping_target_result }}"
 
-# Disconnect, reconnect network adapter in VM settings
-- name: Disconnect new added network adapter of VM
-  include_tasks: ../../common/vm_configure_network_adapter.yml
+# Ping vlan gateway after network adapter disconnected
+- include_tasks: ../../common/vm_configure_network_adapter.yml
   vars:
     netadapter_mac_addr: "{{ new_nic_mac_address }}"
     netadapter_connect: false
@@ -46,17 +63,16 @@
     that:
       - "{{ not reconfig_result.failed }}"
       - "{{ reconfig_result.changed }}"
-
-- name: Check router VM is not connectable after disconnect network adapter
-  include_tasks: ../utils/win_ping_target.yml
+- include_tasks: ../utils/win_ping_target.yml
   vars:
     win_ping_target_ip: "{{ vlan_gateway }}"
+    win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
 - name: Set fact of the ping vlan gateway result after disconnect
   set_fact:
     ping_result_after_disconnect: "{{ win_ping_target_result }}"
 
-- name: Reconnect new added network adapter of VM
-  include_tasks: ../../common/vm_configure_network_adapter.yml
+# Ping vlan gateway after network adapter connected
+- include_tasks: ../../common/vm_configure_network_adapter.yml
   vars:
     netadapter_mac_addr: "{{ new_nic_mac_address }}"
     netadapter_connect: true
@@ -65,11 +81,10 @@
     that:
       - "{{ not reconfig_result.failed }}"
       - "{{ reconfig_result.changed }}"
-
-- name: Check router VM is connectable after re-connect network adapter
-  include_tasks: ../utils/win_ping_target.yml
+- include_tasks: ../utils/win_ping_target.yml
   vars:
     win_ping_target_ip: "{{ vlan_gateway }}"
+    win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
 - name: Set fact of the ping vlan gateway result after re-connect
   set_fact:
     ping_result_after_reconnect: "{{ win_ping_target_result }}"
