@@ -56,18 +56,18 @@
     - name: "Check os_installation_iso_list length"
       assert:
         that:
-          - os_install_iso_list_len <= ide_iso_list_len_limit
+          - os_install_iso_list_len | int <= ide_iso_list_len_limit | int
         fail_msg: "The number of ISO files to be attached to IDE CDROMs is larger than '{{ ide_iso_list_len_limit }}', please set cdrom_controller_type parameter to 'sata'."
     - name: "Compose the VM CDROMs list"
       set_fact:
-        vm_cdroms: "{{ vm_cdroms + [{'type': 'iso', 'iso_path': os_installation_iso_list[item] if loop_end == os_install_iso_list_len else os_installation_iso_list[item-1], 'controller_type': 'ide', 'controller_number': (item / 2) | int, 'unit_number': (item % 2) | int}] }}"
+        vm_cdroms: "{{ vm_cdroms + [{'type': 'iso', 'iso_path': os_installation_iso_list[item] if loop_end | int == os_install_iso_list_len | int else os_installation_iso_list[item-1], 'controller_type': 'ide', 'controller_number': (item / 2) | int, 'unit_number': (item % 2) | int}] }}"
       loop: "{{ range(loop_start | int, loop_end | int) | list }}"
   when:
     - cdrom_controller_type | lower == 'ide'
 
 - name: "Compose the VM CDROMs list"
   set_fact:
-    vm_cdroms: "{{ vm_cdroms + [{'type': 'iso', 'iso_path': os_installation_iso_list[item] if loop_end == os_install_iso_list_len else os_installation_iso_list[item-1], 'controller_type': 'sata', 'controller_number': 0, 'unit_number': item}] }}"
+    vm_cdroms: "{{ vm_cdroms + [{'type': 'iso', 'iso_path': os_installation_iso_list[item] if loop_end | int == os_install_iso_list_len | int else os_installation_iso_list[item-1], 'controller_type': 'sata', 'controller_number': 0, 'unit_number': item}] }}"
   loop: "{{ range(loop_start | int, loop_end | int) | list }}"
   when: 
     - cdrom_controller_type | lower == 'sata'
