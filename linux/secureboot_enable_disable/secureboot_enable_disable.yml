@@ -22,19 +22,21 @@
 
         - include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Skip testcase because {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} doesn't support secure boot."
+            skip_msg: "Secure boot is not supported on VM of {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} with hardware version {{ vm_hardware_version_num }}"
+            skip_reason: "Not Supported"
           when: >
-            (guest_os_ansible_distribution == "Rocky" and guest_os_ansible_distribution_ver is version('8.4', '<=')) or
-            (guest_os_ansible_distribution == "Astra Linux (Orel)")
+            (guest_os_ansible_distribution == "Rocky" and
+             guest_os_ansible_distribution_ver is version('8.4', '<=')) or
+            (guest_os_ansible_distribution == "Astra Linux (Orel)") or
+             (vm_hardware_version_num | int < 13)
 
         - include_tasks: ../../common/vm_get_boot_info.yml
 
         - include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "The VM's config doesn't support secureboot testing: VM hardware version is {{ vm_hardware_version_num }}, firmware is {{ vm_firmware }}"
-          when: >
-            (vm_firmware | lower != "efi") or
-            (vm_hardware_version_num | int < 13)
+            skip_msg: "Secure boot is not applicable for VM with {{ vm_firmware }} firmware"
+            skip_reason: "Not Applicable"
+          when: vm_firmware | lower != "efi"
 
         - name: "Initialize test result variables"
           set_fact:
