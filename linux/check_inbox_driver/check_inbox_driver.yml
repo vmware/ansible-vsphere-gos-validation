@@ -12,7 +12,16 @@
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   vars:
-    inbox_drivers: ["vmxnet3", "vmw_vmci", "vsock", "vmw_vsock_vmci_transport", "vmw_pvscsi", "vmw_balloon", "vmwgfx"]
+    inbox_drivers:
+      - vmxnet3
+      - vmw_vmci
+      - vsock
+      - vmw_vsock_vmci_transport
+      - vmw_pvscsi
+      - vmw_balloon
+      - vmwgfx
+      - vmw_pvrdma
+      - ptp_vmw
   tasks:
     - name: "Initialized inbox drivers' versions dict"
       set_fact:
@@ -21,11 +30,15 @@
     - block:
         - include_tasks: ../setup/test_setup.yml
           vars:
-            skip_test_no_vmtools: True
+            skip_test_no_vmtools: False
 
         - name: "Get OS Release for SUSE"
           set_fact:
-            inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'Release': 'SLE ' ~ guest_os_ansible_distribution_major_ver ~ ' SP' ~ guest_os_ansible_distribution_minor_ver}) }}"
+            inbox_drivers_versions: >-
+              {{
+                inbox_drivers_versions |
+                combine({'Release': 'SLE ' ~ guest_os_ansible_distribution_major_ver ~ ' SP' ~ guest_os_ansible_distribution_minor_ver})
+              }}
           when: guest_os_ansible_distribution in ['SLES', 'SLED']
 
         - name: "Get OS Release for RHEL"
@@ -35,7 +48,11 @@
 
         - name: "Get OS Release for {{ guest_os_ansible_distribution }}"
           set_fact:
-            inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'Release': guest_os_ansible_distribution ~ ' ' ~ guest_os_ansible_distribution_ver}) }}"
+            inbox_drivers_versions: >-
+              {{
+                inbox_drivers_versions |
+                combine({'Release': guest_os_ansible_distribution ~ ' ' ~ guest_os_ansible_distribution_ver})
+              }}
           when: guest_os_ansible_distribution not in ['SLES', 'SLED', "RedHat"]
 
         - name: "Get OS kernel version"
@@ -66,7 +83,7 @@
             - cloudinit_version is defined
             - cloudinit_version
 
-        - name: "Get drivers version in VMware Photon OS"
+        - name: "Get drivers version in VMware Photon OS {{ guest_os_ansible_distribution_ver }}"
           block:
             - name: "Check driver version"
               shell: "if [ -e /sys/module/{{ driver }}/version ]; then cat /sys/module/{{ driver }}/version ; fi"
@@ -79,45 +96,84 @@
 
             - name: Set fact of driver version dict
               set_fact:
-                inbox_drivers_versions: "{{ inbox_drivers_versions | combine({driver.driver: driver.stdout}) }}"
-              with_items: "{{ photon_drivers.results }}"
-              loop_control:
-                loop_var: driver
+                inbox_drivers_versions: >-
+                  {{
+                    inbox_drivers_versions |
+                    combine(photon_drivers.results |
+                            selectattr('stdout', 'defined') |
+                            selectattr('stdout', '!=', '') |
+                            items2dict(key_name='driver', value_name='stdout'))
+                  }}
           when:
             - guest_os_ansible_distribution == "VMware Photon OS"
+            - guest_os_ansible_distribution_major_ver | int < 4
 
-        - name: "Get drivers version in {{ guest_os_ansible_distribution }}"
+        - name: "Get drivers version in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
           block:
-            - name: "Initialize fact of modules information"
-              set_fact:
-                vmware_modules_info: []
-
-            - name: "Get module information"
+            - name: "Get module information of inbox drivers"
               command: "modinfo {{ module_name }}"
               register: modinfo_result
               delegate_to: "{{ vm_guest_ip }}"
-              failed_when: False
+              ignore_errors: True
               loop: "{{ inbox_drivers }}"
               loop_control:
                 loop_var: module_name
 
-            - name: "Convert modinfo result to dictionary"
+            - name: "Set fact of found inbox driver modules"
               set_fact:
-                vmware_modules_info: "{{ vmware_modules_info + ['\n'.join(item.stdout_lines | select('match', '^\\w+:.*[^:]$')) | from_yaml | combine({'module_name': item.module_name }) ] }}"
-              when: item.stdout_lines is defined and item.stdout_lines | length
-              loop: "{{ modinfo_result.results }}"
+                builtin_modules: "{{ modinfo_result.results | selectattr('rc', 'equalto', 0) }}"
 
-            - set_fact:
-                vmware_modules: "{{ vmware_modules_info | selectattr('version', 'defined') | items2dict(key_name='module_name', value_name='version') }}"
-              when: vmware_modules_info is defined and vmware_modules_info | length > 0
-
-            - name: "Set fact of inbox drivers versions"
+            - name: "Set fact of inbox driver version with its version"
               set_fact:
-                inbox_drivers_versions: "{{ inbox_drivers_versions | combine(vmware_modules) }}"
-              when: vmware_modules is defined and vmware_modules
-          when:
-            - guest_os_ansible_system == "Linux"
-            - guest_os_ansible_distribution != "VMware Photon OS"
+                inbox_drivers_versions: >
+                  {{ inbox_drivers_versions |
+                     combine({item.module_name:''.join(item.stdout_lines |
+                                                        select('match', 'version:', ignorecase=True)) |
+                              regex_replace('version:\s*', '')})
+                  }}
+              with_items: "{{ builtin_modules }}"
+
+            - name: "Set fact of inbox driver version with its srcversion"
+              set_fact:
+                inbox_drivers_versions: >
+                  {{ inbox_drivers_versions |
+                     combine({item.module_name:''.join(item.stdout_lines |
+                                                        select('match', 'srcversion:', ignorecase=True)) |
+                              regex_replace('srcversion:\s*', '')})
+                  }}
+              when: >
+                item.module_name not in inbox_drivers_versions or
+                not inbox_drivers_versions[item.module_name]
+              with_items: "{{ builtin_modules }}"
+
+            - name: "Set fact of inbox driver version with its vermagic"
+              set_fact:
+                inbox_drivers_versions: >
+                  {{ inbox_drivers_versions |
+                     combine({item.module_name:''.join(item.stdout_lines |
+                                                        select('match', 'vermagic:', ignorecase=True)) |
+                              regex_replace('vermagic:\s*', '')})
+                  }}
+              when: >
+                item.module_name not in inbox_drivers_versions or
+                not inbox_drivers_versions[item.module_name]
+              with_items: "{{ builtin_modules }}"
+          when: >
+            (guest_os_ansible_distribution != "VMware Photon OS") or
+            (guest_os_ansible_distribution == "VMware Photon OS" and
+            guest_os_ansible_distribution_major_ver | int >= 4)
+
+        # If the driver is not found in guest OS, set its version to 'N/A'
+        - name: "Update fact of inbox driver version dict to set not found driver version with 'N/A'"
+          set_fact:
+            inbox_drivers_versions: >-
+              {{
+                inbox_drivers_versions |
+                combine({module_name: 'N/A'})
+              }}
+          loop: "{{ inbox_drivers | difference(inbox_drivers_versions.keys()) }}"
+          loop_control:
+            loop_var: module_name
 
         - name: "Check whether Xorg server is installed"
           command: "which Xorg"
