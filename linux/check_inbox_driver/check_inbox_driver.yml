@@ -110,78 +110,54 @@
 
         - name: "Get drivers version in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
           block:
-            # Get inbox driver's version
-            - name: "Get inbox drivers version"
-              shell: "modinfo -F version {{ module_name }} | grep -v 'name:'"
-              register: modinfo_version
+            - name: "Get module information of inbox drivers"
+              command: "modinfo {{ module_name }}"
+              register: modinfo_result
               delegate_to: "{{ vm_guest_ip }}"
               ignore_errors: True
               loop: "{{ inbox_drivers }}"
               loop_control:
                 loop_var: module_name
 
-            - name: "Update fact of inbox driver version dict with driver's version"
+            - name: "Set fact of found inbox driver modules"
               set_fact:
-                inbox_drivers_versions: >-
-                  {{
-                    inbox_drivers_versions |
-                    combine(modinfo_version.results |
-                            selectattr('stdout', 'defined') |
-                            selectattr('stdout', '!=', '') |
-                            items2dict(key_name='module_name', value_name='stdout'))
+                builtin_modules: "{{ modinfo_result.results | selectattr('rc', 'equalto', 0) }}"
+
+            - name: "Set fact of inbox driver version with its version"
+              set_fact:
+                inbox_drivers_versions: >
+                  {{ inbox_drivers_versions |
+                     combine({item.module_name:''.join(item.stdout_lines |
+                                                        select('match', 'version:', ignorecase=True)) |
+                              regex_replace('version:\s*', '')})
                   }}
-              when:
-                - modinfo_version is defined
-                - modinfo_version.results | length > 0
+              with_items: "{{ builtin_modules }}"
 
-            # If the inbox driver has no version, get its srcversion
-            - name: "Get inbox drivers src version"
-              shell: "modinfo -F srcversion {{ module_name }} | grep -v 'name:'"
-              register: modinfo_srcversion
-              delegate_to: "{{ vm_guest_ip }}"
-              ignore_errors: True
-              loop: "{{ inbox_drivers | difference(inbox_drivers_versions.keys()) }}"
-              loop_control:
-                loop_var: module_name
-
-            - name: "Update fact of inbox driver version dict with driver's srcversion"
+            - name: "Set fact of inbox driver version with its srcversion"
               set_fact:
-                inbox_drivers_versions: >-
-                  {{
-                    inbox_drivers_versions |
-                    combine(modinfo_srcversion.results |
-                            selectattr('stdout', 'defined') |
-                            selectattr('stdout', '!=', '') |
-                            items2dict(key_name='module_name', value_name='stdout'))
+                inbox_drivers_versions: >
+                  {{ inbox_drivers_versions |
+                     combine({item.module_name:''.join(item.stdout_lines |
+                                                        select('match', 'srcversion:', ignorecase=True)) |
+                              regex_replace('srcversion:\s*', '')})
                   }}
-              when:
-                - modinfo_srcversion is defined
-                - modinfo_srcversion.results | length > 0
+              when: >
+                item.module_name not in inbox_drivers_versions or
+                not inbox_drivers_versions[item.module_name]
+              with_items: "{{ builtin_modules }}"
 
-            # If the inbox driver has no srcversion, get its vermagic which is actually same as kernel version
-            # If the driver exists but has no vermagic, leave the driver version as empty
-            - name: "Get inbox driver vermagic"
-              shell: "modinfo -F vermagic {{ module_name }} | grep -v 'name:'"
-              register: modinfo_vermagic
-              delegate_to: "{{ vm_guest_ip }}"
-              ignore_errors: True
-              loop: "{{ inbox_drivers | difference(inbox_drivers_versions.keys()) }}"
-              loop_control:
-                loop_var: module_name
-
-            - name: "Update fact of inbox driver version dict with driver's vermagic"
+            - name: "Set fact of inbox driver version with its vermagic"
               set_fact:
-                inbox_drivers_versions: >-
-                  {{
-                    inbox_drivers_versions |
-                    combine(modinfo_vermagic.results |
-                            selectattr('rc', 'equalto', '0') |
-                            selectattr('stdout', 'defined') |
-                            items2dict(key_name='module_name', value_name='stdout'))
-                   }}
-              when:
-                - modinfo_vermagic is defined
-                - modinfo_vermagic.results | length > 0
+                inbox_drivers_versions: >
+                  {{ inbox_drivers_versions |
+                     combine({item.module_name:''.join(item.stdout_lines |
+                                                        select('match', 'vermagic:', ignorecase=True)) |
+                              regex_replace('vermagic:\s*', '')})
+                  }}
+              when: >
+                item.module_name not in inbox_drivers_versions or
+                not inbox_drivers_versions[item.module_name]
+              with_items: "{{ builtin_modules }}"
           when: >
             (guest_os_ansible_distribution != "VMware Photon OS") or
             (guest_os_ansible_distribution == "VMware Photon OS" and
