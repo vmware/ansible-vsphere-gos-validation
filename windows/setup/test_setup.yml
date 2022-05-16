@@ -9,12 +9,7 @@
   set_fact:
     current_testcase_name: "{{ ansible_play_name }}"
     current_test_log_folder: "{{ testrun_log_path }}/{{ ansible_play_name }}"
-
-# Prepare router VM, vSwitch and portgroup
-- include_tasks: ../../common/network_testbed_setup.yml
-  when:
-    - deploy_router_vm is defined and deploy_router_vm | bool
-    - router_vm_deployed is undefined or not router_vm_deployed | bool
+    current_testcase_path: "{{ main_playbook_path }}/Windows/{{ ansible_play_name }}"
 
 - include_tasks: base_snapshot_check_revert.yml
 
@@ -25,10 +20,6 @@
 - include_tasks: ../utils/add_windows_host.yml
 - name: "Print VM guest IP address"
   debug: var=vm_guest_ip
-
-# Pause Windows Update
-- include_tasks: ../utils/win_pause_windows_update.yml
-  when: not base_snapshot_exists
 
 # Get VMware tools status and version
 - include_tasks: ../../common/vm_get_vmtools_status.yml
@@ -49,10 +40,6 @@
     - vmtools_is_running | bool
     - guestinfo_gathered is undefined or not guestinfo_gathered
 
-# Take base snapshot if not exist
-- include_tasks: create_base_snapshot.yml
-  when: not base_snapshot_exists
-
 # Skip test case run when VMware tools is required but not installed or not running
 - include_tasks: ../../common/skip_test_case.yml
   vars:
@@ -62,3 +49,24 @@
     - skip_test_no_vmtools is defined
     - skip_test_no_vmtools
     - not (vmtools_is_running is defined and vmtools_is_running | bool)
+
+# Check if test_case_support_status.yml file in test case folder
+- name: "Check if test_case_support_status.yml file exists"
+  stat:
+    path: "{{ current_testcase_path }}/test_case_support_status.yml"
+  register: tc_support_status_result
+- include_tasks: "{{ current_testcase_path }}/test_case_support_status.yml"
+  when:
+    - tc_support_status_result.stat is defined
+    - tc_support_status_result.stat.exists is defined
+    - tc_support_status_result.stat.exists
+
+# Take base snapshot if not exist
+- include_tasks: create_base_snapshot.yml
+  when: not base_snapshot_exists
+
+# Prepare router VM, vSwitch and portgroup
+- include_tasks: ../../common/network_testbed_setup.yml
+  when:
+    - deploy_router_vm is defined and deploy_router_vm | bool
+    - router_vm_deployed is undefined or not router_vm_deployed | bool
