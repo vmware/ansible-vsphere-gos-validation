@@ -12,14 +12,26 @@
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
-    - name: Set fact of the network adapter type
-      set_fact:
-        nic_type: 'VMXNET3'
     - block:
+        - name: Set fact of the network adapter type
+          set_fact:
+            nic_type: 'VMXNET3'
+            skip_vmxnet3_no_vmtools: True
+        - name: "Set fact of skip test to False when there is vmxnet3 inbox driver"
+          set_fact:
+            skip_vmxnet3_no_vmtools: False
+          when:
+            - guest_os_with_inbox_drivers is defined
+            - guest_os_with_inbox_drivers
+
         - include_tasks: ../setup/test_setup.yml
           vars:
-            skip_test_no_vmtools: True
-            deploy_router_vm: True
+            skip_test_no_vmtools: "{{ skip_vmxnet3_no_vmtools }}"
+
+        # Prepare router VM, vSwitch and portgroup
+        - include_tasks: ../../common/network_testbed_setup.yml
+          when: router_vm_deployed is undefined or not router_vm_deployed | bool
+
         - include_tasks: network_adapter_deviceops.yml
       rescue:
         - include_tasks: ../../common/test_rescue.yml

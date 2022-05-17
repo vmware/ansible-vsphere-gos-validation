@@ -120,3 +120,23 @@
     - guest_os_ansible_distribution_ver is defined
     - vcenter_version is defined and vcenter_version != 'N/A'
     - vcenter_build is defined and vcenter_build != 'N/A'
+
+# Skip cloud-init GOSC if cloud-init version is lower than required version.
+- block:
+    # Debian 10 and 11 cloud-init GOSC depends on cloud-init 22.1 or later
+    # See https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1008039
+    # For other OS, cloud-init GOSC requires cloud-init 18.5 or later installed.
+    - name: "Set fact of cloud-init version for supporting GOSC"
+      set_fact:
+        operator: >-
+          {% if guest_os_ansible_distribution != 'Debian' %}>{% else %}>={% endif %}
+        gosc_required_cloudinit_version: >-
+          {% if guest_os_ansible_distribution != 'Debian' %}18.5{% else %}22.1{% endif %}
+
+    - include_tasks: ../../common/skip_test_case.yml
+      vars:
+        skip_reason: "Not Supported"
+        skip_msg: >
+          "The guest OS doesn't have required cloud-init ({{ operator }} {{ gosc_required_cloudinit_version }}) installed. Skip to run this test case."
+      when: (not cloudinit_version) or not (cloudinit_version is version(gosc_required_cloudinit_version, operator))
+  when: enable_cloudinit_gosc

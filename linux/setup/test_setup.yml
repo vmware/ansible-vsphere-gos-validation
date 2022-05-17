@@ -10,12 +10,6 @@
     current_testcase_name: "{{ ansible_play_name }}"
     current_test_log_folder: "{{ testrun_log_path }}/{{ ansible_play_name }}"
 
-# Prepare router VM, vSwitch and portgroup
-- include_tasks: ../../common/network_testbed_setup.yml
-  when:
-    - deploy_router_vm is defined and deploy_router_vm | bool
-    - router_vm_deployed is undefined or not router_vm_deployed | bool
-
 # Check base snapshot existence and/or revert to it
 - include_tasks: base_snapshot_check_revert.yml
 
@@ -46,10 +40,6 @@
     - vmtools_is_running | bool
     - guestinfo_gathered is undefined or not guestinfo_gathered
 
-# Create a base snapshot if it does not exist
-- include_tasks: create_base_snapshot.yml
-  when: not (base_snapshot_exists | bool)
-
 # Skip test case run when VMware tools is required but not installed or not running
 - include_tasks: ../../common/skip_test_case.yml
   vars:
@@ -59,3 +49,7 @@
     - skip_test_no_vmtools is defined
     - skip_test_no_vmtools
     - not (vmtools_is_running is defined and vmtools_is_running | bool)
+
+# Create a base snapshot if it does not exist
+- include_tasks: create_base_snapshot.yml
+  when: not (base_snapshot_exists | bool)
