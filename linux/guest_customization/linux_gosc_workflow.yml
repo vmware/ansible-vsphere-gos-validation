@@ -16,14 +16,7 @@
       vars:
         skip_test_no_vmtools: True
 
-    # Check cloud-init version for cloud-init gosc workflow
-    - include_tasks: ../utils/cloudinit_pkg_check.yml
     - include_tasks: check_gosc_support_status.yml
-    # Prepare router VM, vSwitch and portgroup
-    - include_tasks: ../../common/network_testbed_setup.yml
-      when:
-        - router_vm_required | default(False)
-        - router_vm_deployed is undefined or not router_vm_deployed | bool
 
     - block:
         # Traditional GOSC in Photon OS is implemented with cloud-init,
@@ -86,6 +79,29 @@
         - not enable_cloudinit_gosc | bool
         - guest_os_family == "RedHat"
 
+    # Check cloud-init version for cloud-init gosc workflow
+    - include_tasks: ../utils/cloudinit_pkg_check.yml
+
+    # Skip cloud-init GOSC if cloud-init version is lower than required version.
+    - block:
+        # Debian 10 and 11 cloud-init GOSC depends on cloud-init 22.1 or later
+        # See https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1008039
+        # For other OS, cloud-init GOSC requires cloud-init 18.5 or later installed.
+        - name: "Set fact of cloud-init version for supporting GOSC"
+          set_fact:
+            operator: >-
+              {% if guest_os_ansible_distribution != 'Debian' %}>{% else %}>={% endif %}
+            gosc_required_cloudinit_version: >-
+              {% if guest_os_ansible_distribution != 'Debian' %}18.5{% else %}22.1{% endif %}
+
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_reason: "Not Supported"
+            skip_msg: >
+              "The guest OS doesn't have required cloud-init ({{ operator }} {{ gosc_required_cloudinit_version }}) installed. Skip to run this test case."
+          when: (not cloudinit_version) or not (cloudinit_version is version(gosc_required_cloudinit_version, operator))
+      when: enable_cloudinit_gosc
+
     # Initialize the GOSC spec
     - name: Initialize the GOS customization spec
       set_fact:
@@ -126,6 +142,11 @@
 
     # Modify cloud-init GOSC config in guest OS
     - include_tasks: ../utils/enable_disable_cloudinit_cfg.yml
+    # Prepare router VM, vSwitch and portgroup
+    - include_tasks: ../../common/network_testbed_setup.yml
+      when:
+        - router_vm_required | default(False)
+        - router_vm_deployed is undefined or not router_vm_deployed | bool
     # Execute guest customization on VM
     - include_tasks: linux_gosc_start.yml
     # Check guest customization results

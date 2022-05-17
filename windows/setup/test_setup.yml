@@ -24,8 +24,19 @@
 - include_tasks: ../utils/win_pause_windows_update.yml
   when: not base_snapshot_exists
 
-# Get VMware tools status and version
+# Get VMware tools status
 - include_tasks: ../../common/vm_get_vmtools_status.yml
+
+# Skip test case run when VMware tools is required but not installed or not running
+- include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: "Test case '{{ current_testcase_name }}' is blocked because VMware tools installed: {{ vmtools_is_installed | default(False) }}, running: {{ vmtools_is_running | default(False) }}"
+    skip_reason: "Blocked"
+  when:
+    - skip_test_no_vmtools is defined
+    - skip_test_no_vmtools
+    - not (vmtools_is_running is defined and vmtools_is_running | bool)
+
 - include_tasks: ../utils/win_get_vmtools_version_build.yml
   when:
     - vmtools_is_installed is defined
@@ -42,16 +53,6 @@
     - vmtools_is_running is defined
     - vmtools_is_running | bool
     - guestinfo_gathered is undefined or not guestinfo_gathered
-
-# Skip test case run when VMware tools is required but not installed or not running
-- include_tasks: ../../common/skip_test_case.yml
-  vars:
-    skip_msg: "Test case '{{ current_testcase_name }}' is blocked because VMware tools installed: {{ vmtools_is_installed | default(False) }}, running: {{ vmtools_is_running | default(False) }}"
-    skip_reason: "Blocked"
-  when:
-    - skip_test_no_vmtools is defined
-    - skip_test_no_vmtools
-    - not (vmtools_is_running is defined and vmtools_is_running | bool)
 
 # Take base snapshot if not exist
 - include_tasks: create_base_snapshot.yml
