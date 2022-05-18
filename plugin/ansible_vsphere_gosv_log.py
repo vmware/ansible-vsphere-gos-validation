@@ -356,6 +356,8 @@ class CallbackModule(CallbackBase):
 
         if result._task.loop:
             msg += " => (item={})".format(loop_item)
+            if result._task._attributes['ignore_errors']:
+                ignore_errors = True
 
         msg += " => {}".format(self._dump_results(result._result, indent=4))
 
@@ -641,11 +643,6 @@ class CallbackModule(CallbackBase):
 
         if result._task.loop and 'results' in result._result:
             self._process_items(result)
-
-            if ignore_errors:
-                # Failed items have been logged in self.failed_tasks_log
-                # Append ...ignoring to these failed items
-                self.write_to_logfile(self.failed_tasks_log, "...ignoring\n")
             return
 
         self._print_task_details(result, 'failed', delegated_vars, ignore_errors=ignore_errors)
