@@ -6,20 +6,24 @@
 # Return:
 #   drive_letter_new: an unassigned driver letter
 #
+- name: Initialize the assigned drive letter list
+  set_fact:
+    assigned_drive_letter: ['C', 'D', 'E']
 - name: Set fact of the available driver letter list
   set_fact:
     valid_drive_letter_list: ['Z', 'Y', 'X', 'W', 'V', 'U', 'T', 'S']
-- name: get assigned drive letter list in Windows guest
-  win_shell: "(get-volume | where-object {$_.DriveType -eq 'Fixed'}).DriveLetter"
-  delegate_to: "{{ vm_guest_ip }}"
-  register: get_drive_letter_list
-- name: Display the powershell command result
-  debug: var=get_drive_letter_list
-  when: enable_debug is defined and enable_debug
+
+# Get assigned drive letter list in Windows guest
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(get-volume | where-object {$_.DriveType -eq 'Fixed'}).DriveLetter"
 
 - name: Set fact of the assigned driver letter
   set_fact:
-    assigned_drive_letter: "{{ get_drive_letter_list.stdout_lines | list }}"
+    assigned_drive_letter: "{{ win_powershell_cmd_output.stdout_lines | list }}"
+  when:
+    - win_powershell_cmd_output is defined
+    - win_powershell_cmd_output.stdout_lines is defined
 - debug:
     msg: "Get assigned drive letters: {{ assigned_drive_letter }}"
 

@@ -10,19 +10,15 @@
   set_fact:
     vmtools_info_from_vmtoolsd: ''
 
-- name: Get VMware tools version and build number in guest OS
-  win_shell: "& 'C:\\Program Files\\VMware\\VMware Tools\\VMwareToolboxCmd.exe' -v"
-  register: get_tools_version_output
-  delegate_to: "{{ vm_guest_ip }}"
-- name: Display the command result
-  debug: var=get_tools_version_output
-  when: enable_debug is defined and enable_debug
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "& 'C:\\Program Files\\VMware\\VMware Tools\\VMwareToolboxCmd.exe' -v"
 
 - name: Set fact of tools version and build number
   set_fact:
-    vmtools_info_from_vmtoolsd: "{{ get_tools_version_output['stdout_lines'][0] }}"
-    vmtools_version: "{{ get_tools_version_output['stdout_lines'][0].split(' ')[0].rsplit('.', 1)[0] }}"
-    vmtools_build_number: "{{ get_tools_version_output['stdout_lines'][0].split(' ')[1][1:-1].split('-')[1] }}"
+    vmtools_info_from_vmtoolsd: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+    vmtools_version: "{{ win_powershell_cmd_output.stdout_lines[0].split(' ')[0].rsplit('.', 1)[0] }}"
+    vmtools_build_number: "{{ win_powershell_cmd_output.stdout_lines[0].split(' ')[1][1:-1].split('-')[1] }}"
 
 - name: "Print VMware Tools version and build"
   debug: var=vmtools_info_from_vmtoolsd

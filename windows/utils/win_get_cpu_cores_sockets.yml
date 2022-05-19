@@ -1,34 +1,31 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get CPU number, cores and sockets in guest OS
-# Return:
-#   win_cpu_number,
-#   win_cpu_cores,
-#   win_cpu_sockets
-#
-- name: Get number of logical processors in Windows guest OS
-  win_shell: '(get-wmiobject win32_computersystem).numberoflogicalprocessors'
-  register: win_get_logical_cpu
-  delegate_to: "{{ vm_guest_ip }}"
-- name: Display get logical processors result
-  debug: var=win_get_logical_cpu
-  when: enable_debug is defined and enable_debug
-
-- name: Get CPU sockets in Windows guest OS
-  win_shell: '(get-wmiobject win32_computersystem).numberofprocessors'
-  register: win_get_cpu_socket
-  delegate_to: "{{ vm_guest_ip }}"
-- name: Display get CPU sockets result
-  debug: var=win_get_cpu_socket
-  when: enable_debug is defined and enable_debug
-
-- name: Set fact of CPU number, socket number, cores per socket number
+# Get CPU number, socket number and cores per socket number in guest OS
+- name: Initialize the CPU number and socket number
   set_fact:
-    win_cpu_number: "{{ win_get_logical_cpu.stdout_lines[0] if not win_get_logical_cpu.failed else '0' }}"
-    win_socket_number: "{{ win_get_cpu_socket.stdout_lines[0] if not win_get_cpu_socket.failed else '0' }}"
+    win_cpu_number: 0
+    win_socket_number: 0
+
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(get-wmiobject win32_computersystem | select numberoflogicalprocessors, numberofprocessors | ft -hide | Out-String).trim()"
+
+- name: Set fact of CPU number
+  set_fact:
+    win_cpu_number: "{{ win_powershell_cmd_output.stdout_lines[0].split()[0] }}"
+    win_socket_number: "{{ win_powershell_cmd_output.stdout_lines[0].split()[1] }}"
+  when:
+    - win_powershell_cmd_output is defined
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+    - win_powershell_cmd_output.stdout_lines[0]
+
 - name: Set fact of the cores per socket number
   set_fact:
-    win_cores_per_socket: "{{ (win_cpu_number|int / win_socket_number|int) | int if win_socket_number != '0' else '0' }}"
+    win_cores_per_socket: "{{ (win_cpu_number | int / win_socket_number | int) | int if (win_socket_number | int != 0) else 0 }}"
 - debug:
-    msg: "Get CPU number: {{ win_cpu_number }}, socket number: {{ win_socket_number }}, cores per socket number: {{ win_cores_per_socket }}"
+    msg:
+      - "CPU number in guest: {{ win_cpu_number }}"
+      - "Socket number in guest: {{ win_socket_number }}"
+      - "Cores per socket number: {{ win_cores_per_socket }}"

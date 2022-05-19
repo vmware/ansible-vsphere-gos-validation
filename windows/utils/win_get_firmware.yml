@@ -2,21 +2,17 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Get firmware info in Windows guest OS
-- name: Get firmware type in Windows guest OS
-  win_shell: 'bcdedit /enum FIRMWARE /v | select-string -Pattern "EFI"'
-  delegate_to: "{{ vm_guest_ip }}"
-  register: get_firmware_os
-- name: Display the command result
-  debug: var=get_firmware_os
-  when: enable_debug is defined and enable_debug
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: 'bcdedit /enum FIRMWARE /v | select-string -Pattern "EFI"'
 
 - name: Set fact of the firmware type
   set_fact:
     firmware_os: "efi"
-  when: get_firmware_os.stdout_lines | length > 0
+  when: win_powershell_cmd_output.stdout_lines | length > 0
 - name: Set fact of the firmware type
   set_fact:
     firmware_os: "bios"
-  when: get_firmware_os.stdout_lines | length == 0
+  when: win_powershell_cmd_output.stdout_lines | length == 0
 - debug:
     msg: "Get firmware type from guest OS: {{ firmware_os }}"

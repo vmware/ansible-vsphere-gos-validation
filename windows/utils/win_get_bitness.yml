@@ -1,18 +1,22 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Check guest OS is 32bit or 64bit
-- name: Get guest OS architecture in Windows guest OS
-  win_shell: "(get-wmiobject win32_operatingsystem).OSArchitecture"
-  register: win_get_bitness
-  delegate_to: "{{ vm_guest_ip }}"
+- name: Initialize the guest OS bitness
+  set_fact:
+    win_guest_bitness: ''
 
-- name: Display the guest OS architecture result
-  debug: var=win_get_bitness
-  when: enable_debug is defined and enable_debug
+# Check guest OS is 32bit or 64bit
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(get-wmiobject win32_operatingsystem).OSArchitecture"
 
 - name: Set fact of guest OS bitness
   set_fact:
-    win_guest_bitness: "{{ win_get_bitness.stdout_lines[0] }}"
+    win_guest_bitness: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when:
+    - win_powershell_cmd_output is defined
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+    - win_powershell_cmd_output.stdout_lines[0]
 - debug:
     msg: "Get guest OS bitness: {{ win_guest_bitness }}"

@@ -3,19 +3,20 @@
 ---
 # Get the driver list installed via VMware tools in Windows guest OS
 #
-- name: Get VMware tools driver list in Windows guest OS
-  win_shell: 'get-wmiobject win32_pnpsigneddriver | where-object {$_.Manufacturer -match "VMware"} | select DeviceName, DriverVersion, IsSigned'
-  register: vmtools_driver_list_output
-  delegate_to: "{{ vm_guest_ip }}"
-- name: Display the powershell command result
-  debug: var=vmtools_driver_list_output
-  when: enable_debug is defined and enable_debug
-
-- name: Set fact of the driver list length
+- name: Initialize the VMware driver list
   set_fact:
-    vmtools_driver_list_length: "{{ vmtools_driver_list_output|length|int - 3 }}"
+    vmtools_driver_list: []
+
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "get-wmiobject win32_pnpsigneddriver | where-object {$_.Manufacturer -match 'VMware'} | select DeviceName, DriverVersion, IsSigned | ft -hide"
+
 - name: Set fact of the driver list
   set_fact:
-    vmtools_driver_list: "{{ vmtools_driver_list_output.stdout_lines[3:vmtools_driver_list_length | int] }}"
+    vmtools_driver_list: "{{ win_powershell_cmd_output.stdout_lines }}"
+  when:
+    - win_powershell_cmd_output is defined
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
 - debug:
     msg: "Get VMware driver list: {{ vmtools_driver_list }}"
