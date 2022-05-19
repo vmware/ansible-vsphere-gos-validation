@@ -102,6 +102,22 @@
           when: (not cloudinit_version) or not (cloudinit_version is version(gosc_required_cloudinit_version, operator))
       when: enable_cloudinit_gosc
 
+    # Get DNS server info before GOSC
+    - include_tasks: ../utils/get_system_dns.yml
+    - name: "Set fact of the DNS servers in /etc/resolv.conf before GOSC"
+      set_fact:
+        dns_servers_before_gosc: "{{ dns_servers }}"
+    - debug:
+        msg: "DNS servers before GOSC: {{ dns_servers_before_gosc }}"
+
+    # Modify cloud-init GOSC config in guest OS
+    - include_tasks: ../utils/enable_disable_cloudinit_cfg.yml
+    # Prepare router VM, vSwitch and portgroup
+    - include_tasks: ../../common/network_testbed_setup.yml
+      when:
+        - router_vm_required | default(False)
+        - router_vm_deployed is undefined or not router_vm_deployed | bool
+
     # Initialize the GOSC spec
     - name: Initialize the GOS customization spec
       set_fact:
@@ -132,21 +148,6 @@
         - {'hwclockUTC': True}
       when: ip_assignment == "dhcp"
 
-    # Get DNS server info before GOSC
-    - include_tasks: ../utils/get_system_dns.yml
-    - name: "Set fact of the DNS servers in /etc/resolv.conf before GOSC"
-      set_fact:
-        dns_servers_before_gosc: "{{ dns_servers }}"
-    - debug:
-        msg: "DNS servers before GOSC: {{ dns_servers_before_gosc }}"
-
-    # Modify cloud-init GOSC config in guest OS
-    - include_tasks: ../utils/enable_disable_cloudinit_cfg.yml
-    # Prepare router VM, vSwitch and portgroup
-    - include_tasks: ../../common/network_testbed_setup.yml
-      when:
-        - router_vm_required | default(False)
-        - router_vm_deployed is undefined or not router_vm_deployed | bool
     # Execute guest customization on VM
     - include_tasks: linux_gosc_start.yml
     # Check guest customization results
