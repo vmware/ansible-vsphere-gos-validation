@@ -17,13 +17,16 @@
         - include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: True
-            deploy_router_vm: True
 
         - include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Test case '{{ ansible_play_name }}' is blocked because vCenter server is not configured"
             skip_reason: "Blocked"
           when: vcenter_is_defined is undefined or not vcenter_is_defined | bool
+
+        # Prepare router VM, vSwitch and portgroup
+        - include_tasks: ../../common/network_testbed_setup.yml
+          when: router_vm_deployed is undefined or not router_vm_deployed | bool
 
         - include_tasks: win_gosc_prepare.yml
 

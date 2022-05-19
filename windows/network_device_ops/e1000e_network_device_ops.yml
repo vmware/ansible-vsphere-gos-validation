@@ -16,9 +16,12 @@
         nic_type: 'E1000E'
     - block:
         - include_tasks: ../setup/test_setup.yml
-          vars:
-            deploy_router_vm: True
-        - name: Add e1000e network adapter to VM and verify status
-          include_tasks: network_adapter_deviceops.yml
+
+        # Prepare router VM, vSwitch and portgroup
+        - include_tasks: ../../common/network_testbed_setup.yml
+          when: router_vm_deployed is undefined or not router_vm_deployed | bool
+
+        # Add e1000e network adapter to VM and verify status
+        - include_tasks: network_adapter_deviceops.yml
       rescue:
         - include_tasks: ../../common/test_rescue.yml

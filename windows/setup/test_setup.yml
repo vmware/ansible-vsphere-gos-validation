@@ -10,12 +10,6 @@
     current_testcase_name: "{{ ansible_play_name }}"
     current_test_log_folder: "{{ testrun_log_path }}/{{ ansible_play_name }}"
 
-# Prepare router VM, vSwitch and portgroup
-- include_tasks: ../../common/network_testbed_setup.yml
-  when:
-    - deploy_router_vm is defined and deploy_router_vm | bool
-    - router_vm_deployed is undefined or not router_vm_deployed | bool
-
 - include_tasks: base_snapshot_check_revert.yml
 
 - include_tasks: ../../common/vm_get_ip.yml
@@ -30,8 +24,19 @@
 - include_tasks: ../utils/win_pause_windows_update.yml
   when: not base_snapshot_exists
 
-# Get VMware tools status and version
+# Get VMware tools status
 - include_tasks: ../../common/vm_get_vmtools_status.yml
+
+# Skip test case run when VMware tools is required but not installed or not running
+- include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: "Test case '{{ current_testcase_name }}' is blocked because VMware tools installed: {{ vmtools_is_installed | default(False) }}, running: {{ vmtools_is_running | default(False) }}"
+    skip_reason: "Blocked"
+  when:
+    - skip_test_no_vmtools is defined
+    - skip_test_no_vmtools
+    - not (vmtools_is_running is defined and vmtools_is_running | bool)
+
 - include_tasks: ../utils/win_get_vmtools_version_build.yml
   when:
     - vmtools_is_installed is defined
@@ -52,13 +57,3 @@
 # Take base snapshot if not exist
 - include_tasks: create_base_snapshot.yml
   when: not base_snapshot_exists
-
-# Skip test case run when VMware tools is required but not installed or not running
-- include_tasks: ../../common/skip_test_case.yml
-  vars:
-    skip_msg: "Test case '{{ current_testcase_name }}' is blocked because VMware tools installed: {{ vmtools_is_installed | default(False) }}, running: {{ vmtools_is_running | default(False) }}"
-    skip_reason: "Blocked"
-  when:
-    - skip_test_no_vmtools is defined
-    - skip_test_no_vmtools
-    - not (vmtools_is_running is defined and vmtools_is_running | bool)

@@ -13,9 +13,19 @@
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
     - block:
+        - name: "Set fact of skip test to True when no VMware tools installed"
+          set_fact:
+            skip_pvscsi_no_vmtools: True
+        - name: "Set fact of skip test to False when there is pvscsi inbox driver"
+          set_fact:
+            skip_pvscsi_no_vmtools: False
+          when:
+            - guest_os_with_inbox_drivers is defined
+            - guest_os_with_inbox_drivers
+
         - include_tasks: ../setup/test_setup.yml
           vars:
-            skip_test_no_vmtools: True
+            skip_test_no_vmtools: "{{ skip_pvscsi_no_vmtools }}"
 
         - include_tasks: hotadd_remove_vhba_test.yml
           vars:
