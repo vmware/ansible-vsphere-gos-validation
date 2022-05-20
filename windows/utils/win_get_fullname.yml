@@ -1,17 +1,21 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get OS fullname in Windows guest OS
-- name: Get OS name in Windows guest OS
-  win_shell: '(Get-WmiObject win32_OperatingSystem).name'
-  register: get_os_fullname_result
-  delegate_to: "{{ vm_guest_ip }}"
-- name: Display the powershell command result
-  debug: var=get_os_fullname_result
-  when: enable_debug is defined and enable_debug
+- name: Initialize guest OS fullname got in guest
+  set_fact:
+    os_fullname_guest: ''
+
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-WmiObject win32_OperatingSystem).name"
 
 - name: Set OS fullname got from guest OS
   set_fact:
-    os_fullname_guest: "{{ get_os_fullname_result['stdout_lines'][0].split('|')[0] }}"
+    os_fullname_guest: "{{ win_powershell_cmd_output.stdout_lines[0].split('|')[0] }}"
+  when:
+    - win_powershell_cmd_output is defined
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+    - win_powershell_cmd_output.stdout_lines[0]
 - debug:
     msg: "OS fullname string got in guest OS: {{ os_fullname_guest }}"

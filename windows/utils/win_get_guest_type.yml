@@ -6,13 +6,9 @@
 # ProductType="2" -> Domain controllers
 # ProductType="3" -> Servers that are not domain controllers
 #
-- name: Get Windows guest OS product type
-  win_shell: '(get-wmiobject win32_operatingsystem).ProductType'
-  register: win_get_product_type
-  delegate_to: "{{ vm_guest_ip }}"
-- name: Display the powershell command result
-  debug: var=win_get_product_type
-  when: enable_debug is defined and enable_debug
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(get-wmiobject win32_operatingsystem).ProductType"
 
 - name: Initialize the guest OS type
   set_fact:
@@ -20,14 +16,14 @@
 - name: Set fact of the guest OS type
   set_fact:
     win_guest_type: 'server'
-  when: win_get_product_type.stdout_lines[0]|int == 3
+  when: win_powershell_cmd_output.stdout_lines[0] | int == 3
 - name: Set fact of the guest OS type
   set_fact:
     win_guest_type: 'client'
-  when: win_get_product_type.stdout_lines[0]|int == 1
+  when: win_powershell_cmd_output.stdout_lines[0] | int == 1
 - name: Set fact of the guest OS type
   set_fact:
     win_guest_type: 'domain controller'
-  when: win_get_product_type.stdout_lines[0]|int == 2
+  when: win_powershell_cmd_output.stdout_lines[0] | int == 2
 - debug:
     msg: "Get Windows guest OS product type: {{ win_guest_type }}"

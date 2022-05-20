@@ -1,17 +1,22 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Print relative time value in Windows guest OS
-- name: Get relative time value from 01/01/1970 in Windows guest OS
-  win_shell: "(New-TimeSpan -Start (Get-Date '01/01/1970') -End (Get-Date)).TotalSeconds"
-  register: get_time_var
-  delegate_to: "{{ vm_guest_ip }}"
-- name: Display the powershell command result
-  debug: var=get_time_var
-  when: enable_debug is defined and enable_debug
+- name: Initialize the relative time value in guest
+  set_fact:
+    time_variable: 0
+
+# Get relative time value from 01/01/1970 in Windows guest OS
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(New-TimeSpan -Start (Get-Date '01/01/1970') -End (Get-Date)).TotalSeconds"
 
 - name: Set fact of the time variable
   set_fact:
-    time_variable: "{{ get_time_var.stdout_lines[0] }}"
+    time_variable: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when:
+    - win_powershell_cmd_output is defined
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+    - win_powershell_cmd_output.stdout_lines[0]
 - debug:
     msg: "Get relative time value from 01/01/1970 in Windows guest OS: {{ time_variable }}"

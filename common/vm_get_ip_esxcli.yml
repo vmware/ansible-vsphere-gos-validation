@@ -52,7 +52,10 @@
       shell: esxcli network vm port list -w '{{ vm_world_id }}' | awk '/IP Address/ {print $3}' | sed '/0.0.0.0/d' | sed '/^169.254./d'
       delegate_to: "{{ esxi_hostname }}"
       register: get_vm_ip_esxcli
-      until: get_vm_ip_esxcli.stdout
+      until:
+        - get_vm_ip_esxcli is defined
+        - get_vm_ip_esxcli.stdout is defined
+        - get_vm_ip_esxcli.stdout
       retries: "{{ ((vm_get_ip_timeout | default(300) | int) / 5) | int }}"
       delay: 5
       failed_when: False
@@ -86,7 +89,12 @@
       shell: "{{ esxcli_cmd }}"
       delegate_to: "{{ esxi_hostname }}"
       register: get_vm_ip_esxcli
-      until: "get_vm_ip_esxcli.stdout and '0.0.0.0' not in get_vm_ip_esxcli.stdout and ',169.254.' not in get_vm_ip_esxcli.stdout"
+      until:
+        - get_vm_ip_esxcli is defined
+        - get_vm_ip_esxcli.stdout is defined
+        - get_vm_ip_esxcli.stdout
+        - not "'0.0.0.0' in get_vm_ip_esxcli.stdout"
+        - not "',169.254.' in get_vm_ip_esxcli.stdout"
       retries: "{{ ((vm_get_ip_timeout | default(300) | int) / 5) | int }}"
       delay: 5
       failed_when: False
@@ -95,14 +103,12 @@
     - name: "Set fact of the VM IP info from esxcli command"
       set_fact:
         vm_ip_esxcli: "{{ get_vm_ip_esxcli.stdout_lines }}"
-
     - name: "Print VM IP address got from esxcli command"
       debug: var=vm_ip_esxcli
 
     - name: "Initialize the fact of VM network interfaces for VM '{{ vm_name }}'"
       set_fact:
         vm_guest_mac_ipv4: {}
-
     - name: "Set the fact of valid MAC address and IP address for VM '{{ vm_name }}'"
       set_fact:
         vm_guest_mac_ipv4: "{{ vm_guest_mac_ipv4 |combine({item.split(',')[0]:item.split(',')[1]}) }}"
