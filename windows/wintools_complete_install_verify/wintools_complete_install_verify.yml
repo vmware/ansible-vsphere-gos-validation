@@ -25,14 +25,17 @@
           when: vmtools_esxi_bundled is undefined
 
         # If VBS is enabled, will not install under development tools due to secureboot is enabled
-        - include_tasks: ../../common/vm_get_vbs_status.yml
-        - include_tasks: ../../common/skip_test_case.yml
-          vars:
-            skip_msg: "Skip test case due to under development VMware tools can not test on VM with VBS enabled."
-            skip_reason: "Not Applicable"
-          when:
-            - vm_vbs_enanled is defined and vm_vbs_enanled | bool
-            - is_development_tools is defined and is_development_tools | bool
+        - block:
+            - include_tasks: ../../common/vm_get_vbs_status.yml
+            - include_tasks: ../../common/skip_test_case.yml
+              vars:
+                skip_msg: "Skip test case due to under development VMware tools can not test on VM with VBS enabled."
+                skip_reason: "Not Applicable"
+              when:
+                - vm_vbs_enabled is defined and vm_vbs_enabled | bool
+                - is_development_tools is defined and is_development_tools | bool
+          when: guest_os_ansible_architecture == "64-bit"
+
         - include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Test case '{{ ansible_play_name }}' is blocked because VMware tools is installed, update VMware tools is set to: {{ update_vmtools }}"
