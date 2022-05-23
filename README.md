@@ -65,7 +65,7 @@ This project supports below scenarios for end-to-end guest OS validation testing
 
 | Guest OS types/versions                         | Automatic install from ISO image | Deploy from ova template | Existing VM and installed guest OS |
 | :---------------------------------------------- | :------------------------------: | :----------------------: | :--------------------------------: |
-| Red Hat Enterprise Linux 7.x, 8.x          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Red Hat Enterprise Linux 7.x, 8.x, 9.0          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | CentOS 7.x, 8.x                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Oracle Linux 7.x, 8.x                           | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Rocky Linux 8.x                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
@@ -89,10 +89,10 @@ This project supports below scenarios for end-to-end guest OS validation testing
 Note: This supported guest OS list is used for this project only. For guest OS support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
 
 ### Docker images
-* Latest (Release v1.3):
+* Latest (Release v2.0):
   * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
-* Release v1.3:
-  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v1.3
+* Release v2.0:
+  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v2.0
 
 Launch testing using Docker image
 1. Execute below commands in your machine
