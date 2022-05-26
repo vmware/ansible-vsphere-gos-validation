@@ -13,20 +13,20 @@ RUN tdnf makecache && \
     pip3 install setuptools wheel jmespath && \
     pip3 install pycdlib netaddr pywinrm pyvmomi pypsrp
 
-# Install ansible-base and Ansible collections
-# Change to ansible-core from Ansible 2.11
-RUN pip3 install ansible-core && \
-    ansible-galaxy collection install ansible.netcommon ansible.posix community.general community.vmware community.windows community.crypto
+# Install ansible-core (starts from Ansible 2.11)
+RUN pip3 install ansible-core
 
-# Download latest 'ansible-vsphere-gos-validation' release to /root/ dir
+# Install Ansible collections
+# You can set https proxy if collections are failed to install from Galaxy server
+RUN ansible-galaxy collection install ansible.netcommon ansible.posix community.general community.vmware community.windows community.crypto
+
+# Download latest 'ansible-vsphere-gos-validation' release to working dir
 RUN curl -s https://api.github.com/repos/vmware/ansible-vsphere-gos-validation/releases/latest | grep "tarball_url" | cut -d "\"" -f 4 | xargs -n 1 wget -O test.tar.gz && \
     tar -zxf test.tar.gz && \
     mv vmware-ansible-vsphere-gos-validation*/* ./
 
 # Clean up unused files
-RUN rm -rf ~/.ansible/collections/ansible_collections/community/kubernetes && \
-    rm -rf ~/.ansible/collections/ansible_collections/google && \
-    rm -rf test.tar.gz vmware-ansible-vsphere-gos-validation* && \
+RUN rm -rf test.tar.gz vmware-ansible-vsphere-gos-validation* && \
     tdnf clean all && \
     rm -rf /var/cache/* /root/.cache/pip/* /var/log/* /tmp/* /root/.ansible/tmp/*
 
