@@ -884,7 +884,7 @@ class CallbackModule(CallbackBase):
         self._failed_tasks_cache.clear()
 
         # Update testcase status to Running and set its start time
-        if self._play_name and ('linux' in self._play_path or 'windows' in self._play_path):
+        if self._play_name and self._play_name in self.testcases:
             self.testcases[self._play_name]["status"] = "Running"
             self.testcases[self._play_name]["started_at"] = time.time()
             self._last_test_name = self._play_name
