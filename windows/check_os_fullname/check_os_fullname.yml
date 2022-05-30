@@ -32,21 +32,12 @@
             (esxi_version == 'N/A')
 
         # Get guest fullname from VM guest info
-        - include_tasks: ../../common/vm_get_config.yml
-          vars:
-            property_list: ['guest.guestFullName', 'guest.guestId']
-        - name: Set guest fullname got from VM guest info
-          set_fact:
-            os_fullname_guestinfo: "{{ vm_config.guest.guestFullName }}"
-            os_guestid_guestinfo: "{{ vm_config.guest.guestId }}"
-        - debug:
-            msg:
-              - "Guest fullname from VM guest info: {{ os_fullname_guestinfo }}"
-              - "Guest ID from VM guest info: {{ os_guestid_guestinfo }}"
+        - include_tasks: ../../common/vm_get_guest_info.yml
+        
         - debug:
             msg: "guestID of Windows 11 guest in guestinfo is empty on ESXi 7.0U3c, ignore this known issue, please refer to https://kb.vmware.com/s/article/86517."
           when:
-            - not os_guestid_guestinfo
+            - not guestinfo_guest_id
             - esxi_version is defined and esxi_version
             - esxi_version is version('7.0.3', '=')
             - esxi_build is defined and esxi_build
@@ -57,8 +48,8 @@
         - name: "Check guest ID got from guest info is not empty"
           assert:
             that:
-              - os_guestid_guestinfo
-            fail_msg: "Guest ID in guest info is '{{ os_guestid_guestinfo }}', which should be a valid value firstly."
+              - guestinfo_guest_id
+            fail_msg: "Guest ID in guest info is '{{ guestinfo_guest_id }}', which should be a valid value firstly."
           when: >
             (not "'Windows 11' in os_fullname_guest") or
             (esxi_version is undefined) or
@@ -84,7 +75,14 @@
                 - include_tasks: winsrv2019_fullname.yml
               when: not "'Windows Server 2022' in os_fullname_guest"
             - include_tasks: winsrv2022_fullname.yml
-              when: "'Windows Server 2022' in os_fullname_guest"
+              when:
+                - "'Windows Server 2022' in os_fullname_guest"
+                - guest_os_build_num is defined
+                - guest_os_build_num | int == 20348
+            - include_tasks: winsrvnext_fullname.yml
+              when:
+                - guest_os_build_num is defined
+                - guest_os_build_num | int >= 22424 
           when: guest_os_product_type != "client"
 
         - debug:
@@ -93,8 +91,7 @@
           assert:
             that:
               - expected_guest_fullname != ""
-              - (os_fullname_guestinfo == expected_guest_fullname) or (expected_guest_fullname is string and expected_guest_fullname in os_fullname_guestinfo) or (expected_guest_fullname | type_debug == 'list' and os_fullname_guestinfo in expected_guest_fullname)
-            fail_msg: "Guest fullname in guest info: {{ os_fullname_guestinfo }}, is not the same as expected one: {{ expected_guest_fullname }}."
-            success_msg: "Guest fullname in guest info: {{ os_fullname_guestinfo }} is the same as expected one."
+              - (guestinfo_guest_full_name == expected_guest_fullname) or (expected_guest_fullname is string and expected_guest_fullname in guestinfo_guest_full_name) or (expected_guest_fullname | type_debug == 'list' and guestinfo_guest_full_name in expected_guest_fullname)
+            fail_msg: "Guest fullname in guest info: {{ guestinfo_guest_full_name }}, is not the same as expected one: {{ expected_guest_fullname }}."
       rescue:
         - include_tasks: ../../common/test_rescue.yml
