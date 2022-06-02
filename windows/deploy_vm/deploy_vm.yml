@@ -4,7 +4,8 @@
 # Description:
 #   This test case is used for deploying new Windows VM and installing
 # guest OS in VM automatically using Autounattend.xml file when
-# 'new_vm' is set to True.
+# 'vm_deploy_method' is set to 'iso', if 'vm_deploy_method' is set to 'ova',
+# will deploy a new Windows VM using configured OVA or OVF template files.
 #
 - name: deploy_vm
   hosts: localhost
@@ -19,18 +20,6 @@
       when: new_vm is undefined or not new_vm|bool
 
     - block:
-        # Initialize undefined variables
-        - name: "Initialize variables for new VM settings"
-          set_fact:
-            boot_disk_controller: "{{ boot_disk_controller if (boot_disk_controller is defined and boot_disk_controller) else 'lsilogicsas' }}"
-            secureboot_enabled: "{{ secureboot_enabled if (secureboot_enabled is defined and secureboot_enabled) else False }}"
-            network_adapter_type: "{{ 'e1000e' if (windows_has_inbox_driver is undefined or not windows_has_inbox_driver) else network_adapter_type }}"
-            firmware: "{{ firmware if (firmware is defined and firmware) else 'efi' }}"
-
-        - name: "Set fact of the deploy VM test case name"
-          set_fact:
-            deploy_casename: "deploy_vm_{{ firmware }}_{{ boot_disk_controller }}_{{ network_adapter_type }}"
-
         - name: "Set current test case log path on local machine"
           set_fact:
             current_test_log_folder: "{{ testrun_log_path }}/{{ ansible_play_name }}"
@@ -42,67 +31,13 @@
           register: create_log_path
         - debug: var=create_log_path
           when: enable_debug is defined and enable_debug
-
-        # Check configured VM CPU number and cores per socket number
-        - include_tasks: check_cpu_socket.yml
-
-        - include_tasks: ../../common/get_iso_file_list.yml
-
-        # Generate unattend install iso file
-        - include_tasks: create_unattend_install_iso.yml
-          when: unattend_install_conf is defined and unattend_install_conf
-        - debug:
-            msg: "unattend_install_conf is not defined or set to a file path, will not generate unattend iso file"
-          when: unattend_install_conf is undefined or not unattend_install_conf
-
-        # Compose VM CDROMs with ISO files
-        - include_tasks: ../../common/compose_vm_cdroms.yml
         
-        - name: Set Windows VM disk size at least 64GB
-          set_fact:
-            boot_disk_size_gb: "{{ [64, boot_disk_size_gb | default(64) | int] | max }}"
-        - include_tasks: ../../common/vm_create.yml
-          when: boot_disk_controller != 'ide'
-        - include_tasks: ../../common/vm_create_with_ide_disk.yml
-          when: boot_disk_controller == 'ide'
-        - include_tasks: ../../common/vm_get_vm_info.yml
-        - name: "Set fact of vm_exists to True"
-          set_fact:
-            vm_exists: True
-
-        # When firmware is EFI, configure force EFI setup once
-        - block:
-            # Add virtual TPM device
-            - include_tasks: ../../common/vm_add_vtpm_device.yml
-              vars:
-                vc_cert_path: "{{ current_test_log_folder }}"
-              when: virtual_tpm is defined and virtual_tpm | bool
-            # Enable secureboot
-            - include_tasks: ../../common/vm_set_boot_options.yml
-              vars:
-                secure_boot_enabled_set: "{{ secureboot_enabled | default(False) }}"
-                enter_bios_setup: True
-            - include_tasks: ../../common/vm_set_power_state.yml
-              vars:
-                vm_power_state_set: "powered-on"
-            - include_tasks: ../../common/vm_guest_send_key.yml
-              vars:
-                keys_send:
-                  - DOWNARROW
-                  - DOWNARROW
-                  - ENTER
-                  - ENTER
-          when: firmware is defined and firmware | lower == "efi"
-
-        # Power on VM directly when VM firmware is BIOS
-        - include_tasks: ../../common/vm_set_power_state.yml
-          vars:
-            vm_power_state_set: "powered-on"
-          when: firmware is defined and firmware | lower == "bios"
-        - name: "Wait 3 minutes while OS install"
-          pause:
-            minutes: 3
-
+        - include_tasks: deploy_vm_from_iso.yml
+          when: vm_deploy_method is undefined or vm_deploy_method | lower == 'iso'
+        - include_tasks: deploy_vm_from_ova.yml
+          when:
+            - vm_deploy_method is defined
+            - vm_deploy_method | lower == 'ova' 
         # Check Image APPROVED in vmware.log when VM secureboot is enabled
         - include_tasks: ../../common/vm_wait_log_msg.yml
           vars:
