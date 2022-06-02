@@ -22,9 +22,23 @@
   delegate_to: "{{ vm_guest_ip }}"
   ignore_unreachable: True
 
-- name: "Guest OS unreachable"
-  fail:
-    msg: "{{ win_powershell_cmd_output }}"
+- block:
+    - name: Test connection to VM
+      command: ping -c 10 "{{ vm_guest_ip }}"
+      register: ping_vm_result
+      changed_when: false
+      ignore_errors: true
+    - debug: var=ping_vm_result
+    - name: Test connection into guest
+      setup:
+        filter: "ansible_all_ipv4_addresses"
+      register: setup_vm_connection
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+    - debug: var=setup_vm_connection
+    - name: "Guest OS unreachable"
+      fail:
+        msg: "{{ win_powershell_cmd_output }}"
   when:
     - win_powershell_cmd_output is defined
     - win_powershell_cmd_output.unreachable is defined

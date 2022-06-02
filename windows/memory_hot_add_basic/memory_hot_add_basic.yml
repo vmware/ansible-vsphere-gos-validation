@@ -51,7 +51,10 @@
             skip_reason: "Blocked"
           when: memory_hotadd_size_list | length == 0
 
-        - include_tasks: generate_cpu_num_list.yml
+        # Workaround of connection reset failure, not loop on CPU number when hotadd memory
+        # to try to see if it can decrease the failure rate
+        # - include_tasks: generate_cpu_num_list.yml
+
         - name: Initialize the memory hotadd test result
           set_fact:
             mem_hotadd_results: []
@@ -62,9 +65,8 @@
 
         # Do memory hotadd with different vCPU in the list
         - include_tasks: hotadd_memory_for_vcpu.yml
-          loop: "{{ cpu_number_list }}"
-          loop_control:
-            loop_var: vcpu_number
+          vars:
+            vcpu_number: 2
         - name: Display the test results
           debug: var=mem_hotadd_results
       rescue:
