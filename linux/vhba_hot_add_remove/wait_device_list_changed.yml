@@ -16,6 +16,14 @@
       - wait_device_state | lower in ['present', 'absent']
     fail_msg: "Invalid wait_device_state value '{{ wait_device_state }}', the expected value is 'present' or 'absent'"
 
+- name: "Check wait_device_name is set for absent device"
+  assert:
+    that:
+      - wait_device_name is defined
+      - wait_device_name 
+    fail_msg: "wait_device_name is missing for waiting device absent"
+  when: wait_device_state | lower == 'absent'
+
 - name: "Initialize the difference length of device list with device present or absent"
   set_fact:
     wait_device_diff: "{% if wait_device_state | lower == 'present' %}1{% else %}-1{% endif %}"
@@ -44,22 +52,22 @@
 
         - block:
             - include_tasks: ../../common/get_system_info.yml
-              vars:
-                filter: ["ansible_devices"]
 
             - name: "Delete the removed SCSI disk"
               shell: "echo 1 > /sys/block/{{ wait_device_name }}/device/delete"
               ignore_errors: True
               delegate_to: "{{ vm_guest_ip }}"
               when:
-                - get_system_info_result is defined
-                - get_system_info_result.ansible_facts is defined
-                - get_system_info_result.ansible_facts.ansible_devices is defined
-                - get_system_info_result.ansible_facts.ansible_devices[wait_device_name] is defined
-                - get_system_info_result.ansible_facts.ansible_devices[wait_device_name].size is defined
-                - get_system_info_result.ansible_facts.ansible_devices[wait_device_name].size == "0.00 Bytes"
+                - guest_system_info is defined
+                - guest_system_info.ansible_devices is defined
+                - guest_system_info.ansible_devices[wait_device_name] is defined
+                - guest_system_info.ansible_devices[wait_device_name].size is defined
+                - guest_system_info.ansible_devices[wait_device_name].size == "0.00 Bytes"
           when: wait_device_state | lower == 'absent'
-      when: "'Flatcar' in guest_os_ansible_distribution"
+      when: >
+        ('Flatcar' in guest_os_ansible_distribution or
+         (guest_os_ansible_distribution == "Ubuntu" and
+          guest_os_ansible_distribution_ver == "22.04"))
   when: new_disk_ctrl_type == 'lsilogic'
 
 - block:
