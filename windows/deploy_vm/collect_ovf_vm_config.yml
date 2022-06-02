@@ -1,0 +1,59 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Collect hardware configurations of VM deployed from
+# OVF template
+#
+- name: Initialize VM hardware configurations info variables
+  set_fact:
+    ovf_vm_hardware_config: {}
+    ovf_vm_disk_info: []
+    ovf_vm_network_info: []
+    ovf_vm_vtpm_info: False
+
+- include_tasks: ../../common/vm_get_vm_info.yml
+- name: "Set fact of vm_exists to True"
+  set_fact:
+    vm_exists: True
+
+- name: Add VM guest ID and hardware version info
+  set_fact:
+    ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'guest ID': vm_guest_id | default(''), 'hardware version': vm_hardware_version_num | default('')}) }}"
+
+# Get all the VM hardwares info
+- include_tasks: ../../common/vm_get_config.yml
+
+- name: Add VM firmware and secureboot info
+  set_fact:
+    ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'firmware': vm_config.config.firmware | default(''), 'secureboot': vm_config.config.bootOptions.efiSecureBootEnabled | default('')}) }}"
+- name: Add VM CPU and memory info
+  set_fact:
+    ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'CPU number': vm_config.config.hardware.numCPU | default(''), 'CPU cores per socket': vm_config.config.hardware.numCoresPerSocket | default(''), 'memory MB': vm_config.config.hardware.memoryMB | default('')}) }}"
+- name: Add VBS info
+  set_fact:
+    ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'VBS enabled': vm_config.config.flags.vbsEnabled | default('') }}"
+
+- name: Set fact of disk info
+  set_fact:
+    ovf_vm_disk_info: "{{ ovf_vm_disk_info + [{'label': item.deviceInfo.label | default(''), 'disk GB': item.capacityInKB | int / 1024 / 1024 | default(''), 'controller': (vm_config.config.hardware.device | selectattr('key', 'equalto', item.controller_key))[0].deviceInfo.label, 'thin provisioned': item.backing.thinProvisioned | default('')}] }}"
+  when:
+    - item._vimtype == "vim.vm.device.VirtualDisk"
+  with_items: "{{ vm_config.config.hardware.device }}"
+
+- name: Set fact of network adapter info
+  set_fact:
+    ovf_vm_network_info: "{{ ovf_vm_network_info + [{'label': item.deviceInfo.label | default(''), 'network': item.backing.deviceName | default(''), 'type': item._vimtype.split('.')[-1][7:] | lower }] }}"
+  when:
+    - item._vimtype in ['vim.vm.device.VirtualVmxnet3', 'vim.vm.device.VirtualE1000e', 'vim.vm.device.VirtualE1000']
+  with_items: "{{ vm_config.config.hardware.device }}"
+
+- name: Set fact of vTPM device existence info
+  set_fact:
+    ovf_vm_vtpm_info: True
+  when:
+    - item._vimtype == "vim.vm.device.VirtualTPM"
+  with_items: "{{ vm_config.config.hardware.device }}"
+
+- name: Add devices info
+  set_fact:
+    ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'disk': ovf_vm_disk_info, 'network': ovf_vm_network_info, 'vTPM': ovf_vm_vtpm_info}) }}"

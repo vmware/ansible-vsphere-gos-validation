@@ -1,141 +1,112 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Description:
-#   This test case is used for deploying new Windows VM and installing
-# guest OS in VM automatically using Autounattend.xml file when
-# 'new_vm' is set to True.
+# Deploy a new Windows VM and install guest OS automatically
+# from ISO image
 #
-- name: deploy_vm
-  hosts: localhost
-  gather_facts: no
-  vars_files:
-    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
-  tasks:
-    - include_tasks: ../../common/skip_test_case.yml
+# Initialize VM virtual hardware config variables
+- name: "Initialize variables for new VM settings"
+  set_fact:
+    boot_disk_controller: "{{ boot_disk_controller if (boot_disk_controller is defined and boot_disk_controller) else 'lsilogicsas' }}"
+    secureboot_enabled: "{{ secureboot_enabled if (secureboot_enabled is defined and secureboot_enabled) else False }}"
+    network_adapter_type: "{{ 'e1000e' if (windows_has_inbox_driver is undefined or not windows_has_inbox_driver) else network_adapter_type }}"
+    firmware: "{{ firmware if (firmware is defined and firmware) else 'efi' }}"
+    boot_disk_size_gb: "{{ [64, boot_disk_size_gb | default(64) | int] | max }}"
+
+- name: "Set fact of the deploy VM test case name"
+  set_fact:
+    deploy_casename: "deploy_vm_{{ firmware }}_{{ boot_disk_controller }}_{{ network_adapter_type }}"
+
+# Check configured VM CPU number and cores per socket number
+- include_tasks: check_cpu_socket.yml
+
+# Get or check configured ISO file list
+- include_tasks: ../../common/get_iso_file_list.yml
+
+# Generate unattend install iso file
+- include_tasks: create_unattend_install_iso.yml
+  when: unattend_install_conf is defined and unattend_install_conf
+- debug:
+    msg: "unattend_install_conf is not defined or set to a file path, will not generate unattend iso file"
+  when: unattend_install_conf is undefined or not unattend_install_conf
+
+# Compose VM CDROMs with ISO file list
+- include_tasks: ../../common/compose_vm_cdroms.yml
+
+# Create new VM  
+- include_tasks: ../../common/vm_create.yml
+  when: boot_disk_controller != 'ide'
+- include_tasks: ../../common/vm_create_with_ide_disk.yml
+  when: boot_disk_controller == 'ide'
+
+- include_tasks: ../../common/vm_get_vm_info.yml
+- name: "Set fact of vm_exists to True"
+  set_fact:
+    vm_exists: True
+
+# When firmware is EFI, configure force EFI setup once
+- block:
+    # Add virtual TPM device
+    - include_tasks: ../../common/vm_add_vtpm_device.yml
       vars:
-        skip_msg: "Skip test case due to new_vm is set to '{{ new_vm | default(False) }}'"
-        skip_reason: "No Run"
-      when: new_vm is undefined or not new_vm|bool
+        vc_cert_path: "{{ current_test_log_folder }}"
+      when: virtual_tpm is defined and virtual_tpm | bool
+    # Enable secureboot
+    - include_tasks: ../../common/vm_set_boot_options.yml
+      vars:
+        secure_boot_enabled_set: "{{ secureboot_enabled | default(False) }}"
+        enter_bios_setup: True
+    - include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: "powered-on"
+    - include_tasks: ../../common/vm_guest_send_key.yml
+      vars:
+        keys_send:
+          - DOWNARROW
+          - DOWNARROW
+          - ENTER
+          - ENTER
+  when: firmware is defined and firmware | lower == "efi"
 
-    - block:
-        # Initialize undefined variables
-        - name: "Initialize variables for new VM settings"
-          set_fact:
-            boot_disk_controller: "{{ boot_disk_controller if (boot_disk_controller is defined and boot_disk_controller) else 'lsilogicsas' }}"
-            secureboot_enabled: "{{ secureboot_enabled if (secureboot_enabled is defined and secureboot_enabled) else False }}"
-            network_adapter_type: "{{ 'e1000e' if (windows_has_inbox_driver is undefined or not windows_has_inbox_driver) else network_adapter_type }}"
-            firmware: "{{ firmware if (firmware is defined and firmware) else 'efi' }}"
+# Power on VM directly when VM firmware is BIOS
+- include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+  when: firmware is defined and firmware | lower == "bios"
+- name: "Wait 3 minutes while OS install"
+  pause:
+    minutes: 3
 
-        - name: "Set fact of the deploy VM test case name"
-          set_fact:
-            deploy_casename: "deploy_vm_{{ firmware }}_{{ boot_disk_controller }}_{{ network_adapter_type }}"
+# Check Image APPROVED in vmware.log when VM secureboot is enabled
+- include_tasks: ../../common/vm_wait_log_msg.yml
+  vars:
+    vm_wait_log_name: "vmware.log"
+    vm_wait_log_msg: "SECUREBOOT: Image APPROVED"
+    vm_wait_log_retries: 10
+    vm_wait_log_ignore_errors: False
+    vm_wait_log_hide_output: False
+  when:
+    - firmware is defined and firmware | lower == 'efi'
+    - secureboot_enabled is defined and secureboot_enabled
 
-        - name: "Set current test case log path on local machine"
-          set_fact:
-            current_test_log_folder: "{{ testrun_log_path }}/{{ ansible_play_name }}"
-        - name: "Create the current test case log folder with mode '0755'"
-          file:
-            path: "{{ current_test_log_folder }}"
-            state: directory
-            mode: '0755'
-          register: create_log_path
-        - debug: var=create_log_path
-          when: enable_debug is defined and enable_debug
+- include_tasks: ../../common/vm_wait_network_connected.yml
+- include_tasks: ../../common/vm_get_ip.yml
+  vars:
+    vm_get_ip_timeout: 3600
+- include_tasks: ../utils/win_check_winrm.yml
+  vars:
+    win_check_winrm_timeout: 1800
+- name: "Wait another 1 minute after OS becomes connectable"
+  pause:
+    minutes: 1
+- name: "Print VM guest IP address"
+  debug: var=vm_guest_ip
 
-        # Check configured VM CPU number and cores per socket number
-        - include_tasks: check_cpu_socket.yml
+- include_tasks: ../utils/add_windows_host.yml
 
-        - include_tasks: ../../common/get_iso_file_list.yml
+# Take screenshot of VM after guest OS install
+- include_tasks: ../../common/vm_take_screenshot.yml
+  vars:
+    vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
 
-        # Generate unattend install iso file
-        - include_tasks: create_unattend_install_iso.yml
-          when: unattend_install_conf is defined and unattend_install_conf
-        - debug:
-            msg: "unattend_install_conf is not defined or set to a file path, will not generate unattend iso file"
-          when: unattend_install_conf is undefined or not unattend_install_conf
-
-        # Compose VM CDROMs with ISO files
-        - include_tasks: ../../common/compose_vm_cdroms.yml
-        
-        - name: Set Windows VM disk size at least 64GB
-          set_fact:
-            boot_disk_size_gb: "{{ [64, boot_disk_size_gb | default(64) | int] | max }}"
-        - include_tasks: ../../common/vm_create.yml
-          when: boot_disk_controller != 'ide'
-        - include_tasks: ../../common/vm_create_with_ide_disk.yml
-          when: boot_disk_controller == 'ide'
-        - include_tasks: ../../common/vm_get_vm_info.yml
-        - name: "Set fact of vm_exists to True"
-          set_fact:
-            vm_exists: True
-
-        # When firmware is EFI, configure force EFI setup once
-        - block:
-            # Add virtual TPM device
-            - include_tasks: ../../common/vm_add_vtpm_device.yml
-              vars:
-                vc_cert_path: "{{ current_test_log_folder }}"
-              when: virtual_tpm is defined and virtual_tpm | bool
-            # Enable secureboot
-            - include_tasks: ../../common/vm_set_boot_options.yml
-              vars:
-                secure_boot_enabled_set: "{{ secureboot_enabled | default(False) }}"
-                enter_bios_setup: True
-            - include_tasks: ../../common/vm_set_power_state.yml
-              vars:
-                vm_power_state_set: "powered-on"
-            - include_tasks: ../../common/vm_guest_send_key.yml
-              vars:
-                keys_send:
-                  - DOWNARROW
-                  - DOWNARROW
-                  - ENTER
-                  - ENTER
-          when: firmware is defined and firmware | lower == "efi"
-
-        # Power on VM directly when VM firmware is BIOS
-        - include_tasks: ../../common/vm_set_power_state.yml
-          vars:
-            vm_power_state_set: "powered-on"
-          when: firmware is defined and firmware | lower == "bios"
-        - name: "Wait 3 minutes while OS install"
-          pause:
-            minutes: 3
-
-        # Check Image APPROVED in vmware.log when VM secureboot is enabled
-        - include_tasks: ../../common/vm_wait_log_msg.yml
-          vars:
-            vm_wait_log_name: "vmware.log"
-            vm_wait_log_msg: "SECUREBOOT: Image APPROVED"
-            vm_wait_log_retries: 10
-            vm_wait_log_ignore_errors: False
-            vm_wait_log_hide_output: False
-          when:
-            - firmware is defined and firmware | lower == 'efi'
-            - secureboot_enabled is defined and secureboot_enabled
-
-        - include_tasks: ../../common/vm_wait_network_connected.yml
-        - include_tasks: ../../common/vm_get_ip.yml
-          vars:
-            vm_get_ip_timeout: 3600
-        - include_tasks: ../utils/win_check_winrm.yml
-          vars:
-            win_check_winrm_timeout: 1800
-        - name: "Wait another 1 minute after OS becomes connectable"
-          pause:
-            minutes: 1
-        - name: "Print VM guest IP address"
-          debug: var=vm_guest_ip
-        - include_tasks: ../utils/add_windows_host.yml
-
-        # Take screenshot of VM after guest OS install
-        - include_tasks: ../../common/vm_take_screenshot.yml
-          vars:
-            vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
-
-        - include_tasks: detach_cdrom_iso.yml
-      rescue:
-        - include_tasks: ../../common/test_rescue.yml
-          vars:
-            exit_testing_when_fail: True
+- include_tasks: detach_cdrom_iso.yml

@@ -33,33 +33,15 @@
           when: enable_debug is defined and enable_debug
         
         - include_tasks: deploy_vm_from_iso.yml
-          when: vm_deploy_method is undefined or vm_deploy_method | lower == 'iso'
+          when: >
+            (vm_deploy_method is undefined) or
+            (vm_deploy_method | lower == 'iso')
+
         - include_tasks: deploy_vm_from_ova.yml
           when:
             - vm_deploy_method is defined
             - vm_deploy_method | lower == 'ova' 
-        # Check Image APPROVED in vmware.log when VM secureboot is enabled
-        - include_tasks: ../../common/vm_wait_log_msg.yml
-          vars:
-            vm_wait_log_name: "vmware.log"
-            vm_wait_log_msg: "SECUREBOOT: Image APPROVED"
-            vm_wait_log_retries: 10
-            vm_wait_log_ignore_errors: False
-            vm_wait_log_hide_output: False
-          when:
-            - firmware is defined and firmware | lower == 'efi'
-            - secureboot_enabled is defined and secureboot_enabled
 
-        - include_tasks: ../../common/vm_wait_network_connected.yml
-        - include_tasks: ../../common/vm_get_ip.yml
-          vars:
-            vm_get_ip_timeout: 3600
-        - include_tasks: ../utils/win_check_winrm.yml
-          vars:
-            win_check_winrm_timeout: 1800
-        - name: "Wait another 1 minute after OS becomes connectable"
-          pause:
-            minutes: 1
         - name: "Print VM guest IP address"
           debug: var=vm_guest_ip
         - include_tasks: ../utils/add_windows_host.yml
@@ -68,8 +50,6 @@
         - include_tasks: ../../common/vm_take_screenshot.yml
           vars:
             vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
-
-        - include_tasks: detach_cdrom_iso.yml
       rescue:
         - include_tasks: ../../common/test_rescue.yml
           vars:

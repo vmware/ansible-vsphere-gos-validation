@@ -1,0 +1,27 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Download ConfigureRemotingForAnsible.ps1 script from github
+# for connecting Windows guest OS
+#
+- name: Set fact of the ConfigureRemotingForAnsible.ps1 script URL
+  set_fact:
+    config_remote_windows: "https://raw.githubusercontent.com/ansible/ansible/devel/examples/scripts/ConfigureRemotingForAnsible.ps1"
+- name: Set fact of the local path for downloaded script
+  set_fact:  
+    config_remote_windows_local: "{{ local_cache }}/{{ config_remote_windows.split('/')[-1] }}"
+
+- name: Download ConfigureRemotingForAnsible.ps1 script from URL
+  get_url:
+    url: "{{ config_remote_windows }}"
+    dest: "{{ config_remote_windows_local }}"
+    validate_certs: False
+    use_proxy: "{{ use_localhost_proxy | default(False) }}"
+  environment:
+    HTTPS_PROXY: "{{ http_proxy_localhost | default(omit) }}"
+
+- name: Check downloaded script exists locally
+  stat:
+    path: "{{ config_remote_windows_local }}"
+  register: config_remote_file
+  failed_when: not config_remote_file.stat.exists

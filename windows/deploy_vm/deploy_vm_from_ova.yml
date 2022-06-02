@@ -1,0 +1,55 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Deploy a new Windows VM through the Windows OVF/OVA template
+#
+- name: "Set fact of the deploy VM test case name"
+  set_fact:
+    deploy_casename: "deploy_vm_ovf"
+
+# OVA file on local machine
+- name: "Get OVA path and file name"
+  set_fact:
+    vm_ova_path: "{{ ova_path | realpath }}"
+    vm_ova_name: "{{ ova_path | basename }}"
+  when: ova_nfs_server_path is undefined or not ova_nfs_server_path
+
+# OVA file on NFS server
+- include_tasks: ../../common/mount_nfs_storage_local.yml
+  when: ova_nfs_server_path is defined and ova_nfs_server_path
+
+# Check OVA file exists
+- name: "Check for {{ vm_ova_path }} existence"
+  stat:
+    path: "{{ vm_ova_path }}"
+  register: vm_ova_stat
+  failed_when: not vm_ova_stat.stat.exists
+
+# Deploy a new VM from OVA
+- include_tasks: ../../common/ovf_deploy.yml
+  vars:
+    ovf_path: "{{ vm_ova_path }}"
+    ovf_vm_name: "{{ vm_name }}"
+    deploy_datastore: "{{ datastore }}"
+
+# Get OVA deployed VM info
+- include_tasks: collect_ovf_vm_config.yml
+
+- include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-on'
+
+- include_tasks: ../../common/vm_wait_guest_fullname.yml
+
+- include_tasks: ../../common/vm_get_ip.yml
+  vars:
+    vm_get_ip_timeout: 600
+
+# Set the default user 'User' password
+
+# Execute ConfigureRemotingForAnsible.ps1 script in guest
+ 
+- include_tasks: ../utils/win_check_winrm.yml
+- include_tasks: ../utils/add_windows_host.yml
+- name: "Print VM guest IP address"
+  debug: var=vm_guest_ip
