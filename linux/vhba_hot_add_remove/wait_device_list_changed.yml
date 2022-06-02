@@ -14,7 +14,7 @@
     that:
       - wait_device_state is defined
       - wait_device_state | lower in ['present', 'absent']
-    fail_msg: "Invalid wait_device_state value '{{ wait_device_state }}', the expected value is 'present' or 'absent'"
+    fail_msg: "Invalid wait_device_state value '{{ wait_device_state | default('undefined') }}', the expected value is 'present' or 'absent'"
 
 - name: "Check wait_device_name is set for absent device"
   assert:
@@ -24,11 +24,11 @@
     fail_msg: "wait_device_name is missing for waiting device absent"
   when: wait_device_state | lower == 'absent'
 
-- name: "Initialize the difference length of device list with device present or absent"
+- name: "Initialize the difference length of device list with device {{ wait_device_state | lower }}"
   set_fact:
     wait_device_diff: "{% if wait_device_state | lower == 'present' %}1{% else %}-1{% endif %}"
 
-# Rescan SCSI bus
+# Rescan SCSI bus when hot adding/removing LSILogic disk
 - block:
     - block:
         - name: "Rescan all scsi devices"
@@ -41,7 +41,9 @@
           when:
             - rescan_scsi_result is defined
             - rescan_scsi_result.stdout_lines
-      when: "'Flatcar' not in guest_os_ansible_distribution"
+      when:
+        - "'Flatcar' not in guest_os_ansible_distribution"
+        - not (guest_os_ansible_distribution == "Ubuntu" and guest_os_ansible_distribution_ver == "22.04")
 
     - block:
         - name: "Rescan all hard disks"
@@ -63,7 +65,7 @@
                     items2dict
                   }}  
 
-            - name: "Delete the removed SCSI disk {{ wait_device_name }}"
+            - name: "Rescan the deleted SCSI disk '{{ wait_device_name }}'"
               shell: "echo 1 > /sys/block/{{ wait_device_name }}/device/delete"
               ignore_errors: True
               delegate_to: "{{ vm_guest_ip }}"
@@ -154,7 +156,7 @@
 
     - name: "Check {{ wait_device_name }} to be absent"
       fail:
-        msg: "{{ wait_device_name }} has been removed but still can be detected by guest OS."
+        msg: "Disk '{{ wait_device_name }}' has been removed but still can be detected by guest OS."
       when: wait_device_state | lower == 'absent'
   when: >
     (lsblk_result is undefined or
