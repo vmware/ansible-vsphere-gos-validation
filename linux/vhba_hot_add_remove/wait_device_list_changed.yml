@@ -3,11 +3,32 @@
 ---
 # Wait for a device state is present or absent
 # Parameters:
-#   wait_device_list: The devices list
-#   wait_device_diff: The difference length of device list, like  1 or -1.
+#   device_list_before_change: The devices list before change
+#   wait_device_state: 'present' for new added device
+#                      'absent' for removed device
+#   wait_device_name: The devices name which should be absent.
+#                     Required when wait_device_state is absent.
 #
+- name: "Check wait_device_state is correct"
+  assert:
+    that:
+      - wait_device_state is defined
+      - wait_device_state | lower in ['present', 'absent']
+    fail_msg: "Invalid wait_device_state value '{{ wait_device_state | default('undefined') }}', the expected value is 'present' or 'absent'"
 
-# Rescan SCSI bus
+- name: "Check wait_device_name is set for absent device"
+  assert:
+    that:
+      - wait_device_name is defined
+      - wait_device_name 
+    fail_msg: "wait_device_name is missing for waiting device absent"
+  when: wait_device_state | lower == 'absent'
+
+- name: "Initialize the difference length of device list with device {{ wait_device_state | lower }}"
+  set_fact:
+    wait_device_diff: "{% if wait_device_state | lower == 'present' %}1{% else %}-1{% endif %}"
+
+# Rescan SCSI bus when hot adding/removing LSILogic disk
 - block:
     - block:
         - name: "Rescan all scsi devices"
@@ -20,7 +41,9 @@
           when:
             - rescan_scsi_result is defined
             - rescan_scsi_result.stdout_lines
-      when: "'Flatcar' not in guest_os_ansible_distribution"
+      when:
+        - "'Flatcar' not in guest_os_ansible_distribution"
+        - not (guest_os_ansible_distribution == "Ubuntu" and guest_os_ansible_distribution_ver == "22.04")
 
     - block:
         - name: "Rescan all hard disks"
@@ -28,7 +51,34 @@
             for i in `find /sys/ -iname rescan`;do echo 1 >$i; done;
             for i in `find /sys/ -iname scan`;do echo "- - -" >$i; done;
           delegate_to: "{{ vm_guest_ip }}"
-      when: "'Flatcar' in guest_os_ansible_distribution"
+
+        - block:
+            - include_tasks: ../../common/get_system_info.yml
+
+            - name: "Set fact of removed disk {{ wait_device_name }}"
+              set_fact:
+                guest_ansible_device: >
+                  {{  
+                    guest_system_info.ansible_devices | 
+                    dict2items |
+                    selectattr('key', 'equalto', wait_device_name) |
+                    items2dict
+                  }}  
+
+            - name: "Rescan the deleted SCSI disk '{{ wait_device_name }}'"
+              shell: "echo 1 > /sys/block/{{ wait_device_name }}/device/delete"
+              ignore_errors: True
+              delegate_to: "{{ vm_guest_ip }}"
+              when:
+                - guest_ansible_device is defined
+                - guest_ansible_device[wait_device_name] is defined
+                - guest_ansible_device[wait_device_name].size is defined
+                - guest_ansible_device[wait_device_name].size == "0.00 Bytes"
+          when: wait_device_state | lower == 'absent'
+      when: >
+        ('Flatcar' in guest_os_ansible_distribution or
+         (guest_os_ansible_distribution == "Ubuntu" and
+          guest_os_ansible_distribution_ver == "22.04"))
   when: new_disk_ctrl_type == 'lsilogic'
 
 - block:
@@ -77,15 +127,16 @@
   set_fact:
     device_list_after_change: []
 
-- name: "Wait for new device to be {% if wait_device_diff == 1 %}present{% else %}absent{% endif %}"
+- name: "Wait for device to be {{ wait_device_state | lower }}"
   shell: "lsblk -o NAME,TYPE --nodeps| grep disk | awk '{print $1}'"
   delegate_to: "{{ vm_guest_ip }}"
   register: lsblk_result
   until:
     - lsblk_result.stdout_lines is defined
-    - (lsblk_result.stdout_lines | length) - (wait_device_list | length) == wait_device_diff
+    - (lsblk_result.stdout_lines | length) - (device_list_before_change | length) == (wait_device_diff | int)
   delay: 5
   retries: 10
+  ignore_errors: True
   ignore_unreachable: True
 
 - name: "Guest OS unreachable"
@@ -95,6 +146,22 @@
     - lsblk_result is defined
     - lsblk_result.unreachable is defined
     - lsblk_result.unreachable
+
+# Check device list changed
+- block:
+    - name: "Check new device to be present"
+      fail:
+        msg: "New device is not recognized in guest OS."
+      when: wait_device_state | lower == 'present'
+
+    - name: "Check {{ wait_device_name }} to be absent"
+      fail:
+        msg: "Disk '{{ wait_device_name }}' has been removed but still can be detected by guest OS."
+      when: wait_device_state | lower == 'absent'
+  when: >
+    (lsblk_result is undefined or
+     lsblk_result.stdout_lines is undefined or
+     (lsblk_result.stdout_lines | length) - (device_list_before_change | length) != (wait_device_diff | int))
 
 - name: "Set fact of new device list after change"
   set_fact:
