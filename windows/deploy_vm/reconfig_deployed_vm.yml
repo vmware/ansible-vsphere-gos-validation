@@ -1,0 +1,47 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Remove network adapters to leave only 1 for testing
+- block:
+    - name: Set fact of the network adapter list to be removed
+      set_fact:
+        ovf_vm_network_remove: "{{ (ovf_vm_hardware_config.network | sort(attribute='label'))[1:-1] }}"
+    - include_tasks: ../../common/vm_remove_network_adapter.yml
+      vars:
+        adapter_label: "{{ item.label }}"
+      with_items: "{{ ovf_vm_network_remove }}"
+  when:
+    - ovf_vm_hardware_config is defined
+    - ovf_vm_hardware_config.network is defined
+    - ovf_vm_hardware_config.network | length > 1
+
+# Power on VM and wait for guest fullname reported by VMware tools
+- include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+- include_tasks: ../../common/vm_wait_guest_fullname.yml
+
+# Copy script ConfigureRemotingForAnsible.ps1 to guest OS
+- include_tasks: ../../common/vm_guest_file_operation.yml
+  vars:
+    src_path: "{{ config_remote_windows_local }}"
+    dest_path: "C:\\ConfigureRemotingForAnsible.ps1"
+    operation: 'copy_file'
+
+# Shutdown guest OS before execute guest customization
+- include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "shutdown"
+
+# Do guest customization to set Administrator user
+# password and execute script
+- include_tasks: execute_win_gosc.yml
+- include_tasks: ../../common/vm_wait_gosc_completed.yml
+
+- include_tasks: ../../common/vm_get_ip_from_vmtools.yml
+- include_tasks: ../utils/win_check_winrm.yml
+  vars:
+    win_check_winrm_timeout: 1800
+- name: "Wait another 1 minute after OS becomes connectable"
+  pause:
+    minutes: 1

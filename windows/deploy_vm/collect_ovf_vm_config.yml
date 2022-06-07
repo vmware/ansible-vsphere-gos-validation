@@ -31,11 +31,11 @@
     ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'CPU number': vm_config.config.hardware.numCPU | default(''), 'CPU cores per socket': vm_config.config.hardware.numCoresPerSocket | default(''), 'memory MB': vm_config.config.hardware.memoryMB | default('')}) }}"
 - name: Add VBS info
   set_fact:
-    ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'VBS enabled': vm_config.config.flags.vbsEnabled | default('') }}"
+    ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'VBS enabled': vm_config.config.flags.vbsEnabled | default('')}) }}"
 
 - name: Set fact of disk info
   set_fact:
-    ovf_vm_disk_info: "{{ ovf_vm_disk_info + [{'label': item.deviceInfo.label | default(''), 'disk GB': item.capacityInKB | int / 1024 / 1024 | default(''), 'controller': (vm_config.config.hardware.device | selectattr('key', 'equalto', item.controller_key))[0].deviceInfo.label, 'thin provisioned': item.backing.thinProvisioned | default('')}] }}"
+    ovf_vm_disk_info: "{{ ovf_vm_disk_info + [{'label': item.deviceInfo.label | default(''), 'disk GB': item.capacityInKB | int / 1024 / 1024 | default(''), 'controller': (vm_config.config.hardware.device | selectattr('key', 'equalto', item.controllerKey))[0].deviceInfo.summary, 'thin provisioned': item.backing.thinProvisioned | default('')}] }}"
   when:
     - item._vimtype == "vim.vm.device.VirtualDisk"
   with_items: "{{ vm_config.config.hardware.device }}"
