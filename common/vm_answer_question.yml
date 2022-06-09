@@ -1,0 +1,38 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Answer question to unblock VM configurations
+# Parameters:
+#   vm_question: The guest question object
+#   vm_question_response: The response to the question. e.g. button.serial.file.overwrite
+#
+
+- block:
+    - debug:
+        msg:
+          - "VM has a question to answer:"
+          - "Question message id is: {{ vm_question.message[0].id }}"
+          - "Question message text is: {{ vm_question.message[0].text }}"
+          - "Response choices are: {{ vm_question.choice.choiceInfo | map(attribute='summary') }}"
+    
+    - name: "Answer VM question '{{ vm_question.message[0].id }}'"
+      vmware_guest_powerstate:
+        validate_certs: "{{ validate_certs | default(False) }}"
+        hostname: "{{ vsphere_host_name }}"
+        username: "{{ vsphere_host_user }}"
+        password: "{{ vsphere_host_user_password }}"
+        folder: "{{ vm_folder }}"
+        name: "{{ vm_name }}"
+        state: "powered-on"
+        state_change_timeout: 300
+        answer:
+          - question: "{{ vm_question.message[0].id }}"
+            response: "{{ vm_question_response }}"
+      register: vm_answer_question_result
+  when:
+    - vm_question is defined
+    - vm_question.message is defined
+    - vm_question.message | length > 0
+    - vm_question.choice is defined
+    - vm_question.choice.choiceInfo is defined 
+    - vm_question.choice.choiceInfo | length > 0

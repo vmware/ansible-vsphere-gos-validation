@@ -42,6 +42,38 @@
     state: "{{ vm_power_state_set }}"
     state_change_timeout: 300
   register: vm_change_power_state
+  ignore_errors: True
+
+# Replace serial port output file at power on
+- block:
+    - include_tasks: vm_answer_question.yml
+      vars:
+        vm_question: "{{ vm_change_power_state.instance.guest_question }}"
+        vm_question_response: "button.serial.file.overwrite"
+
+    - name: "Set fact of the result of changing VM power state"
+      set_fact:
+        vm_change_power_state: "{{ vm_answer_question_result }}"
+      when:
+        - vm_answer_question_result is defined
+        - vm_answer_question_result
+  when:
+    - vm_power_state_set | lower == 'powered-on'
+    - vm_change_power_state is defined
+    - vm_change_power_state.instance is defined
+    - vm_change_power_state.instance.guest_question is defined
+    - vm_change_power_state.instance.guest_question.message is defined
+    - vm_change_power_state.instance.guest_question.message | length > 0
+    - vm_change_power_state.instance.guest_question.message[0].id == "msg.serial.file.open"
+
+- fail:
+    msg: >
+      {% if vm_change_power_state is defined and vm_change_power_state.msg is defined %}{{ vm_change_power_state.msg }}
+      {% else %}Failed to set VM power state to {{ vm_power_state_set | lower }}{% endif %}
+  when: >
+    vm_change_power_state is undefined or
+    vm_change_power_state.instance is undefined or
+    vm_change_power_state.failed is defined and vm_change_power_state.failed | bool
 
 - name: Display the result of changing VM power state
   debug: var=vm_change_power_state
