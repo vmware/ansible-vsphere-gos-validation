@@ -16,8 +16,13 @@
 
     # OVA file on NFS server
     - include_tasks: ../../common/mount_nfs_storage_local.yml
+      vars:
+        nfs_server_path: "{{ ova_nfs_server_path }}"
       when: ova_nfs_server_path is defined and ova_nfs_server_path
-
+    - name: "Get OVA path and file name"
+      set_fact:
+        vm_ova_path: "{{ nfs_mount_dir }}/{{ ova_path }}"
+        vm_ova_name: "{{ ova_path | basename }}"
     # Check OVA file exists
     - name: "Check for {{ vm_ova_path }} existence"
       stat:
@@ -130,7 +135,7 @@
         - include_tasks: ../../common/local_unmount.yml
           vars:
             mount_path: "{{ tmp_nfs_mount_dir }}"
-          when: ova_nfs_mounted is defined and ova_nfs_mounted | bool
+          when: nfs_mounted is defined and nfs_mounted | bool
 
         # Remove temporary folders
         - name: "Remove temporary directory {{ tmp_nfs_mount_dir }}"

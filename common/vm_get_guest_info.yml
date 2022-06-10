@@ -12,26 +12,34 @@
     guestinfo_guest_family: ''
     guestinfo_detailed_data: ''
     guestinfo_gathered: False
+    guestinfo_vmtools_info: ''
 
 - name: "Get guest info retrieved by VMware Tools"
   set_fact:
     guestinfo_guest_id: "{{ vm_guestinfo.instance.guest.guestId }}"
     guestinfo_guest_full_name: "{{ vm_guestinfo.instance.guest.guestFullName }}"
     guestinfo_guest_family: "{{ vm_guestinfo.instance.guest.guestFamily }}"
-    guestinfo_detailed_data: |-
-      {%- if vm_extra_config is defined -%}
-          {%- if 'guestOS.detailed.data' in vm_extra_config -%}{{ vm_extra_config['guestOS.detailed.data'] | replace('\"', '') }}
-          {%- elif 'guestInfo.detailed.data' in vm_extra_config -%}{{ vm_extra_config['guestInfo.detailed.data'] | replace('\"', '') }}
-          {%- endif -%}
-      {%- endif -%}
-    guestinfo_gathered: True
   when:
     - vm_guestinfo is defined
     - vm_guestinfo.instance is defined
     - vm_guestinfo.instance.guest is defined
+
+- name: "Get guest detailed data and vmtools version"
+  set_fact:
+    guestinfo_vmtools_info: |-
+      "{%- if 'guestinfo.vmtools.description' in vm_extra_config -%}{{ vm_extra_config['guestinfo.vmtools.description'] | replace('\"', '') }}
+      {%- endif -%}"
+    guestinfo_detailed_data: |-
+      "{%- if 'guestOS.detailed.data' in vm_extra_config -%}{{ vm_extra_config['guestOS.detailed.data'] | replace('\"', '') }}
+      {%- elif 'guestInfo.detailed.data' in vm_extra_config -%}{{ vm_extra_config['guestInfo.detailed.data'] | replace('\"', '') }}
+      {%- endif -%}"
+  when:
+    - vm_extra_config is defined
+    - vm_extra_config
 
 - debug:
     msg:
       - "VM guest info guest id: {{ guestinfo_guest_id }}"
       - "VM guest info guest full name: {{ guestinfo_guest_full_name }}"
       - "VM guset info guest detailed data: {{ guestinfo_detailed_data }}"
+      - "VM guest info VMware tools info: {{ guestinfo_vmtools_info }}"

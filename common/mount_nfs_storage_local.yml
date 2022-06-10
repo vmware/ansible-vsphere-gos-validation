@@ -1,33 +1,39 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get the NFS server and volume from OVA path
-- set_fact:
-    ova_nfs_server: "{{ ova_nfs_server_path.split(':')[0] }}"
-    ova_nfs_volume: "{{ ova_nfs_server_path.split(':')[1] }}"
+# Mount specified NFS volume to the path on local machine
+# Parameters:
+#   nfs_server_path: the NFS share path must be set in the format of
+#     'nfs_server:nfs_volume'.
+#   nfs_mount_dir: (Optional) an existing local dir path, if not specified,
+#     will create a temp dir with 'nfs' prefix in the name by default.
+#
+- name: "Check required parameter nfs_server_path"
+  assert:
+    that:
+      - nfs_server_path is defined
+      - nfs_server_path
+      - nfs_server_path.split(':') | length == 2
+    fail_msg: "nfs_server_path parameter must be set and in this format 'nfs_server:nfs_volume'."
 
-# Create a temporary directory to mount NFS storage
-- include_tasks: create_temp_file_dir.yml
-  vars:
-    tmp_state: "directory"
-    tmp_prefix: "nfs_"
+- block:
+    # Create a temporary directory to mount NFS storage
+    - include_tasks: create_temp_file_dir.yml
+      vars:
+        tmp_state: "directory"
+        tmp_prefix: "nfs_"
+    - name: "Set fact of the mount dir"
+      set_fact:
+        nfs_mount_dir: "{{ tmp_path }}"
+  when: nfs_mount_dir is undefined
 
-- name: "Set fact of the temp dir"
-  set_fact:
-    tmp_nfs_mount_dir: "{{ tmp_path }}"
-
-# Mount OS Image folder
+# Mount NFS share folder locally
 - include_tasks: local_mount.yml
   vars:
-    mount_src: "{{ ova_nfs_server }}:{{ ova_nfs_volume }}"
-    mount_path: "{{ tmp_nfs_mount_dir }}"
+    mount_src: "{{ nfs_server_path }}"
+    mount_path: "{{ nfs_mount_dir }}"
     mount_fstype: "nfs"
 
 - name: "Set fact of the NFS mount result"
   set_fact:
-    ova_nfs_mounted: "{% if nfs_mount_result is defined and nfs_mount_result.changed %}True{% else %}False{% endif %}"
-
-- name: "Get OVA path and file name"
-  set_fact:
-    vm_ova_path: "{{ tmp_nfs_mount_dir }}/{{ ova_path }}"
-    vm_ova_name: "{{ ova_path | basename }}"
+    nfs_mounted: "{% if nfs_mount_result is defined and nfs_mount_result.changed %}True{% else %}False{% endif %}"

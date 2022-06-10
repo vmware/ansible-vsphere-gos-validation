@@ -21,15 +21,9 @@
     ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'guest ID': vm_guest_id | default(''), 'hardware version': vm_hardware_version_num | default('')}) }}"
 
 - include_tasks: ../../common/vm_get_guest_info.yml
-- name: Set fact of VMware tools info
-  set_fact:
-    vmtools_info_from_vmtoolsd: "{{ vm_extra_config['guestinfo.vmtools.description'] | replace('\"', '') }}"
-  when:
-    - vm_extra_config is defined
-    - "'guestinfo.vmtools.description' in vm_extra_config"
 - name: Set fact of guest bitness
   set_fact:
-    vm_guest_os_distribution: "{{ guestinfo_detailed_data.split(\"prettyName='\")[1].strip(\"'\") }}"
+    ovf_vm_guest_os: "{{ guestinfo_detailed_data.split(\"prettyName='\")[1].strip(\"'\") }}"
     ovf_vm_guest_bitness: "{{ (guestinfo_detailed_data | regex_search(\"bitness='[0-9]+'\")).split('=')[1].strip(\"''\") }}"
     ovf_vm_guest_build: "{{ (guestinfo_detailed_data | regex_search(\"kernelVersion='[0-9]+.[0-9]+'\")).split('=')[1].strip(\"''\") }}"
   when:
@@ -37,7 +31,7 @@
     - guestinfo_detailed_data
 - name: Add guest OS version info and VMware tools info
   set_fact:
-    ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'guest OS': vm_guest_os_distribution | default(''), 'VMware tools': vmtools_info_from_vmtoolsd | default('')}) }}"
+    ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'guest OS': ovf_vm_guest_os | default(''), 'VMware tools': guestinfo_vmtools_info | default('')}) }}"
 
 # Get all the VM hardwares info
 - include_tasks: ../../common/vm_get_config.yml
@@ -82,9 +76,9 @@
 # Save the VM hardware info to json file
 - name: Set fact of json file name
   set_fact:
-    ovf_vm_hardware_config_file: "{{ ('-').join(vm_guest_os_distribution.split(',')[0].split(' ')) }}-{{ ovf_vm_guest_build.replace('.', '-') }}-{{ ovf_vm_guest_bitness }}bit-template.json"
+    ovf_vm_hardware_config_file: "{{ ('-').join(ovf_vm_guest_os.split(',')[0].split(' ')) }}-{{ ovf_vm_guest_build.replace('.', '-') }}-{{ ovf_vm_guest_bitness }}bit-template.json"
   when:
-    - vm_guest_os_distribution is defined and vm_guest_os_distribution
+    - ovf_vm_guest_os is defined and ovf_vm_guest_os
     - ovf_vm_guest_build is defined and ovf_vm_guest_build
     - ovf_vm_guest_bitness is defined and ovf_vm_guest_bitness
 - name: Dump VM hardware configuration info to json file

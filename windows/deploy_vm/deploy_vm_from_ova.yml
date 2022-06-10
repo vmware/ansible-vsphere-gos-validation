@@ -16,8 +16,13 @@
 
 # OVA file on NFS server
 - include_tasks: ../../common/mount_nfs_storage_local.yml
+  vars:
+    nfs_server_path: "{{ ova_nfs_server_path }}"
   when: ova_nfs_server_path is defined and ova_nfs_server_path
-
+- name: "Get OVA path and file name"
+  set_fact:
+    vm_ova_path: "{{ nfs_mount_dir }}/{{ ova_path }}"
+    vm_ova_name: "{{ ova_path | basename }}"
 # Check OVA file exists
 - name: "Check for {{ vm_ova_path }} existence"
   stat:
@@ -39,8 +44,6 @@
 - include_tasks: ../../common/vm_wait_guest_fullname.yml
 
 - include_tasks: ../../common/vm_get_ip_from_vmtools.yml
-- name: "Print VM guest IP address"
-  debug: var=vm_guest_ip
 
 # Copy script ConfigureRemotingForAnsible.ps1 to guest OS
 # - include_tasks: ../../common/vm_guest_file_operation.yml
