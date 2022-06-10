@@ -53,3 +53,17 @@
         - include_tasks: ../../common/test_rescue.yml
           vars:
             exit_testing_when_fail: True
+      always:
+        - block:
+            # Umount NFS share points
+            - include_tasks: ../../common/local_unmount.yml
+              vars:
+                mount_path: "{{ nfs_mount_dir }}"
+                local_unmount_ignore_errors: True
+              when: nfs_mounted is defined and nfs_mounted | bool
+            # Remove temporary folders
+            - include_tasks: ../../common/delete_local_file.yml
+              vars:
+                local_path: "{{ nfs_mount_dir }}"
+                del_local_file_ignore_errors: True
+          when: nfs_mount_dir is defined and nfs_mount_dir
