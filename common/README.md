@@ -34,6 +34,7 @@
 * vm_remove_serial_port.yml: Remove a serial port from VM
 * vm_add_remove_vtpm.yml: Add or remove vTPM device from VM
 * vm_add_vtpm_device.yml: Add key provider on vCenter then add new vTPM device to VM
+* vm_answer_question.yml: Answer question at VM power on
   
 ### Tasks for VM CPU or Memory settings
 * vm_enable_cpu_hotadd.yml: Enable VM CPU hotadd
