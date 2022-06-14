@@ -1,8 +1,12 @@
 # Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Collect hardware configurations of VM deployed from
-# OVF template
+# This task collects hardware configurations of deployed VM
+# and save the hardware config info to a json file in specifed
+# directory.
+# Parameters:
+#   ovf_vm_hardware_config_path: the existing directory path
+#   on local machine to save the json file.
 #
 - name: Initialize VM hardware configurations info variables
   set_fact:
@@ -12,15 +16,12 @@
     ovf_vm_vtpm_info: False
     ovf_vm_hardware_config_file: 'ovf_deploy_vm_info.json'
 
-- include_tasks: ../../common/vm_get_vm_info.yml
-- name: "Set fact of vm_exists to True"
-  set_fact:
-    vm_exists: True
+- include_tasks: vm_get_vm_info.yml
 - name: Add VM guest ID and hardware version info
   set_fact:
     ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'guest ID': vm_guest_id | default(''), 'hardware version': vm_hardware_version_num | default('')}) }}"
 
-- include_tasks: ../../common/vm_get_guest_info.yml
+- include_tasks: vm_get_guest_info.yml
 - name: Set fact of guest bitness
   set_fact:
     ovf_vm_guest_os: "{{ guestinfo_detailed_data.split(\"prettyName='\")[1].strip(\"'\") }}"
@@ -34,7 +35,7 @@
     ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'guest OS': ovf_vm_guest_os | default(''), 'VMware tools': guestinfo_vmtools_info | default('')}) }}"
 
 # Get all the VM hardwares info
-- include_tasks: ../../common/vm_get_config.yml
+- include_tasks: vm_get_config.yml
 
 - name: Add VM firmware and secureboot info
   set_fact:
@@ -62,10 +63,7 @@
 
 - name: Set fact of vTPM device existence info
   set_fact:
-    ovf_vm_vtpm_info: True
-  when:
-    - item._vimtype == "vim.vm.device.VirtualTPM"
-  with_items: "{{ vm_config.config.hardware.device }}"
+    ovf_vm_vtpm_info: "{{ vm_config.config.hardware.device | selectattr('_vimtype', 'equalto', 'vim.vm.device.VirtualTPM') | length > 0 }}"
 
 - name: Add devices info
   set_fact:
@@ -83,5 +81,5 @@
     - ovf_vm_guest_bitness is defined and ovf_vm_guest_bitness
 - name: Dump VM hardware configuration info to json file
   copy:
-    dest: "{{ current_test_log_folder }}/{{ ovf_vm_hardware_config_file }}"
+    dest: "{{ ovf_vm_hardware_config_path }}/{{ ovf_vm_hardware_config_file }}"
     content: "{{ [ovf_vm_hardware_config] | to_nice_json }}"
