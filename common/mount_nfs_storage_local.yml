@@ -1,0 +1,39 @@
+# Copyright 2021-2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Mount specified NFS volume to the path on local machine
+# Parameters:
+#   nfs_server_path: the NFS share path must be set in the format of
+#     'nfs_server:nfs_volume'.
+#   nfs_mount_dir: (Optional) an existing local dir path, if not specified,
+#     will create a temp dir with 'nfs' prefix in the name by default.
+#
+- name: "Check required parameter nfs_server_path"
+  assert:
+    that:
+      - nfs_server_path is defined
+      - nfs_server_path
+      - nfs_server_path.split(':') | length == 2
+    fail_msg: "nfs_server_path parameter must be set and in this format 'nfs_server:nfs_volume'."
+
+- block:
+    # Create a temporary directory to mount NFS storage
+    - include_tasks: create_temp_file_dir.yml
+      vars:
+        tmp_state: "directory"
+        tmp_prefix: "nfs_"
+    - name: "Set fact of the mount dir"
+      set_fact:
+        nfs_mount_dir: "{{ tmp_path }}"
+  when: nfs_mount_dir is undefined
+
+# Mount NFS share folder locally
+- include_tasks: local_mount.yml
+  vars:
+    mount_src: "{{ nfs_server_path }}"
+    mount_path: "{{ nfs_mount_dir }}"
+    mount_fstype: "nfs"
+
+- name: "Set fact of the NFS mount result"
+  set_fact:
+    nfs_mounted: "{% if mount_result is defined and mount_result.changed %}True{% else %}False{% endif %}"

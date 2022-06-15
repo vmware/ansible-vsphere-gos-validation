@@ -696,6 +696,7 @@ class CallbackModule(CallbackBase):
                    self.vm_info.GuestInfo_Guest_Full_Name = set_fact_result.get("guestinfo_guest_full_name", '')
                    self.vm_info.GuestInfo_Guest_Family = set_fact_result.get("guestinfo_guest_family", '')
                    self.vm_info.GuestInfo_Detailed_Data = set_fact_result.get("guestinfo_detailed_data", '')
+                   self.vm_info.VMTools_Version = set_fact_result.get("guestinfo_vmtools_info", '')
             if "check_guest_os_gui.yml" == task_file:
                if self.vm_info:
                    self.vm_info.GUI_Installed = str(set_fact_result.get("guest_os_with_gui", ''))

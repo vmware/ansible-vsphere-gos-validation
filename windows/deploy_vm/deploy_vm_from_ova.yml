@@ -1,0 +1,64 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Deploy a new Windows VM through the Windows OVF/OVA template
+#
+- name: "Set fact of the deploy VM test case name"
+  set_fact:
+    deploy_casename: "deploy_vm_ovf"
+
+# OVA file on local machine
+- name: "Get OVA path and file name"
+  set_fact:
+    vm_ova_path: "{{ ova_path | realpath }}"
+    vm_ova_name: "{{ ova_path | basename }}"
+  when: ova_nfs_server_path is undefined or not ova_nfs_server_path
+
+# OVA file on NFS server
+- include_tasks: ../../common/mount_nfs_storage_local.yml
+  vars:
+    nfs_server_path: "{{ ova_nfs_server_path }}"
+  when: ova_nfs_server_path is defined and ova_nfs_server_path
+- name: "Get OVA path and file name"
+  set_fact:
+    vm_ova_path: "{{ nfs_mount_dir }}/{{ ova_path }}"
+    vm_ova_name: "{{ ova_path | basename }}"
+# Check OVA file exists
+- name: "Check for {{ vm_ova_path }} existence"
+  stat:
+    path: "{{ vm_ova_path }}"
+  register: vm_ova_stat
+  failed_when: not vm_ova_stat.stat.exists
+
+# Deploy a new VM from OVA
+- include_tasks: ../../common/ovf_deploy.yml
+  vars:
+    ovf_path: "{{ vm_ova_path }}"
+    ovf_vm_name: "{{ vm_name }}"
+    deploy_datastore: "{{ datastore }}"
+- name: "Set fact of vm_exists to True"
+  set_fact:
+    vm_exists: True
+
+# Power on VM and wait for guest fullname reported by VMware tools
+- include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+- include_tasks: ../../common/vm_wait_guest_fullname.yml
+
+- include_tasks: ../../common/vm_get_ip_from_vmtools.yml
+
+# Copy script ConfigureRemotingForAnsible.ps1 to guest OS
+# - include_tasks: ../../common/vm_guest_file_operation.yml
+#   vars:
+#     src_path: "{{ config_remote_windows_local }}"
+#     dest_path: "C:\\ConfigureRemotingForAnsible.ps1"
+#     operation: 'copy_file'
+
+# Get OVA deployed VM info
+- include_tasks: ../../common/collect_ovf_vm_config.yml
+  vars:
+    ovf_vm_hardware_config_path: "{{ current_test_log_folder }}"
+
+# Reconfigure deployed VM
+# - include_tasks: reconfig_deployed_vm.yml 

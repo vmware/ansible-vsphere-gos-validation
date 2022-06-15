@@ -12,6 +12,7 @@
     guestinfo_guest_family: ''
     guestinfo_detailed_data: ''
     guestinfo_gathered: False
+    guestinfo_vmtools_info: ''
 
 - name: "Get guest info retrieved by VMware Tools"
   set_fact:
@@ -22,6 +23,11 @@
       {%- if vm_extra_config is defined -%}
           {%- if 'guestOS.detailed.data' in vm_extra_config -%}{{ vm_extra_config['guestOS.detailed.data'] | replace('\"', '') }}
           {%- elif 'guestInfo.detailed.data' in vm_extra_config -%}{{ vm_extra_config['guestInfo.detailed.data'] | replace('\"', '') }}
+          {%- endif -%}
+      {%- endif -%}
+    guestinfo_vmtools_info: |-
+      {%- if vm_extra_config is defined -%}
+          {%- if 'guestinfo.vmtools.versionString' in vm_extra_config and 'guestinfo.vmtools.buildNumber' in vm_extra_config -%}{{ vm_extra_config['guestinfo.vmtools.versionString'] | replace('\"', '') ~ ' (build-' ~ vm_extra_config['guestinfo.vmtools.buildNumber'] | replace('\"', '') ~ ')' }}
           {%- endif -%}
       {%- endif -%}
     guestinfo_gathered: True
@@ -35,3 +41,4 @@
       - "VM guest info guest id: {{ guestinfo_guest_id }}"
       - "VM guest info guest full name: {{ guestinfo_guest_full_name }}"
       - "VM guset info guest detailed data: {{ guestinfo_detailed_data }}"
+      - "VM guest info VMware tools info: {{ guestinfo_vmtools_info }}"

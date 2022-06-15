@@ -13,6 +13,7 @@
 * vm_get_video_card.yml: Get VM video card settings
 * vm_get_cdrom_devices.yml: Get VM CDROM devices info list
 * vm_get_vbs_status.yml: Get Windows VM VBS enablement status
+* collect_ovf_vm_config.yml: Collect VM hardware configurations and save to a json file
 
 ### Tasks for VM deploy or remove
 * vm_create.yml: Create a new VM on ESXi host
@@ -141,9 +142,10 @@
 
 ## Localhost tasks
 ### Tasks for NFS mount and unmount
-* local_mount.yml: Mount an NFS share folder or ISO image on localhost
-* local_unmount.yml: Unmount a NFS share folder or ISO image from localhost
+* local_mount.yml: Mount device or NFS volume or something else to the path on localhost
+* local_unmount.yml: Unmount device or NFS volume or something else from localhost
 * delete_local_file.yml: Delete local file or directory
+* mount_nfs_storage_local.yml: Mount NFS volume to the path on localhost
 
 ### Folder and file management
 * create_iso.yml: Create an iso file

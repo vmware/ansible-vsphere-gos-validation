@@ -1,0 +1,35 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: Set fact of customized Administrator password and runonce command
+  set_fact:
+    vm_password: "B1gd3m0z"
+    ansible_script_runonce_cmd: "powershell.exe -ExecutionPolicy Unrestricted -File C:\\ConfigureRemotingForAnsible.ps1 -ForceNewSSLCert -EnableCredSSP"
+
+- name: "Customize Windows guest OS"
+  vmware_guest:
+    validate_certs: "{{ validate_certs | default(False) }}"
+    hostname: "{{ vcenter_hostname }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+    username: "{{ vcenter_username }}"
+    password: "{{ vcenter_password }}"
+    datacenter: "{{ datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    networks:
+      - name: "VM Network"
+        type: "dhcp"
+    customization:
+      existing_vm: True
+      autologon: True
+      autologoncount: 100
+      password: "{{ vm_password }}"
+      runonce:
+        - "{{ ansible_script_runonce_cmd }}"
+    wait_for_customization: True
+    wait_for_customization_timeout: 3600
+  register: win_gosc_result
+
+- name: Display the Windows customization result
+  debug: var=win_gosc_result
+  when: enable_debug
