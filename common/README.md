@@ -59,6 +59,7 @@
 * vm_get_new_disk_node_info.yml: Get disk node info of a new disk
 * vm_get_disk_facts.yml: Get VM disk info
 * vm_get_disk_controller_facts.yml: Get VM disk controller info
+* vm_get_disk_controller_num.yml: Get VM disk controller number with specified type
 
 ### Tasks for VM secureboot settings
 * vm_set_boot_options.yml: Set VM boot configurations
