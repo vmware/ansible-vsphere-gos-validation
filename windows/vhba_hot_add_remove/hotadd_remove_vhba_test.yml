@@ -1,52 +1,28 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# This file is used to hotadd and hot remove disk controller and disk of VM.
-# Disk controller types notes:
-# - paravirtual: require pvscsi driver installed or VMware tools installed.
-# - lsilogicsas: the default disk controller type of VM.
-# - lsilogic: no inbox driver in Windows guest OS now, so no testing.
-# - nvme: use the version of community.vmware collection which contains this controller type support.
-# - sata: use the version of community.vmware collection which contains this controller type support.
-# - buslogic: not supported in 64bit Windows guest OS, no testing.
-#
-- include_tasks: hotadd_remove_vhba_test_prepare.yml
+# Get the number of controllers and disks in guest OS before hotadd
+- include_tasks: get_guest_disk_ctl_num.yml
+- name: Set fact of the controller number and disk number before hotadd
+  set_fact:
+    ctl_num_guest_before_hotadd: "{{ ctl_num_guest }}"
+    disk_num_guest_before_hotadd: "{{ disk_num_guest }}"
 
-# When there are 4 disk controllers with under test type already,
-# or not get the new disk controller bus number, this test case
-# will be "No Run".
+# Get the NVMe controller device instance id list before hotadd
 - block:
-    # Get the number of controllers and disks in guest OS before hotadd
-    - include_tasks: get_guest_disk_ctl_num.yml
-    - name: Set fact of the controller number and disk number before hotadd
+    - include_tasks: ../utils/win_get_nvme_ctl_inst_id_list.yml
+    - name: Set fact of the NVMe controller instance id list before hotadd
       set_fact:
-        ctl_num_guest_before_hotadd: "{{ ctl_num_guest }}"
-        disk_num_guest_before_hotadd: "{{ disk_num_guest }}"
-
-    # Get the NVMe controller device instance id list before hotadd
-    - block:
-        - include_tasks: ../utils/win_get_nvme_ctl_inst_id_list.yml
-        - name: Set fact of the NVMe controller instance id list before hotadd
-          set_fact:
-            nvme_ctl_inst_id_list_before: "{{ nvme_ctl_instance_id_list }}"
-      when: disk_controller == 'nvme'
-
-    # Test on adding new disk controller and new disk at same time
-    - include_tasks: hotadd_vm_disk_new_ctrl.yml
-
-    # Test on adding a new disk on the existing controller
-    - include_tasks: hotadd_vm_disk_existing_ctrl.yml
-
-    # Remove new added disks and disk controller
-    - include_tasks: hotremove_vm_disk_ctrl.yml
+        nvme_ctl_inst_id_list_before: "{{ nvme_ctl_instance_id_list }}"
   when:
-    - add_new_controller
-    - new_vhba_bus_found is defined and new_vhba_bus_found
+    - disk_controller == 'nvme'
+    - test_purpose == "hot-add" 
 
-- name: "Skip testcase: {{ ansible_play_name }}"
-  debug:
-    msg: "Skip test case due to controller '{{ disk_controller }}' number is already 4: {{ vhba_number_before_hotadd }}, or not get new disk controller bus number."
-  when: >
-    (not add_new_controller) or
-    (new_vhba_bus_found is undefined) or
-    (not new_vhba_bus_found)
+# Test on adding new disk controller and new disk at same time
+- include_tasks: hotadd_vm_disk_new_ctrl.yml
+
+# Test on adding a new disk on the existing controller
+- include_tasks: hotadd_vm_disk_existing_ctrl.yml
+
+# Remove new added disks and disk controller
+- include_tasks: hotremove_vm_disk_ctrl.yml
