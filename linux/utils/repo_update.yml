@@ -28,18 +28,21 @@
       delegate_to: "{{ vm_guest_ip }}"
       register: repo_update_result
 
-    - name: "Check OS packages updates status"
-      async_status:
-        jid: "{{ repo_update_result.ansible_job_id }}"
-      register: job_result
-      vars:
-        ansible_async_dir: /tmp/.ansible_async/
-      delegate_to: "{{ vm_guest_ip }}"
-      until: job_result.finished
-      retries: 20
-      delay: 15
-      ignore_errors: True
+    - block:
+        - name: "Check OS packages updates status"
+          async_status:
+            jid: "{{ repo_update_result.ansible_job_id }}"
+          register: job_result
+          vars:
+            ansible_async_dir: /tmp/.ansible_async/
+          delegate_to: "{{ vm_guest_ip }}"
+          until: job_result.finished
+          retries: 20
+          delay: 15
+          ignore_errors: True
+          when: repo_update_result.ansible_job_id is defined
 
-    - name: "Print check update result"
-      debug: var=repo_update_result
+        - name: "Print check update result"
+          debug: var=repo_update_result
+      when: repo_update_result is defined
   when: check_update_cmd is defined and check_update_cmd
