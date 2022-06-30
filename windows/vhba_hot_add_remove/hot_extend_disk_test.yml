@@ -1,0 +1,62 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Adding a new disk controller and disk with 1GB by default
+- include_tasks: hotadd_vm_disk_new_ctrl.yml
+
+# Get disk volume size in guest OS before hot extend
+- include_tasks: ../utils/win_get_disk_volume_size.yml
+  vars:
+    win_disk_volume_letter: "{{ drive_letter_new }}"
+- name: "Set fact of the disk volume size before hot extend"
+  set_fact:
+    win_disk_volume_size_before: "{{ win_get_volume_size_gb }}"
+- name: "Check disk volume size before hot extend"
+  assert:
+    that:
+      - win_disk_volume_size_before | int == 1
+    fail_msg: "Got disk volume '{{ drive_letter_new }}' size '{{ win_disk_volume_size_before }}' GB before extend, not 1GB."
+
+# Hot extend the disk size to 2GB
+- include_tasks: ../../common/vm_hot_add_remove_disk.yml
+  vars:
+    disk_operation: 'present'
+    disk_controller_type: "{{ test_disk_controller_type }}"
+    ctrl_number: "{{ new_vhba_bus_number }}"
+    unit_number: 0
+    disk_size_gb: 2
+- name: "Wait 10 seconds after disk hotadd"
+  pause:
+    seconds: 10
+
+# Get disk size in guest OS after hot extend
+# By default the hotadded disk above is 'disk 1' in guest OS
+- include_tasks: ../utils/win_get_disk_size.yml
+  vars:
+    win_disk_num: 1
+- name: "Set fact of disk size after extend"
+  set_fact:
+    win_disk_size_after: "{{ win_get_disk_size_gb }}"
+- name: "Check disk size after hot extend"
+  assert:
+    that:
+      - win_disk_size_after | int == 2
+    fail_msg: "Got disk size '{{ win_disk_size_after }}' GB in guest OS after hot extend to 2GB."
+
+# Extend disk volume to the new size
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Resize-Partition -DiskNumber 1 -PartitionNumber 1 -Size (Get-PartitionSupportedSize -DiskNumber 1).SizeMax"
+
+# Get disk volume size in guest OS after extend
+- include_tasks: ../utils/win_get_disk_volume_size.yml
+  vars:
+    win_disk_volume_letter: "{{ drive_letter_new }}"
+- name: "Set fact of the disk volume size after extend"
+  set_fact:
+    win_disk_volume_size_after: "{{ win_get_volume_size_gb }}"
+- name: "Check disk volume size after extend"
+  assert:
+    that:
+      - win_disk_volume_size_after | int == 2
+    fail_msg: "Got disk volume '{{ drive_letter_new }}' size '{{ win_disk_volume_size_after }}' GB after extend, not 2GB."

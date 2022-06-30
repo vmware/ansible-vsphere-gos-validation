@@ -4,20 +4,28 @@
 # Add isolation.device settings in vmx
 - name: "Initialize vm_advanced_settings for isolation.device.connectable.disable and isolation.device.edit.disable"
   set_fact:
+    vm_advanced_settings_exist: False
     vm_advanced_settings:
       - key: "isolation.device.connectable.disable"
         value: "FALSE"
       - key: "isolation.device.edit.disable"
         value: "FALSE"
 
+# Check if above advanced settings already configured
 - include_tasks: ../../common/vm_get_extra_config.yml
+- name: "Set fact of existence of expected extra config"
+  set_fact:
+    vm_advanced_settings_exist: True
+  when:
+    - vm_advanced_settings[0].key in vm_extra_config
+    - vm_extra_config[vm_advanced_settings[0].key] | lower == vm_advanced_settings[0].value | lower
+    - vm_advanced_settings[1].key in vm_extra_config
+    - vm_extra_config[vm_advanced_settings[1].key] | lower == vm_advanced_settings[1].value | lower
 
-# Shutdown VM if key-value pair is not as expected in VMX file
-- include_tasks: shutdown.yml
-  when: >
-    (vm_advanced_settings[0].key not in vm_extra_config) or
-    (vm_extra_config[vm_advanced_settings[0].key] | lower != vm_advanced_settings[0].value | lower) or
-    (vm_advanced_settings[1].key not in vm_extra_config) or
-    (vm_extra_config[vm_advanced_settings[1].key] | lower != vm_advanced_settings[1].value | lower)
-
-- include_tasks: ../../common/vm_set_extra_config.yml
+# Set key-value pairs when not in VMX file
+- block:
+    - include_tasks: shutdown.yml
+    - include_tasks: ../../common/vm_set_extra_config.yml
+    - include_tasks: ../../common/vm_wait_guest_ip.yml
+    - include_tasks: ../../common/update_inventory.yml
+  when: not vm_advanced_settings_exist 

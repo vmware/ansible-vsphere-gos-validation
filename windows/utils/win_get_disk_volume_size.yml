@@ -1,0 +1,20 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get disk volume size in GB in Windows guest OS
+# Parameters:
+#   win_disk_volume_letter: the volume letter in guest OS
+# Return:
+#   win_get_volume_size_gb
+#
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "[math]::Round(((Get-Volume -DriveLetter {{ win_disk_volume_letter }}).Size)/1GB)"
+
+- name: Set fact of the disk volume size
+  set_fact:
+    win_get_volume_size_gb: "{{ win_powershell_cmd_output.stdout_lines[0] | int }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines | length != 0
+- debug:
+    msg: "Get disk volume '{{ win_disk_volume_letter }}' size in guest OS: {{ win_get_volume_size_gb }}"

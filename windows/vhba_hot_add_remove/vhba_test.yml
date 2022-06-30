@@ -1,0 +1,37 @@
+# Copyright 2021-2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# This file is used to hotadd and hot remove disk controller and disk of VM.
+# Disk controller types notes:
+# - paravirtual: require pvscsi driver installed or VMware tools installed.
+# - lsilogicsas: the default disk controller type of VM.
+# - lsilogic: no inbox driver in Windows guest OS now, so no testing.
+# - nvme: use the version of community.vmware collection which contains this controller type support.
+# - sata: use the version of community.vmware collection which contains this controller type support.
+# - buslogic: not supported in 64bit Windows guest OS, no testing.
+#
+- include_tasks: get_vm_disk_ctl_num_bus.yml
+
+# When there are 4 disk controllers with under test type already,
+# or not get the new disk controller bus number, this test case
+# will be "No Run".
+- block:
+    - include_tasks: vhba_test_prepare.yml 
+    - include_tasks: hotadd_remove_vhba_test.yml
+      when: >
+        (test_purpose == "hot-add") or
+        (test_purpose == "hot-add-spec13" and test_disk_controller_type == "nvme")
+    - include_tasks: hot_extend_disk_test.yml
+      when:
+        - test_purpose == "hot-extend"
+  when:
+    - add_new_controller
+    - new_vhba_bus_found is defined and new_vhba_bus_found
+
+- name: "Skip testcase: {{ ansible_play_name }}"
+  debug:
+    msg: "Skip test case due to controller '{{ disk_controller }}' number is already 4: {{ vhba_number_before_hotadd }}, or not get new disk controller bus number."
+  when: >
+    (not add_new_controller) or
+    (new_vhba_bus_found is undefined) or
+    (not new_vhba_bus_found)
