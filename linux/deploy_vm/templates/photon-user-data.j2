@@ -28,11 +28,11 @@ users:
 
 # Workaround for root password setting when shadow version is 4.6-5 and earlier
 bootcmd:
-  - [ `printf $(rpm -q shadow | grep -E -o "[0-9]+(\.[0-9]+)+-[0-9]+")"\n4.6-6\n" | sort | head -n 1` != "4.6-6" ] && /bin/sed -E -i 's/^root:([^:]+):.*$/root:\1:17532:0:99999:0:::/' /etc/shadow
+  - shadow_version=$(rpm -q shadow | grep -E -o "[0-9]+(\.[0-9]+)+-[0-9]+"); [ $(printf "$shadow_version\n4.6-6\n" | sort | head -n 1) != "4.6-6" ] && /bin/sed -E -i 's/^root:([^:]+):.*$/root:\1:17532:0:99999:0:::/' /etc/shadow
 
 runcmd:
-  - [ `printf $(grep VERSION= /etc/os-release | grep -E -o "[0-9]+\.[0-9]+")"\n4.0\n" | sort | head -n 1 | cut -d '.' -f 1` -ge 4 ] && systemctl start sshd.socket
   - [systemctl, stop, iptables]
   - [systemctl, disable, iptables]
   - [systemctl, disable, chronyd]
   - [systemctl, disable, chrony-wait]
+  - os_version=$(grep VERSION= /etc/os-release | grep -E -o "[0-9]+\.[0-9]+"); [ $(printf "$os_version\n4.0\n" | sort | head -n 1 | cut -d '.' -f 1) -ge 4 ] && systemctl start sshd.socket
