@@ -136,7 +136,12 @@
       when: nfs_mount_dir is defined and nfs_mount_dir
 
     # Collect cloud-init logs for deploying Ubuntu and Photon OVA
-    - include_tasks: ../utils/collect_cloudinit_logs.yml
+    - include_tasks: ../../common/vm_get_power_state.yml
+    - block:
+        - include_tasks: ../../common/vm_get_vmtools_status.yml
+        - include_tasks: ../utils/collect_cloudinit_logs.yml
       when:
+        - vm_power_state_get is defined
+        - vm_power_state_get == "poweredOn"
         - ova_guest_os_type is defined
         - ova_guest_os_type in ['photon', 'ubuntu']
