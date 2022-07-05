@@ -1,0 +1,22 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Photon OS needs to disable DNSSEC and DNSOverTLS while connecting online repo
+- block:
+    - include_tasks: ../../common/update_ini_style_file.yml
+      vars:
+        file_path: "/etc/systemd/resolved.conf"
+        section_name: "Resolve"
+        option_name: "{{ item[0] }}"
+        option_value: "{{ item[1] }}"
+      with_list:
+        - ["DNSSEC", "no"]
+        - ["DNSOverTLS", "no"]
+    - include_tasks: service_operation.yml
+      vars:
+        service_name: "systemd-resolved"
+        service_enabled: True
+        service_state: "restarted"
+  when:
+    - guest_os_ansible_distribution == "VMware Photon OS"
+    - guest_os_ansible_distribution_major_ver | int == 3
