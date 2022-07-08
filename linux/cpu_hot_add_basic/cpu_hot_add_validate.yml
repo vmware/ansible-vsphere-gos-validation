@@ -3,13 +3,13 @@
 ---
 - include_tasks: ../../common/vm_get_guest_facts.yml
 - name: Set fact of the vCPU number before hotadd
-  set_fact:
+  ansible.builtin.set_fact:
     vcpu_before_hotadd: "{{ vm_guest_facts.instance.hw_processor_count }}"
 - name: Set fact of the vCPU number after hotadd
-  set_fact:
+  ansible.builtin.set_fact:
     vcpu_after_hotadd: "{{ (vcpu_before_hotadd | int) + ( hotadd_num | int) }}"
 
-- debug:
+- ansible.builtin.debug:
     msg: "Hotadd '{{ hotadd_num }}', VM vCPU number will be '{{ vcpu_after_hotadd }}', greater than '{{ max_num_cpus }}', skip test"
   when: vcpu_after_hotadd | int > max_num_cpus | int
 
@@ -20,7 +20,7 @@
         num_cpus: "{{ vcpu_after_hotadd }}"
     # Check VM connection is not broken after hotadd
     - name: "Pause 5 seconds then check VM connection"
-      pause:
+      ansible.builtin.pause:
         seconds: 5
     - include_tasks: ../../common/vm_wait_connection.yml
       vars:
@@ -32,11 +32,11 @@
     - include_tasks: ../utils/get_cpu_info.yml
     # Valiate CPU number in guest is equal to VM config
     - name: Check CPU number in guest OS increased
-      assert:
+      ansible.builtin.assert:
         that:
           - vm_set_cpu_number_result | int == guest_cpu_num | int
         fail_msg: "Hotadd '{{ hotadd_num }}' CPU from '{{ vcpu_before_hotadd }}' to '{{ vcpu_after_hotadd }}', but got '{{ guest_cpu_num }}' in guest OS"
     - name: Add test result
-      set_fact:
+      ansible.builtin.set_fact:
         cpu_hotadd_results: "{{ cpu_hotadd_results + ['vCPU hotadd succeeds: ' ~ vcpu_before_hotadd ~ '->' ~ vcpu_after_hotadd] }}"
   when: vcpu_after_hotadd | int <= max_num_cpus | int

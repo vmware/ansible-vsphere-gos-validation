@@ -8,14 +8,14 @@
 #   esxi_guest_ids: A list of all supported guest IDs for hardware version
 
 - name: "Check esxi_hardware_version is set with valid value"
-  assert:
+  ansible.builtin.assert:
     that:
       - esxi_hardware_version is defined
       - esxi_hardware_version is match('^\d+')
     fail_msg: "Incorrect hardware version '{{ esxi_hardware_version }}'"
 
 - name: "Initialize ESXi supported guest IDs with hardware version {{ esxi_hardware_version }}"
-  set_fact:
+  ansible.builtin.set_fact:
     esxi_guest_ids: []
 
 - name: "Get ESXi server supported hardware versions"
@@ -32,7 +32,7 @@
   ignore_errors: True
 
 - name: "Set fact of ESXi supported guest IDs for hardware version {{ esxi_hardware_version }}"
-  set_fact:
+  ansible.builtin.set_fact:
     esxi_guest_ids: "{{ get_guest_os_ids_result.instance | dict2items | map(attribute='value') | flatten }}"
   when:
     - get_guest_os_ids_result is defined
@@ -41,7 +41,7 @@
 
 - block:
     - name: "Initialize variables for getting hardware version supported guest IDs"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_config_option_esx_hw: "/etc/vmware/hostd/env/vmconfigoption-esx-hw{{ esxi_hardware_version }}.xml"
         vm_default_config_xpath: "/ConfigRoot/ConfigurationOption/guestOSDescriptor/e/id"
     
@@ -55,11 +55,11 @@
       register: guest_os_desc_ids_result
     
     - name: "Set fact of ESXi supported guest IDs for hardware version {{ esxi_hardware_version }}"
-      set_fact:
+      ansible.builtin.set_fact:
         esxi_guest_ids: "{{ guest_os_desc_ids_result.matches | map(attribute='id') | list }}"
   when: >
     get_guest_os_ids_result is undefined or
     get_guest_os_ids_result.failed
 
 - name: "Print ESXi server supported guest IDs on hardware version {{ esxi_hardware_version }}"
-  debug: var=esxi_guest_ids
+  ansible.builtin.debug: var=esxi_guest_ids

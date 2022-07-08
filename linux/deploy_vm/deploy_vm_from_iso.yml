@@ -3,25 +3,25 @@
 ---
 # Initialize undefined variables
 - name: "Initialize variables for new VM settings"
-  set_fact:
+  ansible.builtin.set_fact:
     boot_disk_controller: "{{ boot_disk_controller if (boot_disk_controller is defined and boot_disk_controller) else 'paravirtual' }}"
     firmware: "{{ firmware if (firmware is defined and firmware) else 'efi' }}"
     network_adapter_type: "{{ network_adapter_type if (network_adapter_type is defined and network_adapter_type) else 'vmxnet3' }}"
     autoinstall_complete_msg: "Autoinstall is completed."
 
 - name: "Set CPU number to {{ cpu_cores_per_socket }}"
-  set_fact:
+  ansible.builtin.set_fact:
     cpu_number: "{{ cpu_cores_per_socket }}"
   when:
     - cpu_number is undefined or not cpu_number
     - cpu_cores_per_socket is defined and cpu_cores_per_socket
 
 - name: "Set fact of the deploy VM test case name"
-  set_fact:
+  ansible.builtin.set_fact:
     deploy_casename: "deploy_vm_{{ firmware }}_{{ boot_disk_controller }}_{{ network_adapter_type }}"
 
 - name: "Initialize the fact whether to install guest OS with desktop"
-  set_fact:
+  ansible.builtin.set_fact:
     install_guest_with_desktop: False
 
 - block:
@@ -32,17 +32,17 @@
 
     - block:
         - name: "Set default unattend install conf file for Photon OS"
-          set_fact:
+          ansible.builtin.set_fact:
             unattend_install_conf: "Photon/ks.cfg"
           when: guest_id == 'vmwarePhoton64Guest'
 
         - name: "Set default unattend install conf file for Debian"
-          set_fact:
+          ansible.builtin.set_fact:
             unattend_install_conf: "Debian/10/preseed.cfg"
           when: "'debian10' in guest_id or 'debian11' in guest_id"
       when: unattend_install_conf is undefined or not unattend_install_conf
 
-    - debug:
+    - ansible.builtin.debug:
         msg: "unattend_install_conf is not defined or set to a file path, will not generate unattend iso file"
       when: unattend_install_conf is undefined or not unattend_install_conf
 
@@ -59,7 +59,7 @@
       when: boot_disk_controller == 'ide'
     - include_tasks: ../../common/vm_get_vm_info.yml
     - name: "Set fact of vm_exists to True"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_exists: True
 
     # Add a serial port to monitor autoinstall process
@@ -69,7 +69,7 @@
         - include_tasks: ../../common/vm_get_video_card.yml
 
         - name: Get VM default video memory size
-          set_fact:
+          ansible.builtin.set_fact:
             vm_default_video_memory_mb: "{{ (vm_video_cart_facts.instance.video_memory | int) / 1024 }}"
 
         # Increase VM's video card memory to 8 MB in case desktop can't be loaded
@@ -99,7 +99,7 @@
       vars:
         vm_power_state_set: 'powered-on'
     - name: Sleep 5 seconds to wait boot screen display
-      pause:
+      ansible.builtin.pause:
         seconds: 5
 
     # Check Image APPROVED in vmware.log when VM secureboot is enabled
@@ -149,7 +149,7 @@
         vm_wait_log_retries: 720
 
     - name: "Wait 60s for OS rebooting"
-      pause:
+      ansible.builtin.pause:
         seconds: 60
         
     # For Photon OS and Ubuntu
@@ -172,7 +172,7 @@
         # Otherwise, systemd-logind service running at the end of installaiton
         # to wait user login
         - name: "Set fact of service name for waiting at first time of OS boot"
-          set_fact:
+          ansible.builtin.set_fact:
             wait_service_name: |-
               {%- if guest_os_with_gui -%}display-manager
               {%- else -%}systemd-logind
@@ -206,7 +206,7 @@
 
     - include_tasks: ../../common/vm_remove_serial_port.yml
 
-    - fail:
+    - ansible.builtin.fail:
         msg: "Failed to remove serial port from VM"
       when: >
         remove_serial_port is undefined or
@@ -229,4 +229,4 @@
 
     - include_tasks: ../../common/test_rescue.yml
       vars:
-        exit_testing_when_fail: True
+        exit_testing_when_ansible.builtin.fail: True

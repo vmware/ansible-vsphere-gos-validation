@@ -8,7 +8,7 @@
 #   esxi_latest_hardware_version: The latest hardware version on the ESXi server
 
 - name: "Initialized ESXi server supported hardware version list and default hardware version"
-  set_fact:
+  ansible.builtin.set_fact:
     esxi_hardware_versions: []
     esxi_default_hardware_version: ""
     esxi_latest_hardware_version: ""
@@ -26,12 +26,12 @@
 
 - block:
     - name: "Set fact of ESXi server supported hardware versions and default hardware version"
-      set_fact:
+      ansible.builtin.set_fact:
         esxi_hardware_versions: "{{ get_hardware_versions_result.instance['Supported hardware versions'] | map('regex_replace', 'vmx-0?', '') | map('int') }}"
         esxi_default_hardware_version: "{{ get_hardware_versions_result.instance['Default hardware version'] | regex_replace('vmx-0?', '') }}"
 
     - name: "Set fact of ESXi server latest hardware version"
-      set_fact:
+      ansible.builtin.set_fact:
         esxi_latest_hardware_version: "{{ esxi_hardware_versions | max }}"
       when: esxi_hardware_versions | length > 0
   when:
@@ -40,7 +40,7 @@
     - get_hardware_versions_result.instance['Supported hardware versions'] is defined
     - get_hardware_versions_result.instance['Default hardware version'] is defined
 
-- debug:
+- ansible.builtin.debug:
     msg:
       - "ESXi server supported hardware versions: {{ esxi_hardware_versions }}"
       - "ESXi server latest hardware version: {{ esxi_latest_hardware_version }}"

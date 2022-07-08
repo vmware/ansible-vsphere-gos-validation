@@ -31,21 +31,21 @@
 - include_tasks: vm_get_id.yml
 
 - name: "Get IDE controller number and unit number for boot disk"
-  set_fact:
+  ansible.builtin.set_fact:
     ide_disk_ctlr_num: 0
     ide_disk_unit_num: 0
 
 - name: "Set boot disk size in KB"
-  set_fact:
+  ansible.builtin.set_fact:
     boot_disk_size_kb:  "{{ (boot_disk_size_gb | int) * 1024 * 1024 }}"
 
 - block:
     - name: "Remove pre-added PVSCSI boot disk"
-      shell: "vim-cmd /vmsvc/device.diskremove {{ vm_id }} 0 0 scsi"
+      ansible.builtin.shell: "vim-cmd /vmsvc/device.diskremove {{ vm_id }} 0 0 scsi"
 
     - name: "Remove pre-added PVSCSI controller"
-      shell: "vim-cmd /vmsvc/device.ctlrremove {{ vm_id }} scsi 0"
+      ansible.builtin.shell: "vim-cmd /vmsvc/device.ctlrremove {{ vm_id }} scsi 0"
 
     - name: "Add IDE boot disk"
-      shell: "vim-cmd /vmsvc/device.diskadd {{ vm_id }} {{ boot_disk_size_kb }} {{ ide_disk_ctlr_num }} {{ ide_disk_unit_num  }} {{ datastore }} ide"
+      ansible.builtin.shell: "vim-cmd /vmsvc/device.diskadd {{ vm_id }} {{ boot_disk_size_kb }} {{ ide_disk_ctlr_num }} {{ ide_disk_unit_num  }} {{ datastore }} ide"
   delegate_to: "{{ esxi_hostname }}"

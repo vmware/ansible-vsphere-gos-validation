@@ -9,11 +9,11 @@
 
 - block:
     - name: "Set keyword for searching network config in cloud-init config files"
-      set_fact:
+      ansible.builtin.set_fact:
         network_config_keyword: "network: *{config: *disabled}"
 
     - name: "Search for network config"
-      shell: grep -rl "{{ network_config_keyword }}" /etc/cloud/cloud.cfg /etc/cloud/cloud.cfg.d/*.cfg
+      ansible.builtin.shell: grep -rl "{{ network_config_keyword }}" /etc/cloud/cloud.cfg /etc/cloud/cloud.cfg.d/*.cfg
       register: network_config_result
       failed_when: False
       changed_when: False
@@ -48,13 +48,13 @@
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: Check cloud-init GOSC is enabled
-          command: grep '^disable_vmware_customization' /etc/cloud/cloud.cfg
+          ansible.builtin.command: grep '^disable_vmware_customization' /etc/cloud/cloud.cfg
           register: result
           changed_when: False
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "Save cloud-init GOSC enable flag"
-          set_fact:
+          ansible.builtin.set_fact:
             cloudinit_gosc_enabled: "{{ result.stdout.split(': ')[1] | lower == 'false' }}"
 
         # Enable network config in /etc/cloud/cloud.cfg.d/*.cfg
@@ -74,7 +74,7 @@
 
         # For ubuntu, we should remove files to let gosc with cloud-init work well
         - name: remove files if exists
-          file:
+          ansible.builtin.file:
             path: "{{ config_file_for_netplan }}"
             state: absent
             force: yes
@@ -91,13 +91,13 @@
           ignore_errors: True
 
         - name: Assert disable_vmware_customization is false
-          assert:
+          ansible.builtin.assert:
             that:
               - cloudinit_gosc_enabled
             fail_msg: "Failed to enable cloud-init GOSC"
 
         - name: "Clear cloud-init.log"
-          shell: "cat /dev/null >/var/log/cloud-init.log"
+          ansible.builtin.shell: "cat /dev/null >/var/log/cloud-init.log"
           delegate_to: "{{ vm_guest_ip }}"
           ignore_errors: True
       when: enable_cloudinit_gosc | bool
@@ -113,14 +113,14 @@
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: Check cloud-init GOSC is disabled
-          command: grep '^disable_vmware_customization' /etc/cloud/cloud.cfg
+          ansible.builtin.command: grep '^disable_vmware_customization' /etc/cloud/cloud.cfg
           register: result
           changed_when: False
           ignore_errors: True
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "Save cloud-init GOSC disable flag"
-          set_fact:
+          ansible.builtin.set_fact:
             cloudinit_gosc_disabled: "{{ result.rc != 0 }}"
 
         # Disable network config
@@ -147,7 +147,7 @@
 
         # For ubuntu, create file /etc/cloud/cloud-init.disabled to disable cloud-init
         - name: "Create file /etc/cloud/cloud-init.disabled to disable gosc with cloud-init for Ubuntu"
-          file:
+          ansible.builtin.file:
             path: /etc/cloud/cloud-init.disabled
             state: touch
             mode: "777"
@@ -155,7 +155,7 @@
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: Assert cloud-init GOSC is disabled
-          assert:
+          ansible.builtin.assert:
             that:
               - cloudinit_gosc_disabled
             fail_msg: "Failed to disable cloud-init GOSC"

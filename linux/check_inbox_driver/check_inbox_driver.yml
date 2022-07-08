@@ -24,7 +24,7 @@
       - ptp_vmw
   tasks:
     - name: "Initialized inbox drivers' versions dict"
-      set_fact:
+      ansible.builtin.set_fact:
         inbox_drivers_versions: {}
 
     - block:
@@ -33,7 +33,7 @@
             skip_test_no_vmtools: False
 
         - name: "Get OS Release for SUSE"
-          set_fact:
+          ansible.builtin.set_fact:
             inbox_drivers_versions: >-
               {{
                 inbox_drivers_versions |
@@ -42,12 +42,12 @@
           when: guest_os_ansible_distribution in ['SLES', 'SLED']
 
         - name: "Get OS Release for RHEL"
-          set_fact:
+          ansible.builtin.set_fact:
             inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'Release': 'RHEL ' ~ guest_os_ansible_distribution_ver}) }}"
           when: guest_os_ansible_distribution == "RedHat"
 
         - name: "Get OS Release for {{ guest_os_ansible_distribution }}"
-          set_fact:
+          ansible.builtin.set_fact:
             inbox_drivers_versions: >-
               {{
                 inbox_drivers_versions |
@@ -56,7 +56,7 @@
           when: guest_os_ansible_distribution not in ['SLES', 'SLED', "RedHat"]
 
         - name: "Get OS kernel version"
-          set_fact:
+          ansible.builtin.set_fact:
             inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'kernel': guest_os_ansible_kernel}) }}"
 
         - name: "Get open-vm-tools version"
@@ -64,12 +64,12 @@
             - include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
 
             - name: "Check open-vm-tools version"
-              command: "{{ vmware_toolbox_cmd_path }} -v"
+              ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} -v"
               register: ovt_version
               delegate_to: "{{ vm_guest_ip }}"
 
             - name: "Collect open-vm-tools version"
-              set_fact:
+              ansible.builtin.set_fact:
                 inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'open-vm-tools': ovt_version.stdout}) }}"
           when: vmtools_is_ovt is defined and vmtools_is_ovt
 
@@ -77,7 +77,7 @@
         - include_tasks: ../utils/cloudinit_pkg_check.yml
 
         - name: "Collect cloud-init version"
-          set_fact:
+          ansible.builtin.set_fact:
             inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'cloud-init': cloudinit_version}) }}"
           when:
             - cloudinit_version is defined
@@ -86,7 +86,7 @@
         - name: "Get drivers version in VMware Photon OS {{ guest_os_ansible_distribution_ver }}"
           block:
             - name: "Check driver version"
-              shell: "if [ -e /sys/module/{{ driver }}/version ]; then cat /sys/module/{{ driver }}/version ; fi"
+              ansible.builtin.shell: "if [ -e /sys/module/{{ driver }}/version ]; then cat /sys/module/{{ driver }}/version ; fi"
               with_items: "{{ inbox_drivers }}"
               loop_control:
                 loop_var: driver
@@ -95,7 +95,7 @@
               delegate_to: "{{ vm_guest_ip }}"
 
             - name: Set fact of driver version dict
-              set_fact:
+              ansible.builtin.set_fact:
                 inbox_drivers_versions: >-
                   {{
                     inbox_drivers_versions |
@@ -111,7 +111,7 @@
         - name: "Get drivers version in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
           block:
             - name: "Get module information of inbox drivers"
-              command: "modinfo {{ module_name }}"
+              ansible.builtin.command: "modinfo {{ module_name }}"
               register: modinfo_result
               delegate_to: "{{ vm_guest_ip }}"
               ignore_errors: True
@@ -120,11 +120,11 @@
                 loop_var: module_name
 
             - name: "Set fact of found inbox driver modules"
-              set_fact:
+              ansible.builtin.set_fact:
                 builtin_modules: "{{ modinfo_result.results | selectattr('rc', 'equalto', 0) }}"
 
             - name: "Set fact of inbox driver version with its version"
-              set_fact:
+              ansible.builtin.set_fact:
                 inbox_drivers_versions: >
                   {{ inbox_drivers_versions |
                      combine({item.module_name:''.join(item.stdout_lines |
@@ -134,7 +134,7 @@
               with_items: "{{ builtin_modules }}"
 
             - name: "Set fact of inbox driver version with its srcversion"
-              set_fact:
+              ansible.builtin.set_fact:
                 inbox_drivers_versions: >
                   {{ inbox_drivers_versions |
                      combine({item.module_name:''.join(item.stdout_lines |
@@ -147,7 +147,7 @@
               with_items: "{{ builtin_modules }}"
 
             - name: "Set fact of inbox driver version with its vermagic"
-              set_fact:
+              ansible.builtin.set_fact:
                 inbox_drivers_versions: >
                   {{ inbox_drivers_versions |
                      combine({item.module_name:''.join(item.stdout_lines |
@@ -165,7 +165,7 @@
 
         # If the driver is not found in guest OS, set its version to 'N/A'
         - name: "Update fact of inbox driver version dict to set not found driver version with 'N/A'"
-          set_fact:
+          ansible.builtin.set_fact:
             inbox_drivers_versions: >-
               {{
                 inbox_drivers_versions |
@@ -176,25 +176,25 @@
             loop_var: module_name
 
         - name: "Check whether Xorg server is installed"
-          command: "which Xorg"
+          ansible.builtin.command: "which Xorg"
           register: which_xorg_server
           failed_when: False
           delegate_to: "{{ vm_guest_ip }}"
 
         - block:
             - name: "Check Xorg server"
-              command: "Xorg -version"
+              ansible.builtin.command: "Xorg -version"
               register: xorg_version_result
               failed_when: False
               delegate_to: "{{ vm_guest_ip }}"
 
             - block:
                 - name: "Get Xorg server version"
-                  set_fact:
+                  ansible.builtin.set_fact:
                     xorg_version: "{{ xorg_version_result.stderr_lines | select('match','X.Org X Server') }}"
 
                 - name: "Collect Xorg server version"
-                  set_fact:
+                  ansible.builtin.set_fact:
                      inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'xorg server': xorg_version[0].split()[-1] }) }}"
                   when: xorg_version and xorg_version | length > 0
               when:
@@ -204,7 +204,7 @@
                 - xorg_version_result.stderr_lines | length > 0
 
             - name: "Initialize VMware video driver package name"
-              set_fact:
+              ansible.builtin.set_fact:
                 video_driver_pkg_name: |-
                   {%- if guest_os_family == "RedHat" -%}xorg-x11-drv-vmware
                   {%- elif guest_os_family == "Suse" -%}xf86-video-vmware
@@ -212,13 +212,13 @@
 
             - block:
                 - name: "Looking for VMware video driver package"
-                  shell: "dpkg -l xserver-xorg-video-vmware* | grep xserver-xorg-video-vmware"
+                  ansible.builtin.shell: "dpkg -l xserver-xorg-video-vmware* | grep xserver-xorg-video-vmware"
                   failed_when: False
                   register: vmware_video_package_result
                   delegate_to: "{{ vm_guest_ip }}"
 
                 - name: "Get VMware video driver package name"
-                  set_fact:
+                  ansible.builtin.set_fact:
                     video_driver_pkg_name: "{{ vmware_video_package_result.stdout.split()[1] }}"
                   when:
                     - vmware_video_package_result.rc is defined
@@ -233,7 +233,7 @@
                     package_name: "{{ video_driver_pkg_name }}"
 
                 - name: "Get the VMware video driver version"
-                  set_fact:
+                  ansible.builtin.set_fact:
                     inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'xf86-video-vmware': package_info.Version.split(':')[-1] }) }}"
                   when:
                     - package_info.Version is defined
@@ -245,14 +245,14 @@
             - which_xorg_server.rc == 0
 
         - name: "Print inbox drivers versions"
-          debug: var=inbox_drivers_versions
+          ansible.builtin.debug: var=inbox_drivers_versions
 
         - name: "Set fact of the output file path"
-          set_fact:
+          ansible.builtin.set_fact:
             os_release_info_file_path: "{{ testrun_log_path }}/{{ inbox_drivers_versions['Release'].replace(' ','-') | lower }}.json"
 
         - name: "The inbox drivers versions will be dump to a json file"
-          debug: var=os_release_info_file_path
+          ansible.builtin.debug: var=os_release_info_file_path
 
         - name: "Dump inbox drivers versions"
           copy:

@@ -11,14 +11,14 @@
 #   gpg_key_path: (Optional)The GPG key path
 
 - name: "Check repo name and baseurl parameters are valid"
-  assert:
+  ansible.builtin.assert:
     that:
       - repo_name is defined and repo_name
       - (repo_baseurl is defined and repo_baseurl) or (repo_mirrorlist is defined and repo_mirrorlist)
     fail_msg: "Invalid parameters: repo_name={{ repo_name | default('undefined') }}, repo_baseurl={{ repo_baseurl | default('undefined') }}, repo_mirrorlist = {{ repo_mirrorlist | default('undefined') }}"
 
 - name: "Set default GPG key"
-  set_fact:
+  ansible.builtin.set_fact:
     gpg_key_path: |-
       {%- if guest_os_ansible_distribution == "RedHat" -%}file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
       {%- elif guest_os_ansible_distribution == "CentOS" -%}file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
@@ -32,12 +32,12 @@
     - gpg_key_path is undefined or not gpg_key_path
 
 - name: "Initialize the prefix for local repository"
-  set_fact:
+  ansible.builtin.set_fact:
     repo_baseurl_prefix: ""
 
 - block:
     - name: "Set the prefix for local yum repository"
-      set_fact:
+      ansible.builtin.set_fact:
         repo_baseurl_prefix: "file://"
       when:
         - repo_baseurl is sequence
@@ -56,15 +56,15 @@
       delegate_to: "{{ vm_guest_ip }}"
       register: add_yum_repo_result
 
-    - debug: var=add_yum_repo_result
+    - ansible.builtin.debug: var=add_yum_repo_result
 
     - block:
         - name: "Get new repo file path"
-          set_fact:
+          ansible.builtin.set_fact:
             new_yum_repo_path: "{{ add_yum_repo_result.diff.after_header }}"
 
         - name: "Remove spaces in repo file"
-          shell: "sed -i 's/ *= */=/' {{ new_yum_repo_path }}"
+          ansible.builtin.shell: "sed -i 's/ *= */=/' {{ new_yum_repo_path }}"
           delegate_to: "{{ vm_guest_ip }}"
       when:
         - add_yum_repo_result is defined
@@ -75,7 +75,7 @@
 # Add repo for SLES/SLED
 - block:
     - name: "Set the prefix for local zypper repository"
-      set_fact:
+      ansible.builtin.set_fact:
         repo_baseurl_prefix: "dir:"
       when:
         - repo_baseurl is sequence

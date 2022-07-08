@@ -10,23 +10,23 @@
   when: esxi_version is undefined or esxi_version == 'N/A'
 
 - name: "Set fact of the maximum CPU socket for Windows 10"
-  set_fact:
+  ansible.builtin.set_fact:
     max_socket: "{{ 4 if esxi_version is version('7.0.2', '>=') else 2 }}"
 
 - name: "Set fact of the Windows VM default CPU number and cores per socket number"
-  set_fact:
+  ansible.builtin.set_fact:
     cpu_number: 2
     cpu_cores_per_socket: 2
   when: cpu_number is undefined or not cpu_number
 
 - block:
     - name: "Set cpu_cores_per_socket when it's not defined"
-      set_fact:
+      ansible.builtin.set_fact:
         cpu_cores_per_socket: "{{ (cpu_number | int / max_socket | int) | int if cpu_number | int % max_socket | int == 0 else cpu_number | int }}"
       when: cpu_cores_per_socket is undefined or not cpu_cores_per_socket
 
     - name: Check CPU cores per socket and socket
-      assert:
+      ansible.builtin.assert:
         that:
           - cpu_number | int >= cpu_cores_per_socket | int
           - cpu_number | int / cpu_cores_per_socket | int in range(1, (max_socket | int + 1))
@@ -37,5 +37,5 @@
     - guest_id == "Windows9Guest" or guest_id == "Windows9_64Guest"
 
 - name: "Print the VM CPU number and cores per socket number"
-  debug:
+  ansible.builtin.debug:
     msg: "VM CPU number is: {{ cpu_number }}, cores per socket number is: {{ cpu_cores_per_socket }}"

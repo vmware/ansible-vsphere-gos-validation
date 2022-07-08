@@ -15,12 +15,12 @@
 # the default value is 300 seconds.
 # 
 - name: Initialize the wait for IP address
-  set_fact:
+  ansible.builtin.set_fact:
     wait_ipv4: ""
   when: wait_ipv4 is undefined
 
 - name: Wait for VMware Tools collecting guest info
-  vmware_guest_info:
+  community.vmware.vmware_guest_info:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
     password: "{{ vsphere_host_user_password }}"
@@ -41,14 +41,14 @@
     - ( not wait_ipv4 ) or ( wait_ipv4 and wait_ipv4 in vm_guest_facts.instance.hw_eth0.ipaddresses | ipv4)
 
 # Retrieve IPv4 from eth0 ipaddresses to avoid getting virbr0 IP on RHEL-like guests
-- debug:
+- ansible.builtin.debug:
     msg: "VM guest IP addresses in VM guest facts: {{ vm_guest_facts.instance.hw_eth0.ipaddresses | ipv4 }}"
   when:
     - vm_guest_facts.instance.hw_eth0.ipaddresses
     - vm_guest_facts.instance.hw_eth0.ipaddresses | ipv4
 
 # When retrieving IPv4 from eth0 ipaddresses fails, we can retrieve ipv4 instead
-- debug:
+- ansible.builtin.debug:
     msg: "Found VM guest IP address: {{ vm_guest_facts.instance.ipv4 }}"
   when:
     - (not vm_guest_facts.instance.hw_eth0.ipaddresses) or (not vm_guest_facts.instance.hw_eth0.ipaddresses | ipv4)

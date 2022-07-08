@@ -21,15 +21,15 @@
 
     - block:
         - name: "Set current test case log path on local machine"
-          set_fact:
+          ansible.builtin.set_fact:
             current_test_log_folder: "{{ testrun_log_path }}/{{ ansible_play_name }}"
         - name: "Create the current test case log folder with mode '0755'"
-          file:
+          ansible.builtin.file:
             path: "{{ current_test_log_folder }}"
             state: directory
             mode: '0755'
           register: create_log_path
-        - debug: var=create_log_path
+        - ansible.builtin.debug: var=create_log_path
           when: enable_debug is defined and enable_debug
         
         - include_tasks: deploy_vm_from_iso.yml
@@ -43,7 +43,7 @@
             - vm_deploy_method | lower == 'ova' 
         
         - name: "Print VM guest IP address"
-          debug: var=vm_guest_ip
+          ansible.builtin.debug: var=vm_guest_ip
           when: vm_guest_ip is defined
 
         # Take screenshot of VM after guest OS install
@@ -53,7 +53,7 @@
       rescue:
         - include_tasks: ../../common/test_rescue.yml
           vars:
-            exit_testing_when_fail: True
+            exit_testing_when_ansible.builtin.fail: True
       always:
         - block:
             # Umount NFS share points

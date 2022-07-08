@@ -23,14 +23,14 @@
     # Check VM existence
     - include_tasks: ../common/vm_check_exist.yml
     - name: "Check VM '{{ vm_name }}' does not exist"
-      assert:
+      ansible.builtin.assert:
         that:
           - not vm_exists
         fail_msg: "Cann't deploy VM as a VM with same name '{{ vm_name }}' already exists. Please provide a new vm_name."
       when: new_vm is defined and new_vm | bool
 
     - name: "Check VM '{{ vm_name }}' exists"
-      assert:
+      ansible.builtin.assert:
         that:
           - vm_exists
         fail_msg: "VM '{{ vm_name }}' doesn't exist. Please set new_vm to True to deploy the VM or provide an existing VM name."
@@ -40,10 +40,10 @@
     - include_tasks: ../common/vm_get_vm_info.yml
       when: vm_exists is defined and vm_exists
     - name: Set fact of the VM datastore path
-      set_fact:
+      ansible.builtin.set_fact:
         vm_datastore_path: "/vmfs/volumes/{{ datastore }}"
     - name: Display the datatore path of VM files
-      debug: var=vm_datastore_path
+      ansible.builtin.debug: var=vm_datastore_path
 
     # Get vCenter and ESXi version info
     - include_tasks: ../common/vcenter_get_version_build.yml
@@ -61,12 +61,12 @@
           register: check_esxi_shell
 
         - name: Set ESXi server shell executable
-          set_fact:
+          ansible.builtin.set_fact:
             esxi_shell_executable: "{{ check_esxi_shell.stdout }}"
       when: esxi_shell is defined and esxi_shell
 
     - name: Set ESXi server shell executable
-      set_fact:
+      ansible.builtin.set_fact:
         esxi_shell_executable: "/bin/sh"
       when: esxi_shell is undefined or not esxi_shell
 
@@ -89,7 +89,7 @@
     # For existing VM
     - block:
         - name: "Not cleanup old snapshot by default"
-          set_fact:
+          ansible.builtin.set_fact:
             cleanup_old_snapshots: False
           when: cleanup_old_snapshots is undefined
         

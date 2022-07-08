@@ -3,7 +3,7 @@
 ---
 # Get CPU number, socket number and cores per socket number in guest OS
 - name: Initialize the CPU number and socket number
-  set_fact:
+  ansible.builtin.set_fact:
     win_cpu_number: 0
     win_socket_number: 0
 
@@ -12,7 +12,7 @@
     win_powershell_cmd: "(get-wmiobject win32_computersystem | select numberoflogicalprocessors, numberofprocessors | ft -hide | Out-String).trim()"
 
 - name: Set fact of CPU number
-  set_fact:
+  ansible.builtin.set_fact:
     win_cpu_number: "{{ win_powershell_cmd_output.stdout_lines[0].split()[0] }}"
     win_socket_number: "{{ win_powershell_cmd_output.stdout_lines[0].split()[1] }}"
   when:
@@ -22,9 +22,9 @@
     - win_powershell_cmd_output.stdout_lines[0]
 
 - name: Set fact of the cores per socket number
-  set_fact:
+  ansible.builtin.set_fact:
     win_cores_per_socket: "{{ (win_cpu_number | int / win_socket_number | int) | int if (win_socket_number | int != 0) else 0 }}"
-- debug:
+- ansible.builtin.debug:
     msg:
       - "CPU number in guest: {{ win_cpu_number }}"
       - "Socket number in guest: {{ win_socket_number }}"

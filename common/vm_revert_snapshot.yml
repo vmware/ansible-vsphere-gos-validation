@@ -8,12 +8,12 @@
 #   Default value is False.
 #
 - name: Set fact of revert to snapshot failed if not exist
-  set_fact:
+  ansible.builtin.set_fact:
     skip_if_not_exist: False
   when: skip_if_not_exist is undefined
 
 - name: "Revert to snapshot {{ snapshot_name }}"
-  vmware_guest_snapshot:
+  community.vmware.vmware_guest_snapshot:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
     password: "{{ vsphere_host_user_password }}"
@@ -25,18 +25,18 @@
     snapshot_name: "{{ snapshot_name }}"
   ignore_errors: True
   register: revert_result
-- debug: var=revert_result
+- ansible.builtin.debug: var=revert_result
   when: enable_debug is defined and enable_debug
 
 # Handle revert snasphot failure
 - block:
     - name: "Check snasphot not exist failure message"
-      set_fact:
+      ansible.builtin.set_fact:
         msg_no_snapshots: "{{ revert_result.msg | regex_search('does not have any snapshots to revert') }}"
         msg_not_find_snapshot: "{{ revert_result.msg | regex_search('Couldn.t find any snapshots with specified name') }}"
     
     # Ignore snapshot not exist failure when skip_if_not_exist is set to True
-    - debug:
+    - ansible.builtin.debug:
         msg: "Snapshot '{{ snapshot_name }}' not exist, but 'skip_if_not_exist' is set to True"
       when:
         - skip_if_not_exist
@@ -44,7 +44,7 @@
     
     # Other failures
     - name: "Revert snapshot failed"
-      fail:
+      ansible.builtin.fail:
         msg: "Revert to snapshot '{{ snapshot_name }}' failed"
   when:
     - "'failed' in revert_result"

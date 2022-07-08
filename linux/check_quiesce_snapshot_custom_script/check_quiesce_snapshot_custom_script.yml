@@ -18,7 +18,7 @@
 
         # Take quiesce snapshot
         - name: Set quiesce snapshot variables
-          set_fact:
+          ansible.builtin.set_fact:
             qs_snapshot_name: "quiesce_snapshot_{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
             backup_script_dir: "/etc/vmware-tools/backupScripts.d"
             vss_shell_script: "vss_script_sh.sh"
@@ -28,7 +28,7 @@
 
         # Copy vss_script_sh.sh to /etc/vmware-tools/backupScripts.d/vss_script_sh.sh
         - name: "Create backup script dir {{ backup_script_dir }}"
-          file:
+          ansible.builtin.file:
             path: "{{ backup_script_dir }}"
             state: directory
             mode: 0755
@@ -55,7 +55,7 @@
 
         # Ensure /vss.log is absent
         - name: "Remove {{ vss_log_path }} if it exists"
-          file:
+          ansible.builtin.file:
             path: "{{ vss_log_path }}"
             state: absent
           delegate_to: "{{ vm_guest_ip }}"
@@ -78,7 +78,7 @@
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "{{ ansible_play_name }} failed"
-          fail:
+          ansible.builtin.fail:
             msg: "{{ vss_log_path }} doesn't exist after quiesce snapshot"
           when: >
             (vss_stat is undefined) or
@@ -96,7 +96,7 @@
                 dest_path: "{{ current_test_log_folder }}{{ vss_log_path }}"
 
             - name: Get file content in /vss.log
-              shell: "cat {{ current_test_log_folder }}{{ vss_log_path }}"
+              ansible.builtin.shell: "cat {{ current_test_log_folder }}{{ vss_log_path }}"
               register: vss_content
           when:
             - vss_stat is defined
@@ -106,7 +106,7 @@
 
         # Test failed for non-Flatcar guest
         - name: "{{ ansible_play_name }} failed"
-          fail:
+          ansible.builtin.fail:
             msg: "{{ vss_log_path }} has incorrect content"
           when: ('Flatcar' not in guest_os_ansible_distribution) and
               (( not vss_content ) or
@@ -119,7 +119,7 @@
 
         # Test failed for Flatcar guest
         - name: "{{ ansible_play_name }} failed"
-          fail:
+          ansible.builtin.fail:
             msg: "{{ vss_log_path }} has incorrect content"
           when: ('Flatcar' in guest_os_ansible_distribution) and
              (( not vss_content ) or

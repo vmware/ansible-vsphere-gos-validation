@@ -4,34 +4,34 @@
 # Get expected IP and FQDN hostname bindings from cloudinit "/etc/hosts" template file
 - block:
     - name: "Initialize the fact of hosts template file"
-      set_fact:
+      ansible.builtin.set_fact:
         hosts_template_file: ""
     - name: "Set fact of the hosts template file hosts.debian.tmpl"
-      set_fact:
+      ansible.builtin.set_fact:
         hosts_template_file: "/etc/cloud/templates/hosts.debian.tmpl"
       when: guest_os_family == "Debian"
     - name: "Set fact of the hosts template file hosts.redhat.tmpl"
-      set_fact:
+      ansible.builtin.set_fact:
         hosts_template_file: "/etc/cloud/templates/hosts.redhat.tmpl"
       when: guest_os_family == "RedHat"
     - name: "Set fact of the hosts template file hosts.suse.tmpl"
-      set_fact:
+      ansible.builtin.set_fact:
         hosts_template_file: "/etc/cloud/templates/hosts.suse.tmpl"
       when: guest_os_family == "Suse"
     - name: "Set fact of the hosts template file hosts.photon.tmpl"
-      set_fact:
+      ansible.builtin.set_fact:
         hosts_template_file: "/etc/cloud/templates/hosts.photon.tmpl"
       when: guest_os_ansible_distribution == "VMware Photon OS"
-    - debug:
+    - ansible.builtin.debug:
         msg: "For guest '{{ guest_os_ansible_distribution }}', set /etc/hosts template file: {{ hosts_template_file }}"
     - block:
         - name: "Get FQDN and hostname bound IP address list from hosts template"
-          shell: cat "{{ hosts_template_file }}" | grep '.*fqdn}} .*hostname}}.*' | awk '{ print $1 }'
+          ansible.builtin.shell: cat "{{ hosts_template_file }}" | grep '.*fqdn}} .*hostname}}.*' | awk '{ print $1 }'
           delegate_to: "{{ vm_guest_ip }}"
           register: fqdn_hostname_bind_ip
           failed_when: fqdn_hostname_bind_ip.stderr
         - name: "Print the IP address list to be binding with FQDN and hostname from hosts template file"
-          debug: var=fqdn_hostname_bind_ip
+          ansible.builtin.debug: var=fqdn_hostname_bind_ip
       when: hosts_template_file
   when: enable_cloudinit_gosc
 
@@ -49,7 +49,7 @@
 
 # Traditional GOSC will reboot guest OS (except for Photon) after all customization done
 - name: Sleep 30 seconds to wait guest reboot for traditional GOSC
-  pause:
+  ansible.builtin.pause:
     seconds: 30
   when:
     - guest_os_ansible_distribution != "VMware Photon OS"
@@ -67,7 +67,7 @@
   when: ip_assignment == "dhcp"
 
 - name: "Set fact of GOSC log files"
-  set_fact:
+  ansible.builtin.set_fact:
     gosc_deploypkg_log_file: "/var/log/vmware-imc/toolsDeployPkg.log"
     gosc_cloudinit_log_file: "/var/log/cloud-init.log"
 

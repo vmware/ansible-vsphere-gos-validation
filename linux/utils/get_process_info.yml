@@ -8,23 +8,23 @@
 #   process_list: all running processes in a list with process name
 
 - name: "Initialize process list and status"
-  set_fact:
+  ansible.builtin.set_fact:
     process_list: []
 
 - name: "Get '{{ process_name }}' process information"
-  shell: "ps -ef | grep '{{ process_name }}' | grep -v grep"
+  ansible.builtin.shell: "ps -ef | grep '{{ process_name }}' | grep -v grep"
   register: ps_result
   failed_when: false
   delegate_to: "{{ vm_guest_ip }}"
 
 - block:
     - name: "Set the fact for process list"
-      set_fact:
+      ansible.builtin.set_fact:
         process_list: "{{ process_list | union([{'uid':item.split()[0],'pid':item.split()[1], 'cmd':' '.join(item.split()[7:])}]) }}"
       with_items: "{{ ps_result.stdout_lines }}"
 
     - name: "Get the running process list"
-      debug: var=process_list
+      ansible.builtin.debug: var=process_list
   when:
     - ps_result.stdout_lines is defined
     - ps_result.stdout_lines | length >= 1

@@ -16,28 +16,28 @@
     regexp: "{{ check_msg_regexp }}"
 
 - name: "Initialize error message for checking GOSC log"
-  set_fact:
+  ansible.builtin.set_fact:
     check_msg_error: ""
 
 - block:
     - name: "Set error message for checking GOSC log"
-      set_fact:
+      ansible.builtin.set_fact:
         check_msg_error: "Not found '{{ check_msg_regexp }}' in GOSC log, which should exist in GOSC log"
       when: regexp_found | int == 0
 
     - name: "Update GOSC log check result "
-      set_fact:
+      ansible.builtin.set_fact:
         gosc_log_success: "{{ (gosc_log_success | bool) and (regexp_found | int > 0) }}"
   when: check_msg_state == 'present'
 
 - block:
     - name: "Set error message for checking GOSC log"
-      set_fact:
+      ansible.builtin.set_fact:
         check_msg_error: "Found '{{ check_msg_regexp }}' in GOSC log, which should not exist in GOSC log"
       when: regexp_found | int > 0
 
     - name: "Update GOSC log check result "
-      set_fact:
+      ansible.builtin.set_fact:
         gosc_log_success: "{{ (gosc_log_success | bool) and (regexp_found | int == 0) }}"
   when: check_msg_state == 'absent'
 

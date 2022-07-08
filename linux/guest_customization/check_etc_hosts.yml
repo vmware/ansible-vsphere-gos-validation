@@ -4,7 +4,7 @@
 # Default not to check IPv6 IP address hostname binding result,
 # So set 'ipv6_hostname_check' to False
 - name: "Initialize test case temporary file path and hosts check result"
-  set_fact:
+  ansible.builtin.set_fact:
     hosts_file_path: "{{ current_test_log_folder }}/etc/hosts"
     etc_hosts_success: False
     expected_ips: ['::1']
@@ -18,11 +18,11 @@
     dest_path: "{{ hosts_file_path }}"
 
 - name: "Get IP bindings for hostname {{ linux_gosc_spec['hostname'] }} in /etc/hosts"
-  set_fact:
+  ansible.builtin.set_fact:
     guest_host_ip_bindings: "{{ lookup('file', hosts_file_path).split('\n') | select('match', '.*\\s*' ~ linux_gosc_spec['hostname'] ~ '.' ~ linux_gosc_spec['domain'] ~ ' *' ~ linux_gosc_spec['hostname']) }}"
 
 - name: "Set fact of hostnam and IP binding"
-  set_fact:
+  ansible.builtin.set_fact:
     actual_ips: "{{ guest_host_ip_bindings | map('regex_replace', '\\s*' ~ linux_gosc_spec['hostname'] ~ '.*', '') }}"
   when: guest_host_ip_bindings | length > 0
 
@@ -34,14 +34,14 @@
 #   so will set expected_ips to the one got from template file
 #
 - name: "Set expected IP list to the one got from cloudinit /etc/hosts template file"
-  set_fact:
+  ansible.builtin.set_fact:
     expected_ips: "{{ fqdn_hostname_bind_ip.stdout_lines }}"
   when:
     - enable_cloudinit_gosc
     - fqdn_hostname_bind_ip is defined
 
 - name: "Append static IP address to expected IP list for perl GOSC"
-  set_fact:
+  ansible.builtin.set_fact:
     expected_ips: "{{ expected_ips | union([linux_gosc_spec['ip']]) }}"
   when:
     - ip_assignment == "static"
@@ -49,33 +49,33 @@
 
 # In Ubuntu, may contain 127.0.1.1 
 - name: "Append '127.0.1.1' to expected IP list for perl GOSC"
-  set_fact:
+  ansible.builtin.set_fact:
     expected_ips: "{{ expected_ips | union(['127.0.1.1']) }}"
   when:
     - not enable_cloudinit_gosc
 
 - name: "Remove ::1 from hostname binding list when not check IPv6 binding"
-  set_fact:
+  ansible.builtin.set_fact:
     actual_ips: "{{ actual_ips | difference(['::1']) }}"
     expected_ips: "{{ expected_ips | difference(['::1']) }}"
   when: not ipv6_hostname_check
 
 - name: "Print IP bindings for hostname {{ linux_gosc_spec['hostname'] }} in /etc/hosts"
-  debug:
+  ansible.builtin.debug:
     msg:
       - "Expected IP binding on hostname for {{ linux_gosc_spec['hostname'] }} in /etc/hosts: {{ expected_ips }}"
       - "Actual IP binding on hostname for {{ linux_gosc_spec['hostname'] }} in /etc/hosts: {{ actual_ips }}"
 
 # Check hostname IP bindings in /etc/hosts
 - name: "Get /etc/hosts check result"
-  set_fact:
+  ansible.builtin.set_fact:
     etc_hosts_success: True
   when: >
     (actual_ips | sort == expected_ips | sort) or
     (expected_ips | difference(actual_ips) == ['127.0.1.1'])
 
 - name: "Print /etc/hosts check result"
-  debug: var=etc_hosts_success
+  ansible.builtin.debug: var=etc_hosts_success
 
 - include_tasks: set_gosc_validation_result.yml
   vars:

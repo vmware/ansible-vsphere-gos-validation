@@ -9,7 +9,7 @@
 #     changed. Default value is 10.
 #
 - name: Set fact of valid power state list
-  set_fact:
+  ansible.builtin.set_fact:
     valid_expected_power_state:
       - powered-off
       - powered-on
@@ -19,7 +19,7 @@
       - suspended
       - present
 - name: Check required parameter
-  assert:
+  ansible.builtin.assert:
     that:
       - vm_power_state_set is defined
       - vm_power_state_set | lower in valid_expected_power_state
@@ -32,7 +32,7 @@
   when: vm_power_state_set | lower == 'shutdown-guest' or vm_power_state_set | lower == 'reboot-guest'
 
 - name: "Set VM power state to '{{ vm_power_state_set }}'"
-  vmware_guest_powerstate:
+  community.vmware.vmware_guest_powerstate:
     validate_certs: "{{ validate_certs | default(False) }}"
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -52,7 +52,7 @@
         vm_question_response: "button.serial.file.overwrite"
 
     - name: "Set fact of the result of changing VM power state"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_change_power_state: "{{ vm_answer_question_result }}"
       when:
         - vm_answer_question_result is defined
@@ -66,7 +66,7 @@
     - vm_change_power_state.instance.guest_question.message | length > 0
     - vm_change_power_state.instance.guest_question.message[0].id == "msg.serial.file.open"
 
-- fail:
+- ansible.builtin.fail:
     msg: >
       {% if vm_change_power_state is defined and vm_change_power_state.msg is defined %}{{ vm_change_power_state.msg }}
       {% else %}Failed to set VM power state to {{ vm_power_state_set | lower }}{% endif %}
@@ -75,12 +75,12 @@
     vm_change_power_state.failed is defined and vm_change_power_state.failed | bool
 
 - name: Display the result of changing VM power state
-  debug: var=vm_change_power_state
+  ansible.builtin.debug: var=vm_change_power_state
 
 # When VM power state changed, then wait for VM enter into the expected state
 - block:
     - name: "Wait {{ vm_set_power_state_sleep | default(10) }} seconds after VM power state changed"
-      pause:
+      ansible.builtin.pause:
         seconds: "{{ vm_set_power_state_sleep | default(10) }}"
     - include_tasks: vm_wait_power_state.yml
       vars:
@@ -97,4 +97,4 @@
 # Get current VM power state
 - include_tasks: vm_get_power_state.yml
 - name: Display the current VM power state
-  debug: var=vm_power_state_get
+  ansible.builtin.debug: var=vm_power_state_get

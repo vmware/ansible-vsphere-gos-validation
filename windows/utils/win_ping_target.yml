@@ -9,21 +9,21 @@
 #   win_ping_target_result
 #
 - name: "Check ping target IP address is specified"
-  fail:
+  ansible.builtin.fail:
     msg: "Please specify ping target IP address"
   when: win_ping_target_ip is undefined or not win_ping_target_ip
-- debug:
+- ansible.builtin.debug:
     msg: "Will ping this target IP address: {{ win_ping_target_ip }}"
 
 - name: "Initialize the ping target result"
-  set_fact:
+  ansible.builtin.set_fact:
     win_ping_target_result: False
 - name: "Set fact of the ping command"
-  set_fact:
+  ansible.builtin.set_fact:
     win_ping_command: "ping -n 3 {{ win_ping_target_ip }}"
   when: win_ping_src_ip is undefined or not win_ping_src_ip
 - name: "Set fact of the ping command"
-  set_fact:
+  ansible.builtin.set_fact:
     win_ping_command: "ping -n 3 -S {{ win_ping_src_ip }} {{ win_ping_target_ip }}"
   when:
     - win_ping_src_ip is defined
@@ -37,11 +37,11 @@
 
 - block:
     - name: "Set ping result to True"
-      set_fact:
+      ansible.builtin.set_fact:
         win_ping_target_result: True
       when: win_powershell_cmd_output.rc == 0
     - name: "Set ping result to False"
-      set_fact:
+      ansible.builtin.set_fact:
         win_ping_target_result: False
       when: >
         (win_powershell_cmd_output.rc != 0) or
@@ -50,5 +50,5 @@
     - win_powershell_cmd_output is defined
     - win_powershell_cmd_output.rc is defined
     - win_powershell_cmd_output.stdout is defined
-- debug:
+- ansible.builtin.debug:
     msg: "Ping target IP address result: {{ win_ping_target_result }}"

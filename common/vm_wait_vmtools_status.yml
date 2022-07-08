@@ -14,7 +14,7 @@
 #     waiting expected VMware tools status. 
 #
 - name: Check required parameter
-  assert:
+  ansible.builtin.assert:
     that:
       - vm_wait_vmtools_running is defined
     fail_msg: "Required parameter 'vm_wait_vmtools_running' is not defined."
@@ -22,16 +22,16 @@
 # VMware tools install status will be 'toolsOk', 'toolsOld',
 # 'toolsNotInstalled', etc.
 - name: Set fact of VMware tools not running status
-  set_fact:
+  ansible.builtin.set_fact:
     vmtools_running_status: 'guestToolsNotRunning'
   when: not vm_wait_vmtools_running
 - name: Set fact of VMware tools running status
-  set_fact:
+  ansible.builtin.set_fact:
     vmtools_running_status: 'guestToolsRunning'
   when: vm_wait_vmtools_running
 
 - name: Wait for VMware Tools is in expected status
-  vmware_guest_tools_info:
+  community.vmware.vmware_guest_tools_info:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
     password: "{{ vsphere_host_user_password }}"
@@ -45,14 +45,14 @@
   delay: 3
   ignore_errors: "{{ vm_wait_vmtools_ignore_error | default(False) }}"
 - name: Display the wait for VMware tools status result
-  debug: var=get_vmtools_info
+  ansible.builtin.debug: var=get_vmtools_info
   when: enable_debug
 
 - name: Set fact of VMware Tools installed status
-  set_fact:
+  ansible.builtin.set_fact:
     vmtools_is_installed: "{{ get_vmtools_info.vmtools_info.vm_tools_install_status != 'toolsNotInstalled' }}"
     vmtools_is_running: "{{ get_vmtools_info.vmtools_info.vm_tools_running_status == 'guestToolsRunning' }}"
-- debug:
+- ansible.builtin.debug:
     msg:
       - "VMware tools is installed in guest: {{ vmtools_is_installed }}"
       - "VMware tools is running in guest: {{ vmtools_is_running }}"

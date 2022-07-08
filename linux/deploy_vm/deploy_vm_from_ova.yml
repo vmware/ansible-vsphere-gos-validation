@@ -3,13 +3,13 @@
 ---
 # Initialize deploy_casename with guest_id
 - name: "Set fact of deploy VM test case name"
-  set_fact:
+  ansible.builtin.set_fact:
     deploy_casename: "deploy_ova"
 
 - block:
     # OVA file on local machine
     - name: "Get OVA path and file name"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_ova_path: "{{ ova_path | realpath }}"
         vm_ova_name: "{{ ova_path | basename }}"
       when: ova_nfs_server_path is undefined or not ova_nfs_server_path
@@ -20,7 +20,7 @@
         nfs_server_path: "{{ ova_nfs_server_path }}"
       when: ova_nfs_server_path is defined and ova_nfs_server_path
     - name: "Get OVA path and file name"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_ova_path: "{{ nfs_mount_dir }}/{{ ova_path }}"
         vm_ova_name: "{{ ova_path | basename }}"
     # Check OVA file exists
@@ -40,20 +40,20 @@
     # Get OVA deployed VM info
     - include_tasks: ../../common/vm_get_vm_info.yml
     - name: "Set fact of vm_exists to True"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_exists: True
 
     # Take a snapshot after OVA deploy
     # Reconfiguration must be performed at VM first time boot
     - name: "Set fact of the base snapshot name"
-      set_fact:
+      ansible.builtin.set_fact:
         base_snapshot_for_reconfig: "FreshDeployedFromOVA"
     - include_tasks: ../../common/vm_take_snapshot.yml
       vars:
         snapshot_name: "{{ base_snapshot_for_reconfig }}"
 
     - name: "Set fact of guest OS type for VM '{{ vm_name }}'"
-      set_fact:
+      ansible.builtin.set_fact:
         ova_guest_os_type: |-
           {%- if 'ubuntu' in vm_guest_id -%}ubuntu
           {%- elif 'amazonlinux' in vm_guest_id -%}amazonlinux
@@ -76,7 +76,7 @@
           vars:
             vm_power_state_set: 'powered-on'
         - name: "Set current power state"
-          set_fact:
+          ansible.builtin.set_fact:
             current_power_state: "{{ vm_power_state_get }}"
         - include_tasks: ../../common/vm_get_guest_info.yml
 
@@ -112,13 +112,13 @@
       when: ova_guest_os_type == 'ubuntu'
 
     # Warning about other OS OVAs which are not supported
-    - debug:
+    - ansible.builtin.debug:
         msg: "WARN: OVA guest OS type is not supported in this project. The following tests might fail."
       when: ova_guest_os_type == 'unknown'
   rescue:
     - include_tasks: ../../common/test_rescue.yml
       vars:
-        exit_testing_when_fail: True
+        exit_testing_when_ansible.builtin.fail: True
   always:
     - block:
         # Umount NFS share points

@@ -15,11 +15,11 @@
         - include_tasks: ../setup/test_setup.yml
         # VMware tools status got in test_setup before this test
         - name: Set fact of the VMware tools status before uninstall
-          set_fact:
+          ansible.builtin.set_fact:
             vmtools_is_installed_before: "{{ vmtools_is_installed | default(False) }}"
             vmtools_is_running_before: "{{ vmtools_is_running | default(False) }}"
         - name: Display the VMware tools status before uninstall
-          debug:
+          ansible.builtin.debug:
             msg: "VMware tools installed: {{ vmtools_is_installed_before }}, running: {{ vmtools_is_running_before }}"
 
         - include_tasks: ../../common/skip_test_case.yml
@@ -29,7 +29,7 @@
           when: not vmtools_is_installed_before
 
         - name: Check VMware tools is running before uninstall
-          fail:
+          ansible.builtin.fail:
             msg: "VMware tools installed: {{ vmtools_is_installed_before }}, running: {{ vmtools_is_running_before }}"
           when: not vmtools_is_running_before
 
@@ -37,7 +37,7 @@
         - include_tasks: uninstall_vmtools.yml
         - include_tasks: ../../common/vm_get_vmtools_status.yml
         - name: Verify VMware tools is not running and not installed after uninstall
-          assert:
+          ansible.builtin.assert:
             that:
               - vmtools_is_installed is defined
               - not vmtools_is_installed | bool

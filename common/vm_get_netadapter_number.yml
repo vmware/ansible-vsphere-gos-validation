@@ -5,7 +5,7 @@
 # return the number of network adapters types: VMXNET2, VMXNET3, E1000, E1000E
 #
 - name: "Initialize the number of VM network adapters"
-  set_fact:
+  ansible.builtin.set_fact:
     VMXNET2: 0
     VMXNET3: 0
     E1000: 0
@@ -13,13 +13,13 @@
     MAC_ADDR: []
 - include_tasks: vm_get_network_facts.yml
 - name: "Set fact of the total number of VM network adapters"
-  set_fact:
+  ansible.builtin.set_fact:
     vm_netadapter_num: "{{ vm_network_adapters | length }}"
-- debug:
+- ansible.builtin.debug:
     msg: "Total number of VM network adapters: {{ vm_netadapter_num }}"
 
 - name: "Set fact of the number of each VM network adapter type and the MAC address list"
-  set_fact:
+  ansible.builtin.set_fact:
     VMXNET2: "{{ VMXNET2|int + 1 if item.value.device_type | lower == 'vmxnet2' else VMXNET2 }}"
     VMXNET3: "{{ VMXNET3|int + 1 if item.value.device_type | lower == 'vmxnet3' else VMXNET3 }}"
     E1000: "{{ E1000|int + 1 if item.value.device_type | lower == 'e1000' else E1000 }}"
@@ -30,7 +30,7 @@
   when: vm_network_adapters | length >= 1
 
 - name: Set fact of the dict of network adpater types and their number
-  set_fact:
+  ansible.builtin.set_fact:
     vm_netadapter_num_dict: {'VMXNET2': "{{ VMXNET2 }}", 'VMXNET3': "{{ VMXNET3 }}", 'E1000': "{{ E1000 }}", 'E1000E': "{{ E1000E }}", 'total': "{{ vm_netadapter_num }}", 'MAC_ADDR': "{{ MAC_ADDR }}"}
-- debug:
+- ansible.builtin.debug:
     msg: "Get the number of each network adapter type dict and MAC address list: {{ vm_netadapter_num_dict }} "
