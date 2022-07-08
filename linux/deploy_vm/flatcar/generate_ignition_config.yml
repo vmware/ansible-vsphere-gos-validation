@@ -12,7 +12,7 @@
     tmp_suffix: ".json"
 
 - name: "Set variables for Ignition config"
-  set_fact:
+  ansible.builtin.set_fact:
     ignition_config_file: "{{ tmp_path }}"
 
 # Put SSH public key into ignition config file
@@ -24,7 +24,7 @@
   register: generate_ignition
 
 - name: "Assert {{ ignition_config_file }} is generated"
-  assert:
+  ansible.builtin.assert:
     that:
       - generate_ignition.changed
     fail_msg: "Failed to generate {{ ignition_config_file }}"
@@ -32,10 +32,10 @@
 
 - block:
     - name: "Generate base64 encoded string for {{ ignition_config_file }}"
-      set_fact:
+      ansible.builtin.set_fact:
         ignition_config_data: "{{ lookup('file', ignition_config_file) | b64encode }}"
 
-    - debug: var=ignition_config_data
+    - ansible.builtin.debug: var=ignition_config_data
 
     - name: "Remove {{ ignition_config_file }}"
       include_tasks: ../../../common/delete_local_file.yml

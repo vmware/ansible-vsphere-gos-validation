@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: Initialize inbox driver info variables
-  set_fact:
+  ansible.builtin.set_fact:
     inbox_drivers_info: []
     inbox_pvscsi_info: {}
     inbox_vmxnet3_info: {}
@@ -11,12 +11,12 @@
   vars:
     win_driver_inf: "pvscsii.inf"
 - name: Set fact of pvscsi driver info
-  set_fact:
+  ansible.builtin.set_fact:
     inbox_pvscsi_info: "{{ inbox_pvscsi_info | combine({item.split(' : ')[0].strip(): item.split(' : ')[1].strip()}) }}"
   when: item
   loop: "{{ win_driver_info }}"
 - name: Add pvscsi driver info to list
-  set_fact:
+  ansible.builtin.set_fact:
     inbox_drivers_info: "{{ [inbox_pvscsi_info] }}"
   when: inbox_pvscsi_info | length != 0
 
@@ -24,21 +24,21 @@
   vars:
     win_driver_inf: "vmxnet3.inf"
 - name: Set fact of vmxnet3 driver info
-  set_fact:
+  ansible.builtin.set_fact:
     inbox_vmxnet3_info: "{{ inbox_vmxnet3_info | combine({item.split(' : ')[0].strip(): item.split(' : ')[1].strip()}) }}"
   when: item
   loop: "{{ win_driver_info }}"
 - name: Add vmxnet3 driver info to list
-  set_fact:
+  ansible.builtin.set_fact:
     inbox_drivers_info: "{{ inbox_drivers_info + [inbox_vmxnet3_info] }}"
   when: inbox_vmxnet3_info | length != 0
 
 - name: Print inbox drivers info
-  debug: var=inbox_drivers_info
+  ansible.builtin.debug: var=inbox_drivers_info
 
 - block:
     - name: Set fact of the file path for recording inbox drivers info
-      set_fact:
+      ansible.builtin.set_fact:
         drivers_info_file_path: "{{ current_test_log_folder }}/{{ ('-').join(guest_os_ansible_distribution.split(' ')[1:-1]) }}-{{ guest_os_build_num }}-{{ guest_os_ansible_architecture.replace('-', '') }}.json"
     - include_tasks: ../../common/create_directory.yml
       vars:

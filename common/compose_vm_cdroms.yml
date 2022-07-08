@@ -15,7 +15,7 @@
 #     unit_number: 1
 #
 - name: "Set VM CDROM attaching to SATA controller by default"
-  set_fact:
+  ansible.builtin.set_fact:
     cdrom_controller_type: 'sata'
   when: >
     (cdrom_controller_type is undefined) or
@@ -31,11 +31,11 @@
   with_items: "{{ os_installation_iso_list }}"
 
 - name: "Initialize variable of VM CDROMs list"
-  set_fact:
+  ansible.builtin.set_fact:
     vm_cdroms: []
 
 - name: "Set fact of loop list start and end values"
-  set_fact:
+  ansible.builtin.set_fact:
     loop_start: 0
     loop_end: "{{ os_install_iso_list_len }}"
     ide_iso_list_len_limit: 4
@@ -44,7 +44,7 @@
     (cdrom_controller_type | lower == 'sata' and boot_disk_controller | lower != 'sata')
 
 - name: "Set fact of loop list start and end values"
-  set_fact:
+  ansible.builtin.set_fact:
     loop_start: 1
     loop_end: "{{ os_install_iso_list_len | int + 1 }}"
     ide_iso_list_len_limit: 3
@@ -54,23 +54,23 @@
 
 - block:
     - name: "Check os_installation_iso_list length"
-      assert:
+      ansible.builtin.assert:
         that:
           - os_install_iso_list_len | int <= ide_iso_list_len_limit | int
         fail_msg: "The number of ISO files to be attached to IDE CDROMs is larger than '{{ ide_iso_list_len_limit }}', please set cdrom_controller_type parameter to 'sata'."
     - name: "Compose the VM CDROMs list"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_cdroms: "{{ vm_cdroms + [{'type': 'iso', 'iso_path': os_installation_iso_list[item] if loop_end | int == os_install_iso_list_len | int else os_installation_iso_list[item-1], 'controller_type': 'ide', 'controller_number': (item / 2) | int, 'unit_number': (item % 2) | int}] }}"
       loop: "{{ range(loop_start | int, loop_end | int) | list }}"
   when:
     - cdrom_controller_type | lower == 'ide'
 
 - name: "Compose the VM CDROMs list"
-  set_fact:
+  ansible.builtin.set_fact:
     vm_cdroms: "{{ vm_cdroms + [{'type': 'iso', 'iso_path': os_installation_iso_list[item] if loop_end | int == os_install_iso_list_len | int else os_installation_iso_list[item-1], 'controller_type': 'sata', 'controller_number': 0, 'unit_number': item}] }}"
   loop: "{{ range(loop_start | int, loop_end | int) | list }}"
   when: 
     - cdrom_controller_type | lower == 'sata'
 
 - name: "Display the generated VM CDROMs list"
-  debug: var=vm_cdroms
+  ansible.builtin.debug: var=vm_cdroms

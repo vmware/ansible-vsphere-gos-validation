@@ -8,7 +8,7 @@
 #   vm_cdrom_iso_file: The datastore ISO file to connect to.
 #
 - name: "Initialize variables for CDROM config"
-  set_fact:
+  ansible.builtin.set_fact:
     vm_cdrom_device_info_got: False
     vm_cdrom_device_info: ""
     vm_cdrom_controller_type: "{{ cdrom_controller_type | default('sata') }}"
@@ -18,7 +18,7 @@
 
 - include_tasks: vm_get_cdrom_devices.yml
 - name: "Check CDROM device list"
-  assert:
+  ansible.builtin.assert:
     that:
       - cdrom_device_list is defined
       - cdrom_device_list | length != 0
@@ -27,10 +27,10 @@
 # CDROM drive number is specified
 - block:
     - name: "Set fact of expected CDROM device label"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_cdrom_device_label: "CD/DVD drive {{ vm_cdrom_device_num | int }}"
     - name: "Get CDROM device with specified label"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_cdrom_device_info: "{{ item }}"
         vm_cdrom_device_info_got: "{{ True if (item.label == vm_cdrom_device_label) else False }}"
       with_items: "{{ cdrom_device_list }}"
@@ -41,28 +41,28 @@
 
 # CDROM drive number is not specified, will use the first one in the CDROM device list
 - name: "Get CDROM device with the smallest label number"
-  set_fact:
+  ansible.builtin.set_fact:
     vm_cdrom_device_info: "{{ (cdrom_device_list | sort(attribute='label'))[0] }}"
   when: vm_cdrom_device_num is undefined
 
 - name: "Check CDROM device info"
-  assert:
+  ansible.builtin.assert:
     that:
       - vm_cdrom_device_info
     fail_msg: "Not get VM 'CD/DVD drive {{ vm_cdrom_device_num | default('') }}' info."
 
 - name: "Display the CDROM device info"
-  debug: var=vm_cdrom_device_info
+  ansible.builtin.debug: var=vm_cdrom_device_info
 - name: "Set CDROM controller type to SATA"
-  set_fact:
+  ansible.builtin.set_fact:
     vm_cdrom_controller_type: "sata"
   when: "'SATA' in vm_cdrom_device_info.controller_label"
 - name: "Set CDROM controller type to IDE"
-  set_fact:
+  ansible.builtin.set_fact:
     vm_cdrom_controller_type: "ide"
   when: "'IDE' in vm_cdrom_device_info.controller_label"
 - name: "Get CDROM controller bus number, unit number, and connected state"
-  set_fact:
+  ansible.builtin.set_fact:
     vm_cdrom_controller_num: "{{ vm_cdrom_device_info.bus_num }}"
     vm_cdrom_unit_num: "{{ vm_cdrom_device_info.unit_num }}"
     vm_cdrom_current_connected: "{{ vm_cdrom_device_info.connected }}"

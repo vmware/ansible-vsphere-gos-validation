@@ -7,12 +7,12 @@
 #
 
 - name: "Initialize variable for VM existence"
-  set_fact:
+  ansible.builtin.set_fact:
     existing_vm_info: ""
     vm_exists: False
 
 - name: "Get all registerd VMs and templates on {{ vsphere_host_name }}"
-  vmware_vm_info:
+  community.vmware.vmware_vm_info:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
     password: "{{ vsphere_host_user_password }}"
@@ -23,15 +23,15 @@
 
 - block:
     - name: "Set fact of existing VM basic information"
-      set_fact:
+      ansible.builtin.set_fact:
         existing_vm_info: "{{ all_vm_facts.virtual_machines | selectattr('guest_name', 'equalto', vm_name) }}"
 
     - name: "A VM, template or vApp with name '{{ vm_name }}' exists"
-      debug: var=existing_vm_info
+      ansible.builtin.debug: var=existing_vm_info
       when: enable_debug and existing_vm_info
 
     - name: "Set fact of VM existence"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_exists: True
       when: existing_vm_info | length > 0
   when:
@@ -40,4 +40,4 @@
     - all_vm_facts.virtual_machines
 
 - name: "Print the fact that VM exists or not"
-  debug: var=vm_exists
+  ansible.builtin.debug: var=vm_exists

@@ -13,20 +13,20 @@
     win_powershell_cmd: "Get-NetIPAddress | where-object {$_.InterfaceAlias -match '{{ ethernet_name }}'} | foreach {$_.IPAddress}"
 
 - name: Initialize the Ethernet IP list
-  set_fact:
+  ansible.builtin.set_fact:
     ethernet_ip: []
     ethernet_ip_dict: {}
 
 - block:
     - name: Set fact of the Ethernet IP list
-      set_fact:
+      ansible.builtin.set_fact:
         ethernet_ip: "{{ ethernet_ip | union([item.split('%')[0]]) }}"
       loop: "{{ win_powershell_cmd_output.stdout_lines }}"
     - name: Set fact of the Ethernet name and IP dict
-      set_fact:
+      ansible.builtin.set_fact:
         ethernet_ip_dict: "{{ ethernet_ip_dict | combine({ethernet_name: ethernet_ip}) }}"
       when: ethernet_ip_dict is defined
   when: win_powershell_cmd_output.stdout_lines | length != 0
 
-- debug:
+- ansible.builtin.debug:
     msg: "Get Ethernet name and IP address dict: {{ ethernet_ip_dict }}"

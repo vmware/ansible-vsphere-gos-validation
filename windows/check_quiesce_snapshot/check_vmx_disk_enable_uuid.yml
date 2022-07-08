@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: Set fact of the disk enable UUID key
-  set_fact:
+  ansible.builtin.set_fact:
     vm_advanced_settings:
       - key: "disk.EnableUUID"
         value: "TRUE"
@@ -13,7 +13,7 @@
 # Known issue on Windows Server 2022 guest ID on ESXi 7.0U3c build, fixed in ESXi 7.0U3d
 - block:
     - name: "Known issue - ignore missing disk.EnableUUID = TRUE"
-      debug:
+      ansible.builtin.debug:
         msg: "'disk.EnableUUID = TRUE' is not in VM vmx file, ignore this known issue on ESXi 7.0U3c with guestID '{{ vm_guest_id }}'."
       tags:
         - known_issue
@@ -27,7 +27,7 @@
     - vm_guest_id == "windows2019srvNext_64Guest"
 
 - name: Check if get expected config in vmx
-  assert:
+  ansible.builtin.assert:
     that:
       - vm_advanced_settings[0].key in vm_extra_config
       - vm_extra_config[vm_advanced_settings[0].key] | lower == vm_advanced_settings[0].value | lower

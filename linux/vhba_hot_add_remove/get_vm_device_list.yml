@@ -2,20 +2,20 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: "Initialize device list"
-  set_fact:
+  ansible.builtin.set_fact:
     device_list: []
 
 - name: "Get block devices"
-  shell: "lsblk -o NAME,TYPE --nodeps| grep disk | awk '{print $1}'"
+  ansible.builtin.shell: "lsblk -o NAME,TYPE --nodeps| grep disk | awk '{print $1}'"
   delegate_to: "{{ vm_guest_ip }}"
   register: lsblk_result
 
 - name: "Set the fact of block device list"
-  set_fact:
+  ansible.builtin.set_fact:
     device_list: "{{ lsblk_result.stdout_lines }}"
   when:
     - lsblk_result is defined
     - lsblk_result.stdout_lines is defined
 
 - name: "Print current all block devices in VM '{{ vm_name }}'"
-  debug: var=device_list
+  ansible.builtin.debug: var=device_list

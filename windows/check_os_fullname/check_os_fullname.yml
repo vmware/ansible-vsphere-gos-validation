@@ -19,7 +19,7 @@
 
         # Get OS info inside guest OS
         - include_tasks: ../utils/win_get_fullname.yml
-        - debug:
+        - ansible.builtin.debug:
             msg:
               - "Get guest fullname in guest OS: {{ os_fullname_guest }}"
               - "Get OS architecture in guest OS: {{ guest_os_ansible_architecture }}"
@@ -35,7 +35,7 @@
         - include_tasks: ../../common/vm_get_guest_info.yml
         
         - name: "Known issue - ignore incorrect guestID of Windows 11"
-          debug:
+          ansible.builtin.debug:
             msg:
               - "The guestID of Windows 11 guest in guestinfo is empty on ESXi 7.0U3c. Ignore this known issue."
               - "Please refer to https://kb.vmware.com/s/article/86517."
@@ -51,7 +51,7 @@
             - vmtools_version is defined and vmtools_version
             - vmtools_version is version('12.0.0', '>=')
         - name: "Check guest ID got from guest info is not empty"
-          assert:
+          ansible.builtin.assert:
             that:
               - guestinfo_guest_id
             fail_msg: "Guest ID in guest info is '{{ guestinfo_guest_id }}', which should be a valid value firstly."
@@ -63,7 +63,7 @@
             (vmtools_version is undefined or vmtools_version is version('12.0.0', '<'))
 
         - name: Initialize the expected guest fullname
-          set_fact:
+          ansible.builtin.set_fact:
             expected_guest_fullname: "" 
         # Set expected guest fullname for Windows client
         - block:
@@ -90,10 +90,10 @@
                 - guest_os_build_num | int >= 22424 
           when: guest_os_product_type != "client"
 
-        - debug:
+        - ansible.builtin.debug:
             msg: "Expected guest fullname on ESXi '{{ esxi_version }}': {{ expected_guest_fullname }}"
         - name: "Verify guest fullname in guest info is expected"
-          assert:
+          ansible.builtin.assert:
             that:
               - expected_guest_fullname != ""
               - (guestinfo_guest_full_name == expected_guest_fullname) or (expected_guest_fullname is string and expected_guest_fullname in guestinfo_guest_full_name) or (expected_guest_fullname | type_debug == 'list' and guestinfo_guest_full_name in expected_guest_fullname)

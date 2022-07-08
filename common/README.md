@@ -157,7 +157,7 @@
 * create_directory.yml: Create a new directory with specified path
 
 ## Testing related
-* set_vmware_module_hostname.yml: Check and set configured vCenter or ESXi server info
+* set_community.vmware.vmware_module_hostname.yml: Check and set configured vCenter or ESXi server info
 * add_host_in_memory_inventory.yml: Add host to in memory hosts inventory
 * router_vm_deploy.yml: Deploy a router VM for network testing or GOSC testing
 * network_testbed_setup.yml: Setup network adapter testing testbed

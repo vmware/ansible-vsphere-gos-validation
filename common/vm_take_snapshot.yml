@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: "Create snapshot '{{ snapshot_name }}' on '{{ vm_name }}'"
-  vmware_guest_snapshot:
+  community.vmware.vmware_guest_snapshot:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
     password: "{{ vsphere_host_user_password }}"
@@ -18,13 +18,13 @@
   register: vm_take_snapshot_result
 
 - name: Display the result of taking snapshot
-  debug: var=vm_take_snapshot_result
+  ansible.builtin.debug: var=vm_take_snapshot_result
   when: enable_debug is defined and enable_debug
 
 - block:
     - include_tasks: vm_get_snapshot_facts.yml
     - name: "Check VM snapshot is taken and is the current one"
-      assert:
+      ansible.builtin.assert:
         that:
           - vm_snapshot_facts is defined
           - vm_snapshot_facts.guest_snapshots is defined
@@ -34,7 +34,7 @@
         fail_msg: "Failed to take snapshot '{{ snapshot_name }}' on VM '{{ vm_name }}'."
         success_msg: "Take snapshot '{{ snapshot_name }}' on VM '{{ vm_name }}' succeed."
     - name: "Check VM snapshot took is quiesced snapshot"
-      assert:
+      ansible.builtin.assert:
         that:
           - vm_snapshot_facts.guest_snapshots.current_snapshot.quiesced is defined
           - vm_snapshot_facts.guest_snapshots.current_snapshot.quiesced | bool

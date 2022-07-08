@@ -8,7 +8,7 @@
 # VMware tools status is running.
 #
 - name: "By default VMware tools status is running"
-  set_fact:
+  ansible.builtin.set_fact:
     tools_ready_in_guest_file_ops: True
   when: tools_ready_in_guest_file_ops is undefined
 
@@ -23,7 +23,7 @@
 # recurse: Whether to create the directory path recursively or not
 - block:
     - name: "Create directory {{ dir_path }} in VM guest"
-      vmware_guest_file_operation:
+      community.vmware.vmware_guest_file_operation:
         hostname: "{{ vsphere_host_name }}"
         username: "{{ vsphere_host_user }}"
         password: "{{ vsphere_host_user_password }}"
@@ -39,10 +39,10 @@
       register: create_dir_op
       ignore_errors: true
     - name: "Print the result of create directory"
-      debug: var=create_dir_op
+      ansible.builtin.debug: var=create_dir_op
       when: enable_debug is defined and enable_debug
     - name: "Only ignore directory exists error"
-      fail:
+      ansible.builtin.fail:
         msg: "Failed to create diretory: '{{ dir_path }}', due to {{ create_dir_op.msg }}"
       when:
         - create_dir_op is defined
@@ -55,7 +55,7 @@
 # recurse: Delete the directory path recursively or not
 - block:
     - name: "Delete directory {{ dir_path }} in VM guest"
-      vmware_guest_file_operation:
+      community.vmware.vmware_guest_file_operation:
         hostname: "{{ vsphere_host_name }}"
         username: "{{ vsphere_host_user }}"
         password: "{{ vsphere_host_user_password }}"
@@ -70,7 +70,7 @@
           recurse: "{{ recurse }}"
       register: delete_dir_op
     - name: "Print result of delete directory"
-      debug: var=delete_dir_op
+      ansible.builtin.debug: var=delete_dir_op
       when: enable_debug is defined and enable_debug
   when: operation == "delete_dir"
 
@@ -89,7 +89,7 @@
         dir_mode: "0777"
       when: not fetch_dir_stat.stat.exists
     - name: "Fetch file {{ src_path }} from VM guest"
-      vmware_guest_file_operation:
+      community.vmware.vmware_guest_file_operation:
         hostname: "{{ vsphere_host_name }}"
         username: "{{ vsphere_host_user }}"
         password: "{{ vsphere_host_user_password }}"
@@ -103,7 +103,7 @@
           dest: "{{ dest_path }}"
       register: fetch_file_op
     - name: "Print result of fetch file from Guest OS"
-      debug: var=fetch_file_op
+      ansible.builtin.debug: var=fetch_file_op
       when: enable_debug is defined and enable_debug
   when: operation == "fetch_file"
 
@@ -113,7 +113,7 @@
 # overwrite: If the dest file exists, overwrite it or not
 - block:
     - name: "Copy file {{ src_path }} to VM guest"
-      vmware_guest_file_operation:
+      community.vmware.vmware_guest_file_operation:
         hostname: "{{ vsphere_host_name }}"
         username: "{{ vsphere_host_user }}"
         password: "{{ vsphere_host_user_password }}"
@@ -128,6 +128,6 @@
           overwrite: "{{ overwrite | default(True) }}"
       register: copy_file_op
     - name: "Print result of copy file to Guest OS"
-      debug: var=copy_file_op
+      ansible.builtin.debug: var=copy_file_op
       when: enable_debug is defined and enable_debug
   when: operation == "copy_file"

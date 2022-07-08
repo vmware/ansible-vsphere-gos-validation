@@ -7,9 +7,9 @@
     win_powershell_cmd: "Get-ChildItem 'HKLM:\\software\\microsoft\\windows\\currentversion\\uninstall' | where-object {$_.getvalue('DisplayName') -match 'VMware Tools'} | foreach-object {$_.name} | split-path -leaf"
 
 - name: Set fact of VMware tools product ID
-  set_fact:
+  ansible.builtin.set_fact:
     get_product_id: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
-- debug:
+- ansible.builtin.debug:
     msg: "Get VMware tools product ID: {{ get_product_id }}"
 
 - name: "Uninstall VMware tools in guest OS"
@@ -17,7 +17,7 @@
   vars:
     win_powershell_cmd: "msiexec.exe /q /x '{{ get_product_id }}' /norestart"
 - name: Verify return code and no error message
-  assert:
+  ansible.builtin.assert:
     that:
       - win_powershell_cmd_output.rc | int == 3010 or win_powershell_cmd_output.rc | int == 0
       - not win_powershell_cmd_output.stderr

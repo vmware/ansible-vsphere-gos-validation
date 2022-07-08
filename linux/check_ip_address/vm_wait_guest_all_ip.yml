@@ -5,7 +5,7 @@
     - include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
 
     - name: "Immediately refresh networking information in guest info"
-      command: "{{ vmware_toolbox_cmd_path }} info update network"
+      ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} info update network"
       delegate_to: "{{ vm_guest_ip }}"
   when:
     - vmtools_version is defined
@@ -47,15 +47,15 @@
   ignore_errors: True
 
 - name: "Set fact of IP addresses in guest info"
-  set_fact:
+  ansible.builtin.set_fact:
     all_ip_in_guestinfo: "{{ vm_guestinfo_net.instance.guest.net | map(attribute='ipAddress') | flatten }}"
 
-- debug:
+- ansible.builtin.debug:
     msg: 
       - "VM IP addresses in guest OS: {{ all_ip_in_guest }}"
       - "VM IP addresses in guest info: {{ all_ip_in_guestinfo }}"
 
-- fail:
+- ansible.builtin.fail:
     msg: "Failed to collect all guest OS IP addresses in guest info"
   when: >
     (vm_guestinfo_net is undefined) or

@@ -7,13 +7,13 @@
 # https://raw.githubusercontent.com/ansible/ansible/devel/examples/scripts/ConfigureRemotingForAnsible.ps1
 #
 - name: Set fact of the timestamp suffix of ISO file name
-  set_fact:
+  ansible.builtin.set_fact:
     iso_timestamp: "{{ lookup('pipe','date +%s') }}"
 - name: Set fact of unattend install ISO file name
-  set_fact:
+  ansible.builtin.set_fact:
     unattend_install_iso: "{{ guest_id }}-{{ firmware }}-{{ boot_disk_controller }}-{{ iso_timestamp }}.iso"
 - name: Set fact of unattend install ISO file path on ESXi host
-  set_fact:
+  ansible.builtin.set_fact:
     transferred_unattend_iso: "[{{ datastore }}] {{ unattend_install_iso }}"
 
 - include_tasks: get_ansible_remote_config.yml
@@ -21,7 +21,7 @@
 - include_tasks: gen_unattend_xml_file.yml
 
 - name: Set fact of the file list contained in generated ISO file
-  set_fact:
+  ansible.builtin.set_fact:
     unattend_install_file_list:
       - "{{ created_unattend_file }}"
       - "{{ local_cache }}/{{ config_remote_windows.split('/')[-1] }}"
@@ -29,7 +29,7 @@
 - block:
     - include_tasks: get_pvscsi_driver.yml
     - name: Add PVSCSI driver files to unattend install file list
-      set_fact:
+      ansible.builtin.set_fact:
         unattend_install_file_list: "{{ unattend_install_file_list + pvscsi_file_path_list }}"
   when:
     - boot_disk_controller is defined
@@ -47,10 +47,10 @@
     src_file_path: "{{ local_cache }}/{{ unattend_install_iso }}"
     dest_file_path: "{{ unattend_install_iso }}"
     upload_file_timeout: 600
-- debug:
+- ansible.builtin.debug:
     msg: "Unattend install ISO file is uploaded to ESXi host: {{ transferred_unattend_iso }}"
 
 - name: "Append generated unattend ISO file to the list"
-  set_fact:
+  ansible.builtin.set_fact:
     os_installation_iso_list: "{{ os_installation_iso_list + [transferred_unattend_iso] }}"
     os_install_iso_list_len: "{{ os_install_iso_list_len | int + 1 }}"

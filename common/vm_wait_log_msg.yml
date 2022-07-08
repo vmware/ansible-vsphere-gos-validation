@@ -12,11 +12,11 @@
 #   output of log content. Default is True.
 #
 - name: "Initialize the logs list found and the log message wait result"
-  set_fact:
+  ansible.builtin.set_fact:
     vm_wait_log_msg_list: []
     vm_wait_log_msg_success: False
 - name: "Set fact of VM log file path in datastore"
-  set_fact:
+  ansible.builtin.set_fact:
     vm_log_file_path: "{{ vm_dir_name }}/{{ vm_wait_log_name }}"
 
 # Check if log file exists
@@ -30,7 +30,7 @@
 # Log file exists
 - block:
     - name: "Set fact of the url of datastore file"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_wait_log_url: "{{ ds_file_result.url }}"
     - name: "Wait for message '{{ vm_wait_log_msg }}' appear in VM log {{ vm_wait_log_name }}"
       uri:
@@ -51,7 +51,7 @@
       ignore_errors: "{{ vm_wait_log_ignore_errors | default(False) }}"
 
     - name: "Set fact of the logs list found for specified log message"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_wait_log_msg_list: "{{ get_vm_log_content.content | regex_findall(vm_wait_log_msg) }}"
       when:
         - get_vm_log_content is defined
@@ -60,15 +60,15 @@
         - get_vm_log_content.status == 200
 
     - name: "Set fact of log message wait result"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_wait_log_msg_success: True
       when: vm_wait_log_msg_list | length != 0
-    - debug:
+    - ansible.builtin.debug:
         msg:
           - "Found '{{ vm_wait_log_msg }}' message in VM log {{ vm_wait_log_name }}: {{ 'Success' if vm_wait_log_msg_success | bool else 'Failure' }}"
           - "Found logs list: {{ vm_wait_log_msg_list }}"
     - name: "VM log info check failure"
-      fail:
+      ansible.builtin.fail:
         msg: "Failed to find '{{ vm_wait_log_msg }}' in VM log {{ vm_wait_log_name }}"
       when:
         - vm_wait_log_ignore_errors is undefined or not (vm_wait_log_ignore_errors | bool)
@@ -78,7 +78,7 @@
     - file_in_datastore_result == 'Success'
 
 - name: "VM log info check failure"
-  fail:
+  ansible.builtin.fail:
     msg: "Failed to find VM log file '{{ vm_wait_log_name }}'"
   when:
     - vm_wait_log_ignore_errors is undefined or not (vm_wait_log_ignore_errors | bool)

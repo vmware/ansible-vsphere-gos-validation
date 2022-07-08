@@ -11,7 +11,7 @@
   vars:
     ethernet_name: "{{ win_get_ethernet_name_result }}"
 - name: "Set fact of IP address of new added network adapter"
-  set_fact:
+  ansible.builtin.set_fact:
     new_nic_ip_address: "{{ (ethernet_ip | ansible.netcommon.ipv4)[0] }}"
   when:
     - ethernet_ip is defined
@@ -24,7 +24,7 @@
     win_ping_target_ip: "{{ vlan_gateway }}"
     win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
 - name: Set fact of the ping vlan gateway result
-  set_fact:
+  ansible.builtin.set_fact:
     ping_result_after_hotadd: "{{ win_ping_target_result }}"
 
 # Ping vlan gateway after network adapter disabled
@@ -37,7 +37,7 @@
     win_ping_target_ip: "{{ vlan_gateway }}"
     win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
 - name: Set fact of the ping vlan gateway result after disable
-  set_fact:
+  ansible.builtin.set_fact:
     ping_result_after_disable: "{{ win_ping_target_result }}"
 
 # Ping vlan gateway after network adapter enabled
@@ -50,7 +50,7 @@
     win_ping_target_ip: "{{ vlan_gateway }}"
     win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
 - name: Set fact of the ping vlan gateway result after re-enable
-  set_fact:
+  ansible.builtin.set_fact:
     ping_result_after_enable: "{{ win_ping_target_result }}"
 
 # Ping vlan gateway after network adapter disconnected
@@ -59,7 +59,7 @@
     netadapter_mac_addr: "{{ new_nic_mac_address }}"
     netadapter_connect: false
 - name: Check disconnect network adapter to VM succeed
-  assert:
+  ansible.builtin.assert:
     that:
       - "{{ 'changed' in reconfig_result }}"
       - "{{ reconfig_result.changed }}"
@@ -69,7 +69,7 @@
     win_ping_target_ip: "{{ vlan_gateway }}"
     win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
 - name: Set fact of the ping vlan gateway result after disconnect
-  set_fact:
+  ansible.builtin.set_fact:
     ping_result_after_disconnect: "{{ win_ping_target_result }}"
 
 # Ping vlan gateway after network adapter connected
@@ -78,7 +78,7 @@
     netadapter_mac_addr: "{{ new_nic_mac_address }}"
     netadapter_connect: true
 - name: Check reconnect network adapter to VM succeed
-  assert:
+  ansible.builtin.assert:
     that:
       - "{{ 'changed' in reconfig_result }}"
       - "{{ reconfig_result.changed }}"
@@ -88,5 +88,5 @@
     win_ping_target_ip: "{{ vlan_gateway }}"
     win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
 - name: Set fact of the ping vlan gateway result after re-connect
-  set_fact:
+  ansible.builtin.set_fact:
     ping_result_after_reconnect: "{{ win_ping_target_result }}"

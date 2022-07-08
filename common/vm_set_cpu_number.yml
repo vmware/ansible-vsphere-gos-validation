@@ -7,7 +7,7 @@
 #   num_cpus: the number of vCPU, which must be multiple of cores per socket.
 #
 - name: Set VM CPU number and/or cores per socket number
-  vmware_guest:
+  community.vmware.vmware_guest:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
     password: "{{ vsphere_host_user_password }}"
@@ -20,16 +20,16 @@
       num_cpus: "{{ num_cpus }}"
   register: vm_guest_facts
 - name: Display the VM CPU configure result
-  debug: var=vm_guest_facts
+  ansible.builtin.debug: var=vm_guest_facts
   when: enable_debug is defined and enable_debug
 
 - name: Set fact of the VM CPU number and cores per socket number
-  set_fact:
+  ansible.builtin.set_fact:
     vm_set_cpu_number_result: "{{ vm_guest_facts.instance.hw_processor_count }}"
     vm_set_cpu_cores_result: "{{ vm_guest_facts.instance.hw_cores_per_socket }}"
 
 - name: Check CPU cores per socket is set correctly
-  assert:
+  ansible.builtin.assert:
     that:
       - vm_set_cpu_cores_result | int == num_cores_per_socket | int
     fail_msg: "Failed to set CPU cores per socket to '{{ num_cores_per_socket }}'"
@@ -37,7 +37,7 @@
   when: num_cores_per_socket is defined and num_cores_per_socket
 
 - name: Check CPU number is set correctly
-  assert:
+  ansible.builtin.assert:
     that:
       - vm_set_cpu_number_result | int == num_cpus | int
     fail_msg: "Failed to set CPU number to '{{ num_cpus }}'"

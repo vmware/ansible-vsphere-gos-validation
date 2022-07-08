@@ -4,7 +4,7 @@
 # Get VM cores per socket value
 - include_tasks: ../../common/vm_get_cpu_info.yml
 - name: Set fact of the test cores per socket value
-  set_fact:
+  ansible.builtin.set_fact:
     new_cores_per_socket: "{{ vm_cpu_cores_per_socket | int + cores_per_socket_add | int }}"
 
 # Shutdown VM if it's in power on status
@@ -28,11 +28,11 @@
 # Check cores per socket in guest OS
 - include_tasks: ../utils/win_get_cpu_cores_sockets.yml
 - name: Verify CPU number and CPU cores per socket number got in guest OS
-  assert:
+  ansible.builtin.assert:
     that:
       - "{{ win_cores_per_socket | int == new_cores_per_socket | int }}"
       - "{{ win_cpu_number | int == new_cores_per_socket | int }}"
     fail_msg: "VM vCPU cores per socket set: {{ new_cores_per_socket }}, CPU number in guest OS: {{ win_cpu_number }}, cores per socket number: {{ win_cores_per_socket }}"
 - name: Add test result
-  set_fact:
+  ansible.builtin.set_fact:
     cpu_multicores_per_socket_results: "{{ cpu_multicores_per_socket_results + ['VM vCPU cores per socket set succeeds: ' ~ new_cores_per_socket] }}"

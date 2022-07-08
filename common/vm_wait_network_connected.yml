@@ -3,25 +3,25 @@
 ---
 # Wait network adapter status is connected in specified timeout value
 - name: "Set fact of wait network adapter connected timeout"
-  set_fact:
+  ansible.builtin.set_fact:
     vm_wait_network_connect_timeout: "{{ vm_wait_network_connect_timeout | default(300) }}"
 
 - name: "Get network adapter info firstly"
   include_tasks: vm_get_network_facts.yml
 
 - name: "Initialize the list of start connected network adapter"
-  set_fact:
+  ansible.builtin.set_fact:
     start_connected_net_adapter: []
 - name: "Get start connected network adapter"
-  set_fact:
+  ansible.builtin.set_fact:
     start_connected_net_adapter: "{{ start_connected_net_adapter + [item.key] }}"
   with_dict: "{{ vm_network_adapters }}"
   when: "'start_connected' in item.value and item.value.start_connected"
 - name: "Print the start connected network adapter list"
-  debug: var=start_connected_net_adapter
+  ansible.builtin.debug: var=start_connected_net_adapter
 
 - name: "Wait network adapter connected of VM '{{ vm_name }}'"
-  vmware_guest_network:
+  community.vmware.vmware_guest_network:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
     password: "{{ vsphere_host_user_password }}"
@@ -37,5 +37,5 @@
   delay: 3
   with_items: "{{ start_connected_net_adapter }}"
 - name: "Print the network adapter info"
-  debug: var=vm_netadapter_facts
+  ansible.builtin.debug: var=vm_netadapter_facts
   when: enable_debug is defined and enable_debug

@@ -4,13 +4,13 @@
 # Get VM memory size before memory hotadd
 - include_tasks: ../../common/vm_get_guest_facts.yml
 - name: "Set fact of the memory size before hotadd"
-  set_fact:
+  ansible.builtin.set_fact:
     mem_before_hotadd: "{{ vm_guest_facts.instance.hw_memtotal_mb }}"
 - name: "Set fact of the memory size after hotadd"
-  set_fact:
+  ansible.builtin.set_fact:
     mem_after_hotadd: "{{ (mem_before_hotadd | int) + (hotadd_mb | int) }}"
 
-- debug:
+- ansible.builtin.debug:
     msg: "After hotadd {{ hotadd_mb }}MB, VM memory size will be greater than {{ max_memory_mb }}MB. Skip this hotadd test."
   when: mem_after_hotadd | int > max_memory_mb | int
 
@@ -38,7 +38,7 @@
     # Check VM connection is not broken after memory hot add
     - block:
         - name: "Pause 5 seconds then check VM connection status"
-          pause:
+          ansible.builtin.pause:
             seconds: 5
         - include_tasks: ../../common/vm_wait_connection.yml
           vars:
@@ -55,11 +55,11 @@
     - include_tasks: ../utils/memory_size_in_guest.yml
 
     - name: "Check VM memory size got in guest OS"
-      assert:
+      ansible.builtin.assert:
         that:
           - vm_set_mem_size_result | int == memtotal_mb_in_guest | int
         fail_msg: "Hotadd '{{ hotadd_mb }}' MB memory from '{{ mem_before_hotadd }}' MB to '{{ mem_after_hotadd }}' MB, while got '{{ memtotal_mb_in_guest }}' MB in guest OS"
     - name: Set fact of the memory hotadd results
-      set_fact:
+      ansible.builtin.set_fact:
         mem_hotadd_results: "{{ mem_hotadd_results + ['Memory hotadd succeeds: ' ~ mem_before_hotadd ~ '->' ~ mem_after_hotadd] }}"
   when: mem_after_hotadd | int <= max_memory_mb | int

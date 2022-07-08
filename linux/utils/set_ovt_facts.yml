@@ -4,30 +4,30 @@
 # Set the fact of open-vm-tools packages, processes and services
 
 - name: "Initialize the fact of open-vm-tools packages, processe and service"
-  set_fact:
+  ansible.builtin.set_fact:
     ovt_packages: ["open-vm-tools"]
     ovt_processes: [{"uid": "root", "cmd":"vmtoolsd"}]
     ovt_service: "vmtoolsd"
 
 - name: "Initialize the fact of VGAuth processe and service"
-  set_fact:
+  ansible.builtin.set_fact:
     vgauth_service: "vgauthd"
     vgauth_process: {"uid": "root", "cmd": "VGAuthService"}
   when: "'Flatcar' not in guest_os_ansible_distribution"
 
 - name: "Set the fact of open-vm-tools service name for Ubuntu/Debian"
-  set_fact:
+  ansible.builtin.set_fact:
     ovt_service: "open-vm-tools"
     vgauth_service: "vgauth"
   when: guest_os_family in ["Debian", "Astra Linux (Orel)"]
 
 - name: "Add extra package libvmtools0 for SUSE"
-  set_fact:
+  ansible.builtin.set_fact:
     ovt_packages: "{{ ovt_packages | union(['libvmtools0']) }}"
   when: guest_os_family == "Suse"
 
 - name: "Update the fact of open-vm-tools packages and proecesses for OS with desktop"
-  set_fact:
+  ansible.builtin.set_fact:
     ovt_packages: "{{ ovt_packages | union(['open-vm-tools-desktop']) }}"
     ovt_processes: "{{ ovt_processes | union([{'uid':'vmware', 'cmd':'vmtoolsd -n vmusr'}]) }}"
   when: guest_os_with_gui is defined and guest_os_with_gui

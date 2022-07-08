@@ -6,7 +6,7 @@
 #
 # Initialize VM virtual hardware config variables
 - name: "Initialize variables for new VM settings"
-  set_fact:
+  ansible.builtin.set_fact:
     boot_disk_controller: "{{ boot_disk_controller if (boot_disk_controller is defined and boot_disk_controller) else 'lsilogicsas' }}"
     secureboot_enabled: "{{ secureboot_enabled if (secureboot_enabled is defined and secureboot_enabled) else False }}"
     network_adapter_type: "{{ 'e1000e' if (windows_has_inbox_driver is undefined or not windows_has_inbox_driver) else network_adapter_type }}"
@@ -14,7 +14,7 @@
     boot_disk_size_gb: "{{ [64, boot_disk_size_gb | default(64) | int] | max }}"
 
 - name: "Set fact of the deploy VM test case name"
-  set_fact:
+  ansible.builtin.set_fact:
     deploy_casename: "deploy_vm_{{ firmware }}_{{ boot_disk_controller }}_{{ network_adapter_type }}"
 
 # Check configured VM CPU number and cores per socket number
@@ -26,7 +26,7 @@
 # Generate unattend install iso file
 - include_tasks: create_unattend_install_iso.yml
   when: unattend_install_conf is defined and unattend_install_conf
-- debug:
+- ansible.builtin.debug:
     msg: "unattend_install_conf is not defined or set to a file path, will not generate unattend iso file"
   when: unattend_install_conf is undefined or not unattend_install_conf
 
@@ -41,7 +41,7 @@
 
 - include_tasks: ../../common/vm_get_vm_info.yml
 - name: "Set fact of vm_exists to True"
-  set_fact:
+  ansible.builtin.set_fact:
     vm_exists: True
 
 # When firmware is EFI, configure force EFI setup once
@@ -74,7 +74,7 @@
     vm_power_state_set: "powered-on"
   when: firmware is defined and firmware | lower == "bios"
 - name: "Wait 3 minutes while OS install"
-  pause:
+  ansible.builtin.pause:
     minutes: 3
 
 # Check Image APPROVED in vmware.log when VM secureboot is enabled
@@ -97,7 +97,7 @@
   vars:
     win_check_winrm_timeout: 1800
 - name: "Wait another 1 minute after OS becomes connectable"
-  pause:
+  ansible.builtin.pause:
     minutes: 1
 - include_tasks: ../utils/add_windows_host.yml
 - include_tasks: detach_cdrom_iso.yml
