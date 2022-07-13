@@ -43,7 +43,7 @@
 
     # Create the network config file for new network interface
     - name: "Create/Update network configure file '{{ network_conf_path }}'"
-      template:
+      ansible.builtin.template:
         src: "{{ network_conf_template }}"
         dest: "{{ network_conf_path }}"
         mode: "0666"
@@ -52,7 +52,7 @@
     - name: "Print content of network configure file '{{ network_conf_path }}'"
       ansible.builtin.command: "cat {{ network_conf_path }}"
       register: network_config
-      changed_when: False
+      changed_when: false
       delegate_to: "{{ vm_guest_ip }}"
     - ansible.builtin.debug: var=network_config.stdout_lines
   when: guest_os_ansible_distribution not in ["VMware Photon OS", "Astra Linux (Orel)"]
@@ -60,7 +60,7 @@
 # Check new ethernet device status to see whether it has been bring up automatically
 - include_tasks: ../utils/ethernet_ip_get.yml
   vars:
-    all_ip: False
+    all_ip: false
 
 - name: "Set fact of ethernet device status and IP"
   ansible.builtin.set_fact:
@@ -138,7 +138,7 @@
     - name: "Get link '{{ eth_dev }}' status"
       ansible.builtin.shell: "ip -br addr show {{ eth_dev }} | awk '{print $3}'"
       register: link_status
-      changed_when: False
+      changed_when: false
       until: '"192.168" in link_status.stdout'
       retries: 20
       delay: 5

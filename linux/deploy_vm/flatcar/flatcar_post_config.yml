@@ -3,14 +3,15 @@
 ---
 # Flatcar doesn't have python installed, so we need to install ActivePython3 at first
 - name: "Installing python3 on Flatcar VM {{ vm_name }}"
-  script: "./install_python3.sh '{{ flatcar_python3_download_url }}'"
+  ansible.builtin.script: "./install_python3.sh '{{ flatcar_python3_download_url }}'"
   register: ap3_install_result
   delegate_to: "{{ vm_guest_ip }}"
 
-- ansible.builtin.debug: var=ap3_install_result
+- name: "Display the result of python install"
+  ansible.builtin.debug: var=ap3_install_result
 
 - name: "Check /etc/ssh/sshd_config status"
-  stat:
+  ansible.builtin.stat:
     path: "/etc/ssh/sshd_config"
   register: sshd_config_stat
   delegate_to: "{{ vm_guest_ip }}"
@@ -36,7 +37,7 @@
     usernames: "{{ [vm_username] | union(['core']) }}"
 
 - name: "Change password for user {{ vm_username }}"
-  user:
+  ansible.builtin.user:
     name: "{{ username }}"
     password: "{{ vm_password | password_hash('sha512') }}"
   delegate_to: "{{ vm_guest_ip }}"

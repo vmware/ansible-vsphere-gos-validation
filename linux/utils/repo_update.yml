@@ -24,13 +24,13 @@
         ansible_async_dir: /tmp/.ansible_async/
       async: 300
       poll: 10
-      ignore_errors: True
+      ignore_errors: true
       delegate_to: "{{ vm_guest_ip }}"
       register: repo_update_result
 
     - block:
         - name: "Check OS packages updates status"
-          async_status:
+          ansible.builtin.async_status:
             jid: "{{ repo_update_result.ansible_job_id }}"
           register: job_result
           vars:
@@ -39,7 +39,7 @@
           until: job_result.finished == 1
           retries: 20
           delay: 15
-          ignore_errors: True
+          ignore_errors: true
           when: repo_update_result.ansible_job_id is defined
 
         - name: "Print check update result"

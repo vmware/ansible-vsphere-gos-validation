@@ -1,12 +1,12 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-#Install or uninstall packages in guest
-#Parameters
-#  package_name: one or a list of packages to be installed or removed
-#  package_state: [absent, installed, latest, present, removed]. Default is present.
+# Install or uninstall packages in guest
+# Parameters:
+#   package_name: one or a list of packages to be installed or removed
+#   package_state: [absent, installed, latest, present, removed]. Default is present.
 # Return:
-#  package_manage_output: The output of installing or uninstalling package
+#   package_manage_output: The output of installing or uninstalling package
 
 - name: "Validate the value of variable 'package_state'"
   ansible.builtin.assert:
@@ -71,24 +71,24 @@
 
 - block:
     - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-      yum:
+      ansible.builtin.yum:
         name: "{{ package_name }}"
-        allow_downgrade: yes
+        allow_downgrade: true
         state: "{{ package_state }}"
       delegate_to: "{{ vm_guest_ip }}"
       when: guest_os_ansible_pkg_mgr | lower == "yum"
 
     - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-      dnf:
+      ansible.builtin.dnf:
         name: "{{ package_name }}"
-        allow_downgrade: yes
+        allow_downgrade: true
         state: "{{ package_state }}"
       delegate_to: "{{ vm_guest_ip }}"
       when: guest_os_ansible_pkg_mgr | lower == "dnf"
   when: guest_os_family == "RedHat"
 
 - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-  zypper:
+  community.general.zypper:
     name: "{{ package_name }}"
     state: "{{ package_state }}"
   delegate_to: "{{ vm_guest_ip }}"
@@ -97,7 +97,7 @@
 - block:
     - include_tasks: remove_dpkg_lock_file.yml
     - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-      apt:
+      ansible.builtin.apt:
         name: "{{ package_name }}"
         state: "{{ package_state }}"
         update_cache: true
@@ -105,7 +105,7 @@
       when: guest_os_family == "Debian"
 
     - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-      apt:
+      ansible.builtin.apt:
         name: "{{ package_name }}"
         state: "{{ package_state }}"
       delegate_to: "{{ vm_guest_ip }}"

@@ -8,7 +8,7 @@
 #
 - name: check_inbox_driver
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   vars:
@@ -30,7 +30,7 @@
     - block:
         - include_tasks: ../setup/test_setup.yml
           vars:
-            skip_test_no_vmtools: False
+            skip_test_no_vmtools: false
 
         - name: "Get OS Release for SUSE"
           ansible.builtin.set_fact:
@@ -91,7 +91,7 @@
               loop_control:
                 loop_var: driver
               register: photon_drivers
-              no_log: True
+              no_log: true
               delegate_to: "{{ vm_guest_ip }}"
 
             - name: Set fact of driver version dict
@@ -114,7 +114,7 @@
               ansible.builtin.command: "modinfo {{ module_name }}"
               register: modinfo_result
               delegate_to: "{{ vm_guest_ip }}"
-              ignore_errors: True
+              ignore_errors: true
               loop: "{{ inbox_drivers }}"
               loop_control:
                 loop_var: module_name
@@ -178,14 +178,14 @@
         - name: "Check whether Xorg server is installed"
           ansible.builtin.command: "which Xorg"
           register: which_xorg_server
-          failed_when: False
+          failed_when: false
           delegate_to: "{{ vm_guest_ip }}"
 
         - block:
             - name: "Check Xorg server"
               ansible.builtin.command: "Xorg -version"
               register: xorg_version_result
-              failed_when: False
+              failed_when: false
               delegate_to: "{{ vm_guest_ip }}"
 
             - block:
@@ -195,7 +195,7 @@
 
                 - name: "Collect Xorg server version"
                   ansible.builtin.set_fact:
-                     inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'xorg server': xorg_version[0].split()[-1] }) }}"
+                    inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'xorg server': xorg_version[0].split()[-1] }) }}"
                   when: xorg_version and xorg_version | length > 0
               when:
                 - xorg_version_result.rc is defined
@@ -213,7 +213,7 @@
             - block:
                 - name: "Looking for VMware video driver package"
                   ansible.builtin.shell: "dpkg -l xserver-xorg-video-vmware* | grep xserver-xorg-video-vmware"
-                  failed_when: False
+                  failed_when: false
                   register: vmware_video_package_result
                   delegate_to: "{{ vm_guest_ip }}"
 
@@ -255,7 +255,7 @@
           ansible.builtin.debug: var=os_release_info_file_path
 
         - name: "Dump inbox drivers versions"
-          copy:
+          ansible.builtin.copy:
             dest: "{{ os_release_info_file_path }}"
             content: "{{ [inbox_drivers_versions] | to_nice_json }}"
       rescue:

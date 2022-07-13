@@ -106,16 +106,16 @@
     rebuild_iso_cmd: "{{ rebuild_iso_cmd }} {{ bios_boot_image }} -boot_image any next {{ efi_boot_image }}"
 
 - name: "Copy unattend install config files to {{ unattend_iso_cache }}"
-  copy:
+  ansible.builtin.copy:
     src: "{{ tmp_iso_mount_dir }}{{ item }}"
     dest: "{{ unattend_iso_cache }}"
-    force: yes
+    force: true
     mode: 0644
   with_items: "{{ iso_files_to_update }}"
 
 - block:
     - name: "Update timeout for boot menu"
-      replace:
+      ansible.builtin.replace:
         path: "{{ unattend_iso_cache }}/isolinux.cfg"
         regexp: "timeout 0"
         replace: "timeout 1"
@@ -126,7 +126,7 @@
     # Update autoinstall config files for Photon
     - block:
         - name: "Update boot menu with kickstart for Photon OS"
-          replace:
+          ansible.builtin.replace:
             path: "{{ unattend_iso_cache }}/{{ item }}"
             regexp: '(.*)(root=[^ ]+)(.*)'
             replace: "\\1\\2 ks=cdrom:/isolinux/{{ unattend_install_file_name }} \\3"
@@ -153,13 +153,13 @@
             debian_install_type: "{{ gtk_path.stdout | dirname | dirname | basename }}"
 
         - name: "Update timeout for boot menu"
-          replace:
+          ansible.builtin.replace:
             path: "{{ unattend_iso_cache }}/isolinux.cfg"
             regexp: "default .*"
             replace: "default installgui"
 
         - name: "Update Debian grub.cfg for autoinstall"
-          blockinfile:
+          ansible.builtin.blockinfile:
             path: "{{ unattend_iso_cache }}/grub.cfg"
             block: |
               set default="autoinstall"
@@ -171,7 +171,7 @@
               }
 
         - name: "Update boot menu with preseed.cfg for Debian"
-          replace:
+          ansible.builtin.replace:
             path: "{{ unattend_iso_cache }}/gtk.cfg"
             regexp: '(.*)(initrd.gz )(.*)'
             replace: "\\1\\2 auto=true file=/cdrom/{{ unattend_install_file_name }} \\3"
@@ -194,13 +194,13 @@
     # Update autoinstall config files for Ubuntu live server
     - block:
         - name: "Add autoinstall to kernel command for Ubuntu live server"
-          replace:
+          ansible.builtin.replace:
             path: "{{ unattend_iso_cache }}/grub.cfg"
             regexp: '(.*vmlinuz)(.*)'
             replace: "\\1 autoinstall \\2"
 
         - name: "Set timeout to 5 seconds at boot menu"
-          replace:
+          ansible.builtin.replace:
             path: "{{ unattend_iso_cache }}/grub.cfg"
             regexp: 'set timeout=.*'
             replace: "set timeout=5"
@@ -232,4 +232,4 @@
       with_items:
         - "{{ src_iso_file_path }}"
         - "{{ tmp_iso_mount_dir }}"
-  become: yes
+  become: true

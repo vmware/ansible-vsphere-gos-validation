@@ -9,7 +9,7 @@
 #
 - name: Set fact of revert to snapshot failed if not exist
   ansible.builtin.set_fact:
-    skip_if_not_exist: False
+    skip_if_not_exist: false
   when: skip_if_not_exist is undefined
 
 - name: "Revert to snapshot {{ snapshot_name }}"
@@ -23,25 +23,26 @@
     name: "{{ vm_name }}"
     state: revert
     snapshot_name: "{{ snapshot_name }}"
-  ignore_errors: True
+  ignore_errors: true
   register: revert_result
-- ansible.builtin.debug: var=revert_result
+- name: "Display revert snapshot result"
+  ansible.builtin.debug: var=revert_result
   when: enable_debug is defined and enable_debug
 
-# Handle revert snasphot failure
-- block:
+- name: "Handle revert snasphot failure"
+  block:
     - name: "Check snasphot not exist failure message"
       ansible.builtin.set_fact:
         msg_no_snapshots: "{{ revert_result.msg | regex_search('does not have any snapshots to revert') }}"
         msg_not_find_snapshot: "{{ revert_result.msg | regex_search('Couldn.t find any snapshots with specified name') }}"
-    
-    # Ignore snapshot not exist failure when skip_if_not_exist is set to True
-    - ansible.builtin.debug:
+
+    - name: "Ignore snapshot not exist failure"
+      ansible.builtin.debug:
         msg: "Snapshot '{{ snapshot_name }}' not exist, but 'skip_if_not_exist' is set to True"
       when:
         - skip_if_not_exist
         - msg_no_snapshots or msg_not_find_snapshot
-    
+
     # Other failures
     - name: "Revert snapshot failed"
       ansible.builtin.fail:

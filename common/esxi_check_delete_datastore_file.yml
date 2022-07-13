@@ -37,9 +37,10 @@
 
 - name: Display the datastore file operation result
   ansible.builtin.debug: var=ds_file_result
-  when: enable_debug is defined and enable_debug
+  when: enable_debug
 
-- block:
+- name: "Check file result"
+  block:
     - name: Set fact of the datastore file existence
       ansible.builtin.set_fact:
         file_in_datastore_result: "{{ 'Success' if ('status' in ds_file_result and ds_file_result.status == 200) else 'Fail' }}"
@@ -47,7 +48,8 @@
         msg: "File '{{ file_in_datastore_path }}' in datastore '{{ file_in_datastore }}': {{ file_in_datastore_result }}"
   when: file_in_datastore_ops == 'file'
 
-- block:
+- name: "Remove file result"
+  block:
     - name: Set fact of the result of datastore file remove
       ansible.builtin.set_fact:
         file_in_datastore_result: "{{ 'Success' if not ds_file_result.failed else 'Fail' }}"
@@ -55,8 +57,9 @@
         msg: "Remove file '{{ file_in_datastore_path }}' in datastore '{{ file_in_datastore }}': {{ file_in_datastore_result }}"
   when: file_in_datastore_ops == 'absent'
 
-- ansible.builtin.fail:
-    msg: "{{ 'Delete' if file_in_datastore_ops|lower == 'absent' else 'Check' }} datastore file failed"
+- name: "File operation failed"
+  ansible.builtin.fail:
+    msg: "{{ 'Delete' if file_in_datastore_ops | lower == 'absent' else 'Check' }} datastore file failed"
   when:
     - file_in_datastore_failed_ignore is defined
     - not file_in_datastore_failed_ignore

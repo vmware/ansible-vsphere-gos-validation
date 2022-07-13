@@ -9,11 +9,11 @@
     diskpart_file_path_current: "{{ current_test_log_folder }}/diskpart.txt"
     diskpart_file_path_win: "C:\\test_diskpart\\diskpart.txt"
 - name: Check diskpart script file exists in current path
-  stat:
+  ansible.builtin.stat:
     path: "{{ diskpart_file_path }}"
-    get_attributes: no
-    get_checksum: no
-    get_mime: no
+    get_attributes: false
+    get_checksum: false
+    get_mime: false
   register: diskpart_file_stat
 - name: Check if diskpart file exists
   ansible.builtin.assert:
@@ -22,7 +22,7 @@
     success_msg: "diskpart script file exists"
     fail_msg: "diskpart script file not exist: {{ diskpart_file_path }}"
 - name: Copy diskpart file to current test case log folder
-  copy:
+  ansible.builtin.copy:
     src: "{{ diskpart_file_path }}"
     dest: "{{ current_test_log_folder }}/"
 
@@ -34,7 +34,7 @@
 
 # Edit diskpart script file in remote Windows guest OS
 - name: Modify raw disk number in diskpart script file
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: "{{ diskpart_file_path_current }}"
     regexp: 'select disk *'
     line: "select disk {{ win_get_raw_disk_num }}"
@@ -42,7 +42,7 @@
     - win_get_raw_disk_num is defined
     - win_get_raw_disk_num
 - name: Modify new drive letter in diskpart script file
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: "{{ diskpart_file_path_current }}"
     regexp: 'assign letter*'
     line: "assign letter={{ drive_letter_new }}"
@@ -50,7 +50,7 @@
     - drive_letter_new is defined
     - drive_letter_new
 - name: Remove online disk if disk is already online
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: "{{ diskpart_file_path_current }}"
     regexp: 'online disk'
     state: absent

@@ -28,7 +28,7 @@
 # Make sure VMware tools is installed and running before shutdown VM
 - include_tasks: vm_wait_vmtools_status.yml
   vars:
-    vm_wait_vmtools_running: True
+    vm_wait_vmtools_running: true
   when: vm_power_state_set | lower == 'shutdown-guest' or vm_power_state_set | lower == 'reboot-guest'
 
 - name: "Set VM power state to '{{ vm_power_state_set }}'"
@@ -42,10 +42,10 @@
     state: "{{ vm_power_state_set }}"
     state_change_timeout: 300
   register: vm_change_power_state
-  ignore_errors: True
+  ignore_errors: true
 
-# Replace serial port output file at power on
-- block:
+- name: "Replace serial port output file at power on"
+  block:
     - include_tasks: vm_answer_question.yml
       vars:
         vm_question: "{{ vm_change_power_state.instance.guest_question }}"
@@ -66,7 +66,8 @@
     - vm_change_power_state.instance.guest_question.message | length > 0
     - vm_change_power_state.instance.guest_question.message[0].id == "msg.serial.file.open"
 
-- ansible.builtin.fail:
+- name: "Change VM power state failure"
+  ansible.builtin.fail:
     msg: >
       {% if vm_change_power_state is defined and vm_change_power_state.msg is defined %}{{ vm_change_power_state.msg }}
       {% else %}Failed to set VM power state to {{ vm_power_state_set | lower }}{% endif %}
@@ -77,8 +78,8 @@
 - name: Display the result of changing VM power state
   ansible.builtin.debug: var=vm_change_power_state
 
-# When VM power state changed, then wait for VM enter into the expected state
-- block:
+- name: "Wait for VM enter into the expected state"
+  block:
     - name: "Wait {{ vm_set_power_state_sleep | default(10) }} seconds after VM power state changed"
       ansible.builtin.pause:
         seconds: "{{ vm_set_power_state_sleep | default(10) }}"

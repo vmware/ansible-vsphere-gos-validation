@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: "Check /etc/cloud/cloud.cfg existence"
-  stat:
+  ansible.builtin.stat:
     path: /etc/cloud/cloud.cfg
   register: cloud_init_cfg
   delegate_to: "{{ vm_guest_ip }}"
@@ -15,8 +15,8 @@
     - name: "Search for network config"
       ansible.builtin.shell: grep -rl "{{ network_config_keyword }}" /etc/cloud/cloud.cfg /etc/cloud/cloud.cfg.d/*.cfg
       register: network_config_result
-      failed_when: False
-      changed_when: False
+      failed_when: false
+      changed_when: false
       delegate_to: "{{ vm_guest_ip }}"
 
     - name: Enable Cloud-Init GOSC for cloud-init work flow
@@ -35,7 +35,7 @@
             loop_var: service_name
 
         - name: "Enable cloud-init GOSC in /etc/cloud/cloud.cfg"
-          lineinfile:
+          ansible.builtin.lineinfile:
             path: /etc/cloud/cloud.cfg
             regexp: '^[#\s]*{{ item.split(":")[0] }}'
             line: '{{ item }}'
@@ -50,7 +50,7 @@
         - name: Check cloud-init GOSC is enabled
           ansible.builtin.command: grep '^disable_vmware_customization' /etc/cloud/cloud.cfg
           register: result
-          changed_when: False
+          changed_when: false
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "Save cloud-init GOSC enable flag"
@@ -60,7 +60,7 @@
         # Enable network config in /etc/cloud/cloud.cfg.d/*.cfg
         - block:
             - name: "Enable cloud-init network config"
-              lineinfile:
+              ansible.builtin.lineinfile:
                 path: "{{ file_path }}"
                 regexp: '^[#\s]*{{ network_config_keyword }}'
                 line: '#network: {config: disabled}'
@@ -77,7 +77,7 @@
           ansible.builtin.file:
             path: "{{ config_file_for_netplan }}"
             state: absent
-            force: yes
+            force: true
           with_items:
             - /etc/cloud/cloud-init.disabled
             - /var/lib/cloud/seed/nocloud-net
@@ -88,7 +88,7 @@
           loop_control:
             loop_var: config_file_for_netplan
           delegate_to: "{{ vm_guest_ip }}"
-          ignore_errors: True
+          ignore_errors: true
 
         - name: Assert disable_vmware_customization is false
           ansible.builtin.assert:
@@ -99,24 +99,24 @@
         - name: "Clear cloud-init.log"
           ansible.builtin.shell: "cat /dev/null >/var/log/cloud-init.log"
           delegate_to: "{{ vm_guest_ip }}"
-          ignore_errors: True
+          ignore_errors: true
       when: enable_cloudinit_gosc | bool
 
     - name: Disable Cloud-Init GOSC for perl work flow
       block:
         - name: Disable cloud-init GOSC in /etc/cloud/cloud.cfg
-          lineinfile:
+          ansible.builtin.lineinfile:
             path: /etc/cloud/cloud.cfg
             regexp: '^\s*disable_vmware_customization:'
-            backup: yes
+            backup: true
             state: absent
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: Check cloud-init GOSC is disabled
           ansible.builtin.command: grep '^disable_vmware_customization' /etc/cloud/cloud.cfg
           register: result
-          changed_when: False
-          ignore_errors: True
+          changed_when: false
+          ignore_errors: true
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "Save cloud-init GOSC disable flag"
@@ -126,7 +126,7 @@
         # Disable network config
         - block:
             - name: "Disable cloud-init network config"
-              lineinfile:
+              ansible.builtin.lineinfile:
                 path: "{{ file_path }}"
                 regexp: '^[#\s]*{{ network_config_keyword }}'
                 line: 'network: {config: disabled}'
@@ -138,7 +138,7 @@
               when: network_config_result.stdout_lines is defined and network_config_result.stdout_lines | length >= 1
 
             - name: "Disable cloud-init network config"
-              lineinfile:
+              ansible.builtin.lineinfile:
                 path: /etc/cloud/cloud.cfg
                 line: "network: {config: disabled}"
                 state: present
