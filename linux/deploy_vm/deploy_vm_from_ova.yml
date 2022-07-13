@@ -25,7 +25,7 @@
         vm_ova_name: "{{ ova_path | basename }}"
     # Check OVA file exists
     - name: "Check for {{ vm_ova_path }} existence"
-      stat:
+      ansible.builtin.stat:
         path: "{{ vm_ova_path }}"
       register: vm_ova_stat
       failed_when: not vm_ova_stat.stat.exists
@@ -41,7 +41,7 @@
     - include_tasks: ../../common/vm_get_vm_info.yml
     - name: "Set fact of vm_exists to True"
       ansible.builtin.set_fact:
-        vm_exists: True
+        vm_exists: true
 
     # Take a snapshot after OVA deploy
     # Reconfiguration must be performed at VM first time boot
@@ -118,21 +118,21 @@
   rescue:
     - include_tasks: ../../common/test_rescue.yml
       vars:
-        exit_testing_when_ansible.builtin.fail: True
+        exit_testing_when_ansible.builtin.fail: true
   always:
     - block:
         # Umount NFS share points
         - include_tasks: ../../common/local_unmount.yml
           vars:
             mount_path: "{{ nfs_mount_dir }}"
-            local_unmount_ignore_errors: True
+            local_unmount_ignore_errors: true
           when: nfs_mounted is defined and nfs_mounted | bool
 
         # Remove temporary folders
         - include_tasks: ../../common/delete_local_file.yml
           vars:
             local_path: "{{ nfs_mount_dir }}"
-            del_local_file_ignore_errors: True
+            del_local_file_ignore_errors: true
       when: nfs_mount_dir is defined and nfs_mount_dir
 
     # Collect cloud-init logs for deploying Ubuntu and Photon OVA

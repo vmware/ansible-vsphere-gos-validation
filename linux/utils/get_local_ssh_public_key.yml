@@ -1,11 +1,11 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
-# Get local ssh public key if it exists or 
-# generate new ssh keypair if it doesn't exist
-# Parameters: None
+---
+# Get local ssh public key if it exists or generate new ssh keypair
+# if it doesn't exist
 # Return:
 #   ssh_public_key: SSH public key
-
+#
 # Check whether ~/.ssh/id_rsa.pub exists
 - name: "Set variables for Ignition config"
   ansible.builtin.set_fact:
@@ -14,14 +14,14 @@
     ssh_private_key_file: "{{ lookup('env','HOME') + '/.ssh/id_rsa' }}"
 
 - name: "Check for {{ ssh_public_key_file }} existence"
-  stat:
+  ansible.builtin.stat:
     path: "{{ ssh_public_key_file }}"
   register: ssh_pub_key_stat
 
 # Generate OpenSSH keypair if it doesn't exist
 - block:
     - name: "Check for {{ ssh_key_dir }} existence"
-      stat:
+      ansible.builtin.stat:
         path: "{{ ssh_key_dir }}"
       register: ssh_key_dir_stat
 
@@ -33,9 +33,9 @@
       when: not ssh_key_dir_stat.stat.exists
 
     - name: "Generate SSH keypair"
-      openssh_keypair:
+      community.crypto.openssh_keypair:
         path: "{{ ssh_private_key_file }}"
-        force: True
+        force: true
   when: not ssh_pub_key_stat.stat.exists
 
 - name: "Get SSH public key"

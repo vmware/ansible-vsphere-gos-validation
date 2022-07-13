@@ -7,7 +7,7 @@
 
 - ansible.builtin.debug:
     msg:
-     - "The unattend install config file is {{ unattend_install_template }}"
+      - "The unattend install config file is {{ unattend_install_template }}"
 
 # unattend_install_conf is not for Ubuntu
 - block:
@@ -25,7 +25,7 @@
 
     - name: "Set fact about installing desktop"
       ansible.builtin.set_fact:
-        install_guest_with_desktop: True
+        install_guest_with_desktop: true
       when:
         - guest_id in ['rhel8_64Guest', 'rhel9_64Guest']
         - unattend_install_conf is match('RHEL/8/server_with_GUI/')
@@ -45,7 +45,7 @@
         boot_disk_name: "{{ 'nvme0n1' if boot_disk_controller == 'nvme' else 'sda' }}"
 
     - name: "Create unattend config file from template"
-      template:
+      ansible.builtin.template:
         src: "{{ unattend_install_template }}"
         dest: "{{ new_unattend_install_conf }}"
         mode: "0644"
@@ -143,7 +143,7 @@
     unattend_install_conf is match('Debian')
 
 - name: "Copy generated unattend install config file to log folder"
-  copy:
+  ansible.builtin.copy:
     src: "{{ new_unattend_install_conf }}"
     dest: "{{ current_test_log_folder }}/{{ new_unattend_install_conf | basename }}"
 

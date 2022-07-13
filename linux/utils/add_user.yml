@@ -8,10 +8,10 @@
 
 # If user already exists, return changed with 'false'
 - name: "Get user '{{ os_username }}' info"
-  getent:
+  ansible.builtin.getent:
     database: passwd
     key: "{{ os_username }}"
-  failed_when: False
+  failed_when: false
   register: getent_user_result
   delegate_to: "{{ vm_guest_ip }}"
 
@@ -23,15 +23,14 @@
     - getent_user_result.ansible_facts.getent_passwd[os_username] is defined
 
 # Create a new user if it doesn't exist
-- block:
-    - name: "Add a new user '{{ os_username }}'"
-      user:
-        name: "{{ os_username }}"
-        group: "{{ os_group | default('users') }}"
-        password: "{{ vm_password | password_hash('sha512') }}"
-        update_password: on_create
-        expires: -1
-      delegate_to: "{{ vm_guest_ip }}"
+- name: "Add a new user '{{ os_username }}'"
+  ansible.builtin.user:
+    name: "{{ os_username }}"
+    group: "{{ os_group | default('users') }}"
+    password: "{{ vm_password | password_hash('sha512') }}"
+    update_password: on_create
+    expires: -1
+    delegate_to: "{{ vm_guest_ip }}"
   when: >
     getent_user_result.ansible_facts is undefined or
     getent_user_result.ansible_facts.getent_passwd is undefined or

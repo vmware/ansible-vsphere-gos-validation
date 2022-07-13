@@ -52,7 +52,8 @@
     (cdrom_controller_type | lower == 'ide' and boot_disk_controller | lower == 'ide') or
     (cdrom_controller_type | lower == 'sata' and boot_disk_controller | lower == 'sata')
 
-- block:
+- name: "Handle IDE CDROM"
+  block:
     - name: "Check os_installation_iso_list length"
       ansible.builtin.assert:
         that:
@@ -69,7 +70,7 @@
   ansible.builtin.set_fact:
     vm_cdroms: "{{ vm_cdroms + [{'type': 'iso', 'iso_path': os_installation_iso_list[item] if loop_end | int == os_install_iso_list_len | int else os_installation_iso_list[item-1], 'controller_type': 'sata', 'controller_number': 0, 'unit_number': item}] }}"
   loop: "{{ range(loop_start | int, loop_end | int) | list }}"
-  when: 
+  when:
     - cdrom_controller_type | lower == 'sata'
 
 - name: "Display the generated VM CDROMs list"
