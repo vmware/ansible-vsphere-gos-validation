@@ -8,36 +8,36 @@
   vars_files:
      - "{{ testing_vars_file | default('../vars/test.yml') }}"
   tasks:
-    - name: "Set cleanup VM to False by default"
-      ansible.builtin.set_fact:
-        cleanup_vm: false
-      when: cleanup_vm is undefined
+     - name: "Set cleanup VM to False by default"
+       ansible.builtin.set_fact:
+         cleanup_vm: false
+       when: cleanup_vm is undefined
 
-    # Need to revert to base snapshot of target VM firstly, or removing portgroup would fail
-    - name: "Revert to base snapshot then cleanup network testbed configurations"
-      block:
-        - include_tasks: ../common/vm_revert_snapshot.yml
-          vars:
-            snapshot_name: "{{ base_snapshot_name }}"
-            skip_if_not_exist: true
-          when:
-            - base_snapshot_exists is defined
-            - base_snapshot_exists | bool
-        # Clean up router VM, vSwitch and portgroup
-        - include_tasks: ../common/network_testbed_cleanup.yml
-      when:
-        - router_vm_deployed is defined
-        - router_vm_deployed | bool
+     # Need to revert to base snapshot of target VM firstly, or removing portgroup would fail
+     - name: "Revert to base snapshot then cleanup network testbed configurations"
+       block:
+         - include_tasks: ../common/vm_revert_snapshot.yml
+           vars:
+             snapshot_name: "{{ base_snapshot_name }}"
+             skip_if_not_exist: true
+           when:
+             - base_snapshot_exists is defined
+             - base_snapshot_exists | bool
+         # Clean up router VM, vSwitch and portgroup
+         - include_tasks: ../common/network_testbed_cleanup.yml
+       when:
+         - router_vm_deployed is defined
+         - router_vm_deployed | bool
 
-    - name: Cleanup new deployed VM
-      block:
-        - include_tasks: ../common/vm_set_power_state.yml
-          vars:
-            vm_power_state_set: 'powered-off'
-        - include_tasks: ../common/vm_remove.yml
-        - name: "Set VM cleaned flag is True"
-          ansible.builtin.set_fact:
-            vm_cleaned_up: true
-      when:
-        - cleanup_vm | bool
-        - new_vm is defined and new_vm | bool
+     - name: Cleanup new deployed VM
+       block:
+         - include_tasks: ../common/vm_set_power_state.yml
+           vars:
+             vm_power_state_set: 'powered-off'
+         - include_tasks: ../common/vm_remove.yml
+         - name: "Set VM cleaned flag is True"
+           ansible.builtin.set_fact:
+             vm_cleaned_up: true
+       when:
+         - cleanup_vm | bool
+         - new_vm is defined and new_vm | bool
