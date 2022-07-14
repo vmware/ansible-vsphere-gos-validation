@@ -31,7 +31,8 @@
 - include_tasks: set_proxy.yml
   when: package_state == "present"
 
-- block:
+- name: "Add repo"
+  block:
     # Add a local repo from ISO image for RHEL/SLES/SLED
     - include_tasks: ../utils/add_local_dvd_repo.yml
       when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat']
@@ -41,7 +42,8 @@
       when: guest_os_ansible_distribution in ['Rocky', 'CentOS', 'OracleLinux', 'Ubuntu', 'Debian', 'VMware Photon OS']
   when: package_state in ['installed', 'latest', 'present']
 
-- block:
+- name: "Handle Photon OS"
+  block:
     - name: "Convert packages name list to a string"
       ansible.builtin.set_fact:
         package_name_str: |-
@@ -49,7 +51,8 @@
           {%- elif package_name is string -%}{{ package_name }}
           {%- else -%}{%- endif -%}
 
-    - block:
+    - name: "Handle install package"
+      block:
         - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
           ansible.builtin.command: "tdnf install -y {{ package_name_str }}"
           delegate_to: "{{ vm_guest_ip }}"
@@ -61,15 +64,15 @@
           when: package_install_output.stdout is defined
       when: package_state in [ "installed", "latest", "present" ]
 
-    - block:
-        - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-          ansible.builtin.command: "tdnf remove -y {{ package_name_str }}"
-          delegate_to: "{{ vm_guest_ip }}"
-          register: package_uninstall_output
+    - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+      ansible.builtin.command: "tdnf remove -y {{ package_name_str }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: package_uninstall_output
       when: package_state in [ "absent", "removed" ]
   when: guest_os_ansible_distribution == "VMware Photon OS"
 
-- block:
+- name: "Handle Redhat"
+  block:
     - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       ansible.builtin.yum:
         name: "{{ package_name }}"
@@ -94,7 +97,8 @@
   delegate_to: "{{ vm_guest_ip }}"
   when: guest_os_family == "Suse"
 
-- block:
+- name: "Handle Debian or Astra Linux"
+  block:
     - include_tasks: remove_dpkg_lock_file.yml
     - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       ansible.builtin.apt:

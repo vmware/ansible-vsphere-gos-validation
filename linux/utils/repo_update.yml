@@ -5,8 +5,9 @@
 # Parameters:
 #   check_update_cmd: The command to check repo update
 #   clean_cache_cmd: The command to clean all cache and metadata
-
-- block:
+#
+- name: "Update package metadata"
+  block:
     # Clean all cache and metadata if necessary
     - name: "Clean all cache and metadata"
       ansible.builtin.command: "{{ clean_cache_cmd }}"
@@ -25,10 +26,12 @@
       async: 300
       poll: 10
       ignore_errors: true
+      changed_when: false
       delegate_to: "{{ vm_guest_ip }}"
       register: repo_update_result
 
-    - block:
+    - name: "Asnyc task to check OS packages update status"
+      block:
         - name: "Check OS packages updates status"
           ansible.builtin.async_status:
             jid: "{{ repo_update_result.ansible_job_id }}"
