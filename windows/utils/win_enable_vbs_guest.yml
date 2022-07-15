@@ -1,0 +1,26 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Enable virtualization-based protection of code integrity in guest OS
+# Refer to this page: https://docs.microsoft.com/en-us/windows/security/
+# threat-protection/device-guard/enable-virtualization-based-protection-of-code-integrity
+#
+# Will enable these features:
+# 1. enable VBS
+# 2. enable VBS with Secure Boot and DMA (value 3)
+# 3. enable VBS with UEFI lock (value 1)
+# 4. enable virtualization-based protection of Code Integrity policies
+# 5. enable virtualization-based protection of Code Integrity policies with UEFI lock (value 1)
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard" /v "EnableVirtualizationBasedSecurity" /t REG_DWORD /d 1 /f;
+      reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard" /v "RequirePlatformSecurityFeatures" /t REG_DWORD /d 3 /f;
+      reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard" /v "Locked" /t REG_DWORD /d 1 /f;
+      reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v "Enabled" /t REG_DWORD /d 1 /f;
+      reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v "Locked" /t REG_DWORD /d 1 /f
+
+# Restart guest OS after configuration in guest
+- include_tasks: win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
