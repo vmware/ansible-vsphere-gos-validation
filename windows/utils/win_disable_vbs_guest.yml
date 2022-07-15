@@ -1,0 +1,15 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Disable virtualization-based protection of code integrity in guest OS
+# Refer to this page: https://docs.microsoft.com/en-us/windows/security/
+# threat-protection/device-guard/enable-virtualization-based-protection-of-code-integrity
+#
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "reg add 'HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity' /v 'Enabled' /t REG_DWORD /d 0 /f"
+
+# Restart guest OS after configuration in guest
+- include_tasks: win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
