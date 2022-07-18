@@ -21,8 +21,9 @@
 - name: "Check VM VBS status after enable"
   ansible.builtin.assert:
     that:
+      - vm_vbs_enabled is defined
       - not vm_vbs_enabled | bool
-    fail_msg: "VM VBS status is enabled after disable it."
+    fail_msg: "VM VBS status is not disabled after disabling it."
 
 # Get VBS status in guest OS
 - include_tasks: ../utils/win_get_vbs_guest.yml
@@ -41,3 +42,12 @@
 
 # Get VBS status in guest OS
 - include_tasks: ../utils/win_get_vbs_guest.yml
+
+# SecurityServicesRunning: 0 means No services running
+# VirtualizationBasedSecurityStatus: 0 means VBS is not enabled
+- name: "Check VBS and running security service status"
+  ansible.builtin.assert:
+    that:
+      - win_vbs_status_guest | int == 0
+      - win_vbs_running_service[0] | int != 0
+    fail_msg: "Either VBS is running '{{ win_vbs_status_guest }}', or HVCI is running '{{ win_vbs_running_service }}'."
