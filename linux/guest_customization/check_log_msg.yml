@@ -7,7 +7,7 @@
 #   check_msg_regexp: The regular expression of message to check
 #   check_msg_state: The message state is 'present' or 'absent' in log file.
 # Return:
-#   gosc_log_success: True if message is found; otherwise it is false
+#   gosc_log_success: true if message is found; otherwise it is false
 
 - name: "Check '{{ check_msg_regexp }}' in GOSC log"
   include_tasks: ../utils/file_content_search.yml
@@ -16,28 +16,28 @@
     regexp: "{{ check_msg_regexp }}"
 
 - name: "Initialize error message for checking GOSC log"
-  set_fact:
+  ansible.builtin.set_fact:
     check_msg_error: ""
 
 - block:
     - name: "Set error message for checking GOSC log"
-      set_fact:
+      ansible.builtin.set_fact:
         check_msg_error: "Not found '{{ check_msg_regexp }}' in GOSC log, which should exist in GOSC log"
       when: regexp_found | int == 0
 
     - name: "Update GOSC log check result "
-      set_fact:
+      ansible.builtin.set_fact:
         gosc_log_success: "{{ (gosc_log_success | bool) and (regexp_found | int > 0) }}"
   when: check_msg_state == 'present'
 
 - block:
     - name: "Set error message for checking GOSC log"
-      set_fact:
+      ansible.builtin.set_fact:
         check_msg_error: "Found '{{ check_msg_regexp }}' in GOSC log, which should not exist in GOSC log"
       when: regexp_found | int > 0
 
     - name: "Update GOSC log check result "
-      set_fact:
+      ansible.builtin.set_fact:
         gosc_log_success: "{{ (gosc_log_success | bool) and (regexp_found | int == 0) }}"
   when: check_msg_state == 'absent'
 

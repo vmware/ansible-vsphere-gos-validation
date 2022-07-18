@@ -16,9 +16,10 @@
     file_in_datastore_path: "{{ src_file_path }}"
     file_in_datastore_failed_ignore: "{{ download_file_fail_ignore | default(False) }}"
 
-- block:
+- name: "File in datastore"
+  block:
     - name: "VM datastore file URL get failure"
-      fail:
+      ansible.builtin.fail:
         msg: "Failed to get URL for file '{{ src_file_path }}' in datastore '{{ src_datastore }}'"
       when:
         - download_file_fail_ignore is defined
@@ -27,12 +28,13 @@
            (ds_file_result.url is undefined) or
            (not ds_file_result.url))
 
-    - block:
+    - name: "Download File from URL"
+      block:
         - name: "Set fact of downloading URL for the src datastore file"
-          set_fact:
+          ansible.builtin.set_fact:
             datastore_file_url: "{{ ds_file_result.url }}"
         - name: "Download datastore file"
-          get_url:
+          ansible.builtin.get_url:
             url: "{{ datastore_file_url }}"
             dest: "{{ dest_file_path }}"
             url_username: "{{ vsphere_host_user }}"
@@ -43,7 +45,7 @@
           ignore_errors: "{{ download_file_fail_ignore | default(False) }}"
           register: datastore_file_download_result
         - name: "Print datastore file download result"
-          debug: var=datastore_file_download_result
+          ansible.builtin.debug: var=datastore_file_download_result
           when: enable_debug
       when:
         - ds_file_result.url is defined

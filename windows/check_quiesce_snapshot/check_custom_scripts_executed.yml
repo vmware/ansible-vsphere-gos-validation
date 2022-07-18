@@ -19,55 +19,55 @@
   vars:
     win_powershell_cmd: "get-content -Path C:\\test_pre_freeze.txt"
 - name: Set fact of the pre-freeze time
-  set_fact:
+  ansible.builtin.set_fact:
     pre_freeze_time: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
 
 - include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "get-content -Path C:\\test_post_thaw.txt"
 - name: Set fact of the post-thaw time
-  set_fact:
+  ansible.builtin.set_fact:
     post_thaw_time: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
 
 - include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "get-content -Path C:\\test_quiesce_1.txt"
 - name: Set fact of the first script execute time
-  set_fact:
+  ansible.builtin.set_fact:
     take_quiesce_time_1: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
 
 - include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "get-content -Path C:\\test_quiesce_2.txt"
 - name: Set fact of the second script execute time
-  set_fact:
+  ansible.builtin.set_fact:
     take_quiesce_time_2: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
 
 - name: Check pre-freeze script executed after snapshot take
-  assert:
+  ansible.builtin.assert:
     that:
       - "{{ pre_freeze_time|int > before_snapshot_time|int }}"
   when: pre_freeze_time|int != 0 and before_snapshot_time|int != 0
 
 - name: Check pre-freeze script executed before post-thaw script
-  assert:
+  ansible.builtin.assert:
     that:
       - "{{ pre_freeze_time|int < post_thaw_time|int }}"
   when: pre_freeze_time|int != 0 and post_thaw_time|int != 0
 
 - name: Check script executed after pre-freeze
-  assert:
+  ansible.builtin.assert:
     that:
       - "{{ pre_freeze_time|int < take_quiesce_time_1|int }}"
   when: pre_freeze_time|int != 0 and take_quiesce_time_1|int != 0
 
 - name: Check script executed after pre-freeze
-  assert:
+  ansible.builtin.assert:
     that:
       - "{{ pre_freeze_time|int < take_quiesce_time_2|int }}"
   when: pre_freeze_time|int != 0 and take_quiesce_time_2|int != 0
 
 - name: Check time variables value
-  fail:
+  ansible.builtin.fail:
     msg: "Time before taking snapshot, time pre-freeze or time post-thaw got failed"
   when: not before_snapshot_time or not pre_freeze_time or not post_thaw_time

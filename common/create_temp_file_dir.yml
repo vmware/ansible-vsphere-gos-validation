@@ -11,12 +11,12 @@
 #   tmp_path: the path to temporary file or directory
 #
 - name: "Set default tmp_state to file"
-  set_fact:
+  ansible.builtin.set_fact:
     tmp_state: "file"
   when: tmp_state is undefined or not tmp_state
 
 - name: "Create temporary {{ tmp_state }}"
-  tempfile:
+  ansible.builtin.tempfile:
     path: "{{ tmp_dir | default(omit) }}"
     state: "{{ tmp_state }}"
     prefix: "{{ tmp_prefix | default(omit) }}"
@@ -25,17 +25,17 @@
   failed_when: not tmp_file_dir.changed
 
 - name: "Set fact of created temp dir path"
-  set_fact:
+  ansible.builtin.set_fact:
     tmp_path: "{{ tmp_file_dir.path }}"
 
 - name: "Modify the mode of temporary file"
-  file:
+  ansible.builtin.file:
     path: "{{ tmp_path }}"
     mode: "0644"
   when: tmp_state == "file"
 
 - name: "Modify the mode of temporary directory"
-  file:
+  ansible.builtin.file:
     path: "{{ tmp_path }}"
     mode: "0755"
   when: tmp_state == "directory"

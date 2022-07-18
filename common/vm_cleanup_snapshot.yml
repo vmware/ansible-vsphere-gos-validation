@@ -7,45 +7,45 @@
 # the existing snapshots of the VM.
 #
 - name: Set the revert to snapshot name
-  set_fact:
+  ansible.builtin.set_fact:
     revert_to_snapshot_name: "{{ revert_to_snapshot | default('') }}"
-- debug:
+- ansible.builtin.debug:
     msg: "Will revert to snapshot: '{{ revert_to_snapshot_name if revert_to_snapshot_name else 'N/A' }}' firstly if specified or exists, then remove all snapshots"
 
 # Get current snapshot info
 - include_tasks: vm_get_snapshot_facts.yml
 
 - name: Set fact of the number of snapshots
-  set_fact:
+  ansible.builtin.set_fact:
     snapshots_num: "{{ vm_snapshot_facts.guest_snapshots.snapshots | length if (not vm_snapshot_facts.failed and vm_snapshot_facts.guest_snapshots | length != 0) else 0 }}"
 
 # Do nothing if no snapshot exists
-- debug:
+- ansible.builtin.debug:
     msg: "Skip cleanup existing snapshots of VM since no snapshot found."
   when: snapshots_num | int == 0
 
 # Check if specified snapshot exists and revert to it
 - block:
-    - debug:
+    - ansible.builtin.debug:
         msg: "The number of existing snapshots: {{ snapshots_num }}"
     - name: Set fact of the current snapshot
-      set_fact:
+      ansible.builtin.set_fact:
         current_snapshot_name: "{{ vm_snapshot_facts.guest_snapshots.current_snapshot.name }}"
-    - debug:
+    - ansible.builtin.debug:
         msg: "Current snapshot is: {{ current_snapshot_name }}"
     - block:
         - name: "Set '{{ revert_to_snapshot_name }}' existence status to false"
-          set_fact:
-            revert_to_snapshot_exists: False
+          ansible.builtin.set_fact:
+            revert_to_snapshot_exists: false
         - name: "Check if snapshot named '{{ revert_to_snapshot_name }}' exists"
-          set_fact:
-            revert_to_snapshot_exists: True
+          ansible.builtin.set_fact:
+            revert_to_snapshot_exists: true
           when: item.name == revert_to_snapshot_name
           with_items: "{{ vm_snapshot_facts.guest_snapshots.snapshots }}"
-        - debug:
+        - ansible.builtin.debug:
             msg: "Revert to snapshot '{{ revert_to_snapshot_name }}' exists: {{ revert_to_snapshot_exists }}"
         - name: Cleanup snapshots failed
-          fail:
+          ansible.builtin.fail:
             msg: "Not find specified snapshot '{{ revert_to_snapshot_name }}' to revert, please make sure variable 'revert_to_snapshot' is set correctly."
           when: not revert_to_snapshot_exists
         - include_tasks: vm_revert_snapshot.yml

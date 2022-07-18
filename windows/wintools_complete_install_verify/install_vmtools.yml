@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: Set fact of VMware tools silent install command for 64bit GOS
-  set_fact:
+  ansible.builtin.set_fact:
     vmtools_install_cmd: "D:\\setup64.exe /s /v ADDLOCAL=ALL /qn REBOOT=R"
   when:  
     - guest_os_ansible_architecture is defined
     - guest_os_ansible_architecture == "64-bit"
 - name: Set fact of VMware tools silent install command for 32bit GOS
-  set_fact:
+  ansible.builtin.set_fact:
     vmtools_install_cmd: "D:\\setup.exe /s /v ADDLOCAL=ALL /qn REBOOT=R"
   when:
     - guest_os_ansible_architecture is defined
@@ -19,7 +19,7 @@
   vars:
     win_powershell_cmd: "Get-childitem -path D:\\ -name"
 - name: Check VMware tools install files
-  assert:
+  ansible.builtin.assert:
     that:
       - "'setup.exe' in win_powershell_cmd_output['stdout_lines']"
       - "'setup64.exe' in win_powershell_cmd_output['stdout_lines']"
@@ -30,12 +30,12 @@
 - name: Execute VMware tools silent install command in guest
   win_shell: "{{ vmtools_install_cmd }}"
   delegate_to: "{{ vm_guest_ip }}"
-  ignore_errors: yes
+  ignore_errors: true
   register: wintools_install_result
   async: 360
   poll: 0
 - name: "Pause 2 minutes before checking task status"
-  pause:
+  ansible.builtin.pause:
     minutes: 2
 - name: "Check VMware tools install task status every 3 seconds"
   async_status:

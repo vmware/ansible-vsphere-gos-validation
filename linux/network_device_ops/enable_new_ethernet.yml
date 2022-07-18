@@ -4,13 +4,13 @@
 # Set fact of network config file in guest OSes except Photon OS
 - block:
     - name: "Set fact of the network configure file for RedHat"
-      set_fact:
+      ansible.builtin.set_fact:
         network_conf_template: rhel_network_conf.j2
         network_conf_path: "/etc/sysconfig/network-scripts/ifcfg-{{ eth_dev }}"
       when: guest_os_family == "RedHat"
 
     - name: "Set fact of the network configure file for Ubuntu desktop"
-      set_fact:
+      ansible.builtin.set_fact:
         network_conf_template: debian_network_conf.j2
         network_conf_path: "/etc/network/interfaces"
       when: >
@@ -21,7 +21,7 @@
         # Get netplan config file in Ubuntu server
         - include_tasks: ../utils/get_netplan_config_file.yml
         - name: "Set fact of the network configure file for Ubuntu server"
-          set_fact:
+          ansible.builtin.set_fact:
             network_conf_template: ubuntu_netplan_conf.j2
             network_conf_path: "{{ netplan_config_file }}"
           when: netplan_config_file is defined
@@ -30,40 +30,40 @@
         - guest_os_with_gui is defined and not guest_os_with_gui
 
     - name: "Set fact of the network configure file for SLE"
-      set_fact:
+      ansible.builtin.set_fact:
         network_conf_template: sles_network_conf.j2
         network_conf_path: "/etc/sysconfig/network/ifcfg-{{ eth_dev }}"
       when: guest_os_family == "Suse"
 
     - name: "Set fact of the network configure file for Flatcar"
-      set_fact:
+      ansible.builtin.set_fact:
         network_conf_template: flatcar_network_conf.j2
         network_conf_path: "/etc/systemd/network/{{ eth_dev }}"
       when: "'Flatcar' in guest_os_ansible_distribution"
 
     # Create the network config file for new network interface
     - name: "Create/Update network configure file '{{ network_conf_path }}'"
-      template:
+      ansible.builtin.template:
         src: "{{ network_conf_template }}"
         dest: "{{ network_conf_path }}"
         mode: "0666"
       delegate_to: "{{ vm_guest_ip }}"
 
     - name: "Print content of network configure file '{{ network_conf_path }}'"
-      command: "cat {{ network_conf_path }}"
+      ansible.builtin.command: "cat {{ network_conf_path }}"
       register: network_config
-      changed_when: False
+      changed_when: false
       delegate_to: "{{ vm_guest_ip }}"
-    - debug: var=network_config.stdout_lines
+    - ansible.builtin.debug: var=network_config.stdout_lines
   when: guest_os_ansible_distribution not in ["VMware Photon OS", "Astra Linux (Orel)"]
 
 # Check new ethernet device status to see whether it has been bring up automatically
 - include_tasks: ../utils/ethernet_ip_get.yml
   vars:
-    all_ip: False
+    all_ip: false
 
 - name: "Set fact of ethernet device status and IP"
-  set_fact:
+  ansible.builtin.set_fact:
     eth_dev_status: "{{ ethernets[eth_dev] if ethernets | length > 0 else {} }}"
 
 - block:
@@ -73,7 +73,7 @@
 
     # RHEL/SLED/Ubuntu Desktop network interfaces are managed by NetworkManager
     - name: "Bring link '{{ eth_dev }}' up"
-      shell: "nmcli device connect {{ eth_dev }}"
+      ansible.builtin.shell: "nmcli device connect {{ eth_dev }}"
       delegate_to: "{{ vm_guest_ip }}"
       when:
         - guest_os_ansible_distribution != "Debian"
@@ -86,13 +86,13 @@
         - block:
             # IP could be changed after netplan apply
             - name: "Apply netplan configuration file for new added nic {{ eth_dev }} in Ubuntu"
-              command: "netplan apply"
+              ansible.builtin.command: "netplan apply"
               delegate_to: "{{ vm_guest_ip }}"
               async: 10
               poll: 0
 
             - name: "Sleep 30s for netplan taking effect"
-              pause:
+              ansible.builtin.pause:
                 seconds: 30
 
             # Update VM's guest IP
@@ -103,7 +103,7 @@
         - block:
             # Bring down new ethernet device if no IP assigned
             - name: "Bring link '{{ eth_dev }}' down for {{ guest_os_ansible_distribution }}"
-              shell: "wicked ifdown {{ eth_dev }}"
+              ansible.builtin.shell: "wicked ifdown {{ eth_dev }}"
               delegate_to: "{{ vm_guest_ip }}"
               when:
                 - eth_dev_status.status is defined
@@ -111,19 +111,19 @@
                 - eth_dev_status.ipv4 is undefined or not eth_dev_status.ipv4
 
             - name: "Bring link '{{ eth_dev }}' up for {{ guest_os_ansible_distribution }}"
-              shell: "wicked ifup {{ eth_dev }}"
+              ansible.builtin.shell: "wicked ifup {{ eth_dev }}"
               delegate_to: "{{ vm_guest_ip }}"
           when: guest_os_family == "Suse"
 
         # Old RHEL or Debian is using ifdown/ifup to manage network interfaces
         - name: "Bring link '{{ eth_dev }}' up for {{ guest_os_ansible_distribution }}"
-          shell: "ifdown {{ eth_dev }}; ifup {{ eth_dev }}"
+          ansible.builtin.shell: "ifdown {{ eth_dev }}; ifup {{ eth_dev }}"
           delegate_to: "{{ vm_guest_ip }}"
           when: guest_os_family == "RedHat" or guest_os_ansible_distribution == "Debian"
 
         # Photon OS/Flatcar is using systemd-networkd to manage network interface
         - name: "Bring link '{{ eth_dev }}' up for {{ guest_os_ansible_distribution }}"
-          shell: "ip link set {{ eth_dev }} down; ip link set {{ eth_dev }} up"
+          ansible.builtin.shell: "ip link set {{ eth_dev }} down; ip link set {{ eth_dev }} up"
           delegate_to: "{{ vm_guest_ip }}"
           when: >
             (guest_os_ansible_distribution == "VMware Photon OS") or
@@ -136,14 +136,14 @@
 
     # Get IP address of new interface
     - name: "Get link '{{ eth_dev }}' status"
-      shell: "ip -br addr show {{ eth_dev }} | awk '{print $3}'"
+      ansible.builtin.shell: "ip -br addr show {{ eth_dev }} | awk '{print $3}'"
       register: link_status
-      changed_when: False
+      changed_when: false
       until: '"192.168" in link_status.stdout'
       retries: 20
       delay: 5
       delegate_to: "{{ vm_guest_ip }}"
-    - debug: var=link_status
+    - ansible.builtin.debug: var=link_status
 
     - include_tasks: ../utils/ethernet_ip_get.yml
   when: >
@@ -152,5 +152,5 @@
      eth_dev_status.ipv4 is undefined or
      not eth_dev_status.ipv4)
 
-- debug:
+- ansible.builtin.debug:
     msg: "Get IPv4 address of '{{ eth_dev }}': {{ ethernets[eth_dev] | default('') }}"

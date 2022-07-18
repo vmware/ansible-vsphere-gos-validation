@@ -4,22 +4,23 @@
 # Set proxy for yum or tdnf
 #
 - name: "Initialize proxy setting variables"
-  set_fact:
+  ansible.builtin.set_fact:
     proxy_conf_file: ""
 
 - name: "Set the proxy config file for YUM in {{ guest_os_ansible_distribution }}"
-  set_fact:
+  ansible.builtin.set_fact:
     proxy_conf_file: "/etc/yum.conf"
   when: guest_os_family == "RedHat"
 
 - name: "Set the proxy config file for tdnf in {{ guest_os_ansible_distribution }}"
-  set_fact:
+  ansible.builtin.set_fact:
     proxy_conf_file: "/etc/tdnf/tdnf.conf"
   when: guest_os_ansible_distribution == "VMware Photon OS"
 
-- block:
+- name: "Set proxy in config file in guest"
+  block:
     - name: "Add prefix to proxy URL"
-      set_fact:
+      ansible.builtin.set_fact:
         http_proxy_vm: "http://{{ http_proxy_vm }}"
       when:
         - not http_proxy_vm.startswith('https://')

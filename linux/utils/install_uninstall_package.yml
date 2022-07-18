@@ -1,22 +1,22 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-#Install or uninstall packages in guest
-#Parameters
-#  package_name: one or a list of packages to be installed or removed
-#  package_state: [absent, installed, latest, present, removed]. Default is present.
+# Install or uninstall packages in guest
+# Parameters:
+#   package_name: one or a list of packages to be installed or removed
+#   package_state: [absent, installed, latest, present, removed]. Default is present.
 # Return:
-#  package_manage_output: The output of installing or uninstalling package
+#   package_manage_output: The output of installing or uninstalling package
 
 - name: "Validate the value of variable 'package_state'"
-  assert:
+  ansible.builtin.assert:
     that:
       - package_state in ['absent', 'installed', 'latest', 'present', 'removed']
     fail_msg: "Invalide parameter: package_state={{ package_state }}"
   when: package_state is defined
 
 - name: "Initialize variables for installing or uninstalling package"
-  set_fact:
+  ansible.builtin.set_fact:
     package_state: "{% if package_state is undefined %}present{% endif %}"
     package_manage_output: ""
     local_task_name: |-
@@ -27,11 +27,12 @@
       {%- else -%}Uninstall package{%- endif -%}
 
 # Set proxy for installing package
-- debug: var=vm_guest_ip
+- ansible.builtin.debug: var=vm_guest_ip
 - include_tasks: set_proxy.yml
   when: package_state == "present"
 
-- block:
+- name: "Add repo"
+  block:
     # Add a local repo from ISO image for RHEL/SLES/SLED
     - include_tasks: ../utils/add_local_dvd_repo.yml
       when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat']
@@ -41,63 +42,66 @@
       when: guest_os_ansible_distribution in ['Rocky', 'CentOS', 'OracleLinux', 'Ubuntu', 'Debian', 'VMware Photon OS']
   when: package_state in ['installed', 'latest', 'present']
 
-- block:
+- name: "Handle Photon OS"
+  block:
     - name: "Convert packages name list to a string"
-      set_fact:
+      ansible.builtin.set_fact:
         package_name_str: |-
           {%- if package_name is sequence and package_name is not string -%}{{ ' '.join(package_name) }}
           {%- elif package_name is string -%}{{ package_name }}
           {%- else -%}{%- endif -%}
 
-    - block:
+    - name: "Handle install package"
+      block:
         - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-          command: "tdnf install -y {{ package_name_str }}"
+          ansible.builtin.command: "tdnf install -y {{ package_name_str }}"
           delegate_to: "{{ vm_guest_ip }}"
           register: package_install_output
 
         - name: "Get the output of installing package"
-          set_fact:
+          ansible.builtin.set_fact:
             package_manage_output: "{{ package_install_output.stdout }}"
           when: package_install_output.stdout is defined
       when: package_state in [ "installed", "latest", "present" ]
 
-    - block:
-        - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-          command: "tdnf remove -y {{ package_name_str }}"
-          delegate_to: "{{ vm_guest_ip }}"
-          register: package_uninstall_output
+    - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+      ansible.builtin.command: "tdnf remove -y {{ package_name_str }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: package_uninstall_output
       when: package_state in [ "absent", "removed" ]
   when: guest_os_ansible_distribution == "VMware Photon OS"
 
-- block:
+- name: "Handle Redhat"
+  block:
     - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-      yum:
+      ansible.builtin.yum:
         name: "{{ package_name }}"
-        allow_downgrade: yes
+        allow_downgrade: true
         state: "{{ package_state }}"
       delegate_to: "{{ vm_guest_ip }}"
       when: guest_os_ansible_pkg_mgr | lower == "yum"
 
     - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-      dnf:
+      ansible.builtin.dnf:
         name: "{{ package_name }}"
-        allow_downgrade: yes
+        allow_downgrade: true
         state: "{{ package_state }}"
       delegate_to: "{{ vm_guest_ip }}"
       when: guest_os_ansible_pkg_mgr | lower == "dnf"
   when: guest_os_family == "RedHat"
 
 - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-  zypper:
+  community.general.zypper:
     name: "{{ package_name }}"
     state: "{{ package_state }}"
   delegate_to: "{{ vm_guest_ip }}"
   when: guest_os_family == "Suse"
 
-- block:
+- name: "Handle Debian or Astra Linux"
+  block:
     - include_tasks: remove_dpkg_lock_file.yml
     - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-      apt:
+      ansible.builtin.apt:
         name: "{{ package_name }}"
         state: "{{ package_state }}"
         update_cache: true
@@ -105,7 +109,7 @@
       when: guest_os_family == "Debian"
 
     - name: "{{ local_task_name }} on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-      apt:
+      ansible.builtin.apt:
         name: "{{ package_name }}"
         state: "{{ package_state }}"
       delegate_to: "{{ vm_guest_ip }}"

@@ -9,16 +9,16 @@
   include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "(Get-NetAdapter | where-object {$_.MacAddress -eq '{{ win_get_ethernet_name_mac | replace(':','-') }}'}).Name"
-    win_execute_cmd_ignore_error: True
+    win_execute_cmd_ignore_error: true
 
 - name: Check powershell command result
-  fail:
+  ansible.builtin.fail:
     msg: "Not get Ethernet name with specified MAC address: {{ win_get_ethernet_name_mac }}"
   when: win_powershell_cmd_output.rc != 0 or win_powershell_cmd_output.stdout_lines|length == 0
 
 - name: Set fact of the Ethernet name
-  set_fact:
+  ansible.builtin.set_fact:
     win_get_ethernet_name_result: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
   when: win_powershell_cmd_output.rc == 0 and win_powershell_cmd_output.stdout_lines|length != 0
-- debug:
+- ansible.builtin.debug:
     msg: "Get Ethernet name of specified MAC address: {{ win_get_ethernet_name_mac }} in guest OS: {{ win_get_ethernet_name_result }}"

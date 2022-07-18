@@ -13,11 +13,12 @@
 #
 - name: secureboot_enable_disable
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
-    - block:
+    - name: "Test case block"
+      block:
         - include_tasks: ../setup/test_setup.yml
 
         - include_tasks: ../../common/skip_test_case.yml
@@ -39,16 +40,16 @@
           when: vm_firmware | lower != "efi"
 
         - name: "Initialize test result variables"
-          set_fact:
-            secureboot_enabled_pass: False
-            secureboot_disabled_pass: False
+          ansible.builtin.set_fact:
+            secureboot_enabled_pass: false
+            secureboot_disabled_pass: false
 
         - include_tasks: ../utils/shutdown.yml
 
         # Enable secureboot when secureboot is not enabled
         - include_tasks: ../../common/vm_set_boot_options.yml
           vars:
-            secure_boot_enabled_set: True
+            secure_boot_enabled_set: true
           when: not vm_secureboot_enabled
 
         - include_tasks: ../../common/vm_set_power_state.yml
@@ -62,13 +63,13 @@
             vm_wait_log_name: "vmware.log"
             vm_wait_log_msg: "Image APPROVED"
             vm_wait_log_retries: 1
-            vm_wait_log_ignore_errors: True
+            vm_wait_log_ignore_errors: true
 
         - include_tasks: ../utils/get_system_firmware.yml
 
         - name: "Set fact of secure boot enable test result"
-          set_fact:
-            secureboot_enabled_pass: True
+          ansible.builtin.set_fact:
+            secureboot_enabled_pass: true
           when:
             - vm_wait_log_msg_success | bool
             - guest_firmware == "EFI"
@@ -78,7 +79,7 @@
 
         - include_tasks: ../../common/vm_set_boot_options.yml
           vars:
-            secure_boot_enabled_set: False
+            secure_boot_enabled_set: false
 
         - include_tasks: ../../common/vm_set_power_state.yml
           vars:
@@ -89,12 +90,12 @@
         - include_tasks: ../utils/get_system_firmware.yml
 
         - name: "Set fact of secure boot disable test result"
-          set_fact:
-            secureboot_disabled_pass: True
+          ansible.builtin.set_fact:
+            secureboot_disabled_pass: true
           when: guest_firmware == "EFI"
 
         - name: "Check secure boot enable and disable test results"
-          assert:
+          ansible.builtin.assert:
             that:
               - secureboot_enabled_pass and secureboot_disabled_pass
             fail_msg: "Enable secureboot result: {{ secureboot_enabled_pass }}, disable secureboot result: {{ secureboot_disabled_pass }}"

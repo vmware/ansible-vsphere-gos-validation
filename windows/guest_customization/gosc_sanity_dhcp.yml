@@ -9,14 +9,14 @@
 #
 - name: gosc_sanity_dhcp
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
           vars:
-            skip_test_no_vmtools: True
+            skip_test_no_vmtools: true
 
         - include_tasks: ../../common/skip_test_case.yml
           vars:
@@ -26,9 +26,9 @@
 
         - include_tasks: win_gosc_prepare.yml
         - name: Set fact of the network customize type to dhcp
-          set_fact:
+          ansible.builtin.set_fact:
             customize_network_type: 'dhcp'
-            vm_dhcp_gosc_start: True
+            vm_dhcp_gosc_start: true
         - include_tasks: win_gosc_execution.yml
           vars:
             customize_network: "{{ gosc_dhcp_network | default('VM Network') }}"
@@ -51,7 +51,7 @@
         # Get guest IP after customization from guestinfo
         - include_tasks: ../../common/vm_get_ip_from_vmtools.yml
         - name: Set fact of the guest IP after GOSC
-          set_fact:
+          ansible.builtin.set_fact:
             guest_ip_after_gosc: "{{ vm_guest_ip }}"
         - include_tasks: ../utils/win_check_winrm.yml
 
@@ -64,13 +64,13 @@
           vars:
             property_list: ['guest.hostName']
         - name: Set fact of the hostname after GOSC
-          set_fact:
+          ansible.builtin.set_fact:
             hostname_after_gosc: "{{ vm_config.guest.hostName }}"
-        - debug:
+        - ansible.builtin.debug:
             msg: "Get guest OS hostname/IP after customization: {{ hostname_after_gosc }}/{{ guest_ip_after_gosc }}"
 
         - name: Check if IP address and hostname changed after customization
-          assert:
+          ansible.builtin.assert:
             that:
               - "{{ hostname_before_gosc != hostname_after_gosc }}"
               - "{{ hostname_after_gosc == customize_gos_hostname }}"

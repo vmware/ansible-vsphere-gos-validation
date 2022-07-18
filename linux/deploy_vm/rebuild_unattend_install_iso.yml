@@ -6,7 +6,7 @@
 #   rebuilt_unattend_iso_path: Local path to the rebuilt ISO image with unattend install config file
 #
 - name: "Set fact of the absolute path of source ISO file on ESXi server"
-  set_fact:
+  ansible.builtin.set_fact:
     iso_file_datastore: "{{ os_installation_iso_list[0].split()[0] | regex_replace('\\[|\\]', '') }}"
     iso_file_path_in_datastore: "{{ os_installation_iso_list[0].split()[1] }}"
 
@@ -19,7 +19,7 @@
     download_file_timeout: 600
 
 - name: "Set fact of source ISO image file name and path at local"
-  set_fact:
+  ansible.builtin.set_fact:
     src_iso_file_name: "{{ datastore_file_download_result.dest | basename }}"
     src_iso_file_path: "{{ datastore_file_download_result.dest }}"
 
@@ -35,7 +35,7 @@
     tmp_prefix: "expand_{{ src_iso_file_name | replace('.iso', '') }}_"
 
 - name: "Set fact of the temp dir to mount OS ISO image"
-  set_fact:
+  ansible.builtin.set_fact:
     tmp_iso_mount_dir: "{{ tmp_path }}"
 
 # Mount original ISO image at local
@@ -47,25 +47,25 @@
     mount_fstype: "iso9660"
 
 - name: "Set fact of unattend install config file name"
-  set_fact:
+  ansible.builtin.set_fact:
     unattend_install_file_name: "{{ new_unattend_install_conf | basename }}"
 
 - name: "Initialize fact of command to rebuild unattended install ISO"
-  set_fact:
+  ansible.builtin.set_fact:
     rebuild_iso_cmd: "xorriso -indev {{ src_iso_file_path }} -outdev {{ rebuilt_unattend_iso_path }}"
 
 # Set facts about files and command for creating an autoinstall ISO for Photon
 - block:
     # files for autoinstall in BIOS/UEFI mode
     - name: "Set fact of files to be update for unattended install"
-      set_fact:
+      ansible.builtin.set_fact:
         iso_files_to_update:
           - '/boot/grub2/grub.cfg'
           - '/isolinux/isolinux.cfg'
           - '/isolinux/menu.cfg'
 
     - name: "Add command options to rebuild unattended install ISO for Debian"
-      set_fact:
+      ansible.builtin.set_fact:
         rebuild_iso_cmd: "{{ rebuild_iso_cmd }} -map {{ unattend_iso_cache }}/{{ item | basename }} '{{ item }}'"
       with_items: "{{ iso_files_to_update | union(['/isolinux/ks.cfg'])}}"
   when: unattend_install_conf is match('Photon')
@@ -74,7 +74,7 @@
 - block:
     # files for autoinstall in BIOS/UEFI mode
     - name: "Set fact of files to be update for unattended install"
-      set_fact:
+      ansible.builtin.set_fact:
         iso_files_to_update:
           - '/boot/grub/grub.cfg'
           - '/isolinux/isolinux.cfg'
@@ -82,7 +82,7 @@
           - '/md5sum.txt'
 
     - name: "Add command options to rebuild unattended install ISO for Debian"
-      set_fact:
+      ansible.builtin.set_fact:
         rebuild_iso_cmd: "{{ rebuild_iso_cmd }} -map {{ unattend_iso_cache }}/{{ item | basename }} '{{ item }}'"
       with_items: "{{ iso_files_to_update | union([unattend_install_file_name]) }}"
   when: unattend_install_conf is match('Debian')
@@ -90,32 +90,32 @@
 # Set facts about files and command for creating an autoinstall ISO for Ubuntu live server
 - block:
     - name: "Set fact of files to be update for unattended install"
-      set_fact:
+      ansible.builtin.set_fact:
         iso_files_to_update:
           - '/boot/grub/grub.cfg'
           - '/md5sum.txt'
 
     - name: "Add command options to rebuild unattended install ISO for Ubuntu live server"
-      set_fact:
+      ansible.builtin.set_fact:
         rebuild_iso_cmd: "{{ rebuild_iso_cmd }} -map {{ unattend_iso_cache }}/{{ item | basename }} '{{ item }}'"
       with_items: "{{ iso_files_to_update }}"
   when: unattend_install_conf is match('Ubuntu/Server')
 
 - name: "Add command options for boot images to rebuild unattend install ISO"
-  set_fact:
+  ansible.builtin.set_fact:
     rebuild_iso_cmd: "{{ rebuild_iso_cmd }} {{ bios_boot_image }} -boot_image any next {{ efi_boot_image }}"
 
 - name: "Copy unattend install config files to {{ unattend_iso_cache }}"
-  copy:
+  ansible.builtin.copy:
     src: "{{ tmp_iso_mount_dir }}{{ item }}"
     dest: "{{ unattend_iso_cache }}"
-    force: yes
+    force: true
     mode: 0644
   with_items: "{{ iso_files_to_update }}"
 
 - block:
     - name: "Update timeout for boot menu"
-      replace:
+      ansible.builtin.replace:
         path: "{{ unattend_iso_cache }}/isolinux.cfg"
         regexp: "timeout 0"
         replace: "timeout 1"
@@ -126,7 +126,7 @@
     # Update autoinstall config files for Photon
     - block:
         - name: "Update boot menu with kickstart for Photon OS"
-          replace:
+          ansible.builtin.replace:
             path: "{{ unattend_iso_cache }}/{{ item }}"
             regexp: '(.*)(root=[^ ]+)(.*)'
             replace: "\\1\\2 ks=cdrom:/isolinux/{{ unattend_install_file_name }} \\3"
@@ -138,10 +138,10 @@
     # Update autoinstall config files for Debian
     - block:
         - name: "Get initrd.gz path"
-          shell: "find {{ tmp_iso_mount_dir }} -name initrd.gz | grep gtk"
+          ansible.builtin.shell: "find {{ tmp_iso_mount_dir }} -name initrd.gz | grep gtk"
           register: gtk_path
 
-        - fail:
+        - ansible.builtin.fail:
             msg: "Failed to find initrd.gz in {{ tmp_iso_mount_dir }}"
           when: >
             gtk_path is undefined or
@@ -149,17 +149,17 @@
             not gtk_path.stdout
 
         - name: "Set fact of Debian install type"
-          set_fact:
+          ansible.builtin.set_fact:
             debian_install_type: "{{ gtk_path.stdout | dirname | dirname | basename }}"
 
         - name: "Update timeout for boot menu"
-          replace:
+          ansible.builtin.replace:
             path: "{{ unattend_iso_cache }}/isolinux.cfg"
             regexp: "default .*"
             replace: "default installgui"
 
         - name: "Update Debian grub.cfg for autoinstall"
-          blockinfile:
+          ansible.builtin.blockinfile:
             path: "{{ unattend_iso_cache }}/grub.cfg"
             block: |
               set default="autoinstall"
@@ -171,13 +171,13 @@
               }
 
         - name: "Update boot menu with preseed.cfg for Debian"
-          replace:
+          ansible.builtin.replace:
             path: "{{ unattend_iso_cache }}/gtk.cfg"
             regexp: '(.*)(initrd.gz )(.*)'
             replace: "\\1\\2 auto=true file=/cdrom/{{ unattend_install_file_name }} \\3"
 
         - name: "Update md5sum for Debian ISO files"
-          shell: "{{ item }}"
+          ansible.builtin.shell: "{{ item }}"
           with_items:
             - "sed -i '#./isolinux/isolinux.cfg#d' md5sum.txt"
             - "echo \"`md5sum isolinux.cfg | awk '{print $1}'` ./isolinux/isolinux.cfg\" >>md5sum.txt"
@@ -188,25 +188,25 @@
           register: update_initrd_output
 
         - name: "Print command output for updating initrd"
-          debug: var=update_initrd_output
+          ansible.builtin.debug: var=update_initrd_output
       when: unattend_install_conf is match('Debian')
 
     # Update autoinstall config files for Ubuntu live server
     - block:
         - name: "Add autoinstall to kernel command for Ubuntu live server"
-          replace:
+          ansible.builtin.replace:
             path: "{{ unattend_iso_cache }}/grub.cfg"
             regexp: '(.*vmlinuz)(.*)'
             replace: "\\1 autoinstall \\2"
 
         - name: "Set timeout to 5 seconds at boot menu"
-          replace:
+          ansible.builtin.replace:
             path: "{{ unattend_iso_cache }}/grub.cfg"
             regexp: 'set timeout=.*'
             replace: "set timeout=5"
 
         - name: "Update md5sum for Ubuntu live server ISO files"
-          shell: "{{ item }}"
+          ansible.builtin.shell: "{{ item }}"
           with_items:
             - "sed -i '#./boot/grub/grub.cfg#d' md5sum.txt"
             - "echo \"`md5sum grub.cfg | awk '{print $1}'` ./boot/grub/grub.cfg\" >>md5sum.txt"
@@ -215,7 +215,7 @@
       when: unattend_install_conf is match('Ubuntu/Server')
 
     - name: "Rebuild ISO image with unattend install config file"
-      shell: "{{ rebuild_iso_cmd }}"
+      ansible.builtin.shell: "{{ rebuild_iso_cmd }}"
       when:
         - rebuild_iso_cmd is defined
         - rebuild_iso_cmd
@@ -226,10 +226,10 @@
         mount_path: "{{ tmp_iso_mount_dir }}"
 
     - name: "Cleanup original ISO files and copied files"
-      file:
+      ansible.builtin.file:
         path: "{{ item }}"
         state: absent
       with_items:
         - "{{ src_iso_file_path }}"
         - "{{ tmp_iso_mount_dir }}"
-  become: yes
+  become: true

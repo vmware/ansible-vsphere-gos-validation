@@ -16,12 +16,12 @@
 
 
 - name: "Ignore expected_service_status when service '{{ service_name }}' is expected to be '{{ expected_service_state }}'"
-  set_fact:
+  ansible.builtin.set_fact:
     expected_service_status: ""
   when: expected_service_state == 'absent'
 
 - name: "Check the value of 'expected_service_state' and 'expected_service_status'"
-  fail:
+  ansible.builtin.fail:
     msg: "Invalid parameters: expected_service_state={{ expected_service_state | default('undefined') }}, expected_service_status={{ expected_service_status | default('undefined') }}"
   when: >
     (expected_service_state is undefined) or
@@ -33,7 +33,7 @@
 - include_tasks: get_service_info.yml
 
 - name: "Check service '{{ service_name }}' is {{ expected_service_state }}"
-  assert:
+  ansible.builtin.assert:
     that:
       - service_info is defined
       - service_info.state is defined
@@ -43,7 +43,7 @@
   when: expected_service_state == 'active'
 
 - name: "Check service '{{ service_name }}' is {{ expected_service_state }}"
-  assert:
+  ansible.builtin.assert:
     that:
       - service_info is defined
       - service_info.state is defined
@@ -53,7 +53,7 @@
   when: expected_service_state in  ['running', 'stopped']
 
 - name: "Check service '{{ service_name }}' is {{ expected_service_status }}"
-  assert:
+  ansible.builtin.assert:
     that:
       - service_info is defined
       - service_info.status is defined
@@ -63,12 +63,10 @@
   when: expected_service_status in ['enabled', 'disabled']
 
 - name: "Check service '{{ service_name }}' is {{ expected_service_state }}"
-  assert:
+  ansible.builtin.assert:
     that:
       - service_info is defined
       - not service_info
     fail_msg: "Serivce '{{ service_name }}' exists"
     success_msg: "Service '{{ service_name }}' doesn't exist"
   when: expected_service_state == 'absent'
-
-

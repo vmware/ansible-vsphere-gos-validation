@@ -5,7 +5,7 @@
 ## num_cpus: expected number of cpus in guest
 
 - name: "Wait for {{ num_cpus }} CPUs present under /sys/devices/system/cpu/"
-  shell: "ls -1 -d /sys/devices/system/cpu/cpu[0-9]*"
+  ansible.builtin.shell: "ls -1 -d /sys/devices/system/cpu/cpu[0-9]*"
   register: present_cpu_num
   changed_when: false
   until:
@@ -18,7 +18,7 @@
 
 # Cpu0 of some OS doesn't have online. So we only check the other CPUs.
 - name: "Wait for {{ num_cpus }} CPUs ready"
-  wait_for:
+  ansible.builtin.wait_for:
     path: /sys/devices/system/cpu/cpu{{ cpu_index }}/online
     state: present
   loop: "{{ range(1, num_cpus | int) | list }}"
@@ -29,7 +29,7 @@
 
 # Rescan CPUs
 - name: "Rescan CPUs and online them"
-  shell: "echo '1' >/sys/devices/system/cpu/cpu{{ cpu_index }}/online"
+  ansible.builtin.shell: "echo '1' >/sys/devices/system/cpu/cpu{{ cpu_index }}/online"
   loop: "{{ range(1, num_cpus | int) | list }}"
   loop_control:
     loop_var: cpu_index

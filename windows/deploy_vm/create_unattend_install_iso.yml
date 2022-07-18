@@ -7,52 +7,52 @@
 # https://raw.githubusercontent.com/ansible/ansible/devel/examples/scripts/ConfigureRemotingForAnsible.ps1
 #
 - name: Set fact of the timestamp suffix of ISO file name
-  set_fact:
+  ansible.builtin.set_fact:
     iso_timestamp: "{{ lookup('pipe','date +%s') }}"
 - name: Set fact of unattend install ISO file name
-  set_fact:
+  ansible.builtin.set_fact:
     unattend_install_iso: "{{ guest_id }}-{{ firmware }}-{{ boot_disk_controller }}-{{ iso_timestamp }}.iso"
 - name: Set fact of unattend install ISO file path on ESXi host
-  set_fact:
+  ansible.builtin.set_fact:
     transferred_unattend_iso: "[{{ datastore }}] {{ unattend_install_iso }}"
 
 - name: "Set fact of the absolute path of unattend install config file"
-  set_fact:
+  ansible.builtin.set_fact:
     unattend_install_conf: "{{ main_playbook_path }}/autoinstall/{{ unattend_install_conf }}"
 - name: "Display the path of unattend install config file"
-  debug: var=unattend_install_conf
+  ansible.builtin.debug: var=unattend_install_conf
 
 - include_tasks: get_ansible_remote_config.yml
 
 - block:
     - name: Set fact of the copied Autounattend.xml path
-      set_fact:
+      ansible.builtin.set_fact:
         copied_unattend_file: "{{ local_cache }}/{{ iso_timestamp }}/Autounattend.xml"
     - name: Create a new directory in cache using timestamp
-      file:
+      ansible.builtin.file:
         path: "{{ local_cache }}/{{ iso_timestamp }}/"
         mode: '0777'
         state: directory
     - name: Copy specified Autounattend.xml file to cache
-      command: "cp {{ unattend_install_conf }} {{ copied_unattend_file }}"
+      ansible.builtin.command: "cp {{ unattend_install_conf }} {{ copied_unattend_file }}"
     - name: Remove product key in Autounattend.xml
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: "{{ copied_unattend_file }}"
         regexp: "<Key>(.{5}-){4}.{5}</Key>"
         state: absent
     - name: Insert the new product key in Autounattend.xml
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: "{{ copied_unattend_file }}"
         insertafter: "<ProductKey>"
         line: "<Key>{{ windows_product_key }}</Key>"
       register: replace_product_key_result
     - name: Display the replacing product key task result
-      debug: var=replace_product_key_result
+      ansible.builtin.debug: var=replace_product_key_result
       when: enable_debug is defined and enable_debug
   when: windows_product_key is defined and windows_product_key
 
 - name: Set fact of the file list contained in generated ISO file
-  set_fact:
+  ansible.builtin.set_fact:
     unattend_install_file_list:
       - "{{ copied_unattend_file | default(unattend_install_conf) }}"
       - "{{ local_cache }}/{{ config_remote_windows.split('/')[-1] }}"
@@ -60,7 +60,7 @@
 - block:
     - include_tasks: get_pvscsi_driver.yml
     - name: Add PVSCSI driver files to unattend install file list
-      set_fact:
+      ansible.builtin.set_fact:
         unattend_install_file_list: "{{ unattend_install_file_list + pvscsi_file_path_list }}"
   when:
     - boot_disk_controller is defined
@@ -78,10 +78,10 @@
     src_file_path: "{{ local_cache }}/{{ unattend_install_iso }}"
     dest_file_path: "{{ unattend_install_iso }}"
     upload_file_timeout: 600
-- debug:
+- ansible.builtin.debug:
     msg: "Unattend install ISO file is uploaded to ESXi host: {{ transferred_unattend_iso }}"
 
 - name: "Append generated unattend ISO file to the list"
-  set_fact:
+  ansible.builtin.set_fact:
     os_installation_iso_list: "{{ os_installation_iso_list + [transferred_unattend_iso] }}"
     os_install_iso_list_len: "{{ os_install_iso_list_len | int + 1 }}"

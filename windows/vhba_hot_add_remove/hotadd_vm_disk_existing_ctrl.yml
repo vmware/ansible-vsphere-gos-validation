@@ -9,14 +9,14 @@
     ctrl_number: "{{ new_vhba_bus_number }}"
     unit_number: 1
 - name: "Wait 10 seconds after disk hotadd"
-  pause:
+  ansible.builtin.pause:
     seconds: 10
 
 # When hotadd a NVMe disk to existing controller, disable and re-enable NVMe
 # controller device in guest OS, then new disk can be recognized
 - block:
     - name: "WORKAROUND" 
-      debug:
+      ansible.builtin.debug:
         msg: "Disable/re-enable NVMe controller is a workaround for hotadd disk to existing NVMe controller due to hotadd/remove disk is not supported when NVMe Spec v1.0 is emulated"
     - include_tasks: disable_enable_nvme_device.yml
   when:
@@ -26,14 +26,14 @@
 # Get the number of disk controller and disk in guest OS after hotadd
 - include_tasks: ../utils/win_get_disk_num.yml
 - name: Set fact of disk number after hotadd
-  set_fact:
+  ansible.builtin.set_fact:
     disk_num_guest_after_hotadd: "{{ disk_num_guest }}"
-- debug:
+- ansible.builtin.debug:
     msg:
       - "The number of disk in guest OS after hotadd: {{ disk_num_guest_after_hotadd }}"
 
 - name: Verify disk number increases in guest OS
-  assert:
+  ansible.builtin.assert:
     that:
       - "{{ disk_num_guest_after_hotadd | int == disk_num_guest_before_hotadd | int + 2 }}"
     success_msg: "Disk number increases 2 in guest OS"

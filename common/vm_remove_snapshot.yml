@@ -9,7 +9,7 @@
 #     if snapshot_remove_state is set to 'absent', then it's required to pass an existing snapshot name
 #
 - name: "Remove snapshot on '{{ vm_name }}'"
-  vmware_guest_snapshot:
+  community.vmware.vmware_guest_snapshot:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
     password: "{{ vsphere_host_user_password }}"
@@ -21,14 +21,14 @@
     snapshot_name: "{{ snapshot_name | default(omit) }}"
   register: task_result
 - name: Display the result of remove snapshot
-  debug: var=task_result
+  ansible.builtin.debug: var=task_result
   when: enable_debug is defined and enable_debug
 
 - block:
     - include_tasks: vm_get_snapshot_facts.yml
 
     - name: "Assert snapshot '{{ snapshot_name }}' not exist"
-      assert:
+      ansible.builtin.assert:
         that:
           - item.name != snapshot_name
         fail_msg: "Failed to remove snapshot {{ snapshot_name }}"

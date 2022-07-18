@@ -8,7 +8,7 @@
 #
 - name: check_efi_firmware
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
@@ -26,7 +26,7 @@
           when: vm_config.config.firmware == "bios"
 
         - name: Set searching keyword in vmware.log
-          set_fact:
+          ansible.builtin.set_fact:
             vmware_log_keyword: "The EFI ROM is .*{{ guest_os_ansible_architecture }}"
 
         - name: Get firmware info in guest OS
@@ -38,10 +38,10 @@
             vm_wait_log_name: "vmware.log"
             vm_wait_log_msg: "{{ vmware_log_keyword }}"
             vm_wait_log_retries: 1
-            vm_wait_log_ignore_errors: True
+            vm_wait_log_ignore_errors: true
 
         - name: "Verify EFI firmware info in guest OS and vmware.log"
-          assert:
+          ansible.builtin.assert:
             that:
               - firmware_os == "efi"
               - vm_wait_log_msg_success | bool

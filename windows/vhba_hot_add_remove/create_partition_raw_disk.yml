@@ -4,25 +4,25 @@
 # Copy diskpart script to Windows guest and run it to create partition on raw disk
 #
 - name: Set fact of the diskpart file path
-  set_fact:
+  ansible.builtin.set_fact:
     diskpart_file_path: "{{ playbook_dir }}/diskpart.txt"
     diskpart_file_path_current: "{{ current_test_log_folder }}/diskpart.txt"
     diskpart_file_path_win: "C:\\test_diskpart\\diskpart.txt"
 - name: Check diskpart script file exists in current path
-  stat:
+  ansible.builtin.stat:
     path: "{{ diskpart_file_path }}"
-    get_attributes: no
-    get_checksum: no
-    get_mime: no
+    get_attributes: false
+    get_checksum: false
+    get_mime: false
   register: diskpart_file_stat
 - name: Check if diskpart file exists
-  assert:
+  ansible.builtin.assert:
     that:
       - "{{ diskpart_file_stat.stat.isreg is defined and diskpart_file_stat.stat.isreg }}"
     success_msg: "diskpart script file exists"
     fail_msg: "diskpart script file not exist: {{ diskpart_file_path }}"
 - name: Copy diskpart file to current test case log folder
-  copy:
+  ansible.builtin.copy:
     src: "{{ diskpart_file_path }}"
     dest: "{{ current_test_log_folder }}/"
 
@@ -34,7 +34,7 @@
 
 # Edit diskpart script file in remote Windows guest OS
 - name: Modify raw disk number in diskpart script file
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: "{{ diskpart_file_path_current }}"
     regexp: 'select disk *'
     line: "select disk {{ win_get_raw_disk_num }}"
@@ -42,7 +42,7 @@
     - win_get_raw_disk_num is defined
     - win_get_raw_disk_num
 - name: Modify new drive letter in diskpart script file
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: "{{ diskpart_file_path_current }}"
     regexp: 'assign letter*'
     line: "assign letter={{ drive_letter_new }}"
@@ -50,7 +50,7 @@
     - drive_letter_new is defined
     - drive_letter_new
 - name: Remove online disk if disk is already online
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: "{{ diskpart_file_path_current }}"
     regexp: 'online disk'
     state: absent
@@ -67,7 +67,7 @@
   vars:
     win_check_file_exist_file: "{{ diskpart_file_path_win }}"
 - name: Check diskpart script file copied to guest OS
-  assert:
+  ansible.builtin.assert:
     that:
       - "{{ win_check_file_exist_result }}"
     success_msg: "diskpart file found in guest OS"
@@ -81,7 +81,7 @@
 - block:
     # Check new file creation and content write to the new disk
     - name: Set fact of the file path to do disk write test
-      set_fact:
+      ansible.builtin.set_fact:
         write_test_file_path_win: "{{ drive_letter_new }}:\\test_disk_write.txt"
         test_line: "This is the test line to write to the file. "
 
@@ -96,7 +96,7 @@
       vars:
         win_check_file_exist_file: "{{ write_test_file_path_win }}"
     - name: Check file created on disk drive in guest OS
-      assert:
+      ansible.builtin.assert:
         that:
           - "{{ win_check_file_exist_result }}"
         success_msg: "New created file found in guest OS"

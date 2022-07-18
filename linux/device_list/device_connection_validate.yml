@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: "Set fact of the device name and device connect status"
-  set_fact:
+  ansible.builtin.set_fact:
     device_name: "{{ device_status.split(':')[0] }}"
     device_is_connected: "{{ device_status.split(':')[1].strip(' ') | lower == 'enabled' }}"
   when: device_status.split(':') | length == 2
 
 - name: "Set fact of the device name, device unit and device connect status"
-  set_fact:
+  ansible.builtin.set_fact:
     device_name: "{{ device_status.split(':')[0] }}"
     device_unit: "{{ device_status.split(':')[1] }}"
     device_is_connected: "{{ device_status.split(':')[-1].strip(' ') | lower == 'enabled' }}"
@@ -16,21 +16,21 @@
 
 - block:
     - name: "Set device number in VM config"
-      set_fact:
+      ansible.builtin.set_fact:
         device_num: "{{ device_name | regex_search('[0-9]+$') | int + 1 }}"
 
     - name: "Map '{{ device_name }}' to 'Network adapter {{ device_num }}'"
-      set_fact:
+      ansible.builtin.set_fact:
         device_label: "Network adapter {{ device_num }}"
       when: "'Ethernet' in device_name"
 
     - name: "Map '{{ device_name }}' to 'Floppy drive {{ device_num }}'"
-      set_fact:
+      ansible.builtin.set_fact:
         device_label: "Floppy drive {{ device_num }}"
       when: "'floppy' in device_name"
 
     - name: "Map '{{ device_name }}' to 'Serial port {{ device_num }}'"
-      set_fact:
+      ansible.builtin.set_fact:
         device_label: "Serial port {{ device_num }}"
       when: "'serial' in device_name"
   when: >
@@ -40,12 +40,12 @@
 
 - block:
     - name: "Map '{{ device_name }}' to '{{ device_name | regex_replace('ide', 'IDE ') }}'"
-      set_fact:
+      ansible.builtin.set_fact:
         cd_ctrl_label: "{{ device_name | regex_replace('ide', 'IDE ') }}"
       when: "'ide' in device_name"
 
     - name: "Map '{{ device_name }}' to '{{ device_name | regex_replace('sata', 'SATA controller ') }}'"
-      set_fact:
+      ansible.builtin.set_fact:
         cd_ctrl_label: "{{ device_name | regex_replace('sata', 'SATA controller ') }}"
       when: "'sata' in device_name"
 
@@ -55,7 +55,7 @@
 
     # Search for the CD/DVD drive device
     - name: "Find CD/DVD drive device with controllerKey = {{ vm_devices_with_label[0].key }} and unitNumber = {{ device_unit }}"
-      set_fact:
+      ansible.builtin.set_fact:
         cd_device: "{{ vm_device }}"
       with_items: "{{ vm_config.config.hardware.device }}"
       loop_control:
@@ -65,20 +65,20 @@
         - vm_device.unitNumber | int == device_unit | int
 
     - name: "Map '{{ device_name }}:{{ device_unit }}' to '{{ cd_device.deviceInfo.label }}'"
-      set_fact:
+      ansible.builtin.set_fact:
         device_label: "{{ cd_device.deviceInfo.label }}"
   when: "'ide' in device_name or 'sata' in device_name"
 
 - include_tasks: vm_get_devices_with_label.yml
 
 - name: "Device status detected by VMware Tools"
-  debug: var=device_status
+  ansible.builtin.debug: var=device_status
 
 - name: "Device status in VM config"
-  debug: var=vm_devices_with_label
+  ansible.builtin.debug: var=vm_devices_with_label
 
 - name: Check device has correct status reported
-  assert:
+  ansible.builtin.assert:
     that:
       - vm_devices_with_label[0].connectable.connected == device_is_connected
     fail_msg: "Device status detected by VMware Tools: '{{ device_status }}', but device status in VM config: {{ device_label }} connected is {{ vm_devices_with_label[0].connectable.connected }}"

@@ -9,27 +9,27 @@
 #   vm_primary_ip: the ipv4 address of first network interface which is connectable
 #
 - name: "Initialize VM primary IP for VM '{{ vm_name }}'"
-  set_fact:
+  ansible.builtin.set_fact:
     vm_primary_ip: ""
 
 - name: "Assert VM has valid IPv4 address for VM '{{ vm_name }}'"
-  assert:
+  ansible.builtin.assert:
     that:
       - vm_guest_mac_ipv4 | length >= 1
     fail_msg: "Not found valid IPv4 address for VM '{{ vm_name }}'"
 
 - name: Display the VM MAC and IP address dict
-  debug: var=vm_guest_mac_ipv4
+  ansible.builtin.debug: var=vm_guest_mac_ipv4
 
 - block:
     - name: "Get IP of VM '{{ vm_name }}' primary NIC with MAC address {{ vm_primary_mac }}"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_primary_ip: "{{ vm_guest_mac_ipv4[vm_primary_mac] }}"
   when: vm_primary_mac is defined and vm_primary_mac in vm_guest_mac_ipv4.keys()
 
 - block:
     - name: "Set the only network interface as VM primary NIC of '{{ vm_name }}'"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_primary_mac: "{{ (vm_guest_mac_ipv4.keys() | list)[0] }}"
         vm_primary_ip: "{{ (vm_guest_mac_ipv4.values() | list)[0] }}"
       when: vm_guest_mac_ipv4 | length == 1
@@ -38,17 +38,17 @@
       block:
         # Loop each IP and ping, find all reachable nics
         - name: "Initialize VM '{{ vm_name }}' reachable network interfaces"
-          set_fact:
+          ansible.builtin.set_fact:
             vm_reachable_nics: {}
 
         - name: "Try to ping each IP and find the reachable network interfaces"
-          command: ping -c 5 "{{ item.value }}"
+          ansible.builtin.command: ping -c 5 "{{ item.value }}"
           register: all_ping_results
           ignore_errors: true
           with_dict: "{{ vm_guest_mac_ipv4 }}"
 
         - name: "Get all reachable IP addresses for '{{ vm_name }}'"
-          set_fact:
+          ansible.builtin.set_fact:
             vm_reachable_nics: "{{ vm_reachable_nics | combine({ping_result.item.key:ping_result.item.value}) }}"
           when: ping_result.rc == 0
           with_items: "{{ all_ping_results.results }}"
@@ -56,7 +56,7 @@
             loop_var: ping_result
 
         - name: "Set the only reachable network interface as VM '{{ vm_name }}' primary NIC"
-          set_fact:
+          ansible.builtin.set_fact:
             vm_primary_mac: "{{ (vm_reachable_nics.keys() | list)[0] }}"
             vm_primary_ip: "{{ (vm_reachable_nics.values() | list)[0] }}"
           when: vm_reachable_nics | length == 1
@@ -65,27 +65,27 @@
         - block:
             # If all nics are not reachable, test all of them
             - name: "By default, test all network interfaces of VM '{{ vm_name }}'"
-              set_fact:
+              ansible.builtin.set_fact:
                 test_vm_nics: "{{ vm_guest_mac_ipv4 }}"
 
             # If more than 1 reachable nics are found, test these reachable nics
             - name: "Only test reachable network interfaces of VM '{{ vm_name }}'"
-              set_fact:
+              ansible.builtin.set_fact:
                 test_vm_nics: "{{ vm_reachable_nics }}"
               when: vm_reachable_nics | length > 1
 
             - name: Display the reachable VM network interfaces
-              debug: var=test_vm_nics
+              ansible.builtin.debug: var=test_vm_nics
 
             - name: "Initialize IP testing variable for VM '{{ vm_name }}'"
-              set_fact:
+              ansible.builtin.set_fact:
                 test_vm_nic_result: {}
 
             - name: "Test SSH connection and find a primary network interface for VM '{{ vm_name }}'"
               include_tasks: vm_test_nic.yml
               vars:
                 vm_wait_connection_timeout: 300
-                skip_if_primary_ip_found: True
+                skip_if_primary_ip_found: true
               with_dict: "{{ test_vm_nics }}"
               loop_control:
                 loop_var: test_vm_nic
@@ -98,7 +98,7 @@
      (vm_primary_mac not in vm_guest_mac_ipv4.keys())
 
 - name: "Assert VM has primary connectable IP"
-  assert:
+  ansible.builtin.assert:
     that:
       - vm_primary_ip
     fail_msg: "Not found a connectable IP from {{ vm_guest_mac_ipv4.values() }}"

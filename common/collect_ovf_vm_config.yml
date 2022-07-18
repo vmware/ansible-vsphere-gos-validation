@@ -9,21 +9,21 @@
 #   on local machine to save the json file.
 #
 - name: Initialize VM hardware configurations info variables
-  set_fact:
+  ansible.builtin.set_fact:
     ovf_vm_hardware_config: {}
     ovf_vm_disk_info: []
     ovf_vm_network_info: []
-    ovf_vm_vtpm_info: False
+    ovf_vm_vtpm_info: false
     ovf_vm_hardware_config_file: 'ovf_deploy_vm_info.json'
 
 - include_tasks: vm_get_vm_info.yml
 - name: Add VM guest ID and hardware version info
-  set_fact:
+  ansible.builtin.set_fact:
     ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'Guest ID': vm_guest_id | default(''), 'Hardware version': vm_hardware_version_num | default('')}) }}"
 
 - include_tasks: vm_get_guest_info.yml
 - name: Set fact of guest bitness
-  set_fact:
+  ansible.builtin.set_fact:
     ovf_vm_guest_os: "{{ guestinfo_detailed_data.split(\"prettyName='\")[1].strip(\"'\") }}"
     ovf_vm_guest_bitness: "{{ (guestinfo_detailed_data | regex_search(\"bitness='[0-9]+'\")).split('=')[1].strip(\"''\") }}"
     ovf_vm_guest_build: "{{ (guestinfo_detailed_data | regex_search(\"kernelVersion='[0-9]+.[0-9]+'\")).split('=')[1].strip(\"''\") }}"
@@ -31,55 +31,55 @@
     - guestinfo_detailed_data is defined
     - guestinfo_detailed_data
 - name: Add guest OS version info and VMware tools info
-  set_fact:
+  ansible.builtin.set_fact:
     ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'Guest OS': ovf_vm_guest_os | default(''), 'VMware tools': guestinfo_vmtools_info | default('')}) }}"
 
 # Get all the VM hardwares info
 - include_tasks: vm_get_config.yml
 
 - name: Add VM firmware and secureboot info
-  set_fact:
+  ansible.builtin.set_fact:
     ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'Firmware': vm_config.config.firmware | default(''), 'Secure boot': vm_config.config.bootOptions.efiSecureBootEnabled | default('')}) }}"
 - name: Add VM CPU and memory info
-  set_fact:
+  ansible.builtin.set_fact:
     ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'CPU number': vm_config.config.hardware.numCPU | default(''), 'CPU cores per socket': vm_config.config.hardware.numCoresPerSocket | default(''), 'Memory MB': vm_config.config.hardware.memoryMB | default('')}) }}"
 - name: Add VBS info
-  set_fact:
+  ansible.builtin.set_fact:
     ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'VBS enabled': vm_config.config.flags.vbsEnabled | default('')}) }}"
 
 - name: Set fact of disk info
-  set_fact:
+  ansible.builtin.set_fact:
     ovf_vm_disk_info: "{{ ovf_vm_disk_info + [{'label': item.deviceInfo.label | default(''), 'disk GB': item.capacityInKB | int / 1024 / 1024 | default(''), 'controller': (vm_config.config.hardware.device | selectattr('key', 'equalto', item.controllerKey))[0].deviceInfo.summary, 'thin provisioned': item.backing.thinProvisioned | default('')}] }}"
   when:
     - item._vimtype == "vim.vm.device.VirtualDisk"
   with_items: "{{ vm_config.config.hardware.device }}"
 
 - name: Set fact of network adapter info
-  set_fact:
+  ansible.builtin.set_fact:
     ovf_vm_network_info: "{{ ovf_vm_network_info + [{'label': item.deviceInfo.label | default(''), 'network': item.backing.deviceName | default(''), 'type': item._vimtype.split('.')[-1][7:] | lower, 'mac': item.macAddress }] }}"
   when:
     - item._vimtype in ['vim.vm.device.VirtualVmxnet3', 'vim.vm.device.VirtualE1000e', 'vim.vm.device.VirtualE1000']
   with_items: "{{ vm_config.config.hardware.device }}"
 
 - name: Set fact of vTPM device existence info
-  set_fact:
+  ansible.builtin.set_fact:
     ovf_vm_vtpm_info: "{{ vm_config.config.hardware.device | selectattr('_vimtype', 'equalto', 'vim.vm.device.VirtualTPM') | length > 0 }}"
 
 - name: Add devices info
-  set_fact:
+  ansible.builtin.set_fact:
     ovf_vm_hardware_config: "{{ ovf_vm_hardware_config | combine({'Disk': ovf_vm_disk_info, 'Network': ovf_vm_network_info, 'vTPM': ovf_vm_vtpm_info}) }}"
 - name: Display the deployed VM hardware configuration
-  debug: var=ovf_vm_hardware_config
+  ansible.builtin.debug: var=ovf_vm_hardware_config
 
 # Save the VM hardware info to json file
 - name: Set fact of json file name
-  set_fact:
+  ansible.builtin.set_fact:
     ovf_vm_hardware_config_file: "{{ ('-').join(ovf_vm_guest_os.split(',')[0].split(' ')) }}-{{ ovf_vm_guest_build.replace('.', '-') }}-{{ ovf_vm_guest_bitness }}bit-template.json"
   when:
     - ovf_vm_guest_os is defined and ovf_vm_guest_os
     - ovf_vm_guest_build is defined and ovf_vm_guest_build
     - ovf_vm_guest_bitness is defined and ovf_vm_guest_bitness
 - name: Dump VM hardware configuration info to json file
-  copy:
+  ansible.builtin.copy:
     dest: "{{ ovf_vm_hardware_config_path }}/{{ ovf_vm_hardware_config_file }}"
     content: "{{ [ovf_vm_hardware_config] | to_nice_json }}"
