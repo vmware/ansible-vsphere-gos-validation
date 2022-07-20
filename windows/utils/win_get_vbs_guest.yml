@@ -23,8 +23,10 @@
       ansible.builtin.set_fact:
         win_device_guard_result: "{{ win_device_guard_result | combine({item.split(':')[0].strip(): item.split(':')[1].strip()}) }}"
       when: item | length != 0
-      with_itmes:
+      with_items:
         - "{{ win_powershell_cmd_output.stdout_lines }}"
+    - name: "Display the Device Guard status"
+      ansible.builtin.debug: var=win_device_guard_result
     - name: "Set fact of status"
       ansible.builtin.set_fact:
         win_vbs_status_guest: "{{ win_device_guard_result.VirtualizationBasedSecurityStatus }}"
@@ -37,5 +39,5 @@
 - name: "Display the results"
   ansible.builtin.debug:
     msg:
-      - "SecurityServicesRunning is '{{ win_vbs_running_service }}'"
-      - "VirtualizationBasedSecurityStatus is '{{ win_vbs_status_guest }}'"
+      - "SecurityServicesRunning: {{ win_vbs_running_service }}"
+      - "VirtualizationBasedSecurityStatus: {{ win_vbs_status_guest }}"

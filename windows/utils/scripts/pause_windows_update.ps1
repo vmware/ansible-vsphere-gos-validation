@@ -25,13 +25,13 @@ $current_date_time = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ
 $days_after_date_time = (Get-Date).AddDays(7).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
 
 # Set Pause Windows update till 7 days after current date time
-New-ItemProperty -Path $win_pause_update_reg_path -Name 'PauseUpdatesStartTime' -PropertyType string -Value $current_date_time
-New-ItemProperty -Path $win_pause_update_reg_path -Name 'PauseUpdatesExpiryTime' -PropertyType string -Value $days_after_date_time
-New-ItemProperty -Path $win_pause_update_reg_path -Name 'PauseFeatureUpdatesStartTime' -PropertyType string -Value $current_date_time
-New-ItemProperty -Path $win_pause_update_reg_path -Name 'PauseFeatureUpdatesEndTime' -PropertyType string -Value $days_after_date_time
-New-ItemProperty -Path $win_pause_update_reg_path -Name 'PauseQualityUpdatesStartTime' -PropertyType string -Value $current_date_time
-New-ItemProperty -Path $win_pause_update_reg_path -Name 'PauseQualityUpdatesEndTime' -PropertyType string -Value $days_after_date_time
-New-ItemProperty -Path $win_pause_update_reg_path -Name 'ExcludeWUDriversInQualityUpdate' -PropertyType string -Value 1
+Set-ItemProperty -Path $win_pause_update_reg_path -Name 'PauseUpdatesStartTime' -PropertyType string -Value $current_date_time
+Set-ItemProperty -Path $win_pause_update_reg_path -Name 'PauseUpdatesExpiryTime' -PropertyType string -Value $days_after_date_time
+Set-ItemProperty -Path $win_pause_update_reg_path -Name 'PauseFeatureUpdatesStartTime' -PropertyType string -Value $current_date_time
+Set-ItemProperty -Path $win_pause_update_reg_path -Name 'PauseFeatureUpdatesEndTime' -PropertyType string -Value $days_after_date_time
+Set-ItemProperty -Path $win_pause_update_reg_path -Name 'PauseQualityUpdatesStartTime' -PropertyType string -Value $current_date_time
+Set-ItemProperty -Path $win_pause_update_reg_path -Name 'PauseQualityUpdatesEndTime' -PropertyType string -Value $days_after_date_time
+Set-ItemProperty -Path $win_pause_update_reg_path -Name 'ExcludeWUDriversInQualityUpdate' -PropertyType string -Value 1
 
 # Do not include driver udpate in Windows update
 If(!(Test-Path -Path $win_update_policy_path))
