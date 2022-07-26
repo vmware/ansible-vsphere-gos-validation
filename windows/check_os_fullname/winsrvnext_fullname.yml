@@ -7,19 +7,20 @@
 # Workaroud for Windows Server vNext LTSC testing, will change this when the
 # OS release has an official name
 - block:
-    - name: "Set fact of expected guest fullname for Windows Server vNext on ESXi >= 6.7U2"
-      set_fact:
-        expected_guest_fullname: "Microsoft Windows Server 2016 or later (64-bit)"
-      when:
-        - esxi_version is version('6.7.0', '=')
-        - esxi_update_version | int >= 2
     - name: "Set fact of expected guest fullname for Windows Server vNext on ESXi 7.0.0"
       set_fact:
         expected_guest_fullname: "Microsoft Windows Server 2019 (64-bit)"
       when: esxi_version is version('7.0.0', '=')
     - name: "Set fact of expected guest fullname for Windows Server vNext on ESXi 7.0.1"
-      set_fact:
-        expected_guest_fullname: "Microsoft Windows Server 2021 (64-bit)"
+      block:
+        - name: "When VMware tools version is 12.0.5"
+          set_fact:
+            expected_guest_fullname: "Microsoft Windows Server 2021 (64-bit)"
+          when: vmtools_version is version('12.0.5', '=')
+        - name: "When VMware tools version > 12.0.5"
+          set_fact:
+            expected_guest_fullname: "Microsoft Windows Server 2019 (64-bit)"
+          when: vmtools_version is version('12.0.5', '>')
       when: esxi_version is version('7.0.1', '=')
     - name: "Set fact of expected guest fullname for Windows Server vNext on ESXi 7.0.2"
       set_fact:
@@ -31,14 +32,10 @@
       when:
         - esxi_version is version('7.0.3', '>=')
         - guestinfo_detailed_data is defined and guestinfo_detailed_data
-  when: vmtools_version is version('12.0.5', '>')
+  when: vmtools_version is version('12.0.5', '>=')
 
 # For VMWare tools version <= 12.0.5
 - block:
-    - name: "Set fact of expected guest fullname for Windows Server vNext"
-      set_fact:
-        expected_guest_fullname: "Microsoft Windows Server 2016 or later (64-bit)"
-      when: vm_guest_id == "windows9Server64Guest"
     - name: "Set fact of expected guest fullname for Windows Server vNext"
       set_fact:
         expected_guest_fullname: "Microsoft Windows Server 2019 (64-bit)"
@@ -47,4 +44,4 @@
       set_fact:
         expected_guest_fullname: "Microsoft Windows Server 2022 (64-bit)"
       when: vm_guest_id == "windows2019srvNext_64Guest"
-  when: vmtools_version is version('12.0.5', '<=')
+  when: vmtools_version is version('12.0.5', '<')
