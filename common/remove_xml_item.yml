@@ -5,13 +5,17 @@
 # Parameters:
 #   xml_file_path: the path of the xml file
 #   xml_item_path_list: the list of elements paths to be removed
+#   xml_namespaces_dict: the dict of namespaces in xml file
 #
-- name: "Remove the specified items in file '{{ xml_file_path }}'"
+- name: "Remove the specified item in file '{{ xml_file_path }}'"
   community.general.xml:
     path: "{{ xml_file_path }}"
-    xpath: item
+    xpath: "{{ xml_item_path }}"
     state: absent
+    namespaces: "{{ xml_namespaces_dict | default(omit) }}"
   with_items: "{{ xml_item_path_list }}"
+  loop_control:
+    loop_var: xml_item_path
   register: change_xml_result
 
 - name: "Display the xml file change result"

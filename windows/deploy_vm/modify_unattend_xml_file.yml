@@ -15,14 +15,21 @@
 - name: "Display info"
   debug:
     msg:
-      - "Use this unattend auto install file: {{ unattend_install_conf_path }}"
-      - "Copied to this local path: {{ copied_unattend_dest_path }}"
+      - "Unattend auto install config file: {{ unattend_install_conf_path }}"
+      - "Copy to local path for modifying: {{ copied_unattend_dest_path }}"
 
 - include_tasks: ../../common/create_directory.yml
   vars:
     dir_path: "{{ copied_unattend_dest_path }}"
 - name: "Copy Autounattend.xml file to the temp folder"
   ansible.builtin.command: "cp {{ unattend_install_conf_path }} {{ copied_unattend_file }}"
+  register: copy_unattend_result
+- name: "Display result"
+  debug: var=copy_unattend_result
+
+- name: "Set fact of namespace in Autounattend.xml file"
+  ansible.builtin.set_fact:
+    auto_unattend_namespace: {'ms': "urn:schemas-microsoft-com:unattend"}
 
 # If user configures a product key, then update it
 - include_tasks: ../../common/set_xml_item_value.yml
@@ -30,7 +37,8 @@
     xml_file_path: "{{ copied_unattend_file }}"
     xml_item_value: "{{ windows_product_key }}"
     xml_item_path_list:
-      - "/unattend/settings[@pass='windowsPE']/component[@name='Microsoft-Windows-Setup']/UserData/ProductKey/Key"
+      - /ms:unattend/ms:settings[@pass='windowsPE']/ms:component[@name='Microsoft-Windows-Setup']/ms:UserData/ms:ProductKey/ms:Key
+    xml_namespaces_dict: "{{ auto_unattend_namespace }}"
   when:
     - windows_product_key is defined
     - windows_product_key
@@ -43,9 +51,10 @@
       vars:
         xml_file_path: "{{ copied_unattend_file }}"
         xml_item_value: "{{ vm_username }}"
-        xml_item_path_list:  
-          - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/UserAccounts/LocalAccounts/LocalAccount/Name"
-          - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/AutoLogon/Username"
+        xml_namespaces_dict: "{{ auto_unattend_namespace }}"
+        xml_item_path_list:
+          - /ms:unattend/ms:settings[@pass='oobeSystem']/ms:component[@name='Microsoft-Windows-Shell-Setup']/ms:UserAccounts/ms:LocalAccounts/ms:LocalAccount/ms:Name
+          - /ms:unattend/ms:settings[@pass='oobeSystem']/ms:component[@name='Microsoft-Windows-Shell-Setup']/ms:AutoLogon/ms:Username
       when: vm_username | lower != "administrator"
     
     - name: "Handle user name 'administrator'"
@@ -54,13 +63,15 @@
           vars:
             xml_file_path: "{{ copied_unattend_file }}"
             xml_item_path_list:
-              - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/UserAccounts/LocalAccounts/*"
+              - /ms:unattend/ms:settings[@pass='oobeSystem']/ms:component[@name='Microsoft-Windows-Shell-Setup']/ms:UserAccounts/ms:LocalAccounts
+            xml_namespaces_dict: "{{ auto_unattend_namespace }}"
         - include_tasks: ../../common/set_xml_item_value.yml
           vars:
             xml_file_path: "{{ copied_unattend_file }}"
             xml_item_value: "{{ vm_username }}"
             xml_item_path_list:
-              - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/AutoLogon/Username"
+              - /ms:unattend/ms:settings[@pass='oobeSystem']/ms:component[@name='Microsoft-Windows-Shell-Setup']/ms:AutoLogon/ms:Username
+            xml_namespaces_dict: "{{ auto_unattend_namespace }}"
       when: vm_username | lower == "administrator"
   when:
     - "'srv' not in guest_id | lower"
@@ -76,27 +87,23 @@
         win_original_password: "{{ vm_password }}"
         win_append_string: Password
     
-    - name: "Handle Windows client user password"
-      block:
-        - name: "Set fact of password items path in xml file"
-          ansible.builtin.set_fact:
-            client_password_items:
-              - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/UserAccounts/LocalAccounts/LocalAccount/Password/Value"
-              - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/AutoLogon/Password/Value"
-          when: vm_username | lower != "administrator"
-        - name: "Set fact of password items path in xml file"
-          ansible.builtin.set_fact:
-            client_password_items:
-              - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/AutoLogon/Password/Value"
-          when: vm_username | lower == "administrator"
-        - include_tasks: ../../common/set_xml_item_value.yml
-          vars:
-            xml_file_path: "{{ copied_unattend_file }}"
-            xml_item_value: "{{ win_passwd_base64 }}"
-            xml_item_path_list: "{{ client_password_items }}"
-      when:
-        - "'srv' not in guest_id | lower"
-        - "'server' not in guest_id | lower" 
+    - name: "Set fact of password items path in xml file"
+      ansible.builtin.set_fact:
+        client_password_items:
+          - /ms:unattend/ms:settings[@pass='oobeSystem']/ms:component[@name='Microsoft-Windows-Shell-Setup']/ms:UserAccounts/ms:LocalAccounts/ms:LocalAccount/ms:Password/ms:Value
+          - /ms:unattend/ms:settings[@pass='oobeSystem']/ms:component[@name='Microsoft-Windows-Shell-Setup']/ms:AutoLogon/ms:Password/ms:Value
+      when: vm_username | lower != "administrator"
+    - name: "Set fact of password items path in xml file"
+      ansible.builtin.set_fact:
+        client_password_items:
+          - /ms:unattend/ms:settings[@pass='oobeSystem']/ms:component[@name='Microsoft-Windows-Shell-Setup']/ms:AutoLogon/ms:Password/ms:Value
+      when: vm_username | lower == "administrator"
+    - include_tasks: ../../common/set_xml_item_value.yml
+      vars:
+        xml_file_path: "{{ copied_unattend_file }}"
+        xml_item_value: "{{ win_passwd_base64 }}"
+        xml_item_path_list: "{{ client_password_items }}"
+        xml_namespaces_dict: "{{ auto_unattend_namespace }}"
 
     - name: "Handle Administrator user password"
       block: 
@@ -109,6 +116,7 @@
             xml_file_path: "{{ copied_unattend_file }}"
             xml_item_value: "{{ win_passwd_base64 }}"
             xml_item_path_list:
-              - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/UserAccounts/AdministratorPassword/Value"
+              - /ms:unattend/ms:settings[@pass='oobeSystem']/ms:component[@name='Microsoft-Windows-Shell-Setup']/ms:UserAccounts/ms:AdministratorPassword/ms:Value
+            xml_namespaces_dict: "{{ auto_unattend_namespace }}"
       when: vm_username | lower == "administrator"
   when: vm_password != "B1gd3m0z"
