@@ -1,0 +1,114 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Copy corresponding Autounattend.xml file to a temp path on local machine
+# then modify it accordingly
+#
+- name: "Set fact of unattend file path and copied to path"
+  ansible.builtin.set_fact:
+    unattend_install_conf_path: "{{ main_playbook_path }}/autoinstall/{{ unattend_install_conf }}"
+    copied_unattend_dest_path: "{{ local_cache }}/{{ iso_timestamp }}"
+- name: "Set fact of the copied Autounattend.xml file path"
+  ansible.builtin.set_fact:
+    copied_unattend_file: "{{ copied_unattend_dest_path }}/{{ unattend_install_conf | basename }}"
+
+- name: "Display info"
+  debug:
+    msg:
+      - "Use this unattend auto install file: {{ unattend_install_conf_path }}"
+      - "Copied to this local path: {{ copied_unattend_dest_path }}"
+
+- include_tasks: ../../common/create_directory.yml
+  vars:
+    dir_path: "{{ copied_unattend_dest_path }}"
+- name: "Copy Autounattend.xml file to the temp folder"
+  ansible.builtin.command: "cp {{ unattend_install_conf_path }} {{ copied_unattend_file }}"
+
+# If user configures a product key, then update it
+- include_tasks: ../../common/set_xml_item_value.yml
+  vars:
+    xml_file_path: "{{ copied_unattend_file }}"
+    xml_item_value: "{{ windows_product_key }}"
+    xml_item_path_list:
+      - "/unattend/settings[@pass='windowsPE']/component[@name='Microsoft-Windows-Setup']/UserData/ProductKey/Key"
+  when:
+    - windows_product_key is defined
+    - windows_product_key
+
+# By default, new user name is "test" in Autounattend.xml for Windows client,
+# for Windows Server, "Administrator" user will be used, no new user account created
+- name: "Handle user name for Windows client"
+  block:
+    - include_tasks: ../../common/set_xml_item_value.yml
+      vars:
+        xml_file_path: "{{ copied_unattend_file }}"
+        xml_item_value: "{{ vm_username }}"
+        xml_item_path_list:  
+          - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/UserAccounts/LocalAccounts/LocalAccount/Name"
+          - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/AutoLogon/Username"
+      when: vm_username | lower != "administrator"
+    
+    - name: "Handle user name 'administrator'"
+      block:
+        - include_tasks: ../../common/remove_xml_item.yml
+          vars:
+            xml_file_path: "{{ copied_unattend_file }}"
+            xml_item_path_list:
+              - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/UserAccounts/LocalAccounts/*"
+        - include_tasks: ../../common/set_xml_item_value.yml
+          vars:
+            xml_file_path: "{{ copied_unattend_file }}"
+            xml_item_value: "{{ vm_username }}"
+            xml_item_path_list:
+              - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/AutoLogon/Username"
+      when: vm_username | lower == "administrator"
+  when:
+    - "'srv' not in guest_id | lower"
+    - "'server' not in guest_id | lower"
+    - vm_username | lower != "test"
+
+# User also can set the password for new created user for Windows client
+# and "Administrator" user in Windows Server
+- name: "Handle user password"
+  block:
+    - include_tasks: ../utils/win_gen_base64_password.yml
+      vars:
+        win_original_password: "{{ vm_password }}"
+        win_append_string: Password
+    
+    - name: "Handle Windows client user password"
+      block:
+        - name: "Set fact of password items path in xml file"
+          ansible.builtin.set_fact:
+            client_password_items:
+              - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/UserAccounts/LocalAccounts/LocalAccount/Password/Value"
+              - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/AutoLogon/Password/Value"
+          when: vm_username | lower != "administrator"
+        - name: "Set fact of password items path in xml file"
+          ansible.builtin.set_fact:
+            client_password_items:
+              - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/AutoLogon/Password/Value"
+          when: vm_username | lower == "administrator"
+        - include_tasks: ../../common/set_xml_item_value.yml
+          vars:
+            xml_file_path: "{{ copied_unattend_file }}"
+            xml_item_value: "{{ win_passwd_base64 }}"
+            xml_item_path_list: "{{ client_password_items }}"
+      when:
+        - "'srv' not in guest_id | lower"
+        - "'server' not in guest_id | lower" 
+
+    - name: "Handle Administrator user password"
+      block: 
+        - include_tasks: ../utils/win_gen_base64_password.yml
+          vars:
+            win_original_password: "{{ vm_password }}"
+            win_append_string: AdministratorPassword
+        - include_tasks: ../../common/set_xml_item_value.yml
+          vars:
+            xml_file_path: "{{ copied_unattend_file }}"
+            xml_item_value: "{{ win_passwd_base64 }}"
+            xml_item_path_list:
+              - "/unattend/settings[@pass='oobeSystem']/component[@name='Microsoft-Windows-Shell-Setup']/UserAccounts/AdministratorPassword/Value"
+      when: vm_username | lower == "administrator"
+  when: vm_password != "B1gd3m0z"

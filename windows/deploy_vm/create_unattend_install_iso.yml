@@ -16,45 +16,14 @@
   set_fact:
     transferred_unattend_iso: "[{{ datastore }}] {{ unattend_install_iso }}"
 
-- name: "Set fact of the absolute path of unattend install config file"
-  set_fact:
-    unattend_install_conf: "{{ main_playbook_path }}/autoinstall/{{ unattend_install_conf }}"
-- name: "Display the path of unattend install config file"
-  debug: var=unattend_install_conf
-
 - include_tasks: get_ansible_remote_config.yml
 
-- block:
-    - name: Set fact of the copied Autounattend.xml path
-      set_fact:
-        copied_unattend_file: "{{ local_cache }}/{{ iso_timestamp }}/Autounattend.xml"
-    - name: Create a new directory in cache using timestamp
-      file:
-        path: "{{ local_cache }}/{{ iso_timestamp }}/"
-        mode: '0777'
-        state: directory
-    - name: Copy specified Autounattend.xml file to cache
-      command: "cp {{ unattend_install_conf }} {{ copied_unattend_file }}"
-    - name: Remove product key in Autounattend.xml
-      lineinfile:
-        path: "{{ copied_unattend_file }}"
-        regexp: "<Key>(.{5}-){4}.{5}</Key>"
-        state: absent
-    - name: Insert the new product key in Autounattend.xml
-      lineinfile:
-        path: "{{ copied_unattend_file }}"
-        insertafter: "<ProductKey>"
-        line: "<Key>{{ windows_product_key }}</Key>"
-      register: replace_product_key_result
-    - name: Display the replacing product key task result
-      debug: var=replace_product_key_result
-      when: enable_debug is defined and enable_debug
-  when: windows_product_key is defined and windows_product_key
+- include_tasks: modify_unattend_xml_file.yml
 
 - name: Set fact of the file list contained in generated ISO file
   set_fact:
     unattend_install_file_list:
-      - "{{ copied_unattend_file | default(unattend_install_conf) }}"
+      - "{{ copied_unattend_file }}"
       - "{{ local_cache }}/{{ config_remote_windows.split('/')[-1] }}"
 
 - block:

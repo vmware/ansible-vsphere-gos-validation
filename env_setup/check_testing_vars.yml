@@ -20,7 +20,7 @@
       - vm_password is defined and vm_password
     fail_msg: "Invalid variables: vm_name, vm_username and vm_password must be set"
 
-- name: "Check username is root for existing VM"
+- name: "Check username is root for existing Linux VM"
   assert:
     that:
       - vm_username == "root"
@@ -28,6 +28,16 @@
   when:
     - new_vm is undefined or not new_vm | bool
     - testing_testcase_file | dirname | basename == "linux"
+
+- name: "Check username is Administrator for new Windows Server VM"
+  assert:
+    that:
+      - vm_username | lower == "administrator"
+    fail_msg: "Windows Server auto install only set 'Admininstrator' user using default Autounattend.xml"
+  when:
+    - new_vm is defined and new_vm | bool
+    - testing_testcase_file | dirname | basename == "windows"
+    - 'srv' in guest_id | lower or 'server' in guest_id | lower
 
 - block:
     - name: "Check VM deploy method"
