@@ -154,6 +154,9 @@
 * check_testcase_in_file.yml: Find if specified testcase in testcase list file
 * transfer_file_remote.yml: Transfer file to specified remote host
 * update_ini_style_file.yml: Update INI-style file content
+* create_directory.yml: Create a new directory with specified path
+* remove_xml_item.yml: Remove the specified xpath nodes in xml file
+* set_xml_item_value.yml: Set the values of specified xpath nodes in xml file
 
 ## Testing related
 * set_vmware_module_hostname.yml: Check and set configured vCenter or ESXi server info

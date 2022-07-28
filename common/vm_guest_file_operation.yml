@@ -83,12 +83,10 @@
         path: "{{ dest_path | dirname }}"
       ignore_errors: true
       register: fetch_dir_stat
-    - name: "Destination base directory doesn't exist, create it"
-      file:
-        path: "{{ dest_path | dirname }}"
-        state: "directory"
-        mode: "777"
-        recurse: True
+    - include_tasks: create_directory.yml
+      vars:
+        dir_path: "{{ dest_path | dirname }}"
+        dir_mode: "0777"
       when: not fetch_dir_stat.stat.exists
     - name: "Fetch file {{ src_path }} from VM guest"
       vmware_guest_file_operation:
