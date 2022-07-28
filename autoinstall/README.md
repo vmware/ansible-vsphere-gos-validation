@@ -12,3 +12,10 @@
 11. For Photon OS 3.0 or later unattend auto-install, please use file Photon/ks.cfg.
 12. For Ubuntu Server 20.04 or later unattend auto-install, please use file Ubuntu/Server/user-data.j2.
 13. For Debian 10.1x or 11.x unattend auto-install, please use file Debian/10/preseed.cfg
+
+# Notes
+## For Windows
+1. If the OS auto install process does not proceed as expected or VM console shows error,
+please try to set parameter "windows_product_key" in "vars/test.yml" file with the valid
+license key and try again.
+Also can refer to [Windows KMS Client Setup Key](https://docs.microsoft.com/en-us/windows-server/get-started/kmsclientkeys)

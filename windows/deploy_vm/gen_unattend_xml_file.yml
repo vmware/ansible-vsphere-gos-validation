@@ -1,0 +1,50 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Generate Autounattend.xml file from template to the temp path on local machine
+- name: "Set fact of unattend file template path and dest path"
+  ansible.builtin.set_fact:
+    unattend_install_conf_path: "{{ main_playbook_path }}/autoinstall/{{ unattend_install_conf }}"
+    unattend_dest_path: "{{ local_cache }}/{{ iso_timestamp }}"
+- name: "Set fact of target Autounattend.xml file path"
+  ansible.builtin.set_fact:
+    created_unattend_file: "{{ unattend_dest_path }}/{{ unattend_install_conf | basename }}"
+
+- include_tasks: ../../common/create_directory.yml
+  vars:
+    dir_path: "{{ unattend_dest_path }}"
+
+- name: "Set fact of bitness info"
+  ansible.builtin.set_fact:
+    win_client_unattend_bitness: "{{ 'amd64' if '64' in guest_id else 'x86' }}"
+  when:
+    - "'srv' not in guest_id | lower"
+    - "'server' not in guest_id | lower"
+
+- include_tasks: ../utils/win_gen_base64_password.yml
+  vars:
+    win_original_password: "{{ vm_password }}"
+    win_append_string: Password
+- name: "Set fact of encoded VM password"
+  ansible.builtin.set_fact:
+    win_encoded_password: "{{ win_passwd_base64 }}"
+
+- name: "Handle Administrator password"
+  block:
+    - include_tasks: ../utils/win_gen_base64_password.yml
+      vars:
+        win_original_password: "{{ vm_password }}"
+        win_append_string: AdministratorPassword
+    - name: "Set fact of encoded VM administrator password"
+      ansible.builtin.set_fact:
+        win_encoded_admin_password: "{{ win_passwd_base64 }}"
+  when: vm_username | lower == "administrator"
+
+- name: "Create unattend config file from template"
+  ansible.builtin.template:
+    src: "{{ unattend_install_conf_path }}"
+    dest: "{{ created_unattend_file }}"
+    mode: "0644"
+  register: create_unattend_file_result
+- name: "Display result"
+  ansible.builtin.debug: var=create_unattend_file_result
