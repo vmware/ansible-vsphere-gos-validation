@@ -1,17 +1,40 @@
 # Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Map Rocky Linux when ESXi version > 7.0.3 and VMware Tools version > 11.3.0
-- name: "Set guest_fullname variable for Rocky Linux on ESXi 7.0.3 later and VMTools 11.3.0 later"
+# Map Rocky Linux when ESXi version > 7.0.3 and VMware Tools version >= 12.0.0
+- name: "Set guest_fullname variable for Rocky Linux on ESXi 7.0.3 later and VMTools 12.0.0 or later"
   ansible.builtin.set_fact:
     guest_fullname: "Rocky Linux ({{ guest_os_bit }})"
   when:
     - esxi_version is version('7.0.3', '>')
-    - vmtools_version is version('11.3.0', '>')
+    - vmtools_version is version('12.0.0', '>=')
 
-# Map Rocky Linux when ESXi version <= 7.0.3 or VMware Tools version <= 11.3.0
-- name: "Set guest_fullname variable for Rocky Linux on ESXi 7.0.3 and earlier, or VMTools 11.3.0 and earlier"
+- name: "Check Rocky Linux open-vm-tools version"
+  block:
+    - include_tasks: ../utils/get_installed_package_info.yml
+      vars:
+        package_name: "open-vm-tools"
+
+    - name: "Ignore known issue about Rocky Linux guest fullname"
+      block:
+        - name: "Known issue - ignore incorrect guest fullname with Rocky Linux built-in OVT 11.3.5"
+          ansible.builtin.debug:
+            msg:
+              - "The guest fullname get by Rocky Linux built-in open-vm-tools 11.3.5-{{ package_info.Release }} is incorrect. Ignore this known issue."
+          tags:
+            - known_issue
+
+        - meta: end_host
+      when:
+        - package_info is defined
+        - package_info.Release is defined
+        - package_info.Release == "1.el8" or package_info.Release == "1.el9"
+        - package_info.Vendor is defined and 'Rocky' in package_info.Vendor
+  when: vmtools_version is version('11.3.5', '=')
+
+# Map Rocky Linux when ESXi version <= 7.0.3 or VMware Tools version <= 11.3.5 (not built-in 11.3.5)
+- name: "Set guest_fullname variable for Rocky Linux on ESXi 7.0.3 and earlier, or VMTools 11.3.5 or earlier"
   include_tasks: otherlinux_fullname_map.yml
   when: >
     esxi_version is version('7.0.3', '<=') or
-    vmtools_version is version('11.3.0', '<=')
+    vmtools_version is version('11.3.5', '<=')
