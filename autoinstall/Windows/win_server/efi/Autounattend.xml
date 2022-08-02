@@ -10,8 +10,12 @@
         <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
             <UserData>
                 <ProductKey>
+                    {% if windows_product_key is defined and windows_product_key %}
+                    <Key>{{ windows_product_key }}</Key>
+                    {% else %}
+                    <Key>WMDGN-G9PQG-XVVXX-R3X43-63DFG</Key>
+                    {% endif %}
                     <WillShowUI>Never</WillShowUI>
-                    <Key>6NMRW-2C8FM-D24W7-TQWMY-CWH2D</Key>
                 </ProductKey>
                 <AcceptEula>true</AcceptEula>
             </UserData>
@@ -20,12 +24,12 @@
                     <InstallFrom>
                         <MetaData wcm:action="add">
                             <Key>/IMAGE/INDEX</Key>
-                            <Value>2</Value>
+                            <Value>4</Value>
                         </MetaData>
                     </InstallFrom>
                     <InstallTo>
                         <DiskID>0</DiskID>
-                        <PartitionID>2</PartitionID>
+                        <PartitionID>4</PartitionID>
                     </InstallTo>
                 </OSImage>
             </ImageInstall>
@@ -34,38 +38,60 @@
                     <CreatePartitions>
                         <CreatePartition wcm:action="add">
                             <Order>1</Order>
-                            <Size>549</Size>
+                            <Size>499</Size>
                             <Type>Primary</Type>
                         </CreatePartition>
                         <CreatePartition wcm:action="add">
                             <Order>2</Order>
-                            <Extend>true</Extend>
+                            <Size>99</Size>
+                            <Type>EFI</Type>
+                        </CreatePartition>
+                        <CreatePartition wcm:action="add">
+                            <Order>4</Order>
                             <Type>Primary</Type>
+                            <Extend>true</Extend>
+                        </CreatePartition>
+                        <CreatePartition wcm:action="add">
+                            <Order>3</Order>
+                            <Size>128</Size>
+                            <Type>MSR</Type>
                         </CreatePartition>
                     </CreatePartitions>
-                    <DiskID>0</DiskID>
-                    <WillWipeDisk>true</WillWipeDisk>
                     <ModifyPartitions>
                         <ModifyPartition wcm:action="add">
                             <Order>1</Order>
                             <PartitionID>1</PartitionID>
-                            <Label>System Reserved</Label>
+                            <Label>Recovery</Label>
                             <Format>NTFS</Format>
-                            <Active>true</Active>
+							              <typeID>de94bba4-06d1-4d40-a16a-bfd50179d6ac</typeID>
+                        </ModifyPartition>
+                        <ModifyPartition wcm:action="add">
+                            <Order>4</Order>
+                            <PartitionID>4</PartitionID>
+                            <Label>Windows</Label>
+                            <Format>NTFS</Format>
                         </ModifyPartition>
                         <ModifyPartition wcm:action="add">
                             <Order>2</Order>
                             <PartitionID>2</PartitionID>
-                            <Label>Windows</Label>
-                            <Format>NTFS</Format>
+							              <Format>FAT32</Format>
+                            <Label>System</Label>
+                        </ModifyPartition>
+						            <ModifyPartition wcm:action="add">
+                            <Order>3</Order>
+                            <PartitionID>3</PartitionID>
                         </ModifyPartition>
                     </ModifyPartitions>
+                    <DiskID>0</DiskID>
+                    <WillWipeDisk>true</WillWipeDisk>
                 </Disk>
+                <DisableEncryptedDiskProvisioning>true</DisableEncryptedDiskProvisioning>
+                <WillShowUI>OnError</WillShowUI>
             </DiskConfiguration>
         </component>
-        <component name="Microsoft-Windows-PnpCustomizationsWinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+		<component name="Microsoft-Windows-PnpCustomizationsWinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
             <DriverPaths>
-                <PathAndCredentials wcm:action="add">
+                <PathAndCredentials wcm:keyValue="ab59b29b" wcm:action="add">
                     <Path>E:\</Path>
                 </PathAndCredentials>
             </DriverPaths>
@@ -81,20 +107,42 @@
         </component>
         <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
             <UserAccounts>
+                {% if vm_username|lower != "administrator" %}
+                <LocalAccounts>
+                    <LocalAccount wcm:action="add">
+                        <Password>
+                            <PlainText>false</PlainText>
+                            <Value>{{ win_encoded_password }}</Value>
+                        </Password>
+                        <DisplayName></DisplayName>
+                        <Name>{{ vm_username }}</Name>
+                        <Group>Administrators</Group>
+                    </LocalAccount>
+                </LocalAccounts>
+                {% else %}
                 <AdministratorPassword>
-                    <Value>QgAxAGcAZAAzAG0AMAB6AEEAZABtAGkAbgBpAHMAdAByAGEAdABvAHIAUABhAHMAcwB3AG8AcgBkAA==</Value>
+                    <Value>{{ win_encoded_admin_password }}</Value>
                     <PlainText>false</PlainText>
                 </AdministratorPassword>
+                {% endif %}
             </UserAccounts>
-			<AutoLogon>
+            <AutoLogon>
                 <Password>
-                   <Value>QgAxAGcAZAAzAG0AMAB6AFAAYQBzAHMAdwBvAHIAZAA=</Value>
-                   <PlainText>false</PlainText>
+                    <Value>{{ win_encoded_password }}</Value>
+                    <PlainText>false</PlainText>
                 </Password>
                 <Enabled>true</Enabled>
-                <LogonCount>1</LogonCount>
-                <Username>Administrator</Username>
+                <LogonCount>100</LogonCount>
+                <Username>{{ vm_username }}</Username>
             </AutoLogon>
+            <OOBE>
+                <HideEULAPage>true</HideEULAPage>
+                <HideLocalAccountScreen>true</HideLocalAccountScreen>
+                <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+                <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+                <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+                <ProtectYourPC>3</ProtectYourPC>
+            </OOBE>
             <FirstLogonCommands>
                 <SynchronousCommand wcm:action="add">
                     <CommandLine>powershell.exe -ExecutionPolicy ByPass -File E:\ConfigureRemotingForAnsible.ps1</CommandLine>
@@ -111,5 +159,5 @@
             </FirstLogonCommands>
         </component>
     </settings>
-    <cpi:offlineImage cpi:source="catalog://desktop-pumkr1e/users/test/downloads/catalog_files/servercore_dc_18267/install_windows server serverdatacenteracore.clg" xmlns:cpi="urn:schemas-microsoft-com:cpi" />
+    <cpi:offlineImage cpi:source="wim://desktop-pumkr1e/users/test/downloads/share/0621/install.wim#Windows Server 2019 SERVERDATACENTER" xmlns:cpi="urn:schemas-microsoft-com:cpi" />
 </unattend>
