@@ -310,7 +310,7 @@ class CallbackModule(CallbackBase):
         msg = ""
 
         # Set task banner
-        task_banner = self._banner("{} [{}]".format(prefix, task_name))
+        task_banner = self._banner("{} [{}][{}]".format(prefix, self._play_name, task_name))
         task_path = task.get_path()
         if task_path:
             task_banner += "task path: {}\n".format(task_path)
