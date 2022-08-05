@@ -190,6 +190,7 @@ class CallbackModule(CallbackBase):
         self.testrun_log_dir = None
         self.full_debug_log = "full_debug.log"
         self.failed_tasks_log = "failed_tasks.log"
+        self.known_issues_log = "known_issues.log"
         self.test_results_log = "results.log"
         self.test_results_yml = "test_results.yml"
         self.os_release_info_file = None
@@ -300,6 +301,7 @@ class CallbackModule(CallbackBase):
                            loop_item=None,
                            ignore_errors=False):
         task = result._task
+        task_tags = task._attributes['tags']
         prefix = self._task_type_cache.get(task._uuid, 'TASK')
 
         # Use cached task name
@@ -364,6 +366,10 @@ class CallbackModule(CallbackBase):
         if ignore_errors:
             msg += "\n...ignoring"
             log_failed_tasks = False
+
+        if 'known_issue' in str(task_tags) and 'msg' in result._result:
+            known_issues = "{}: {}".format(self._play_name, result._result['msg'])
+            self.write_to_logfile(self.known_issues_log, known_issues)
 
         # Add logger handler for failed tasks
         if log_failed_tasks:
