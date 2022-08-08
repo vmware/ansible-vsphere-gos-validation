@@ -20,7 +20,7 @@
   assert:
     that:
       - wait_device_name is defined
-      - wait_device_name 
+      - wait_device_name
     fail_msg: "wait_device_name is missing for waiting device absent"
   when: wait_device_state | lower == 'absent'
 
@@ -58,12 +58,12 @@
             - name: "Set fact of removed disk {{ wait_device_name }}"
               set_fact:
                 guest_ansible_device: >
-                  {{  
-                    guest_system_info.ansible_devices | 
+                  {{
+                    guest_system_info.ansible_devices |
                     dict2items |
                     selectattr('key', 'equalto', wait_device_name) |
                     items2dict
-                  }}  
+                  }}
 
             - name: "Rescan the deleted SCSI disk '{{ wait_device_name }}'"
               shell: "echo 1 > /sys/block/{{ wait_device_name }}/device/delete"
@@ -104,8 +104,9 @@
       when: new_vm is undefined or not new_vm | bool
 
     - block:
-        - debug:
-            msg:  
+        - name: "Ignore NVMe known issue"
+          debug:
+            msg:
               - "Guest OS can't detect hot add, remove disk attached to NVMe controller when VM's hardware version is {{ vm_hardware_version_num }}. Ignore this known issue."
               - "VM's boot disk controller is not NVMe, so it needs to unload and reload nvme driver to see NVMe device changes."
               - "Please refer to https://kb.vmware.com/s/article/2147574."
@@ -118,8 +119,9 @@
       when: vm_boot_disk_ctrl_type != 'nvme'
 
     - block:
-        - debug:
-            msg: 
+        - name: "Ignore NVMe known issue"
+          debug:
+            msg:
               - "Guest OS can't detect hot add, remove disk attached to NVMe controller when VM's hardware version is {{ vm_hardware_version_num }}. Ignore this known issue."
               - "VM's boot disk controller is NVMe, so reboot guest OS to see NVMe device changes."
               - "Please refer to https://kb.vmware.com/s/article/2147574."
