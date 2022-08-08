@@ -12,16 +12,6 @@
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   vars:
-    inbox_drivers:
-      - vmxnet3
-      - vmw_vmci
-      - vsock
-      - vmw_vsock_vmci_transport
-      - vmw_pvscsi
-      - vmw_balloon
-      - vmwgfx
-      - vmw_pvrdma
-      - ptp_vmw
   tasks:
     - name: "Initialized inbox drivers' versions dict"
       set_fact:
@@ -32,28 +22,7 @@
           vars:
             skip_test_no_vmtools: False
 
-        - name: "Get OS Release for SUSE"
-          set_fact:
-            inbox_drivers_versions: >-
-              {{
-                inbox_drivers_versions |
-                combine({'Release': 'SLE ' ~ guest_os_ansible_distribution_major_ver ~ ' SP' ~ guest_os_ansible_distribution_minor_ver})
-              }}
-          when: guest_os_ansible_distribution in ['SLES', 'SLED']
-
-        - name: "Get OS Release for RHEL"
-          set_fact:
-            inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'Release': 'RHEL ' ~ guest_os_ansible_distribution_ver}) }}"
-          when: guest_os_ansible_distribution == "RedHat"
-
-        - name: "Get OS Release for {{ guest_os_ansible_distribution }}"
-          set_fact:
-            inbox_drivers_versions: >-
-              {{
-                inbox_drivers_versions |
-                combine({'Release': guest_os_ansible_distribution ~ ' ' ~ guest_os_ansible_distribution_ver})
-              }}
-          when: guest_os_ansible_distribution not in ['SLES', 'SLED', "RedHat"]
+        - include_tasks: get_os_release.yml
 
         - name: "Get OS kernel version"
           set_fact:
@@ -83,173 +52,26 @@
             - cloudinit_version is defined
             - cloudinit_version
 
-        - name: "Get drivers version in VMware Photon OS {{ guest_os_ansible_distribution_ver }}"
-          block:
-            - name: "Check driver version"
-              shell: "if [ -e /sys/module/{{ driver }}/version ]; then cat /sys/module/{{ driver }}/version ; fi"
-              with_items: "{{ inbox_drivers }}"
-              loop_control:
-                loop_var: driver
-              register: photon_drivers
-              no_log: True
-              delegate_to: "{{ vm_guest_ip }}"
+        # Get Xorg version
+        - include_tasks: get_xorg_version.yml
 
-            - name: Set fact of driver version dict
-              set_fact:
-                inbox_drivers_versions: >-
-                  {{
-                    inbox_drivers_versions |
-                    combine(photon_drivers.results |
-                            selectattr('stdout', 'defined') |
-                            selectattr('stdout', '!=', '') |
-                            items2dict(key_name='driver', value_name='stdout'))
-                  }}
-          when:
-            - guest_os_ansible_distribution == "VMware Photon OS"
-            - guest_os_ansible_distribution_major_ver | int < 4
+        # Get Linux inbox drivers
+        - include_tasks: get_inbox_drivers.yml
 
-        - name: "Get drivers version in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-          block:
-            - name: "Get module information of inbox drivers"
-              command: "modinfo {{ module_name }}"
-              register: modinfo_result
-              delegate_to: "{{ vm_guest_ip }}"
-              ignore_errors: True
-              loop: "{{ inbox_drivers }}"
-              loop_control:
-                loop_var: module_name
-
-            - name: "Set fact of found inbox driver modules"
-              set_fact:
-                builtin_modules: "{{ modinfo_result.results | selectattr('rc', 'equalto', 0) }}"
-
-            - name: "Set fact of inbox driver version with its version"
-              set_fact:
-                inbox_drivers_versions: >
-                  {{ inbox_drivers_versions |
-                     combine({item.module_name:''.join(item.stdout_lines |
-                                                        select('match', 'version:', ignorecase=True)) |
-                              regex_replace('version:\s*', '')})
-                  }}
-              with_items: "{{ builtin_modules }}"
-
-            - name: "Set fact of inbox driver version with its srcversion"
-              set_fact:
-                inbox_drivers_versions: >
-                  {{ inbox_drivers_versions |
-                     combine({item.module_name:''.join(item.stdout_lines |
-                                                        select('match', 'srcversion:', ignorecase=True)) |
-                              regex_replace('srcversion:\s*', '')})
-                  }}
-              when: >
-                item.module_name not in inbox_drivers_versions or
-                not inbox_drivers_versions[item.module_name]
-              with_items: "{{ builtin_modules }}"
-
-            - name: "Set fact of inbox driver version with its vermagic"
-              set_fact:
-                inbox_drivers_versions: >
-                  {{ inbox_drivers_versions |
-                     combine({item.module_name:''.join(item.stdout_lines |
-                                                        select('match', 'vermagic:', ignorecase=True)) |
-                              regex_replace('vermagic:\s*', '')})
-                  }}
-              when: >
-                item.module_name not in inbox_drivers_versions or
-                not inbox_drivers_versions[item.module_name]
-              with_items: "{{ builtin_modules }}"
-          when: >
-            (guest_os_ansible_distribution != "VMware Photon OS") or
-            (guest_os_ansible_distribution == "VMware Photon OS" and
-            guest_os_ansible_distribution_major_ver | int >= 4)
-
-        # If the driver is not found in guest OS, set its version to 'N/A'
-        - name: "Update fact of inbox driver version dict to set not found driver version with 'N/A'"
-          set_fact:
-            inbox_drivers_versions: >-
-              {{
-                inbox_drivers_versions |
-                combine({module_name: 'N/A'})
-              }}
-          loop: "{{ inbox_drivers | difference(inbox_drivers_versions.keys()) }}"
-          loop_control:
-            loop_var: module_name
-
-        - name: "Check whether Xorg server is installed"
-          command: "which Xorg"
-          register: which_xorg_server
-          failed_when: False
-          delegate_to: "{{ vm_guest_ip }}"
-
-        - block:
-            - name: "Check Xorg server"
-              command: "Xorg -version"
-              register: xorg_version_result
-              failed_when: False
-              delegate_to: "{{ vm_guest_ip }}"
-
-            - block:
-                - name: "Get Xorg server version"
-                  set_fact:
-                    xorg_version: "{{ xorg_version_result.stderr_lines | select('match','X.Org X Server') }}"
-
-                - name: "Collect Xorg server version"
-                  set_fact:
-                     inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'xorg server': xorg_version[0].split()[-1] }) }}"
-                  when: xorg_version and xorg_version | length > 0
-              when:
-                - xorg_version_result.rc is defined
-                - xorg_version_result.rc == 0
-                - xorg_version_result.stderr_lines is defined
-                - xorg_version_result.stderr_lines | length > 0
-
-            - name: "Initialize VMware video driver package name"
-              set_fact:
-                video_driver_pkg_name: |-
-                  {%- if guest_os_family == "RedHat" -%}xorg-x11-drv-vmware
-                  {%- elif guest_os_family == "Suse" -%}xf86-video-vmware
-                  {%- else -%}{%- endif -%}
-
-            - block:
-                - name: "Looking for VMware video driver package"
-                  shell: "dpkg -l xserver-xorg-video-vmware* | grep xserver-xorg-video-vmware"
-                  failed_when: False
-                  register: vmware_video_package_result
-                  delegate_to: "{{ vm_guest_ip }}"
-
-                - name: "Get VMware video driver package name"
-                  set_fact:
-                    video_driver_pkg_name: "{{ vmware_video_package_result.stdout.split()[1] }}"
-                  when:
-                    - vmware_video_package_result.rc is defined
-                    - vmware_video_package_result.rc == 0
-                    - vmware_video_package_result.stdout is defined
-                    - vmware_video_package_result.stdout
-              when: guest_os_family in ["Debian", "Astra Linux (Orel)"]
-
-            - block:
-                - include_tasks: ../utils/get_installed_package_info.yml
-                  vars:
-                    package_name: "{{ video_driver_pkg_name }}"
-
-                - name: "Get the VMware video driver version"
-                  set_fact:
-                    inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'xf86-video-vmware': package_info.Version.split(':')[-1] }) }}"
-                  when:
-                    - package_info.Version is defined
-                    - package_info.Version
-              when: video_driver_pkg_name
-          when:
-            - which_xorg_server is defined
-            - which_xorg_server.rc is defined
-            - which_xorg_server.rc == 0
-
+      rescue:
+        - include_tasks: ../../common/test_rescue.yml
+      always:
         - name: "Print inbox drivers versions"
           debug: var=inbox_drivers_versions
 
+        - name: "Create test case log direcotry"
+          include_tasks: ../../common/create_directory.yml
+          vars:
+            dir_path: "{{ current_test_log_folder }}"
+
         - name: "Set fact of the output file path"
           set_fact:
-            os_release_info_file_path: "{{ testrun_log_path }}/{{ inbox_drivers_versions['Release'].replace(' ','-') | lower }}.json"
+            os_release_info_file_path: "{{ current_test_log_folder }}/{{ inbox_drivers_versions['Release'].replace(' ','-') | lower }}.json"
 
         - name: "The inbox drivers versions will be dump to a json file"
           debug: var=os_release_info_file_path
@@ -258,5 +80,3 @@
           copy:
             dest: "{{ os_release_info_file_path }}"
             content: "{{ [inbox_drivers_versions] | to_nice_json }}"
-      rescue:
-        - include_tasks: ../../common/test_rescue.yml

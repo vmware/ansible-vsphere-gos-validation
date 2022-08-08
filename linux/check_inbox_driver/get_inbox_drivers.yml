@@ -1,0 +1,190 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of mandatory and optional inbox drivers"
+  set_fact:
+    mandatory_drivers:
+      - vmxnet3
+      - vmw_vmci
+      - vsock
+      - vmw_vsock_vmci_transport
+      - vmw_pvscsi
+      - vmw_balloon
+    optional_drivers:
+      - vmw_vsock_virtio_transport_common
+      - vmw_pvrdma
+      - ptp_vmw
+
+- name: "Update mandatory inbox drivers when guest OS has GUI"
+  set_fact:
+    mandatory_drivers: "{{ mandatory_drivers + ['vmwgfx'] }}"
+  when: guest_os_with_gui is defined and guest_os_with_gui | bool
+
+- name: "Update optional inbox drivers when guest OS has no GUI"
+  set_fact:
+    optional_drivers: "{{ optional_drivers + ['vmwgfx'] }}"
+  when: guest_os_with_gui is undefined or not (guest_os_with_gui | bool)
+
+- name: "Set fact of all inbox drivers to check"
+  set_fact:
+    inbox_drivers: "{{ mandatory_drivers + optional_drivers }}"
+
+- name: "Get drivers version in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+  block:
+    - name: "Check driver version"
+      shell: "if [ -e /sys/module/{{ driver }}/version ]; then cat /sys/module/{{ driver }}/version ; fi"
+      with_items: "{{ inbox_drivers }}"
+      loop_control:
+        loop_var: driver
+      register: photon_drivers
+      no_log: True
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: Set fact of driver version dict
+      set_fact:
+        inbox_drivers_versions: >-
+          {{
+            inbox_drivers_versions |
+            combine(photon_drivers.results |
+                    selectattr('stdout', 'defined') |
+                    selectattr('stdout', '!=', '') |
+                    items2dict(key_name='driver', value_name='stdout'))
+          }}
+  when:
+    - guest_os_ansible_distribution == "VMware Photon OS"
+    - guest_os_ansible_distribution_major_ver | int < 4
+
+- name: "Get drivers version in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+  block:
+    - name: "Get module information of inbox drivers"
+      command: "modinfo {{ module_name }}"
+      register: modinfo_result
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: True
+      loop: "{{ inbox_drivers }}"
+      loop_control:
+        loop_var: module_name
+
+    - name: "Set fact of found inbox driver modules"
+      set_fact:
+        builtin_modules: "{{ modinfo_result.results | selectattr('rc', 'equalto', 0) }}"
+
+    - name: "Set fact of inbox driver version with its version"
+      set_fact:
+        inbox_drivers_versions: >
+          {{ inbox_drivers_versions |
+             combine({item.module_name:''.join(item.stdout_lines |
+                                                select('match', 'version:', ignorecase=True)) |
+                      regex_replace('version:\s*', '')})
+          }}
+      with_items: "{{ builtin_modules }}"
+
+    - name: "Set fact of inbox driver version with its srcversion"
+      set_fact:
+        inbox_drivers_versions: >
+          {{ inbox_drivers_versions |
+             combine({item.module_name:''.join(item.stdout_lines |
+                                                select('match', 'srcversion:', ignorecase=True)) |
+                      regex_replace('srcversion:\s*', '')})
+          }}
+      when: >
+        item.module_name not in inbox_drivers_versions or
+        not inbox_drivers_versions[item.module_name]
+      with_items: "{{ builtin_modules }}"
+
+    - name: "Set fact of inbox driver version with its vermagic"
+      set_fact:
+        inbox_drivers_versions: >
+          {{ inbox_drivers_versions |
+             combine({item.module_name:''.join(item.stdout_lines |
+                                                select('match', 'vermagic:', ignorecase=True)) |
+                      regex_replace('vermagic:\s*', '')})
+          }}
+      when: >
+        item.module_name not in inbox_drivers_versions or
+        not inbox_drivers_versions[item.module_name]
+      with_items: "{{ builtin_modules }}"
+
+    - name: "Initialize fact of inbox driver filename"
+      set_fact:
+        inbox_drivers_filenames: {}
+
+    - name: "Update fact of inbox driver filename"
+      set_fact:
+        inbox_drivers_filenames: >
+          {{ inbox_drivers_filenames |
+             combine({item.module_name:''.join(item.stdout_lines |
+                                                select('match', 'filename:', ignorecase=True)) |
+                      regex_replace('filename:\s*', '')})
+          }}
+      with_items: "{{ builtin_modules }}"
+
+    - name: "Print inbox drivers' filenames"
+      debug: var=inbox_drivers_filenames
+
+    # Photon OS inbox drivers are built in kernel, so here only checks other Linux OS
+    - name: "Check inbox drivers filenames"
+      block:
+         - name: "Check inbox driver's filename is valid"
+           assert:
+             that:
+               - (item.value | basename) is match('.*\.ko')
+             fail_msg: "Invalid inbox driver {{ item.key }} filename: {{ item.value }}"
+           with_dict: "{{ inbox_drivers_filenames }}"
+
+         - name: "Check inbox driver's file exits"
+           stat:
+             path: "{{ item.value }}"
+           delegate_to: "{{ vm_guest_ip }}"
+           with_dict: "{{ inbox_drivers_filenames }}"
+           register: stat_drivers_filenames
+
+         - name: "Check all inbox drivers' filenames exist"
+           assert:
+             that:
+               - stat_driver_filename.stat is defined
+               - stat_driver_filename.stat.exists is defined
+               - stat_driver_filename.stat.exists
+             fail_msg: "Inbox driver file {{ stat_driver_filename.stat.path }} doesn't exist"
+           with_items: "{{ stat_drivers_filenames.results }}"
+           loop_control:
+             loop_var: stat_driver_filename
+      when: guest_os_ansible_distribution != "VMware Photon OS"
+  when: >
+    not (guest_os_ansible_distribution == "VMware Photon OS" and
+    guest_os_ansible_distribution_major_ver | int < 4)
+
+# If the driver is not found in guest OS, set its version to 'N/A'
+- name: "Update fact of inbox driver version dict to set not found driver version with 'N/A'"
+  set_fact:
+    inbox_drivers_versions: >-
+      {{
+        inbox_drivers_versions |
+        combine({module_name: 'N/A'})
+      }}
+  loop: "{{ inbox_drivers | difference(inbox_drivers_versions.keys()) }}"
+  loop_control:
+    loop_var: module_name
+
+- name: "Check all mandatory inbox drivers exists in {{ guest_os_ansible_distribution }}"
+  assert:
+    that:
+      - inbox_drivers_versions[item]
+      - inbox_drivers_versions[item] != 'N/A'
+    fail_msg: "Inbox driver {{ item }} is missing in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+  with_items: "{{ mandatory_drivers }}"
+  when: >
+    not (guest_os_ansible_distribution == "VMware Photon OS" and
+    guest_os_ansible_distribution_major_ver | int >= 4)
+
+# Photon OS 4 inbox driver vmw_balloon doesn't have version information or filename
+- name: "Check all mandatory inbox drivers exists in {{ guest_os_ansible_distribution }}"
+  assert:
+    that:
+      - inbox_drivers_versions[item]
+      - inbox_drivers_versions[item] != 'N/A'
+    fail_msg: "Inbox driver {{ item }} is missing in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+  with_items: "{{ mandatory_drivers | difference(['vmw_balloon']) }}"
+  when:
+    - guest_os_ansible_distribution == "VMware Photon OS"
+    - guest_os_ansible_distribution_major_ver | int >= 4
