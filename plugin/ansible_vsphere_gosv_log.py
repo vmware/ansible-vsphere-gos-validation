@@ -199,7 +199,7 @@ class CallbackModule(CallbackBase):
         self._play_name = None
         self._play_path = None
         self._last_test_name = None
-        self._failed_tasks_cache = {}
+        self._play_tasks_cache = {}
 
         self._last_task_uuid = None
         self._last_task_name = None
@@ -309,14 +309,20 @@ class CallbackModule(CallbackBase):
         if task_name is None:
             task_name = task.get_name().strip()
 
-        msg = ""
+        # Get the current test case name or play name
+        current_play = self._play_path
+        if self._last_test_name:
+            current_play = self._last_test_name
+        elif self._play_name:
+            current_play = self._play_name
 
         # Set task banner
-        task_banner = self._banner("{} [{}][{}]".format(prefix, self._play_name, task_name))
+        task_banner = self._banner("{} [{}][{}]".format(prefix, current_play, task_name))
         task_path = task.get_path()
         if task_path:
             task_banner += "task path: {}\n".format(task_path)
 
+        msg = ""
         # Print task banner if the task is changed
         if self._last_task_uuid != task._uuid:
             msg += task_banner
@@ -368,38 +374,41 @@ class CallbackModule(CallbackBase):
             log_failed_tasks = False
 
         if 'known_issue' in str(task_tags) and 'msg' in result._result:
-            known_issues = "{}: {}".format(self._play_name, result._result['msg'])
-            self.write_to_logfile(self.known_issues_log, known_issues)
+            self._display.display("TAGS: known_issue", color=C.COLOR_VERBOSE)
+            log_header = ""
+            if 'known_issue' not in self._play_tasks_cache:
+                self._play_tasks_cache['known_issue'] = [task_path]
+                log_header = self._banner("Known Issue in Play [{}]".format(current_play))
+                self.write_to_logfile(self.known_issues_log, log_header)
+            else:
+                self._play_tasks_cache['known_issue'].append(task_path)
+            self.add_logger_file_handler(self.known_issues_log)
 
         # Add logger handler for failed tasks
         if log_failed_tasks:
-            # Get the failed test case name or play name
-            failed_play = self._play_path
-            if self._last_test_name:
-                failed_play = self._last_test_name
-            elif self._play_name:
-                failed_play = self._play_name
-
-            failed_at = ""
-            if failed_play not in self._failed_tasks_cache:
-                self._failed_tasks_cache[failed_play] = []
-                failed_at = self._banner("Failed at Play [{}]".format(failed_play))
+            log_header = ""
+            if 'failed' not in self._play_tasks_cache:
+                self._play_tasks_cache['failed'] = []
+                log_header = self._banner("Failed at Play [{}]".format(current_play))
 
             # If it is a failed item and not the first item, log its task name and path
             # in self.failed_tasks_log as well
-            if task_path and task_path not in self._failed_tasks_cache[failed_play]:
-                self._failed_tasks_cache[failed_play].append(task_path)
+            if task_path and task_path not in self._play_tasks_cache['failed']:
+                self._play_tasks_cache['failed'].append(task_path)
                 if task_path not in msg:
-                    failed_at += task_banner
+                    log_header += task_banner
 
-            if failed_at:
-                self.write_to_logfile(self.failed_tasks_log, failed_at)
+            if log_header:
+                self.write_to_logfile(self.failed_tasks_log, log_header)
 
             self.add_logger_file_handler(self.failed_tasks_log)
 
         self.logger.info(msg)
 
-        # Remove logger handler for failed tasks
+        # Remove logger handler for known issues and failed tasks
+        if 'known_issue' in str(task_tags) and 'msg' in result._result:
+            self.remove_logger_file_handler(self.known_issues_log)
+
         if log_failed_tasks:
             self.remove_logger_file_handler(self.failed_tasks_log)
 
@@ -887,8 +896,8 @@ class CallbackModule(CallbackBase):
 
         self.play = play
 
-        # Clear failed tasks cache
-        self._failed_tasks_cache.clear()
+        # Clear play tasks cache
+        self._play_tasks_cache.clear()
 
         # Update testcase status to Running and set its start time
         if self._play_name and self._play_name in self.testcases:
@@ -929,24 +938,25 @@ class CallbackModule(CallbackBase):
 
         # Log testcases results
         self._print_os_release_info()
-        self._display.banner("TEST SUMMARY")
-        self.logger.info(self._banner("TEST SUMMARY"))
-        self.add_logger_file_handler(self.test_results_log)
-        self._print_testbed_info()
 
-        # Print VM information
-        if self.vm_info:
-            vm_info_str = str(self.vm_info)
-        else:
-            vm_info_str = "Not found VM information"
-
-        self.logger.info(vm_info_str)
-        self._display.display(vm_info_str, color=C.COLOR_VERBOSE)
-
+        # Only print test summary when there is test case
         if len(self.testcases) > 0:
-            self._print_test_results()
+            self._display.banner("TEST SUMMARY")
+            self.logger.info(self._banner("TEST SUMMARY"))
+            self.add_logger_file_handler(self.test_results_log)
+            self._print_testbed_info()
 
-        self.remove_logger_file_handler(self.test_results_log)
+            # Print VM information
+            if self.vm_info:
+                vm_info_str = str(self.vm_info)
+            else:
+                vm_info_str = "Not found VM information"
+
+            self.logger.info(vm_info_str)
+            self._display.display(vm_info_str, color=C.COLOR_VERBOSE)
+
+            self._print_test_results()
+            self.remove_logger_file_handler(self.test_results_log)
 
         if self.testrun_log_dir and self.log_dir != self.testrun_log_dir:
             os.system("cp -rf {}/* {}".format(self.log_dir, self.testrun_log_dir))
