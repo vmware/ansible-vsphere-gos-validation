@@ -375,14 +375,16 @@ class CallbackModule(CallbackBase):
 
         if 'known_issue' in str(task_tags) and 'msg' in result._result:
             self._display.display("TAGS: known_issue", color=C.COLOR_VERBOSE)
-            log_header = ""
             if 'known_issue' not in self._play_tasks_cache:
-                self._play_tasks_cache['known_issue'] = [task_path]
-                log_header = self._banner("Known Issue in Play [{}]".format(current_play))
-                self.write_to_logfile(self.known_issues_log, log_header)
-            else:
+                self._play_tasks_cache['known_issue'] = []
+                self.write_to_logfile(self.known_issues_log, current_play + ":\n")
+
+            if task_path and task_path not in self._play_tasks_cache['known_issue']:
                 self._play_tasks_cache['known_issue'].append(task_path)
-            self.add_logger_file_handler(self.known_issues_log)
+                if isinstance(result._result['msg'], list):
+                    self.write_to_logfile(self.known_issues_log, "  {}\n".format('\n  '.join(result._result['msg']))) 
+                else:
+                    self.write_to_logfile(self.known_issues_log, "  {}\n".format(str(result._result['msg'])))
 
         # Add logger handler for failed tasks
         if log_failed_tasks:
@@ -405,10 +407,7 @@ class CallbackModule(CallbackBase):
 
         self.logger.info(msg)
 
-        # Remove logger handler for known issues and failed tasks
-        if 'known_issue' in str(task_tags) and 'msg' in result._result:
-            self.remove_logger_file_handler(self.known_issues_log)
-
+        # Remove logger handler for failed tasks
         if log_failed_tasks:
             self.remove_logger_file_handler(self.failed_tasks_log)
 
