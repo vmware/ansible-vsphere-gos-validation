@@ -1,0 +1,58 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Shutdown guest OS to disable VBS on VM
+- include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "shutdown"
+
+# Disable VBS on VM
+- include_tasks: ../utils/win_enable_vbs_vm.yml
+  vars:
+    win_enable_vbs: false
+
+# Power on VM
+- include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+- include_tasks: ../../common/vm_get_ip.yml
+  vars:
+    vm_get_ip_timeout: 600
+- include_tasks: ../utils/win_check_winrm.yml
+- include_tasks: ../utils/add_windows_host.yml
+
+# Check VM VBS status on VM
+- include_tasks: ../../common/vm_get_vbs_status.yml
+- name: "Check VM VBS status after enable"
+  ansible.builtin.assert:
+    that:
+      - vm_vbs_enabled is defined
+      - not vm_vbs_enabled | bool
+    fail_msg: "VM VBS status is not disabled after disabling it."
+
+# Get VBS status in guest OS
+- include_tasks: ../utils/win_get_vbs_guest.yml
+
+# SecurityServicesRunning: 0 means No services running
+# VirtualizationBasedSecurityStatus: 1 means VBS is enabled but not running
+- name: "Check VBS and running security service status"
+  ansible.builtin.assert:
+    that:
+      - win_vbs_status_guest | int == 1
+      - win_vbs_running_service[0] | int != 2
+    fail_msg: "Either VBS is running '{{ win_vbs_status_guest }}', or HVCI is running '{{ win_vbs_running_service }}'."
+
+# Disable VBS in guest
+- include_tasks: ../utils/win_disable_vbs_guest.yml
+
+# Get VBS status in guest OS
+- include_tasks: ../utils/win_get_vbs_guest.yml
+
+# SecurityServicesRunning: 0 means No services running
+# VirtualizationBasedSecurityStatus: 0 means VBS is not enabled
+- name: "Check VBS and running security service status"
+  ansible.builtin.assert:
+    that:
+      - win_vbs_status_guest | int == 0
+      - win_vbs_running_service[0] | int == 0
+    fail_msg: "Either VBS is not disabled '{{ win_vbs_status_guest }}', or still running security service '{{ win_vbs_running_service }}'."

@@ -1,0 +1,43 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get virtualization-based protection of code integrity in guest OS
+# Refer to this page: https://docs.microsoft.com/en-us/windows/security/
+# threat-protection/device-guard/enable-virtualization-based-protection-of-code-integrity
+#
+- name: "Initialize the VBS and running security service status"
+  ansible.builtin.set_fact:
+    win_vbs_status_guest: ""
+    win_vbs_running_service: []
+
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "CimInstance –ClassName Win32_DeviceGuard –Namespace root\\Microsoft\\Windows\\DeviceGuard"
+
+- name: "Get VBS and running security service status"
+  block:
+    - name: "Initialize the result dict"
+      ansible.builtin.set_fact:
+        win_device_guard_result: {}
+    - name: "Convert the result list to dict"
+      ansible.builtin.set_fact:
+        win_device_guard_result: "{{ win_device_guard_result | combine({item.split(':')[0].strip(): item.split(':')[1].strip()}) }}"
+      when: item | length != 0
+      with_items:
+        - "{{ win_powershell_cmd_output.stdout_lines }}"
+    - name: "Display the Device Guard status"
+      ansible.builtin.debug: var=win_device_guard_result
+    - name: "Set fact of status"
+      ansible.builtin.set_fact:
+        win_vbs_status_guest: "{{ win_device_guard_result.VirtualizationBasedSecurityStatus }}"
+        win_vbs_running_service: "{{ win_device_guard_result.SecurityServicesRunning.strip('{}').split(', ') }}"
+  when:
+    - win_powershell_cmd_output is defined
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+
+- name: "Display the results"
+  ansible.builtin.debug:
+    msg:
+      - "SecurityServicesRunning: {{ win_vbs_running_service }}"
+      - "VirtualizationBasedSecurityStatus: {{ win_vbs_status_guest }}"
