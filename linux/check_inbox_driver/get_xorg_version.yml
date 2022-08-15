@@ -2,26 +2,27 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: "Check whether Xorg server is installed"
-  command: "which Xorg"
+  ansible.builtin.command: "which Xorg"
   register: which_xorg_server
-  failed_when: False
+  changed_when: false
+  failed_when: false
   delegate_to: "{{ vm_guest_ip }}"
 
 - block:
     - name: "Check Xorg server"
-      command: "Xorg -version"
+      ansible.builtin.command: "Xorg -version"
       register: xorg_version_result
-      failed_when: False
+      failed_when: false
       delegate_to: "{{ vm_guest_ip }}"
 
     - block:
         - name: "Get Xorg server version"
-          set_fact:
+          ansible.builtin.set_fact:
             xorg_version: "{{ xorg_version_result.stderr_lines | select('match','X.Org X Server') }}"
 
         - name: "Collect Xorg server version"
-          set_fact:
-             inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'xorg server': xorg_version[0].split()[-1] }) }}"
+          ansible.builtin.set_fact:
+            inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'xorg server': xorg_version[0].split()[-1] }) }}"
           when: xorg_version and xorg_version | length > 0
       when:
         - xorg_version_result.rc is defined
@@ -30,7 +31,7 @@
         - xorg_version_result.stderr_lines | length > 0
 
     - name: "Initialize VMware video driver package name"
-      set_fact:
+      ansible.builtin.set_fact:
         video_driver_pkg_name: |-
           {%- if guest_os_family == "RedHat" -%}xorg-x11-drv-vmware
           {%- elif guest_os_family == "Suse" -%}xf86-video-vmware
@@ -38,13 +39,13 @@
 
     - block:
         - name: "Looking for VMware video driver package"
-          shell: "dpkg -l xserver-xorg-video-vmware* | grep xserver-xorg-video-vmware"
-          failed_when: False
+          ansible.builtin.shell: "dpkg -l xserver-xorg-video-vmware* | grep xserver-xorg-video-vmware"
+          failed_when: false
           register: vmware_video_package_result
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "Get VMware video driver package name"
-          set_fact:
+          ansible.builtin.set_fact:
             video_driver_pkg_name: "{{ vmware_video_package_result.stdout.split()[1] }}"
           when:
             - vmware_video_package_result.rc is defined
@@ -59,7 +60,7 @@
             package_name: "{{ video_driver_pkg_name }}"
 
         - name: "Get the VMware video driver version"
-          set_fact:
+          ansible.builtin.set_fact:
             inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'xf86-video-vmware': package_info.Version.split(':')[-1] }) }}"
           when:
             - package_info.Version is defined
