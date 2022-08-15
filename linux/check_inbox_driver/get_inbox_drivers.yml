@@ -125,6 +125,23 @@
     # Photon OS inbox drivers are built in kernel, so here only checks other Linux OS
     - name: "Check inbox drivers filenames"
       block:
+        - name: "Do not check vsock driver in OracleLinux with kernel UEK R7 due to known issue"
+          block:
+            - name: "Known issue - ignore failure of invalid vsock driver"
+              debug:
+                msg:
+                  - "The inbox driver vsock is missing in Oracle Linux 9.0 with kernel UEK R7. Ignore this known issue."
+                  - "Please refer to https://bugzilla.oracle.com/bugzilla/show_bug.cgi?id=17884"
+              tags:
+                - known_issue
+
+            - name: "Remove vsock from inbox drivers filename checking when OracleLinux with kernel UEK R7"
+              set_fact:
+                inbox_drivers_filenames:  "{{ inbox_drivers_filenames | dict2items | selectattr('key', '!=', 'vsock') | items2dict }}"
+          when:
+            - guest_os_ansible_distribution == "OracleLinux"
+            - guest_os_ansible_kernel == "5.15.0-0.30.19.el9uek.x86_64"
+
          - name: "Check inbox driver's filename is valid"
            assert:
              that:
