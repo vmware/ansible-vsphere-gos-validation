@@ -7,9 +7,9 @@
 #   vm_wait_log_msg: the regular expression of message to wait for appearing
 #   vm_wait_log_retries: how many times to re-check log about waiting message
 #   vm_wait_log_delay: seconds to delay for a retry
-#   vm_wait_log_ignore_errors: true to ignore task failure. Default is False.
-#   vm_wait_log_hide_output: true to hide the output, False will print the
-#   output of log content. Default is True.
+#   vm_wait_log_ignore_errors: true to ignore task failure. Default is false.
+#   vm_wait_log_hide_output: true to hide the output, if set to false will print
+#   the output of log content. Default is true.
 #
 - name: "Initialize the logs list found and the log message wait result"
   ansible.builtin.set_fact:
@@ -25,7 +25,7 @@
     file_in_datastore_ops: file
     file_in_datastore: "{{ datastore }}"
     file_in_datastore_path: "{{ vm_log_file_path }}"
-    file_in_datastore_failed_ignore: "{{ vm_wait_log_ignore_errors | default(False) }}"
+    file_in_datastore_failed_ignore: "{{ vm_wait_log_ignore_errors | default(false) }}"
 
 # Log file exists
 - block:
@@ -39,16 +39,16 @@
         return_content: true
         user: "{{ vsphere_host_user }}"
         password: "{{ vsphere_host_user_password }}"
-        validate_certs: "{{ validate_certs | default(False) }}"
+        validate_certs: "{{ validate_certs | default(false) }}"
       register: get_vm_log_content
-      no_log: "{{ vm_wait_log_hide_output | default(True) }}"
+      no_log: "{{ vm_wait_log_hide_output | default(true) }}"
       until:
         - get_vm_log_content is defined
         - get_vm_log_content.content is defined
         - get_vm_log_content.content | regex_findall(vm_wait_log_msg) | length != 0
       delay: "{{ vm_wait_log_delay | default(5) }}"
       retries:  "{{ vm_wait_log_retries | default(60) }}"
-      ignore_errors: "{{ vm_wait_log_ignore_errors | default(False) }}"
+      ignore_errors: "{{ vm_wait_log_ignore_errors | default(false) }}"
 
     - name: "Set fact of the logs list found for specified log message"
       ansible.builtin.set_fact:
