@@ -20,6 +20,29 @@
       - guestinfo_guest_id
     fail_msg: "Guest ID in guest info is '{{ guestinfo_guest_id }}', which should be a valid value firstly."
 
+- name: "Known issue about Rocky Linux guest fullname"
+  block:
+    - include_tasks: ../utils/get_installed_package_info.yml
+      vars:
+        package_name: "open-vm-tools"
+
+    - name: "Known issue - ignore incorrect guest fullname with Rocky Linux built-in OVT 11.3.5"
+      ansible.builtin.debug:
+        msg:
+          - "The guest fullname of Rocky Linux with built-in open-vm-tools 11.3.5-{{ package_info.Release }} is incorrect, which is always same as VM's guest OS version."
+          - "The expected guest fullname should be {{ ', or '.join(guest_fullname) }}. Ignore this known issue."
+          - "Please refer to https://github.com/rocky-linux/rockylinux.org/issues/422"
+      tags:
+        - known_issue
+      when:
+        - package_info is defined
+        - package_info.Release is defined
+        - package_info.Release == "1.el8" or package_info.Release == "1.el9"
+        - package_info.Vendor is defined and 'Rocky' in package_info.Vendor
+  when:
+    - guest_os_ansible_distribution == 'Rocky'
+    - vmtools_version is version('11.3.5', '=')
+
 - block:
     - name: "Assert Guest OS fullname is either {{ guest_fullname[0] }} or {{ guest_fullname[1] }}"
       ansible.builtin.assert:
