@@ -4,21 +4,22 @@
 # Cleanup testing environment
 - name: env_cleanup
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
   vars_files:
-     - "{{ testing_vars_file | default('../vars/test.yml') }}"
+    - "{{ testing_vars_file | default('../vars/test.yml') }}"
   tasks:
     - name: "Set cleanup VM to False by default"
-      set_fact:
-        cleanup_vm: False
+      ansible.builtin.set_fact:
+        cleanup_vm: false
       when: cleanup_vm is undefined
 
-    - block:
-        # Need to revert to base snapshot of target VM firstly, or removing portgroup would fail
+    # Need to revert to base snapshot of target VM firstly, or removing portgroup would fail
+    - name: "Revert to base snapshot then cleanup network testbed configurations"
+      block:
         - include_tasks: ../common/vm_revert_snapshot.yml
           vars:
             snapshot_name: "{{ base_snapshot_name }}"
-            skip_if_not_exist: True
+            skip_if_not_exist: true
           when:
             - base_snapshot_exists is defined
             - base_snapshot_exists | bool
@@ -35,8 +36,8 @@
             vm_power_state_set: 'powered-off'
         - include_tasks: ../common/vm_remove.yml
         - name: "Set VM cleaned flag is True"
-          set_fact:
-            vm_cleaned_up: True
+          ansible.builtin.set_fact:
+            vm_cleaned_up: true
       when:
         - cleanup_vm | bool
         - new_vm is defined and new_vm | bool

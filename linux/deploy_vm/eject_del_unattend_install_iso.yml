@@ -4,13 +4,13 @@
 # Eject CDROM of unattend install ISO in guest OS
 - include_tasks: ../utils/eject_cdrom_in_guest.yml
   vars:
-    guest_cdrom_device_num: "{{ os_install_iso_list_len|int -1 }}"
+    guest_cdrom_device_num: "{{ os_install_iso_list_len | int -1 }}"
 
 # By default, it's attached to the last CDROM in composed VM CDROMs list
 - name: "Set fact of the controller and unit number of CDROM attaching unattend install ISO"
-  set_fact:
-    unattend_iso_cdrom_ctl_num: "{{ vm_cdroms[os_install_iso_list_len|int - 1].controller_number }}"
-    unattend_iso_cdrom_unit_num: "{{ vm_cdroms[os_install_iso_list_len|int - 1].unit_number }}"
+  ansible.builtin.set_fact:
+    unattend_iso_cdrom_ctl_num: "{{ vm_cdroms[os_install_iso_list_len | int - 1].controller_number }}"
+    unattend_iso_cdrom_unit_num: "{{ vm_cdroms[os_install_iso_list_len | int - 1].unit_number }}"
 
 # Change CDROM type from iso to client
 - include_tasks: ../../common/vm_configure_cdrom.yml
@@ -27,14 +27,14 @@
     file_in_datastore: "{{ datastore }}"
     file_in_datastore_path: "{{ unattend_iso_file_name }}"
     file_in_datastore_ops: "absent"
-    file_in_datastore_ignore_failed: True
+    file_in_datastore_ignore_failed: true
 
 - include_tasks: ../../common/esxi_check_delete_datastore_file.yml
   vars:
     file_in_datastore: "{{ datastore }}"
     file_in_datastore_path: "{{ new_os_installation_iso }}"
     file_in_datastore_ops: "absent"
-    file_in_datastore_ignore_failed: True
+    file_in_datastore_ignore_failed: true
   when:
     - unattend_install_conf is match('Ubuntu/Server')
     - new_os_installation_iso is defined

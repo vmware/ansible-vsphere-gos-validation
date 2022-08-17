@@ -7,11 +7,11 @@
 #   check_testcase_file_path: the path of the test case file
 # Return:
 #   check_testcase_in_file:
-#     True: any test case in the list is in the test case file
-#     False: all the test cases in the list are not in the test case file
+#     true: any test case in the list is in the test case file
+#     false: all the test cases in the list are not in the test case file
 #
 - name: Check required parameters
-  fail:
+  ansible.builtin.fail:
     msg: "Parameter 'check_testcase_list' or 'check_testcase_file_path' is not defined, or 'check_testcase_list' is not list type."
   when: >
     check_testcase_list is undefined or
@@ -19,34 +19,34 @@
     not check_testcase_list or
     check_testcase_list is string or
     not check_testcase_file_path
-- debug:
+- ansible.builtin.debug:
     msg:
       - "Specified test case file: {{ check_testcase_file_path }}"
       - "Specified test case list: {{ check_testcase_list }}"
 
 - name: "Initialize test case in test case file result"
-  set_fact:
-    check_testcase_in_file: False
+  ansible.builtin.set_fact:
+    check_testcase_in_file: false
 
 - name: "Get all the test cases in test case file"
-  command: "cat {{ check_testcase_file_path }}"
+  ansible.builtin.command: "cat {{ check_testcase_file_path }}"
   register: testcase_list
 - name: "Display the test cases in test case file"
-  debug: var=testcase_list.stdout_lines
+  ansible.builtin.debug: var=testcase_list.stdout_lines
 
 - name: "Check specified name in the list also contained in test case file"
-  shell: grep -v '^\s*#' "{{ check_testcase_file_path }}" | grep -E "{{ ('|').join(check_testcase_list) }}"
+  ansible.builtin.shell: grep -v '^\s*#' "{{ check_testcase_file_path }}" | grep -E "{{ ('|').join(check_testcase_list) }}"
   failed_when: false
   register: check_result
 - name: "Display the search result"
-  debug: var=check_result
+  ansible.builtin.debug: var=check_result
   when: enable_debug is defined and enable_debug
 - name: Set found specified name in test case file
-  set_fact:
-    check_testcase_in_file: True
+  ansible.builtin.set_fact:
+    check_testcase_in_file: true
   when:
     - "'stdout_lines' in check_result"
     - "check_result.stdout_lines | length != 0"
 
-- debug:
+- ansible.builtin.debug:
     msg: "Test cases in specified list are in test case file: {{ check_testcase_in_file }}"

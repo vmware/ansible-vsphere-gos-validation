@@ -8,30 +8,31 @@
 #
 - name: check_os_fullname
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
-    - block:
+    - name: "Test case block"
+      block:
         - include_tasks: ../setup/test_setup.yml
           vars:
-            skip_test_no_vmtools: True
+            skip_test_no_vmtools: true
 
         # Run this test when VMware tools is running
         - include_tasks: ../../common/esxi_get_version_build.yml
           when: esxi_version is undefined or esxi_update_version is undefined
 
         - name: Get OS fullname in guest OS
-          debug:
+          ansible.builtin.debug:
             msg: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
 
         - name: "Initalize guest_fullnane to 'guest fullname not defined in test case'"
-          set_fact:
+          ansible.builtin.set_fact:
             guest_fullname: "guest fullname not defined in test case"
 
         # Map Ubuntu
         - name: Set guest_fullname variable for Ubuntu
-          set_fact:
+          ansible.builtin.set_fact:
             guest_fullname: "Ubuntu Linux ({{ guest_os_bit }})"
           when: guest_os_ansible_distribution == "Ubuntu"
 
@@ -52,7 +53,7 @@
 
         # Map FreeBSD guest full name
         - name: Set guest_fullname variable for FreeBSD
-          set_fact:
+          ansible.builtin.set_fact:
             guest_fullname: "FreeBSD {{ guest_os_ansible_distribution_major_ver }} ({{ guest_os_bit }})"
           when: guest_os_ansible_distribution == "FreeBSD"
 

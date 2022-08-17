@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: "Set fact of the absolute path to unattend install config file template"
-  set_fact:
+  ansible.builtin.set_fact:
     unattend_install_template: "{{ main_playbook_path }}/autoinstall/{{ unattend_install_conf }}"
 
-- debug:
+- ansible.builtin.debug:
     msg:
-     - "The unattend install config file is {{ unattend_install_template }}"
+      - "The unattend install config file is {{ unattend_install_template }}"
 
 # unattend_install_conf is not for Ubuntu
 - block:
@@ -19,39 +19,39 @@
         tmp_prefix: "unattend_iso_"
 
     - name: "Set facts of unattend install cache and file names"
-      set_fact:
+      ansible.builtin.set_fact:
         unattend_iso_cache: "{{ tmp_path }}"
         unattend_iso_file_name: "{{ guest_id }}{{ '_'.join(''.join(unattend_install_conf.split('.')[:-1]).split('/')) }}-{{ lookup('pipe','date +%s') }}.iso"
 
     - name: "Set fact about installing desktop"
-      set_fact:
-        install_guest_with_desktop: True
+      ansible.builtin.set_fact:
+        install_guest_with_desktop: true
       when:
         - guest_id in ['rhel8_64Guest', 'rhel9_64Guest']
         - unattend_install_conf is match('RHEL/8/server_with_GUI/')
 
     - name: "Set fact of the absolute path of unattend install config file and ISO"
-      set_fact:
+      ansible.builtin.set_fact:
         new_unattend_install_conf: "{{ unattend_iso_cache }}/{{ unattend_install_template.split('/')[-1] }}"
         generated_unattend_iso: "{{ unattend_iso_cache }}/{{ unattend_iso_file_name }}"
 
-    - debug:
+    - ansible.builtin.debug:
         msg:
           - "The unattend install config file to be generated is {{ new_unattend_install_conf }}"
 
     # For nvme boot disk, boot device name shoule be nvme0n1 instead of sda
     - name: "Set boot disk name"
-      set_fact:
+      ansible.builtin.set_fact:
         boot_disk_name: "{{ 'nvme0n1' if boot_disk_controller == 'nvme' else 'sda' }}"
 
     - name: "Create unattend config file from template"
-      template:
+      ansible.builtin.template:
         src: "{{ unattend_install_template }}"
         dest: "{{ new_unattend_install_conf }}"
         mode: "0644"
 
     - name: "Print the content of unattend install config file"
-      debug:
+      ansible.builtin.debug:
         msg: "{{ lookup('file', new_unattend_install_conf) | split('\n') }}"
 
     - name: "Create a guest OS unattend install ISO file"
@@ -76,7 +76,7 @@
 # unattend_install_conf is for Ubuntu
 - block:
     - name: "Set fact for autoinstall start message to be printed to VM serial port"
-      set_fact:
+      ansible.builtin.set_fact:
         autoinstall_start_msg: "Ubuntu autoinstall is started at {{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
 
     # Create the Ubuntu seed ISO to modify login information
@@ -86,7 +86,7 @@
         local_hostname: "ubuntu-{{ hostname_timestamp }}"
 
     - name: "Set fact of generated unattend install config file and seed ISO"
-      set_fact:
+      ansible.builtin.set_fact:
         new_unattend_install_conf: "{{ user_data_path }}"
         unattend_iso_cache: "{{ tmp_seed_dir }}"
         generated_unattend_iso: "{{ seed_iso_path }}"
@@ -105,16 +105,16 @@
         upload_file_timeout: 600
 
     - name: "Replace original install ISO file with fully automated install ISO file"
-      set_fact:
+      ansible.builtin.set_fact:
         os_installation_iso_list: ["[{{ datastore }}] {{ new_os_installation_iso }}"]
         os_install_iso_list_len: 1
   when: unattend_install_conf is match('Ubuntu')
 
 - name: "Set fact of unattended install ISO path on datastore {{ datastore }}"
-  set_fact:
+  ansible.builtin.set_fact:
     transferred_unattend_iso: "[{{ datastore }}] {{ unattend_iso_file_name }}"
 
-- debug:
+- ansible.builtin.debug:
     msg:
       - "The unattend install ISO generated is {{ generated_unattend_iso }}"
       - "The unattend install ISO will be uploaded to '{{ transferred_unattend_iso }}' on ESXi host"
@@ -127,7 +127,7 @@
     upload_file_timeout: 600
 
 - name: "Append generated unattend ISO file to the list"
-  set_fact:
+  ansible.builtin.set_fact:
     os_installation_iso_list: "{{ os_installation_iso_list + [transferred_unattend_iso] }}"
     os_install_iso_list_len: "{{ os_install_iso_list_len | int + 1 }}"
   when:
@@ -135,7 +135,7 @@
     - unattend_install_conf is not match('Debian')
 
 - name: "Replace original install ISO file with unattend install ISO file"
-  set_fact:
+  ansible.builtin.set_fact:
     os_installation_iso_list: "{{ [transferred_unattend_iso] }}"
     os_install_iso_list_len: 1
   when: >
@@ -143,11 +143,11 @@
     unattend_install_conf is match('Debian')
 
 - name: "Copy generated unattend install config file to log folder"
-  copy:
+  ansible.builtin.copy:
     src: "{{ new_unattend_install_conf }}"
     dest: "{{ current_test_log_folder }}/{{ new_unattend_install_conf | basename }}"
 
 - name: "Remove cache folder {{ unattend_iso_cache }}"
-  file:
+  ansible.builtin.file:
     path: "{{ unattend_iso_cache }}"
     state: absent

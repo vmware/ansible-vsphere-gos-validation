@@ -8,24 +8,24 @@
     property_list: ['config.hardware.device']
 
 - name: Set fact of CDROM devices list from VM config
-  set_fact:    
+  ansible.builtin.set_fact:    
     cdrom_device_list1: "{{ vm_config.config.hardware.device | selectattr('deviceInfo.label', 'match', 'CD/DVD drive') }}"
 
 - name: Initialize CDROM devices info list
-  set_fact:
+  ansible.builtin.set_fact:
     cdrom_device_list2: []
 - name: Set fact of CDROM devices info list
-  set_fact:
+  ansible.builtin.set_fact:
     cdrom_device_list2: "{{ cdrom_device_list2 + [{'controller_key': item.controllerKey, 'label': item.deviceInfo.label, 'unit_num': item.unitNumber, 'connected': item.connectable.connected}] }}"
   with_items: "{{ cdrom_device_list1 }}"
 
 - name: Initialize CDROM devices info list
-  set_fact:
+  ansible.builtin.set_fact:
     cdrom_device_list: []
 - name: Set fact of CDROM devices info list contain controller info
-  set_fact:
+  ansible.builtin.set_fact:
     cdrom_device_list: "{{ cdrom_device_list + [item | combine( { 'bus_num': (vm_config.config.hardware.device | selectattr('key', 'equalto', item.controller_key))[0].busNumber, 'controller_label': (vm_config.config.hardware.device | selectattr('key', 'equalto', item.controller_key))[0].deviceInfo.label } )] }}" 
   with_items: "{{ cdrom_device_list2 }}"
 
 - name: Print CDROM devices info list
-  debug: var=cdrom_device_list
+  ansible.builtin.debug: var=cdrom_device_list

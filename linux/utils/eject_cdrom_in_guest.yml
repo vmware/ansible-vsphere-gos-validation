@@ -7,31 +7,31 @@
 #                           Otherwise, all cdrom devices will be ejected.
 #
 - name: "Initialize the fact of guest CDROM devices with ISO connected"
-  set_fact:
+  ansible.builtin.set_fact:
     guest_cdroms: []
 
 - name: "Set CDROM device to be ejected"
-  set_fact:
+  ansible.builtin.set_fact:
     eject_cdrom_name: "sr{{ guest_cdrom_device_num | int }}"
   when:
     - guest_cdrom_device_num is defined
     - guest_cdrom_device_num is match('^[0-9]$')
 
 - name: "All CDROM connected to ISO will be ejected"
-  set_fact:
+  ansible.builtin.set_fact:
     eject_cdrom_name: ""
   when: >
     guest_cdrom_device_num is undefined or
     guest_cdrom_device_num is not match('^[0-9]$')
 
 - name: "Get the fact of all block devices"
-  command: "lsblk -o NAME,TYPE,FSTYPE"
+  ansible.builtin.command: "lsblk -o NAME,TYPE,FSTYPE"
   register: lsblk_result
   delegate_to: "{{ vm_guest_ip }}"
 
 - block:
     - name: "Set the fact of guest CDROM devices with ISO connected"
-      set_fact:
+      ansible.builtin.set_fact:
         guest_cdroms: "{{ guest_cdroms | union(['/dev/' ~ lsblk_item.split()[0]]) }}"
       when:
         - lsblk_item.split() | length == 3
@@ -42,7 +42,7 @@
         loop_var: lsblk_item
 
     - name: "Print the CDROM devices connecting to ISO"
-      debug: var=guest_cdroms
+      ansible.builtin.debug: var=guest_cdroms
   when:
     - lsblk_result is defined
     - lsblk_result.stdout_lines is defined
@@ -54,7 +54,7 @@
         filter: "ansible_mounts"
 
     - name: "Get the fact about all OS mounts"
-      set_fact:
+      ansible.builtin.set_fact:
         guest_os_ansible_mounts: "{{ guest_system_info.ansible_mounts | selectattr('device', 'in', guest_cdroms) | map(attribute='mount') }}"
 
     # Unmount ISO images before ejecting them
@@ -63,7 +63,7 @@
         path: "{{ guest_cdrom_mount }}"
         state: absent
       delegate_to: "{{ vm_guest_ip }}"
-      become: True
+      become: true
       with_items: "{{ guest_os_ansible_mounts }}"
       loop_control:
         loop_var: guest_cdrom_mount
@@ -71,7 +71,7 @@
 
     # Eject connected CDROM
     - name: "Eject CDROM device {{ guest_cdrom_device }}"
-      command: "eject -v {{ guest_cdrom_device }}"
+      ansible.builtin.command: "eject -v {{ guest_cdrom_device }}"
       delegate_to: "{{ vm_guest_ip }}"
       register: eject_cdrom_result
       when: >
@@ -82,5 +82,5 @@
         loop_var: guest_cdrom_device
 
     - name: "Print CDROM eject result"
-      debug: var=eject_cdrom_result
+      ansible.builtin.debug: var=eject_cdrom_result
   when: guest_cdroms | length > 0

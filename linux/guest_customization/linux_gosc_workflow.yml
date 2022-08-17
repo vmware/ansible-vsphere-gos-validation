@@ -9,16 +9,17 @@
 #
 - block:
     - name: "Set cloud-init workflow flag"
-      set_fact:
+      ansible.builtin.set_fact:
         enable_cloudinit_gosc: "{% if gosc_workflow  == 'cloud-init' %}True{% else %}False{% endif %}"
 
     - include_tasks: ../setup/test_setup.yml
       vars:
-        skip_test_no_vmtools: True
+        skip_test_no_vmtools: true
 
     - include_tasks: check_gosc_support_status.yml
 
-    - block:
+    - name: "Test case block"
+      block:
         # Traditional GOSC in Photon OS is implemented with cloud-init,
         # so will upgrade cloud-init to the latest version in Photon OS
         - include_tasks: ../utils/install_uninstall_package.yml
@@ -55,8 +56,8 @@
     # Install perl if guest OS doesn't have it
     - block:
         - name: "Check perl existence"
-          command: "which perl"
-          failed_when: False
+          ansible.builtin.command: "which perl"
+          failed_when: false
           register: which_perl_result
           delegate_to: "{{ vm_guest_ip }}"
 
@@ -88,7 +89,7 @@
         # See https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1008039
         # For other OS, cloud-init GOSC requires cloud-init 18.5 or later installed.
         - name: "Set fact of cloud-init version for supporting GOSC"
-          set_fact:
+          ansible.builtin.set_fact:
             operator: >-
               {% if guest_os_ansible_distribution != 'Debian' %}>{% else %}>={% endif %}
             gosc_required_cloudinit_version: >-
@@ -105,9 +106,9 @@
     # Get DNS server info before GOSC
     - include_tasks: ../utils/get_system_dns.yml
     - name: "Set fact of the DNS servers in /etc/resolv.conf before GOSC"
-      set_fact:
+      ansible.builtin.set_fact:
         dns_servers_before_gosc: "{{ dns_servers }}"
-    - debug:
+    - ansible.builtin.debug:
         msg: "DNS servers before GOSC: {{ dns_servers_before_gosc }}"
 
     # Modify cloud-init GOSC config in guest OS
@@ -115,17 +116,17 @@
     # Prepare router VM, vSwitch and portgroup
     - include_tasks: ../../common/network_testbed_setup.yml
       when:
-        - router_vm_required | default(False)
+        - router_vm_required | default(false)
         - router_vm_deployed is undefined or not router_vm_deployed | bool
 
     # Initialize the GOSC spec
     - name: Initialize the GOS customization spec
-      set_fact:
+      ansible.builtin.set_fact:
         linux_gosc_spec: {'domain': 'gosc.test.com', 'timezone': "Europe/Berlin", 'dns_suffix': ["test.com", "gosc.test.com"]}
 
     # Add network settings for static IP guest customization
     - name: "Set GOS customization spec of static IP"
-      set_fact:
+      ansible.builtin.set_fact:
         linux_gosc_spec: "{{ linux_gosc_spec | combine(item) }}"
       loop:
         - {'network': "{{ portgroup_name }}"}
@@ -134,18 +135,18 @@
         - {'gateway': "192.168.192.1"}
         - {'dns_servers': ["192.168.1.1", "192.168.1.2"]}
         - {'hostname': "gosc-static-vm-01"}
-        - {'hwclockUTC': False}
+        - {'hwclockUTC': false}
       when: ip_assignment == "static"
 
     # Add network settings for DHCP guest customization
     - name: "Set GOS customization spec of DHCP IP"
-      set_fact:
+      ansible.builtin.set_fact:
         linux_gosc_spec: "{{ linux_gosc_spec | combine(item) }}"
       loop:
         - {'network': "{{ gosc_dhcp_network | default('VM Network') }}"}
         - {'dns_servers': ["10.10.1.1", "10.10.1.2"]}
         - {'hostname': "gosc-dhcp-vm-01"}
-        - {'hwclockUTC': True}
+        - {'hwclockUTC': true}
       when: ip_assignment == "dhcp"
 
     # Execute guest customization on VM

@@ -5,24 +5,24 @@
 # Parameters:
 #   win_is_folder_path: the file path
 # Return:
-#   win_is_folder_result: True or False
+#   win_is_folder_result: true or false
 #
 - name: Initialize the check result
-  set_fact:
-    win_is_folder_result: False
+  ansible.builtin.set_fact:
+    win_is_folder_result: false
 
 # Check if specified path is a directory in Windows guest OS
 - include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "(Get-Item -Path '{{ win_is_folder_path }}') -is [System.IO.DirectoryInfo]"
-    win_execute_cmd_ignore_error: True
+    win_execute_cmd_ignore_error: true
 
 - name: Set fact of the check result
-  set_fact:
-    win_is_folder_result: True
+  ansible.builtin.set_fact:
+    win_is_folder_result: true
   when:
     - not win_powershell_cmd_output.failed
     - win_powershell_cmd_output.stdout_lines | length != 0
     - win_powershell_cmd_output.stdout_lines[0] == 'True'
-- debug:
+- ansible.builtin.debug:
     msg: "Specified path in guest OS {{ win_is_folder_path }} is folder: {{ win_is_folder_result }}"

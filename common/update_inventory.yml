@@ -9,7 +9,7 @@
 - include_tasks: vm_get_ip.yml
   vars:
     vm_get_ip_timeout: "{{ update_inventory_timeout | default(900) }}"
-- debug:
+- ansible.builtin.debug:
     msg: "Get '{{ vm_name }}' IP address: {{ vm_guest_ip }}"
 
 - include_tasks: vm_wait_connection.yml
@@ -17,13 +17,13 @@
     vm_wait_connection_timeout: "{{ update_inventory_timeout | default(900) }}"
 
 - name: "Initialize the default update inventory to True"
-  set_fact:
-    update_inventory: True
+  ansible.builtin.set_fact:
+    update_inventory: true
 
 - block:
     - name: Loop groups to update update_inventory
-      set_fact:
-        update_inventory: False
+      ansible.builtin.set_fact:
+        update_inventory: false
       when: vm_guest_ip == item
       loop: "{{ groups['target_vm'] }}"
   when: groups['target_vm'] is defined
@@ -37,5 +37,5 @@
         add_host_in_memory_inventory_user: "{{ vm_username }}"
         add_host_in_memory_inventory_pwd: "{{ vm_password }}"
         add_host_in_memory_inventory_python: "{{ vm_python | default('auto') }}"
-        add_host_in_memory_inventory_ssh_pipeline: "{{ vm_ssh_pipeline_enable | default(False) }}"
+        add_host_in_memory_inventory_ssh_pipeline: "{{ vm_ssh_pipeline_enable | default(false) }}"
   when: update_inventory

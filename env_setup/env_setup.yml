@@ -4,7 +4,7 @@
 # Setup testing environment
 - name: env_setup
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
   vars_files:
     - "{{ testing_vars_file | default('../vars/test.yml') }}"
   tasks:
@@ -23,27 +23,27 @@
     # Check VM existence
     - include_tasks: ../common/vm_check_exist.yml
     - name: "Check VM '{{ vm_name }}' does not exist"
-      assert:
+      ansible.builtin.assert:
         that:
           - not vm_exists
         fail_msg: "Cann't deploy VM as a VM with same name '{{ vm_name }}' already exists. Please provide a new vm_name."
       when: new_vm is defined and new_vm | bool
 
     - name: "Check VM '{{ vm_name }}' exists"
-      assert:
+      ansible.builtin.assert:
         that:
           - vm_exists
         fail_msg: "VM '{{ vm_name }}' doesn't exist. Please set new_vm to True to deploy the VM or provide an existing VM name."
       when: new_vm is undefined or not new_vm | bool
-    
+ 
     # Get VM related info if testing on existing VM
     - include_tasks: ../common/vm_get_vm_info.yml
       when: vm_exists is defined and vm_exists
     - name: Set fact of the VM datastore path
-      set_fact:
+      ansible.builtin.set_fact:
         vm_datastore_path: "/vmfs/volumes/{{ datastore }}"
     - name: Display the datatore path of VM files
-      debug: var=vm_datastore_path
+      ansible.builtin.debug: var=vm_datastore_path
 
     # Get vCenter and ESXi version info
     - include_tasks: ../common/vcenter_get_version_build.yml
@@ -52,21 +52,21 @@
 
     - block:
         - name: Get shell executable on ESXi server
-          raw: "if [ -e {{ esxi_shell }} ]; then printf {{ esxi_shell }} ; else printf /bin/sh; fi"
+          ansible.builtin.raw: "if [ -e {{ esxi_shell }} ]; then printf {{ esxi_shell }} ; else printf /bin/sh; fi"
           vars:
             ansible_user: "{{ esxi_username }}"
             ansible_password: "{{ esxi_password }}"
-            ansible_host_key_checking: no
+            ansible_host_key_checking: false
           delegate_to: "{{ esxi_hostname }}"
           register: check_esxi_shell
 
         - name: Set ESXi server shell executable
-          set_fact:
+          ansible.builtin.set_fact:
             esxi_shell_executable: "{{ check_esxi_shell.stdout }}"
       when: esxi_shell is defined and esxi_shell
 
     - name: Set ESXi server shell executable
-      set_fact:
+      ansible.builtin.set_fact:
         esxi_shell_executable: "/bin/sh"
       when: esxi_shell is undefined or not esxi_shell
 
@@ -78,7 +78,7 @@
         add_host_in_memory_inventory_user: "{{ esxi_username }}"
         add_host_in_memory_inventory_pwd: "{{ esxi_password }}"
         add_host_in_memory_inventory_python: "/bin/python"
-        add_host_in_memory_inventory_ssh_pipeline: True
+        add_host_in_memory_inventory_ssh_pipeline: true
         add_host_in_memory_inventory_remote_tmp: "{{ vm_datastore_path }}"
         add_host_in_memory_inventory_shell: "{{ esxi_shell_executable }}"
 
@@ -89,10 +89,10 @@
     # For existing VM
     - block:
         - name: "Not cleanup old snapshot by default"
-          set_fact:
-            cleanup_old_snapshots: False
+          ansible.builtin.set_fact:
+            cleanup_old_snapshots: false
           when: cleanup_old_snapshots is undefined
-        
+ 
         # Cleanup existing snapshots of existing VM if required
         - include_tasks: ../common/vm_cleanup_snapshot.yml
           when: cleanup_old_snapshots | bool

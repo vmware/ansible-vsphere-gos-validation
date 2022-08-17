@@ -5,29 +5,29 @@
 # and new disk controller bus number
 # 
 - name: "Set fact of the valid SCSI controller types list"
-  set_fact:
+  ansible.builtin.set_fact:
     valid_scsi_controller_list: ['buslogic', 'paravirtual', 'lsilogicsas', 'lsilogic']
 
 - name: "Set disk controller type to scsi, sata or nvme"
-  set_fact:
+  ansible.builtin.set_fact:
     disk_controller: "{{ 'scsi' if test_disk_controller_type in valid_scsi_controller_list else test_disk_controller_type }}"
-- debug:
+- ansible.builtin.debug:
     msg: "Under test disk controller type: {{ disk_controller }}"
 
 # Get the total number of controllers with type: scsi, sata or nvme
 - include_tasks: ../../common/vm_get_disk_controller_num.yml
 
 - name: "Set controller '{{ disk_controller }}' number before hotadd"
-  set_fact:
+  ansible.builtin.set_fact:
     vhba_number_before_hotadd: "{{ vhba_number }}"
-- debug:
+- ansible.builtin.debug:
     msg: "Get the number of '{{ disk_controller }}' controller before hotadd: {{ vhba_number_before_hotadd }}"
 
 # New disk controller can be added when existing controller number < 4
 - name: "Set fact of run add new disk controller test when it's number < 4"
-  set_fact:
-    add_new_controller: "{{ True if vhba_number_before_hotadd | int < 4 else False }}"
-- debug:
+  ansible.builtin.set_fact:
+    add_new_controller: "{{ true if vhba_number_before_hotadd | int < 4 else false }}"
+- ansible.builtin.debug:
     msg: "Add new '{{ disk_controller }}' controller when existing < 4: {{ add_new_controller }}"
 
 # Get new disk controller bus number

@@ -6,7 +6,7 @@
 #   vmtools_service_dict: service and service status dict
 #
 - name: Initialize the service and service status result
-  set_fact:
+  ansible.builtin.set_fact:
     vmtools_service_list: []
     vmtools_service_dict: {}
 
@@ -16,7 +16,7 @@
     win_powershell_cmd: "get-service | where-object {$_.displayname -match 'VMware'} | select Name, Status | ft -hide"
 
 - name: Set fact of service list
-  set_fact:
+  ansible.builtin.set_fact:
     vmtools_service_list: "{{ win_powershell_cmd_output.stdout_lines }}"
   when:
     - win_powershell_cmd_output is defined
@@ -24,9 +24,9 @@
     - win_powershell_cmd_output.stdout_lines | length != 0
 
 - name: Set fact of the service and service status dict
-  set_fact:
+  ansible.builtin.set_fact:
     vmtools_service_dict: "{{ vmtools_service_dict | combine({item.split()[0]: item.split()[1]}) }}"
   when: item 
   with_items: "{{ vmtools_service_list }}"
-- debug:
+- ansible.builtin.debug:
     msg: "Get VMware tools installed service dict: {{ vmtools_service_dict | to_yaml }}"

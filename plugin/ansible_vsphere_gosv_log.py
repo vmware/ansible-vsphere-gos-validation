@@ -684,7 +684,7 @@ class CallbackModule(CallbackBase):
         else:
             self._print_task_details(result, "ok", delegated_vars)
 
-        if str(task.action) == "set_fact":
+        if str(task.action) == "ansible.builtin.set_fact":
             set_fact_result = task_result.get('ansible_facts', None)
             # Update deploy_vm test case name if deploy_casename is set
             if self._last_test_name and self._last_test_name.startswith("deploy"):
@@ -717,7 +717,7 @@ class CallbackModule(CallbackBase):
                if self.vm_info:
                    self.vm_info.GUI_Installed = str(set_fact_result.get("guest_os_with_gui", ''))
 
-        elif str(task.action) == "debug":
+        elif str(task.action) == "ansible.builtin.debug":
             if "skip_test_case.yml" == task_file and "Skip testcase:" in task.name:
                 [test_name, test_result] = task.name.split(',')
                 test_name = test_name.split(':')[-1].strip()

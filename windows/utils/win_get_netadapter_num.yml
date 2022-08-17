@@ -4,7 +4,7 @@
 # Get network adapter number from guest OS, except Hyper-V vEthernet
 #
 - name: Initialize network adapter number in guest OS
-  set_fact:
+  ansible.builtin.set_fact:
     nic_num_os: 0
     vmxnet3_guest_num: 0
     e1000e_guest_num: 0
@@ -13,20 +13,20 @@
 - include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "(Get-NetAdapter | where-object {$_.InterfaceDescription -notmatch 'Hyper-V'} | measure).Count"
-    win_execute_cmd_ignore_error: True
+    win_execute_cmd_ignore_error: true
 
 - name: Set fact of the network adapter number
-  set_fact:
+  ansible.builtin.set_fact:
     nic_num_os: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
   when:
     - "'rc' in win_powershell_cmd_output"
     - win_powershell_cmd_output.rc == 0
     - win_powershell_cmd_output.stdout_lines | length != 0
-- debug:
+- ansible.builtin.debug:
     msg: "Get total number of network adapters in guest OS: {{ nic_num_os }}"
 
 - name: Set fact of the searched keywords of vmxnet3 and e1000e network adapter
-  set_fact:
+  ansible.builtin.set_fact:
     vmxnet3_adapter_name: "vmxnet3 Ethernet Adapter"
     e1000e_adapter_name: "Intel\\(R\\) 82574L"
 
@@ -36,13 +36,13 @@
     win_powershell_cmd: "(Get-NetAdapter | where-object {$_.InterfaceDescription -match '{{ vmxnet3_adapter_name }}'} | measure).Count"
 
 - name: Set fact of the VMXNET3 network adapter number
-  set_fact:
+  ansible.builtin.set_fact:
     vmxnet3_guest_num: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
   when:
     - "'rc' in win_powershell_cmd_output"
     - win_powershell_cmd_output.rc == 0
     - win_powershell_cmd_output.stdout_lines | length != 0
-- debug:
+- ansible.builtin.debug:
     msg: "Get vmxnet3 network adapter number in guest OS: {{ vmxnet3_guest_num }}"
 
 # Get the number of e1000e adapters in Windows guest OS
@@ -51,17 +51,17 @@
     win_powershell_cmd: "(Get-NetAdapter | where-object {$_.InterfaceDescription -match '{{ e1000e_adapter_name }}'} | measure).Count"
 
 - name: Set fact of the E1000E network adapter number
-  set_fact:
+  ansible.builtin.set_fact:
     e1000e_guest_num: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
   when:
     - "'rc' in win_powershell_cmd_output"
     - win_powershell_cmd_output.rc == 0
     - win_powershell_cmd_output.stdout_lines | length != 0
-- debug:
+- ansible.builtin.debug:
     msg: "Get e1000e network adapter number in guest OS: {{ e1000e_guest_num }}"
 
 - name: Set fact of the network adapter dict
-  set_fact:
+  ansible.builtin.set_fact:
     win_get_netadapter_num_dict: {'VMXNET3': "{{ vmxnet3_guest_num }}", 'E1000E': "{{ e1000e_guest_num }}", 'total': "{{ nic_num_os }}"}
-- debug:
+- ansible.builtin.debug:
     msg: "Get network adatpers in guest OS: {{ win_get_netadapter_num_dict }}"

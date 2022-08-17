@@ -10,17 +10,18 @@
 #
 - name: ovt_verify_install
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
-    - block:
+    - name: "Test case block"
+      block:
         - include_tasks: ../setup/test_setup.yml
           vars:
-            skip_test_no_vmtools: True
+            skip_test_no_vmtools: true
         - name: "Set update VMware tools by default"
-          set_fact:
-            update_vmtools: True
+          ansible.builtin.set_fact:
+            update_vmtools: true
           when: update_vmtools is undefined
 
         # Flatcar doesn't support to install open-vm-tools
@@ -33,7 +34,7 @@
         # VM has open-vm-tools installed and update_vmtools is set false
         - include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Skip test case because vmtools_is_installed is {{ vmtools_is_installed | default('undefined') }}, update_vmtools is {{ update_vmtools | default(False) }}"
+            skip_msg: "Skip test case because vmtools_is_installed is {{ vmtools_is_installed | default('undefined') }}, update_vmtools is {{ update_vmtools | default(false) }}"
             skip_reason: "No Run"
           when: >
             (vmtools_is_installed is defined and
@@ -42,13 +43,13 @@
 
         # Initialize variables
         - name: "Initialize variables for installing open-vm-tools"
-          set_fact:
-            uninstall_tools: False
-            install_tools: False
+          ansible.builtin.set_fact:
+            uninstall_tools: false
+            install_tools: false
 
         - name: "Set the fact for uninstalling open-vm-tools"
-          set_fact:
-            uninstall_tools: True
+          ansible.builtin.set_fact:
+            uninstall_tools: true
           when:
             - vmtools_is_installed is defined
             - vmtools_is_installed
@@ -65,8 +66,8 @@
 
         # Initialize the variable for installing tools
         - name: "Set the fact for installing tools"
-          set_fact:
-            install_tools: True
+          ansible.builtin.set_fact:
+            install_tools: true
           when: >
             (vmtools_is_installed is undefined) or
             (not vmtools_is_installed) or
@@ -89,4 +90,4 @@
       rescue:
         - include_tasks: ../../common/test_rescue.yml
           vars:
-            exit_testing_when_fail: True
+            exit_testing_when_fail: true

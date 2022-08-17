@@ -9,14 +9,14 @@
 #
 - name: gosc_sanity_staticip
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
           vars:
-            skip_test_no_vmtools: True
+            skip_test_no_vmtools: true
 
         - include_tasks: ../../common/skip_test_case.yml
           vars:
@@ -33,9 +33,9 @@
         # Use router VM as the default gateway hardcoded to 192.168.192.1,
         # use configured static IP address in this subnet
         - name: Set fact of customize static network and gosc start
-          set_fact:
+          ansible.builtin.set_fact:
             customize_network_type: 'static'
-            vm_static_gosc_start: True
+            vm_static_gosc_start: true
 
         - include_tasks: win_gosc_execution.yml
           vars:
@@ -64,7 +64,7 @@
         # Get guest IP after customization from guestinfo
         - include_tasks: ../../common/vm_get_ip_from_vmtools.yml
         - name: Set fact of the VM guest IP after GOSC
-          set_fact:
+          ansible.builtin.set_fact:
             guest_ip_after_gosc: "{{ vm_guest_ip }}"
 
         # Get guest hostname after customization from guestinfo
@@ -76,13 +76,13 @@
           vars:
             property_list: ['guest.hostName']
         - name: Set fact of the hostname after GOSC
-          set_fact:
+          ansible.builtin.set_fact:
             hostname_after_gosc: "{{ vm_config.guest.hostName }}"
-        - debug:
+        - ansible.builtin.debug:
             msg: "Get guest OS hostname/IP after customization: {{ hostname_after_gosc }}/{{ guest_ip_after_gosc }}"
 
         - name: Check IP and hostname changed after customization
-          assert:
+          ansible.builtin.assert:
             that:
               - "{{ guest_ip_before_gosc != guest_ip_after_gosc }}"
               - "{{ hostname_before_gosc != hostname_after_gosc }}"

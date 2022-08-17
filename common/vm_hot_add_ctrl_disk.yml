@@ -15,7 +15,7 @@
 #   unit_number: the disk unit number.
 #
 - name: Check required parameter and valid value
-  assert:
+  ansible.builtin.assert:
     that:
       - disk_controller_type is defined and disk_controller_type
       - disk_controller_type | lower in ['buslogic', 'lsilogic', 'lsilogicsas', 'paravirtual', 'sata', 'nvme']
@@ -26,11 +26,11 @@
       - "ctrl_number and unit_number are also required."
 
 - name: "Add new disk to VM via vmware_guest module"
-  vmware_guest:
+  community.vmware.vmware_guest:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
     password: "{{ vsphere_host_user_password }}"
-    validate_certs: "{{ validate_certs | default(False) }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
     datacenter: "{{ vsphere_host_datacenter }}"
     folder: "{{ vm_folder }}"
     name: "{{ vm_name }}"
@@ -43,5 +43,5 @@
         unit_number: "{{ unit_number }}"
   register: disk_add_facts
 - name: Display the VM disk operation result
-  debug: var=disk_add_facts
+  ansible.builtin.debug: var=disk_add_facts
   when: enable_debug

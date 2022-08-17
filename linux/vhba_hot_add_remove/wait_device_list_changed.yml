@@ -10,14 +10,14 @@
 #                     Required when wait_device_state is absent.
 #
 - name: "Check wait_device_state is correct"
-  assert:
+  ansible.builtin.assert:
     that:
       - wait_device_state is defined
       - wait_device_state | lower in ['present', 'absent']
     fail_msg: "Invalid wait_device_state value '{{ wait_device_state | default('undefined') }}', the expected value is 'present' or 'absent'"
 
 - name: "Check wait_device_name is set for absent device"
-  assert:
+  ansible.builtin.assert:
     that:
       - wait_device_name is defined
       - wait_device_name
@@ -25,19 +25,21 @@
   when: wait_device_state | lower == 'absent'
 
 - name: "Initialize the difference length of device list with device {{ wait_device_state | lower }}"
-  set_fact:
+  ansible.builtin.set_fact:
     wait_device_diff: "{% if wait_device_state | lower == 'present' %}1{% else %}-1{% endif %}"
 
 # Rescan SCSI bus when hot adding/removing LSILogic disk
-- block:
-    - block:
+- name: "Handle LSILogic disk"
+  block:
+    - name: "Rescan in guest expect Flatcar and Ubuntu 22.04"
+      block:
         - name: "Rescan all scsi devices"
-          command: "/usr/bin/rescan-scsi-bus.sh -a -r"
+          ansible.builtin.command: "/usr/bin/rescan-scsi-bus.sh -a -r"
           register: rescan_scsi_result
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "Print result of rescanning scsi"
-          debug: var=rescan_scsi_result.stdout_lines
+          ansible.builtin.debug: var=rescan_scsi_result.stdout_lines
           when:
             - rescan_scsi_result is defined
             - rescan_scsi_result.stdout_lines
@@ -45,18 +47,19 @@
         - "'Flatcar' not in guest_os_ansible_distribution"
         - not (guest_os_ansible_distribution == "Ubuntu" and guest_os_ansible_distribution_ver == "22.04")
 
-    - block:
+    - name: "Rescan in guest for Flatcar and Ubuntu 22.04"
+      block:
         - name: "Rescan all hard disks"
-          shell: |
+          ansible.builtin.shell: |
             for i in `find /sys/ -iname rescan`;do echo 1 >$i; done;
             for i in `find /sys/ -iname scan`;do echo "- - -" >$i; done;
           delegate_to: "{{ vm_guest_ip }}"
 
-        - block:
+        - name: "Rescan in guest for removed disk"
+          block:
             - include_tasks: ../../common/get_system_info.yml
-
             - name: "Set fact of removed disk {{ wait_device_name }}"
-              set_fact:
+              ansible.builtin.set_fact:
                 guest_ansible_device: >
                   {{
                     guest_system_info.ansible_devices |
@@ -66,8 +69,8 @@
                   }}
 
             - name: "Rescan the deleted SCSI disk '{{ wait_device_name }}'"
-              shell: "echo 1 > /sys/block/{{ wait_device_name }}/device/delete"
-              ignore_errors: True
+              ansible.builtin.shell: "echo 1 > /sys/block/{{ wait_device_name }}/device/delete"
+              ignore_errors: true
               delegate_to: "{{ vm_guest_ip }}"
               when:
                 - guest_ansible_device is defined
@@ -81,17 +84,20 @@
           guest_os_ansible_distribution_ver == "22.04"))
   when: new_disk_ctrl_type == 'lsilogic'
 
-- block:
-    - debug:
+- name: "Handle NVMe disk"
+  block:
+    - name: "WORKAROUND"
+      ansible.builtin.debug:
         msg: "Hot adding or removing NVMe disks cannot be detected by guest OS on VMs with hardware version of {{ vm_hardware_version }}."
 
     # Get boot disk controller
     - name: "Set fact of VM's boot disk controller type"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_boot_disk_ctrl_type: "{{ boot_disk_controller if boot_disk_controller in ['sata', 'nvme'] else 'scsi' }}"
       when: new_vm is defined and new_vm | bool
 
-    - block:
+    - name: "For existing VM situation"
+      block:
         - include_tasks: ../../common/vm_get_device_with_label.yml
           vars:
             device_label: "Hard disk 1"
@@ -99,13 +105,13 @@
           vars:
             device_key: "{{ device_info_with_label.controllerKey }}"
         - name: "Set fact of VM's boot disk controller type"
-          set_fact:
+          ansible.builtin.set_fact:
             vm_boot_disk_ctrl_type: "{{ device_info_with_key.deviceInfo.label.split()[0] | lower }}"
       when: new_vm is undefined or not new_vm | bool
 
     - block:
         - name: "Known issue - workaround of detecting NVMe device changes"
-          debug:
+          ansible.builtin.debug:
             msg:
               - "Guest OS can't detect hot add, remove disk attached to NVMe controller when VM's hardware version is {{ vm_hardware_version_num }}. Ignore this known issue."
               - "VM's boot disk controller is not NVMe, so unload and reload nvme driver to see NVMe device changes as a workaround."
@@ -114,13 +120,13 @@
             - known_issue
 
         - name: "Unload and reload nvme driver"
-          shell: "rmmod nvme && modprobe nvme"
+          ansible.builtin.shell: "rmmod nvme && modprobe nvme"
           delegate_to: "{{ vm_guest_ip }}"
       when: vm_boot_disk_ctrl_type != 'nvme'
 
     - block:
         - name: "Known issue - workaround of detecting NVMe device changes"
-          debug:
+          ansible.builtin.debug:
             msg:
               - "Guest OS can't detect hot add, remove disk attached to NVMe controller when VM's hardware version is {{ vm_hardware_version_num }}. Ignore this known issue."
               - "VM's boot disk controller is NVMe, so reboot guest OS to see NVMe device changes as a workaround."
@@ -136,38 +142,39 @@
     - guest_os_ansible_distribution != 'VMware Photon OS'
 
 - name: "Initialize new device list after change"
-  set_fact:
+  ansible.builtin.set_fact:
     device_list_after_change: []
 
 - name: "Wait for device to be {{ wait_device_state | lower }}"
-  shell: "lsblk -o NAME,TYPE --nodeps| grep disk | awk '{print $1}'"
+  ansible.builtin.shell: "lsblk -o NAME,TYPE --nodeps| grep disk | awk '{print $1}'"
   delegate_to: "{{ vm_guest_ip }}"
+  changed_when: false
   register: lsblk_result
   until:
     - lsblk_result.stdout_lines is defined
     - (lsblk_result.stdout_lines | length) - (device_list_before_change | length) == (wait_device_diff | int)
   delay: 5
   retries: 10
-  ignore_errors: True
-  ignore_unreachable: True
+  ignore_errors: true
+  ignore_unreachable: true
 
 - name: "Guest OS unreachable"
-  fail:
+  ansible.builtin.fail:
     msg: "{{ lsblk_result }}"
   when:
     - lsblk_result is defined
     - lsblk_result.unreachable is defined
     - lsblk_result.unreachable
 
-# Check device list changed
-- block:
+- name: "Check device list changed"
+  block:
     - name: "Check new device to be present"
-      fail:
+      ansible.builtin.fail:
         msg: "New device is not recognized in guest OS."
       when: wait_device_state | lower == 'present'
 
     - name: "Check {{ wait_device_name }} to be absent"
-      fail:
+      ansible.builtin.fail:
         msg: "Disk '{{ wait_device_name }}' has been removed but still can be detected by guest OS."
       when: wait_device_state | lower == 'absent'
   when: >
@@ -176,11 +183,11 @@
      (lsblk_result.stdout_lines | length) - (device_list_before_change | length) != (wait_device_diff | int))
 
 - name: "Set fact of new device list after change"
-  set_fact:
+  ansible.builtin.set_fact:
     device_list_after_change: "{{ lsblk_result.stdout_lines }}"
   when:
     - lsblk_result is defined
     - lsblk_result.stdout_lines is defined
 
 - name: "Print the new device list after change"
-  debug: var=device_list_after_change
+  ansible.builtin.debug: var=device_list_after_change

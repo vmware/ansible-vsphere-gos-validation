@@ -14,13 +14,13 @@
 #   vm_primary_ip: the first IPv4 address which is connectable
 #
 - name: "Initialize IP address check result for VM '{{ vm_name }}'"
-  set_fact:
+  ansible.builtin.set_fact:
     test_vm_nic_result: {}
   when: test_vm_nic_result is undefined
 
 - block:
     - name: "Set fact of the network interface MAC and IP address"
-      set_fact:
+      ansible.builtin.set_fact:
         test_vm_mac: "{{ test_vm_nic.key }}"
         test_vm_ip: "{{ test_vm_nic.value }}"
 
@@ -38,16 +38,16 @@
             add_host_in_memory_inventory_python: "{{ vm_python | default('auto') }}"
 
         - name: "Test SSH connection with IP {{ test_vm_ip }} of VM '{{ vm_name }}'"
-          setup:
+          ansible.builtin.setup:
             filter: "ansible_all_ipv4_addresses"
           register: test_ssh_connection
           delegate_to: "{{ test_vm_ip }}"
         - name: Display the target VM connection test result
-          debug: var=test_ssh_connection
+          ansible.builtin.debug: var=test_ssh_connection
           when: enable_debug is defined and enable_debug
 
         - name: "Check IP address '{{ test_vm_ip }}' in ansible_all_ipv4_addresses"
-          assert:
+          ansible.builtin.assert:
             that:
               - not test_ssh_connection.failed
               - test_ssh_connection.ansible_facts is defined
@@ -55,14 +55,14 @@
               - test_vm_ip in test_ssh_connection.ansible_facts.ansible_all_ipv4_addresses
 
         - name: "SSH connection to '{{ test_vm_ip }}' succeeded"
-          set_fact:
+          ansible.builtin.set_fact:
             test_vm_nic_result: "{{ test_vm_nic_result | combine({test_vm_mac: 'succeed'}) }}"
             vm_primary_mac: "{{ test_vm_mac }}"
             vm_primary_ip: "{{ test_vm_ip }}"
       rescue:
         # Failed at waiting connection, testing connection or assertion
         - name: "SSH connection to IP {{ test_vm_ip }} of VM '{{ vm_name }}' failed"
-          set_fact:
+          ansible.builtin.set_fact:
             test_vm_nic_result: "{{ test_vm_nic_result | combine({test_vm_mac: 'fail'}) }}"
   when: >
     (skip_if_primary_ip_found is undefined) or

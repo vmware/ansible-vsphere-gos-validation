@@ -10,20 +10,20 @@
 #
 - block:
     - name: "Check 'os_installation_iso_url' parameter value is valid"
-      assert:
+      ansible.builtin.assert:
         that:
           - os_installation_iso_url
         fail_msg: "os_installation_iso_url parameter is not valid, please set it to the ftp/http/https URL for downloading OS installation ISO file."
     - include_tasks: download_iso_and_transfer.yml
     - name: "Set fact of ISO file list and length"
-      set_fact:
+      ansible.builtin.set_fact:
         os_installation_iso_list: "{{ [transferred_install_iso] }}"
         os_install_iso_list_len: 1
   when: os_installation_iso_url is defined
 
 - block:
     - name: "Check 'os_installation_iso_list' parameter value is valid"
-      assert:
+      ansible.builtin.assert:
         that:
           - os_installation_iso_list is defined
           - os_installation_iso_list
@@ -32,13 +32,13 @@
         fail_msg: "os_installation_iso_list parameter is not valid, please set it to a list of ISO files' paths."
 
     - name: "Check configured path in 'os_installation_iso_list' list is in valid format '[datastore] file_path1/file_name1'."
-      assert:
+      ansible.builtin.assert:
         that:
           - item is regex("^\[.*\]\s.+")
         fail_msg: "ISO file's path in os_installation_iso_list parameter is not in the format of '[datastore_name] file_path/file_name'."
       with_items: "{{ os_installation_iso_list }}"
 
     - name: "Set fact of the length of configured 'os_installation_iso_list' parameter"
-      set_fact:
+      ansible.builtin.set_fact:
         os_install_iso_list_len: "{{ os_installation_iso_list | length }}"
   when: os_installation_iso_url is undefined

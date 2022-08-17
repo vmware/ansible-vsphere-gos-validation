@@ -13,11 +13,11 @@
 #     'lsilogic', 'lsilogicsas', 'paravirtual', 'sata', or 'nvme'.
 #   ctrl_number: the disk controller bus number.
 #   unit_number: the disk unit number.
-#   delete_disk_file: True or False. If 'disk_operation' is 'absent', whether
+#   delete_disk_file: true or false. If 'disk_operation' is 'absent', whether
 #     delete disk file in datastore or not.
 #
 - name: Check required parameter
-  assert:
+  ansible.builtin.assert:
     that:
       - disk_operation is defined and disk_operation
       - disk_operation | lower in ['present', 'absent']
@@ -32,21 +32,21 @@
 
 - block:
     - name: Set default disk size to 1 GB
-      set_fact:
+      ansible.builtin.set_fact:
         disk_size_gb: 1
       when: disk_size_gb is undefined or disk_size_gb|int == 0
     - name: Set default disk provision type to 'thin'
-      set_fact:
+      ansible.builtin.set_fact:
         disk_provision_type: 'thin'
       when: disk_provision_type is undefined or not disk_provision_type
   when: disk_operation | lower == 'present'
 
 - name: "{{ disk_operation }} disk to VM"
-  vmware_guest_disk:
+  community.vmware.vmware_guest_disk:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
     password: "{{ vsphere_host_user_password }}"
-    validate_certs: "{{ validate_certs | default(False) }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
     datacenter: "{{ vsphere_host_datacenter }}"
     folder: "{{ vm_folder }}"
     name: "{{ vm_name }}"
@@ -61,5 +61,5 @@
         destroy: "{{ delete_disk_file | default(omit) }}"
   register: disk_add_facts
 - name: Display the VM disk operation result
-  debug: var=disk_add_facts
+  ansible.builtin.debug: var=disk_add_facts
   when: enable_debug

@@ -7,18 +7,19 @@
 #
 - name: check_quiesce_snapshot_custom_script
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
-    - block:
+    - name: "Test case block"
+      block:
         - include_tasks: ../setup/test_setup.yml
           vars:
-            skip_test_no_vmtools: True
+            skip_test_no_vmtools: true
 
         # Take quiesce snapshot
         - name: Set quiesce snapshot variables
-          set_fact:
+          ansible.builtin.set_fact:
             qs_snapshot_name: "quiesce_snapshot_{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
             backup_script_dir: "/etc/vmware-tools/backupScripts.d"
             vss_shell_script: "vss_script_sh.sh"
@@ -28,14 +29,14 @@
 
         # Copy vss_script_sh.sh to /etc/vmware-tools/backupScripts.d/vss_script_sh.sh
         - name: "Create backup script dir {{ backup_script_dir }}"
-          file:
+          ansible.builtin.file:
             path: "{{ backup_script_dir }}"
             state: directory
             mode: 0755
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "Copy custom script {{ vss_shell_script }}"
-          copy:
+          ansible.builtin.copy:
             src: "{{ vss_shell_script }}"
             dest: "{{ backup_script_dir }}/{{ vss_shell_script }}"
             mode: 0755
@@ -43,7 +44,7 @@
 
         # Copy pre-freeze-script and post-thaw-script to /usr/sbin/
         - name: Copy custom script pre-freeze-script and post-thaw-script to /usr/sbin
-          copy:
+          ansible.builtin.copy:
             src: "{{ vss_bin_script }}"
             dest: "/usr/sbin/{{ item }}"
             mode: 0755
@@ -55,7 +56,7 @@
 
         # Ensure /vss.log is absent
         - name: "Remove {{ vss_log_path }} if it exists"
-          file:
+          ansible.builtin.file:
             path: "{{ vss_log_path }}"
             state: absent
           delegate_to: "{{ vm_guest_ip }}"
@@ -72,13 +73,13 @@
         # /etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw
         # /usr/sbin/post-thaw-script thaw
         - name: "Check {{ vss_log_path }} existence"
-          stat:
+          ansible.builtin.stat:
             path: "{{ vss_log_path }}"
           register: vss_stat
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "{{ ansible_play_name }} failed"
-          fail:
+          ansible.builtin.fail:
             msg: "{{ vss_log_path }} doesn't exist after quiesce snapshot"
           when: >
             (vss_stat is undefined) or
@@ -96,7 +97,7 @@
                 dest_path: "{{ current_test_log_folder }}{{ vss_log_path }}"
 
             - name: Get file content in /vss.log
-              shell: "cat {{ current_test_log_folder }}{{ vss_log_path }}"
+              ansible.builtin.shell: "cat {{ current_test_log_folder }}{{ vss_log_path }}"
               register: vss_content
           when:
             - vss_stat is defined
@@ -106,7 +107,7 @@
 
         # Test failed for non-Flatcar guest
         - name: "{{ ansible_play_name }} failed"
-          fail:
+          ansible.builtin.fail:
             msg: "{{ vss_log_path }} has incorrect content"
           when: ('Flatcar' not in guest_os_ansible_distribution) and
               (( not vss_content ) or
@@ -119,7 +120,7 @@
 
         # Test failed for Flatcar guest
         - name: "{{ ansible_play_name }} failed"
-          fail:
+          ansible.builtin.fail:
             msg: "{{ vss_log_path }} has incorrect content"
           when: ('Flatcar' in guest_os_ansible_distribution) and
              (( not vss_content ) or

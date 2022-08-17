@@ -4,11 +4,11 @@
 # Get VM memory size before memory hotadd
 - include_tasks: ../../common/vm_get_guest_facts.yml
 - name: "Set fact of the memory size before hotadd"
-  set_fact:
+  ansible.builtin.set_fact:
     mem_before_hotadd: "{{ vm_guest_facts.instance.hw_memtotal_mb }}"
 
 - name: "Set fact of the memory size after hotadd"
-  set_fact:
+  ansible.builtin.set_fact:
     mem_after_hotadd: "{{ (mem_before_hotadd | int) + (hotadd_mb | int) }}"
 
 - include_tasks: ../../common/vm_set_memory_size.yml
@@ -16,14 +16,14 @@
     memory_mb: "{{ mem_after_hotadd }}"
 
 - name: Wait for 20 seconds after changing VM memory
-  pause:
+  ansible.builtin.pause:
     seconds: 20
 # Add check guest OS winrm can be connected after memory size change
 - include_tasks: ../utils/win_check_winrm.yml
 
 - include_tasks: ../utils/win_get_mem_size.yml
 - name: Check memory size got from guest OS
-  assert:
+  ansible.builtin.assert:
     that:
       - "{{ mem_after_hotadd | int }} == {{ win_get_mem_size | int }}"
     fail_msg: "Get memory size in guest: {{ win_get_mem_size | int }}MB, not expected: {{ mem_after_hotadd | int }}MB"
@@ -32,7 +32,7 @@
     (guest_os_ansible_architecture == "32-bit" and mem_after_hotadd | int < 4096)
 
 - name: Check memory size got from guest OS
-  assert:
+  ansible.builtin.assert:
     that:
       - "{{ win_get_mem_size | int }} == 3072"
     fail_msg: "Get memory size in 32-bit guest: {{ win_get_mem_size | int }}MB, when configured memory size >= 4GB"
@@ -41,5 +41,5 @@
     - mem_after_hotadd | int >= 4096
 
 - name: Set fact of the memory hotadd results
-  set_fact:
+  ansible.builtin.set_fact:
     mem_hotadd_results: "{{ mem_hotadd_results + ['Memory hotadd succeeds: ' ~ mem_before_hotadd ~ '->' ~ mem_after_hotadd ~ ' with vCPU number: ' ~ vcpu_number] }}"

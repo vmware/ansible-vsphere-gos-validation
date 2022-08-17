@@ -3,14 +3,14 @@
 ---
 # Create local folders and files for info collection
 - name: "Create dir '{{ current_test_log_folder }}' for info collection"
-  file:
+  ansible.builtin.file:
     path: "{{ current_test_log_folder }}"
     state: directory
     mode: "777"
-    recurse: True
+    recurse: true
 
 - name: "Initialize GOSC validation results"
-  set_fact:
+  ansible.builtin.set_fact:
     gosc_validation_result: {}
     gosc_validation_errors: {}
 
@@ -38,30 +38,30 @@
 - include_tasks: check_timezone_and_hwclock.yml
 
 - name: "Print GOSC validation result"
-  debug: var=gosc_validation_result
+  ansible.builtin.debug: var=gosc_validation_result
 
 - name: "Print GOSC validation errors"
-  debug: var=gosc_validation_errors
+  ansible.builtin.debug: var=gosc_validation_errors
 
 - name: "Get failed customization items"
-  set_fact:
+  ansible.builtin.set_fact:
     gosc_failed_items: "{{ gosc_validation_result | dict2items | selectattr('value', 'equalto', false) | map(attribute='key') }}"
 
 # Warn about below known issues but not fail the task
 - block:
     - name: "Ignore DNS customization failures"
-      set_fact:
+      ansible.builtin.set_fact:
         ignored_gosc_failed_items: ['dns_servers_success', 'dns_suffix_success']
 
     - name: "Known issue - ignore cloud-init GOSC failure on DNS"
-      debug:
+      ansible.builtin.debug:
         msg: "{{ (gosc_validation_errors | dict2items | selectattr('key', 'in', ignored_gosc_failed_items) | map(attribute='value') | flatten) + ['DNS customization failed due to https://bugs.launchpad.net/ubuntu/+source/cloud-init/+bug/1776452. Ignore this knonwn issue.'] }}"
       tags:
         - known_issue
       when: (gosc_failed_items | length) > (gosc_failed_items | difference(ignored_gosc_failed_items) | length)
 
     - name: "Update failed customization items"
-      set_fact:
+      ansible.builtin.set_fact:
         gosc_failed_items: "{{ gosc_failed_items | difference(ignored_gosc_failed_items) }}"
   when:
     - gosc_failed_items | length > 0
@@ -73,18 +73,18 @@
 # The issue was fixed on vCenter Server 6.5 U3, 6.7U2, and later releases.
 - block:
     - name: "Ignore default gateway customization failure"
-      set_fact:
+      ansible.builtin.set_fact:
         ignored_gosc_failed_items: ['guest_gateway_success']
 
     - name: "Known issue - ignore cloud-init GOSC failure on default gateway"
-      debug:
+      ansible.builtin.debug:
         msg: "{{ (gosc_validation_errors | dict2items | selectattr('key', 'in', ignored_gosc_failed_items) | map(attribute='value') | flatten) + ['Default gateway customization failure has been fixed on vCenter Server 6.5 U3 and 6.7U2. Ignore this knonwn issue.', 'Please refer to https://docs.vmware.com/en/VMware-vSphere/6.5/rn/vsphere-vcenter-server-65u3-release-notes.html#guest-os-issues-resolved and https://docs.vmware.com/en/VMware-vSphere/6.7/rn/vsphere-vcenter-server-67u2-release-notes.html#guest-os-issues-resolved.'] }}"
       tags:
         - known_issue
       when: (gosc_failed_items | length) > (gosc_failed_items | difference(ignored_gosc_failed_items) | length)
 
     - name: "Update failed customization items"
-      set_fact:
+      ansible.builtin.set_fact:
         gosc_failed_items: "{{ gosc_failed_items | difference(ignored_gosc_failed_items) }}"
   when:
     - gosc_failed_items | length > 0
@@ -94,24 +94,24 @@
 
 - block:
     - name: "Ignore GOSC state keyword failure"
-      set_fact:
+      ansible.builtin.set_fact:
         ignored_gosc_failed_items: ['gosc_state_keyword_found']
 
     - name: "Known issue - ignore no GOSC complete state code"
-      debug:
+      ansible.builtin.debug:
         msg: "{{ (gosc_validation_errors | dict2items | selectattr('key', 'in', ignored_gosc_failed_items) | map(attribute='value') | flatten) + ['There is no GOSC complete state keyword in vmware.log when performing GOSC from vCenter Server 6.5 U3 or earlier. Ignore this known issue.'] }}"
       tags:
         - known_issue
       when: (gosc_failed_items | length) > (gosc_failed_items | difference(ignored_gosc_failed_items) | length)
 
     - name: "Update failed customization items"
-      set_fact:
+      ansible.builtin.set_fact:
         gosc_failed_items: "{{ gosc_failed_items | difference(ignored_gosc_failed_items) }}"
   when:
     - gosc_failed_items | length > 0
     - vcenter_version is version('6.5.0', '==')
 
 - name: "GOS customization failed"
-  fail:
+  ansible.builtin.fail:
     msg: "{{ gosc_validation_errors | dict2items | selectattr('key', 'in', gosc_failed_items) | map(attribute='value') | flatten }}"
   when: gosc_failed_items | length > 0

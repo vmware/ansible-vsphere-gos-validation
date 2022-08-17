@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: "Set memory size to {{ memory_mb }} MB"
-  vmware_guest:
+  community.vmware.vmware_guest:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
     password: "{{ vsphere_host_user_password }}"
-    validate_certs: "{{ validate_certs | default(False) }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
     datacenter: "{{ vsphere_host_datacenter }}"
     folder: "{{ vm_folder }}"
     name: "{{ vm_name }}"
@@ -14,14 +14,14 @@
       memory_mb: "{{ memory_mb }}"
   register: vm_guest_facts
 - name: Display the memory set result
-  debug: var=vm_guest_facts
+  ansible.builtin.debug: var=vm_guest_facts
   when: enable_debug is defined and enable_debug
 
 - name: Set fact of the memory size after setting
-  set_fact:
+  ansible.builtin.set_fact:
     vm_set_mem_size_result: "{{ vm_guest_facts.instance.hw_memtotal_mb }}"
 - name: Check VM memory size after setting
-  assert:
+  ansible.builtin.assert:
     that:
       - vm_set_mem_size_result | int == memory_mb | int
     fail_msg: "Failed to set memory to {{ memory_mb }} MB. VM memory size is {{ vm_set_mem_size_result }} MB"

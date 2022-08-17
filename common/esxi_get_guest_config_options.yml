@@ -47,14 +47,14 @@
 #      ]
 #  }
 - name: "Check esxi_hardware_version is set with valid value"
-  assert:
+  ansible.builtin.assert:
     that:
       - esxi_hardware_version is defined
       - esxi_hardware_version is match('^\d+')
     fail_msg: "Incorrect hardware version '{{ esxi_hardware_version }}'"
 
 - name: "Initialize variables about guest ID config options"
-  set_fact:
+  ansible.builtin.set_fact:
     guest_config_options: {}
 
 # Get config options from ansible module vmware_vm_config_option
@@ -63,17 +63,17 @@
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
     password: "{{ vsphere_host_user_password }}"
-    validate_certs: "{{ validate_certs | default(False) }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
     datacenter: "{{ vsphere_host_datacenter }}"
     esxi_hostname: "{{ esxi_hostname }}"
-    get_config_options: True
+    get_config_options: true
     hardware_version: "vmx-{{ esxi_hardware_version }}"
     guest_id: "{{ guest_id }}"
   register: get_config_options_result
-  ignore_errors: True
+  ignore_errors: true
 
 - name: "Set fact of guest ID {{ guest_id }} default config options on hardware version {{ hardware_version }}"
-  set_fact:
+  ansible.builtin.set_fact:
     guest_config_options: >-
       {{
         get_config_options_result.instance["Recommended config options"].keys()
@@ -90,7 +90,7 @@
 # Get config options from config file
 - block:
     - name: "Initialize variables for getting guest ID default configs"
-      set_fact:
+      ansible.builtin.set_fact:
         vm_config_option_esx_hw: "/etc/vmware/hostd/env/vmconfigoption-esx-hw{{ esxi_hardware_version }}.xml"
         guest_config_options_xpath: "/ConfigRoot/ConfigurationOption/guestOSDescriptor/e[id='{{ guest_id }}']"
         vm_device_types:
@@ -128,7 +128,7 @@
           supportsTPM20: "support_tpm_20"
 
     - name: "Initialize VM default config options"
-      set_fact:
+      ansible.builtin.set_fact:
         guest_config_options: >-
           {{
             vm_config_name.values() | zip_longest([]) 
@@ -141,14 +141,14 @@
         tmp_dir: "{{ local_cache }}"
 
     - name: "Set fact of temp config option file"
-      set_fact:
+      ansible.builtin.set_fact:
         tmp_config_option_file: "{{ tmp_path }}"
 
     - name: "Fetch config option file from ESXi server"
       fetch:
         src: "{{ vm_config_option_esx_hw }}"
         dest: "{{ tmp_config_option_file }}"
-        flat: True
+        flat: true
       delegate_to: "{{ esxi_hostname }}"
 
     - name: "Get default config option from guest OS descriptor for guest id {{ guest_id }}"
@@ -157,11 +157,11 @@
         xpath: "{{ guest_config_options_xpath }}/{{ item }}"
         content: text
       register: guest_os_descriptor
-      ignore_errors: True
+      ignore_errors: true
       loop: "{{ vm_config_name.keys() }}"
       
     - name: "Set fact for VM default config with guest id {{ guest_id }}"
-      set_fact:
+      ansible.builtin.set_fact:
         guest_config_options: >-
           {{ 
             guest_config_options 
@@ -176,10 +176,10 @@
         xpath: "{{ guest_config_options_xpath }}/vRAMSizeInKB/defaultValue"
         content: text
       register: guest_vram_size
-      ignore_errors: True
+      ignore_errors: true
 
     - name: "Set default video RAM size in KB for guest id {{ guest_id }}"
-      set_fact:
+      ansible.builtin.set_fact:
         guest_config_options: "{{ guest_config_options | combine({'rec_vram_kb': guest_vram_size.matches[0].defaultValue}) }}"
       when:
         - guest_vram_size is defined
@@ -192,10 +192,10 @@
         xpath: "{{ guest_config_options_xpath }}/supportedDiskControllerList/e"
         content: text
       register: guest_supported_disk_ctrls
-      ignore_errors: True
+      ignore_errors: true
 
     - name: "Set supported disk controllers for guest id {{ guest_id }}"
-      set_fact:
+      ansible.builtin.set_fact:
         guest_config_options: >-
           {{ 
             guest_config_options
@@ -215,10 +215,10 @@
         xpath: "{{ guest_config_options_xpath }}/supportedEthernetCard/e"
         content: text
       register: guest_supported_ethernet_card
-      ignore_errors: True
+      ignore_errors: true
 
     - name: "Set supported network adapters for guest id {{ guest_id }}"
-      set_fact:
+      ansible.builtin.set_fact:
         guest_config_options: >-
           {{ 
             guest_config_options
@@ -238,10 +238,10 @@
         xpath: "{{ guest_config_options_xpath }}/supportedUSBControllerList/e"
         content: text
       register: guest_supported_usb_ctrls
-      ignore_errors: True
+      ignore_errors: true
 
     - name: "Set supported USB controllers for guest id {{ guest_id }}"
-      set_fact:
+      ansible.builtin.set_fact:
         guest_config_options: >-
           {{ 
             guest_config_options
@@ -256,7 +256,7 @@
         - guest_supported_usb_ctrls.matches | length > 0
 
     - name: "Combine guest_id and hardware version into guest_config_options"
-      set_fact:
+      ansible.builtin.set_fact:
         guest_config_options: >-
           {{ 
             guest_config_options
@@ -267,7 +267,7 @@
            }}
 
     - name: "Remove temporary config option file"
-      file:
+      ansible.builtin.file:
         path: "{{ tmp_config_option_file }}"
         state: absent
   when: >
@@ -276,7 +276,7 @@
     (get_config_options_result.instance["Recommended config options"]) is undefined
 
 - name: "Set default CPU number for VM with guest id {{ guest_id }}"
-  set_fact:
+  ansible.builtin.set_fact:
     guest_config_options: "{{ guest_config_options | combine({'default_cpu_number': (guest_config_options.default_cpu_cores_per_socket | int) * (guest_config_options.default_cpu_socket | int) }) }}"
   when:
     - guest_config_options.default_cpu_cores_per_socket is defined
@@ -285,5 +285,5 @@
     - guest_config_options.default_cpu_socket | int >= 1
 
 - name: "Print guest id {{ guest_id }} config options on hardware version {{ esxi_hardware_version }}"
-  debug: var=guest_config_options
+  ansible.builtin.debug: var=guest_config_options
 

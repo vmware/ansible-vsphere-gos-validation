@@ -12,25 +12,26 @@
 #
 - name: device_list
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
-    - block:
+    - name: "Test case block"
+      block:
         - include_tasks: ../setup/test_setup.yml
           vars:
-            skip_test_no_vmtools: True
+            skip_test_no_vmtools: true
 
         - include_tasks: ../utils/device_connectable_enable.yml
 
         - include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
 
         - name: "List devices in guest OS"
-          command: "{{ vmware_toolbox_cmd_path }} device list"
+          ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} device list"
           register: device_list
           delegate_to: "{{ vm_guest_ip }}"
 
-        - debug:
+        - ansible.builtin.debug:
             msg: "Devices detected by VMware Tools in guest OS: {{ device_list.stdout_lines }}"
 
         # Get VM's hardware devices

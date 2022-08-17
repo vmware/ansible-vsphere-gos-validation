@@ -3,11 +3,11 @@
 ---
 # Collect cloud-init logs at deploying OVA or guest customization
 - name: "Initialize the cloud-init logs archive path in guest OS"
-  set_fact:
+  ansible.builtin.set_fact:
     cloudinit_logs_src_path: "/tmp/cloud-init_{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}.tar.gz"
 
 - name: "Set fact of cloud-init logs archive path at local"
-  set_fact:
+  ansible.builtin.set_fact:
     cloudinit_logs_local_path: "{{ current_test_log_folder }}/{{ cloudinit_logs_src_path | basename }}"
 
 - block:
@@ -29,14 +29,14 @@
 
 - block:
     - name: "Collect cloud-init logs"
-      shell: "/usr/bin/cloud-init collect-logs -u -t {{ cloudinit_logs_src_path }}"
+      ansible.builtin.shell: "/usr/bin/cloud-init collect-logs -u -t {{ cloudinit_logs_src_path }}"
       delegate_to: "{{ vm_guest_ip }}"
 
     - name: "Fetch cloud-init logs from guest OS"
-      fetch:
+      ansible.builtin.fetch:
         src: "{{ cloudinit_logs_src_path }}"
         dest: "{{ cloudinit_logs_local_path }}"
-        flat: True
+        flat: true
       delegate_to: "{{ vm_guest_ip }}"
   when:
     - vmtools_is_running is undefined or not (vmtools_is_running | bool)

@@ -4,7 +4,7 @@
 # Get existing Ethernet interface before hotadd testing
 - include_tasks: ../utils/ethernet_link_get.yml
 - name: "Set fact of Ethernet adapter info before hotadd"
-  set_fact:
+  ansible.builtin.set_fact:
     eth_before_hotadd: "{{ guest_network_interfaces }}"
 
 # Hotadd a new network adapter to VM
@@ -13,16 +13,16 @@
 # Get Ethernet interfaces after hotadd
 - include_tasks: ../utils/ethernet_link_get.yml
 - name: "Set fact of Ethernet adapter info after hotadd"
-  set_fact:
+  ansible.builtin.set_fact:
     eth_after_hotadd: "{{ guest_network_interfaces }}"
 
 # Get new added Ethernet interface
 - name: "Set fact of new added Ethernet adapter"
-  set_fact:
+  ansible.builtin.set_fact:
     new_eth: "{{ eth_after_hotadd | difference(eth_before_hotadd) }}"
 
 - name: "Assert detect new {{ adapter_type }} adapter interface succeed"
-  assert:
+  ansible.builtin.assert:
     that:
       - new_eth | length != 0
       - new_eth[0]
@@ -42,7 +42,7 @@
 # Ping VLAN gateway to check hot-added ethernet adapter works
 - include: ping_vlan_gateway.yml
 - name: "Check ping vlan gateway result"
-  assert:
+  ansible.builtin.assert:
     that:
       - success_ping
     fail_msg: "Failed to ping vlan gateway from {{ new_eth[0] }}"

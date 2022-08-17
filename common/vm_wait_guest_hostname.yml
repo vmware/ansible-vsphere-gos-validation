@@ -10,16 +10,16 @@
 # info, the default value is 300 seconds.
 #
 - name: "Initialize the guest hostname to empty string if not defined"
-  set_fact:
+  ansible.builtin.set_fact:
     wait_guest_hostname: ""
   when: wait_guest_hostname is undefined
 
 - name: Wait for VMware Tools collecting guest OS hostname
-  vmware_guest_info:
+  community.vmware.vmware_guest_info:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
     password: "{{ vsphere_host_user_password }}"
-    validate_certs: "{{ validate_certs | default(False) }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
     datacenter: "{{ vsphere_host_datacenter }}"
     folder: "{{ vm_folder }}"
     name: "{{ vm_name }}"
@@ -35,7 +35,7 @@
     - (not wait_guest_hostname) or (wait_guest_hostname and wait_guest_hostname == vm_guest_facts.instance.guest.hostName)
 
 - name: Display the retrieved guest info
-  debug: var=vm_guest_facts
+  ansible.builtin.debug: var=vm_guest_facts
   when: enable_debug | bool
-- debug:
+- ansible.builtin.debug:
     msg: "Get VM guest OS hostname: {{ vm_guest_facts.instance.guest.hostName }}"

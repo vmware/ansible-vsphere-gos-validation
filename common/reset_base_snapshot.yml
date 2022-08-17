@@ -3,8 +3,8 @@
 ---
 # Rename or remove old base snapshot and take a new base snapshot
 # Parameters:
-#   remove_old_base_snapshot: if set to 'False', will rename old
-#   base snapshot with a timestamp sufix, if set to 'True', will
+#   remove_old_base_snapshot: if set to false, will rename old
+#   base snapshot with a timestamp sufix, if set to true, will
 #   remove old base snapshot.
 #
 # Check old base snapshot exists or not
@@ -13,7 +13,7 @@
     snapshot_name: "{{ base_snapshot_name }}"
 
 - name: "Set fact of snapshot '{{ base_snapshot_name }}' existence"
-  set_fact:
+  ansible.builtin.set_fact:
     old_base_snapshot_exist: "{{ snapshot_exist }}"
     old_snapshot_new_name: "{{ base_snapshot_name }}-{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
 
@@ -24,7 +24,7 @@
     new_snapshot_name: "{{ old_snapshot_new_name }}"
   when:
     - old_base_snapshot_exist
-    - not remove_old_base_snapshot | default(False)
+    - not remove_old_base_snapshot | default(false)
 
 # Remove old base snapshot
 - include_tasks: vm_remove_snapshot.yml
@@ -32,7 +32,7 @@
     snapshot_name: "{{ base_snapshot_name }}"
   when:
     - old_base_snapshot_exist
-    - remove_old_base_snapshot | default(False)
+    - remove_old_base_snapshot | default(false)
 
 # Take a new snapshot as base snapshot
 - include_tasks: vm_take_snapshot.yml
@@ -40,5 +40,5 @@
     snapshot_name: "{{ base_snapshot_name }}"
 
 - name: "Refresh base snapshot status variable"
-  set_fact:
-    base_snapshot_exists: True
+  ansible.builtin.set_fact:
+    base_snapshot_exists: true

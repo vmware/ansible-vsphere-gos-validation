@@ -3,14 +3,14 @@
 ---
 # Fetch log files from Windows guest OS to local
 - name: Initialize the dict of source log files and dest path
-  set_fact:
+  ansible.builtin.set_fact:
     separator: '\'
     source_log_list: []
     dest_log_list: []
     gosc_win_log_src_dest: {}
 
 - name: Set fact of the GOSC log files' paths
-  set_fact:
+  ansible.builtin.set_fact:
     gosc_win_log_files:
       - 'Temp\vmware-imc\guestcust.log'
       - 'Temp\vmware-imc\toolsDeployPkg.log'
@@ -24,16 +24,16 @@
       - 'Debug\PASSWD.LOG'
       - 'Debug\sammui.log'
 - name: Set fact of the absolute file path list
-  set_fact:
+  ansible.builtin.set_fact:
     source_log_list: "{{ source_log_list + [win_dir ~ separator ~ item] }}"
     dest_log_list: "{{ dest_log_list + [current_test_log_folder ~ '/' ~ item.split(separator) | join('/')] }}"
   with_items: "{{ gosc_win_log_files }}"
 
 - name: Set fact of the source file path and dest file path dict
-  set_fact:
+  ansible.builtin.set_fact:
     gosc_win_log_src_dest: "{{ dict(source_log_list | zip(dest_log_list)) }}"
 - name: Display the GOSC log files to be fetched
-  debug: var=gosc_win_log_src_dest
+  ansible.builtin.debug: var=gosc_win_log_src_dest
 
 - include_tasks: ../../common/vm_guest_file_operation.yml
   vars:

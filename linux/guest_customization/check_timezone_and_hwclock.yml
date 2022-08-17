@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: "Initialize timezone check result"
-  set_fact:
+  ansible.builtin.set_fact:
     guest_timezone: ""
     timezone_success: ""
 
 - name: "Initialize hardware clock check result for perl GOSC"
-  set_fact:
+  ansible.builtin.set_fact:
     guest_hwclockUTC: ""
     hwclock_success: ""
   when: gosc_workflow == "perl"
@@ -28,11 +28,11 @@
         dest_path: "{{ current_test_log_folder }}/timedatectl_status.txt"
 
     - name: "Get time zone from 'timedatectl status'"
-      set_fact:
+      ansible.builtin.set_fact:
         guest_timedate_status: "{{ lookup('file', current_test_log_folder ~ '/timedatectl_status.txt') | regex_search('\\s*Time zone:\\s*[^\\n]+\\n?') }}"
 
     - name: "Set fact of guest time zone after GOSC"
-      set_fact:
+      ansible.builtin.set_fact:
         guest_timezone: "{{ guest_timedate_status | regex_replace('.*\\s*Time zone:\\s*([^\\s]+)\\s*.*\\n?', '\\1')}}"
 
     - block:
@@ -43,7 +43,7 @@
             regexp: "^ *RTC in local TZ: no"
           register: hwclock_result
         - name: "Save guest hardware clock setting after GOSC"
-          set_fact:
+          ansible.builtin.set_fact:
             guest_hwclockUTC: "{{ regexp_found | int > 0 }}"
       when: (gosc_workflow == "perl")
   when: vm_shell_result.exit_code is defined and vm_shell_result.exit_code == 0
@@ -64,7 +64,7 @@
         dest_path: "{{ current_test_log_folder }}/readlink_etc_localtime.txt"
 
     - name: "Get timezone info from /etc/localtime"
-      set_fact:
+      ansible.builtin.set_fact:
         guest_timezone: "{{ lookup('file', current_test_log_folder ~ '/readlink_etc_localtime.txt') | replace('/usr/share/zoneinfo/','') }}"
 
     # Get hwclock by running command "hwclock -D" when test perl GOSC
@@ -85,18 +85,18 @@
             path: "{{ current_test_log_folder }}/hwclock_D.txt"
             regexp: "^Hardware clock is on UTC time"
         - name: "Save hardware clock settting after GOSC"
-          set_fact:
+          ansible.builtin.set_fact:
             guest_hwclockUTC: "{{ regexp_found | int > 0 }}"
       when: gosc_workflow == "perl"
   when: vm_shell_result.exit_code is undefined or vm_shell_result.exit_code != 0
 
 # Check guest time zone
 - name: "Check guest timezone is customized"
-  set_fact:
+  ansible.builtin.set_fact:
     timezone_success: "{{ guest_timezone == linux_gosc_spec['timezone'] }}"
 
 - name: "Print timezone check result"
-  debug: var=timezone_success
+  ansible.builtin.debug: var=timezone_success
 
 - include_tasks: set_gosc_validation_result.yml
   vars:
@@ -107,10 +107,10 @@
 # cloud-init GOSC doesn't support hwclock customization
 - block:
     - name: Check guest hwclock is customized
-      set_fact:
+      ansible.builtin.set_fact:
         hwclock_success: "{{ guest_hwclockUTC == linux_gosc_spec['hwclockUTC'] }}"
     - name: "Print hardware clock check result"
-      debug: var=hwclock_success
+      ansible.builtin.debug: var=hwclock_success
 
     - include_tasks: set_gosc_validation_result.yml
       vars:

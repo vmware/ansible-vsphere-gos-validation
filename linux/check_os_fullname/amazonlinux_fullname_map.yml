@@ -6,17 +6,17 @@
 # "Other 3.x or later Linux (64-bit)" (on ESXi 6.5 and earlier)
 
 - name: "Read /etc/vmware-tools/tools.conf"
-  shell: cat /etc/vmware-tools/tools.conf | grep '^ *short-name *='
+  ansible.builtin.shell: cat /etc/vmware-tools/tools.conf | grep '^ *short-name *='
   register: result
-  failed_when: False
-  changed_when: False
+  failed_when: false
+  changed_when: false
   delegate_to: "{{ vm_guest_ip }}"
 
 - block:
     - name: "Initilize shortname"
-      set_fact:
+      ansible.builtin.set_fact:
         short_name: "{{ result.stdout.split(' = ')[1] }}"
-    - debug:
+    - ansible.builtin.debug:
         msg: "Guest short name is overwritten to {{ short_name }}"
   when: result.stdout
 
@@ -24,7 +24,7 @@
 - block:
     # Map Amazon Linux when ESXi <= 6.5.0
     - name: "Set guest_fullname variable for Amazon Linux on ESXi <= 6.5.0"
-      set_fact:
+      ansible.builtin.set_fact:
         guest_fullname: ["Other 3.x or later Linux ({{ guest_os_bit }})", "Other 3.x Linux ({{ guest_os_bit }})"]
       when: >
         (esxi_version is version('6.5.0', '<=')) or
@@ -32,7 +32,7 @@
 
     # Map Amazon Linux when ESXi > 6.7.0 GA
     - name: "Set guest_fullname variable for Amazon Linux on ESXi >= 6.7.0"
-      set_fact:
+      ansible.builtin.set_fact:
         guest_fullname: "Amazon Linux {{ guest_os_ansible_distribution_major_ver }} ({{ guest_os_bit }})"
       when: >
         (esxi_version is version('6.7.0', '>')) or
@@ -42,7 +42,7 @@
 
 # short-name = other3xlinux-64 in tools.conf
 - name: "Set guest_fullname variable for Amazon Linux on ESXi <= 6.5.0"
-  set_fact:
+  ansible.builtin.set_fact:
     guest_fullname: ["Other 3.x or later Linux ({{ guest_os_bit }})", "Other 3.x Linux ({{ guest_os_bit }})"]
   when:
     - short_name is defined and short_name == "other3xlinux-64"

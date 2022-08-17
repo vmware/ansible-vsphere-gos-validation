@@ -8,7 +8,7 @@
 #
 
 - name: "Initialize DNS server list and searching domain list"
-  set_fact:
+  ansible.builtin.set_fact:
     dns_servers_src: ""
     dns_domains_src: ""
     dns_servers: []
@@ -16,32 +16,32 @@
 
 # OS support command 'resolvectl dns'
 - name: "Get resolvectl dns"
-  command: "/usr/bin/resolvectl dns"
+  ansible.builtin.command: "/usr/bin/resolvectl dns"
   register: resolvectl_dns_result
-  failed_when: False
+  failed_when: false
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Print the output of 'resolvectl dns'"
-  debug: var=resolvectl_dns_result
+  ansible.builtin.debug: var=resolvectl_dns_result
   when: enable_debug | bool
 
 - block:
     - name: "Get DNS servers from 'resolvectl dns'"
-      set_fact:
+      ansible.builtin.set_fact:
         dns_servers_src: "{{ resolvectl_dns_result.stdout_lines | select('match', '^ *Link') }}"
 
     # Run command to get DNS searching domains
     - name: "Get resolvectl domain"
-      command: "/usr/bin/resolvectl domain"
+      ansible.builtin.command: "/usr/bin/resolvectl domain"
       register: resolvectl_domain_result
       delegate_to: "{{ vm_guest_ip }}"
 
     - name: "Print the output of 'resolvectl domain'"
-      debug: var=resolvectl_domain_result
+      ansible.builtin.debug: var=resolvectl_domain_result
       when: enable_debug | bool
 
     - name: "Get DNS searching domains from 'resolvectl domain'"
-      set_fact:
+      ansible.builtin.set_fact:
         dns_domains_src: "{{ resolvectl_domain_result.stdout_lines | select('match', '^ *Link') }}"
   when:
     - resolvectl_dns_result.rc is defined
@@ -53,33 +53,33 @@
 - block:
     - block:
         - name: "Get content of /etc/resolv.conf"
-          command: "cat /etc/resolv.conf"
+          ansible.builtin.command: "cat /etc/resolv.conf"
           register: resolv_conf_result
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "Get DNS servers from /etc/resolv.conf"
-          set_fact:
+          ansible.builtin.set_fact:
             dns_servers_src: "{{ resolv_conf_result.stdout_lines | select('match', '^ *nameserver') }}"
             dns_domains_src: "{{ resolv_conf_result.stdout_lines | select('match', '^ *search') }}"
       when: guest_os_ansible_distribution != 'Ubuntu'
 
     - block:
         - name: "Get DNS servers from /usr/bin/systemd-resolve status"
-          shell: "/usr/bin/systemd-resolve --status | sed -n '/DNS Servers/,/DNS Domain/p' | head -n -1"
+          ansible.builtin.shell: "/usr/bin/systemd-resolve --status | sed -n '/DNS Servers/,/DNS Domain/p' | head -n -1"
           register: resolve_dns_servers
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "Set fact of DNS servers"
-          set_fact:
+          ansible.builtin.set_fact:
             dns_servers_src: "{{ resolve_dns_servers.stdout | replace('\n', ' ') }}"
 
         - name: "Get DNS searching domains from /usr/bin/systemd-resolve status"
-          shell: "/usr/bin/systemd-resolve --status | sed -n '/DNS Domain/,/DNSSEC NTA/p' | head -n -1"
+          ansible.builtin.shell: "/usr/bin/systemd-resolve --status | sed -n '/DNS Domain/,/DNSSEC NTA/p' | head -n -1"
           register: resolve_dns_domains
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "Set fact of DNS servers"
-          set_fact:
+          ansible.builtin.set_fact:
             dns_domains_src: "{{ resolve_dns_domains.stdout | replace('\n', ' ') }}"
       when: guest_os_ansible_distribution == 'Ubuntu'
   when: >
@@ -89,11 +89,11 @@
      resolvectl_dns_result.stdout_lines | length == 0)
 
 - name: "Set fact of DNS servers and searching domains for {{ guest_os_ansible_distribution }}"
-  set_fact:
+  ansible.builtin.set_fact:
     dns_servers: "{{ dns_servers_src | regex_findall('\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b') }}"
     dns_domains: "{{ dns_domains_src | regex_findall('\\b(?:[a-zA-Z0-9-]{1,}\\.){1,}[a-zA-Z0-9-]{1,}\\b') }}"
 
-- debug:
+- ansible.builtin.debug:
     msg:
       - "Guest DNS servers: {{ dns_servers }}"
       - "Guest DNS domains: {{ dns_domains }}"

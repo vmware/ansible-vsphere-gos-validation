@@ -7,7 +7,7 @@
 # Get network adapter number before hotadd
 - include_tasks: network_adapter_number_check.yml
 - name: Set fact of the NIC info before hotadd
-  set_fact:
+  ansible.builtin.set_fact:
     nic_num_before_hotadd: "{{ vm_nic_num_get }}"
     nic_mac_addr_list_before_hotadd: "{{ vm_nic_mac_addr_list_get }}"
     nic_num_before_hotadd_guest: "{{ guest_nic_num_get }}"
@@ -17,25 +17,25 @@
   vars:
     adapter_type: "{{ nic_type | lower }}"
 - name: Verify new network adapter hotadd operation succeed
-  assert:
+  ansible.builtin.assert:
     that:
       - "{{ 'changed' in add_adapter }}"
       - "{{ add_adapter.changed }}"
     fail_msg: "Hotadd new network adapter task result is not changed."
 - name: Wait 10 seconds after network adapter hotadd
-  pause:
+  ansible.builtin.pause:
     seconds: 10
 
 # Get network adapter number after hotadd
 - include_tasks: network_adapter_number_check.yml
 - name: Set fact of the NIC info after hotadd
-  set_fact:
+  ansible.builtin.set_fact:
     nic_num_after_hotadd: "{{ vm_nic_num_get }}"
     nic_mac_addr_list_after_hotadd: "{{ vm_nic_mac_addr_list_get }}"
     nic_num_after_hotadd_guest: "{{ guest_nic_num_get }}"
 
 - name: Get MAC address of new added network adapter
-  set_fact:
+  ansible.builtin.set_fact:
     new_nic_mac_address: "{{ (nic_mac_addr_list_after_hotadd | difference(nic_mac_addr_list_before_hotadd))[0] | default('') }}"
 
 # Check disconnect and reconnect of newwork adapter
@@ -46,24 +46,24 @@
   vars:
     netadapter_mac_addr: "{{ new_nic_mac_address }}"
 - name: Check remove network adapter to VM succeed
-  assert:
+  ansible.builtin.assert:
     that:
       - "{{ 'changed' in remove_result }}"
       - "{{ remove_result.changed }}"
     fail_msg: "Hot remove network adapter task result is not changed."
 - name: Wait 10 seconds after network adapter hot remove
-  pause:
+  ansible.builtin.pause:
     seconds: 10
 
 # Get the number of VM network adapter after hot remove
 - include_tasks: network_adapter_number_check.yml
 - name: Set fact of the NIC info after hot remove
-  set_fact:
+  ansible.builtin.set_fact:
     nic_num_after_hotremove: "{{ vm_nic_num_get }}"
     nic_num_after_hotremove_guest: "{{ guest_nic_num_get }}"
 
 - name: "Display test results of '{{ nic_type }}' in check conditions"
-  debug:
+  ansible.builtin.debug:
     msg:
       - "New network adapter MAC address: {{ new_nic_mac_address }}"
       - "Network adapter number on VM before hotadd: {{ nic_num_before_hotadd }}"
@@ -79,7 +79,7 @@
       - "Ping vlan gateway result after re-connect from VM: {{ ping_result_after_reconnect }}"
 
 - name: Verify network adapter numbers and connect status to VLAN gateway
-  assert:
+  ansible.builtin.assert:
     that:
       - new_nic_mac_address | ansible.netcommon.hwaddr
       - "{{ nic_num_before_hotadd | int == nic_num_before_hotadd_guest | int }}"

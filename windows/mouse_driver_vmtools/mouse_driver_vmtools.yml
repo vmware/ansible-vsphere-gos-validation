@@ -8,26 +8,26 @@
 #
 - name: mouse_driver_vmtools
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
           vars:
-            skip_test_no_vmtools: True
+            skip_test_no_vmtools: true
 
         # Get VMware pointing device driver version in Windows guest OS
         - include_tasks: ../utils/win_execute_cmd.yml
           vars:
             win_powershell_cmd: "(Get-WmiObject Win32_PnpSignedDriver | where-object {$_.DeviceName -Match 'VMware Pointing Device'}).DriverVersion"
         - name: Set fact of the pointing device driver version
-          set_fact:
+          ansible.builtin.set_fact:
             vmware_pointing_device_driver: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
-        - debug:
+        - ansible.builtin.debug:
             msg: "Get VMware pointing device driver version: {{ vmware_pointing_device_driver }}"
         - name: "Verify pointing device driver version is like 'x.x.x.x'"
-          assert:
+          ansible.builtin.assert:
             that:
               - vmware_pointing_device_driver is regex("^\d+\.\d+\.\d+\.\d+$")
             fail_msg: "Get VMware pointing device driver failed."
