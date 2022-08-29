@@ -81,7 +81,6 @@ This project supports below scenarios for end-to-end guest OS validation testing
 | Debian 11.x                                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Debian 10.10 and later                          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Debian 9, 10.9 and earlier                      |                                  |                          | :heavy_check_mark:                 |
-| Astra Linux (Orel) 2.12.43                      |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Windows 10, 11                                  | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Windows Server 2019, 2022                       | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Windows Server SAC releases                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
