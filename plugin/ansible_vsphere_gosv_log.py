@@ -502,7 +502,7 @@ class CallbackModule(CallbackBase):
         table_width = sum([9, version_col_width, build_col_width, hostname_col_width, server_col_width, cpu_model_col_width]) + 11
 
         row_border = "+{}+\n".format("".ljust(table_width - 2, "-"))
-        row_format = "| {:<7} | {:<} | {:<} | {:<} |\n"
+        row_format = "| {:<7} | {:<} | {:<} | {:<} | {:<} | {:<} |\n"
 
         # Table head
         msg += row_border
