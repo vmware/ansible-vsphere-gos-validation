@@ -132,6 +132,7 @@
 * esxi_get_vmnic_facts.yml: Get phyical NICs facts on ESXi server
 * esxi_get_version_build.yml: Get ESXi release version and milestone
 * vcenter_get_version_build.yml: Get vCenter server version info
+* esxi_get_model.yml: Get ESXi server model and CPU model info
 
 ### Tasks for ESXi virtual switch and portgroup
 * esxi_add_portgroup.yml: Add a new virtual switch port group

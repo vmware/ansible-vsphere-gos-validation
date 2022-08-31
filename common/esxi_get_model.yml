@@ -1,0 +1,20 @@
+# Copyright 2021-2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get ESXi server model and CPU model
+- include_tasks: esxi_get_property.yml
+  vars:
+    esxi_host_property_list:
+      - summary.hardware.cpuModel
+      - summary.hardware.model
+      - summary.hardware.vendor
+
+- name: "Set fact of ESXi server model and CPU model info"
+  ansible.builtin.set_fact:
+    esxi_model_info: "{{ esxi_host_property_results.ansible_facts.summary.hardware.vendor }} {{ esxi_host_property_results.ansible_facts.summary.hardware.model }}"
+    esxi_cpu_model_info: "{{ esxi_host_property_results.ansible_facts.summary.hardware.cpuModel }}"
+
+- name: "Display ESXi server model info"
+  ansible.builtin.debug: var=esxi_model_info
+- name: "Display ESXi server CPU model info"
+  ansible.builtin.debug: var=esxi_cpu_model_info
