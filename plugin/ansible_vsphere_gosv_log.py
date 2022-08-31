@@ -167,7 +167,9 @@ class CallbackModule(CallbackBase):
         self.esxi_info = {'hostname':'',
                           'version':'',
                           'update_version':'',
-                          'build':''}
+                          'build':'',
+                          'model':'',
+                          'cpu_model':''}
         self.vm_info = None
 
         self.os_distribution = ""
