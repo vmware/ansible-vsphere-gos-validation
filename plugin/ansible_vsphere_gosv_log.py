@@ -497,7 +497,7 @@ class CallbackModule(CallbackBase):
         server_model_col_width = max([len('Server Model'), len(self.esxi_info['model']), len(self.esxi_info['cpu_model'])])
         
         # Table width
-        table_width = sum([9, version_col_width, build_col_width, hostname_col_width, server_model_col_width]) + 17
+        table_width = sum([9, version_col_width, build_col_width, hostname_col_width, server_model_col_width]) + 14
 
         row_border = "+{}+\n".format("".ljust(table_width - 2, "-"))
         row_format = "| {:<7} | {:<} | {:<} | {:<} | {:<} |\n"
