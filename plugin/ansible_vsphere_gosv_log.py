@@ -493,16 +493,14 @@ class CallbackModule(CallbackBase):
         build_col_width = max([len('Build'), len(self.vcenter_info['build']), len(self.esxi_info['build'])])
         # Get hostname or IP column width
         hostname_col_width = max([len('Hostname or IP'), len(self.vcenter_info['hostname']), len(self.esxi_info['hostname'])])
-        # Get server column width
-        server_col_width = max([len('Server'), len(self.esxi_info['model'])])
-        # Get cpu model column width
-        cpu_model_col_width = max([len('CPU Model'), len(self.esxi_info['cpu_model'])])
+        # Get server model column width
+        server_model_col_width = max([len('Server Model'), len(self.esxi_info['model']), len(self.esxi_info['cpu_model'])])
         
         # Table width
-        table_width = sum([9, version_col_width, build_col_width, hostname_col_width, server_col_width, cpu_model_col_width]) + 17
+        table_width = sum([9, version_col_width, build_col_width, hostname_col_width, server_model_col_width]) + 17
 
         row_border = "+{}+\n".format("".ljust(table_width - 2, "-"))
-        row_format = "| {:<7} | {:<} | {:<} | {:<} | {:<} | {:<} |\n"
+        row_format = "| {:<7} | {:<} | {:<} | {:<} | {:<} |\n"
 
         # Table head
         msg += row_border
@@ -510,8 +508,7 @@ class CallbackModule(CallbackBase):
                                  "Version".ljust(version_col_width),
                                  "Build".ljust(build_col_width),
                                  "Hostname or IP".ljust(hostname_col_width),
-                                 "Server".ljust(server_col_width),
-                                 "CPU Model".ljust(cpu_model_col_width))
+                                 "Server Model".ljust(server_model_col_width))
         msg += row_border
 
         # vCenter row
@@ -520,8 +517,7 @@ class CallbackModule(CallbackBase):
                                      self.vcenter_info['version'].ljust(version_col_width),
                                      self.vcenter_info['build'].ljust(build_col_width),
                                      self.vcenter_info['hostname'].ljust(hostname_col_width),
-                                     ''.ljust(server_col_width),
-                                     ''.ljust(cpu_model_col_width))
+                                     ''.ljust(server_model_col_width))
             msg += row_border
 
         # Server row
@@ -530,8 +526,13 @@ class CallbackModule(CallbackBase):
                                      self.esxi_info['version'].ljust(version_col_width),
                                      self.esxi_info['build'].ljust(build_col_width),
                                      self.esxi_info['hostname'].ljust(hostname_col_width),
-                                     self.esxi_info['model'].ljust(server_col_width),
-                                     self.esxi_info['cpu_model'].ljust(cpu_model_col_width))
+                                     self.esxi_info['model'].ljust(server_model_col_width))
+            if self.esxi_info['cpu_model']:
+                msg += row_format.format('',
+                                         ''.ljust(version_col_width),
+                                         ''.ljust(build_col_width),
+                                         ''.ljust(hostname_col_width),
+                                         self.esxi_info['cpu_model'].ljust(server_model_col_width))
             msg += row_border
 
         msg += "\n"
