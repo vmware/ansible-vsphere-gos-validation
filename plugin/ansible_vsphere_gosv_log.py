@@ -167,7 +167,9 @@ class CallbackModule(CallbackBase):
         self.esxi_info = {'hostname':'',
                           'version':'',
                           'update_version':'',
-                          'build':''}
+                          'build':'',
+                          'model':'',
+                          'cpu_model':''}
         self.vm_info = None
 
         self.os_distribution = ""
@@ -454,13 +456,14 @@ class CallbackModule(CallbackBase):
         Print testbed information as below:
 
         Testbed information:
-        +---------------------------------------------------------+
-        | Product | Version | Build    | Hostname or IP           |
-        +---------------------------------------------------------+
-        | vCenter | 7.0.2   | 17694817 | 192.168.10.10            |
-        +---------------------------------------------------------+
-        | ESXi    | 7.0.2   | 17630552 | 192.168.10.11            |
-        +---------------------------------------------------------+
+        +-----------------------------------------------+--------------------------------------------+
+        | Product | Version | Build    | Hostname or IP | Server Model                               |
+        +-----------------------------------------------+--------------------------------------------+
+        | vCenter | 7.0.2   | 17694817 | 192.168.10.10  |                                            | 
+        +-----------------------------------------------+--------------------------------------------+
+        | ESXi    | 7.0.2   | 17630552 | 192.168.10.11  | Dell Inc. PowerEdge R650                   |
+        |         |         |          |                | Intel(R) Xeon(R) Silver 4314 CPU @ 2.40GHz |
+        +-----------------------------------------------+--------------------------------------------+
         """
 
         if (self.testing_vars and
@@ -491,19 +494,22 @@ class CallbackModule(CallbackBase):
         build_col_width = max([len('Build'), len(self.vcenter_info['build']), len(self.esxi_info['build'])])
         # Get hostname or IP column width
         hostname_col_width = max([len('Hostname or IP'), len(self.vcenter_info['hostname']), len(self.esxi_info['hostname'])])
-
+        # Get server model column width
+        server_model_col_width = max([len('Server Model'), len(self.esxi_info['model']), len(self.esxi_info['cpu_model'])])
+        
         # Table width
-        table_width = sum([9, version_col_width, build_col_width, hostname_col_width]) + 11
+        table_width = sum([9, version_col_width, build_col_width, hostname_col_width, server_model_col_width]) + 14
 
         row_border = "+{}+\n".format("".ljust(table_width - 2, "-"))
-        row_format = "| {:<7} | {:<} | {:<} | {:<} |\n"
+        row_format = "| {:<7} | {:<} | {:<} | {:<} | {:<} |\n"
 
         # Table head
         msg += row_border
         msg += row_format.format("Product",
                                  "Version".ljust(version_col_width),
                                  "Build".ljust(build_col_width),
-                                 "Hostname or IP".ljust(hostname_col_width))
+                                 "Hostname or IP".ljust(hostname_col_width),
+                                 "Server Model".ljust(server_model_col_width))
         msg += row_border
 
         # vCenter row
@@ -511,7 +517,8 @@ class CallbackModule(CallbackBase):
             msg += row_format.format("vCenter",
                                      self.vcenter_info['version'].ljust(version_col_width),
                                      self.vcenter_info['build'].ljust(build_col_width),
-                                     self.vcenter_info['hostname'].ljust(hostname_col_width))
+                                     self.vcenter_info['hostname'].ljust(hostname_col_width),
+                                     ''.ljust(server_model_col_width))
             msg += row_border
 
         # Server row
@@ -519,7 +526,14 @@ class CallbackModule(CallbackBase):
             msg += row_format.format("ESXi",
                                      self.esxi_info['version'].ljust(version_col_width),
                                      self.esxi_info['build'].ljust(build_col_width),
-                                     self.esxi_info['hostname'].ljust(hostname_col_width))
+                                     self.esxi_info['hostname'].ljust(hostname_col_width),
+                                     self.esxi_info['model'].ljust(server_model_col_width))
+            if self.esxi_info['cpu_model']:
+                msg += row_format.format('',
+                                         ''.ljust(version_col_width),
+                                         ''.ljust(build_col_width),
+                                         ''.ljust(hostname_col_width),
+                                         self.esxi_info['cpu_model'].ljust(server_model_col_width))
             msg += row_border
 
         msg += "\n"
@@ -761,6 +775,11 @@ class CallbackModule(CallbackBase):
                         self.esxi_info['build'] = debug_var_value
                     if not self.esxi_info['update_version'] and debug_var_name == "esxi_update_version":
                         self.esxi_info['update_version'] = debug_var_value
+                if "esxi_get_model.yml" == task_file:
+                    if not self.esxi_info['model'] and debug_var_name == "esxi_model_info":
+                        self.esxi_info['model'] = debug_var_value
+                    if not self.esxi_info['cpu_model'] and debug_var_name == "esxi_cpu_model_info":
+                        self.esxi_info['cpu_model'] = debug_var_value
                 if "vcenter_get_version_build.yml" == task_file:
                     if not self.vcenter_info['hostname'] and debug_var_name == "vcenter_hostname":
                         self.vcenter_info['hostname'] = debug_var_value
