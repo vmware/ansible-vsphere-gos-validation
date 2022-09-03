@@ -196,7 +196,7 @@
         - name: "Add autoinstall to kernel command for Ubuntu live server"
           ansible.builtin.replace:
             path: "{{ unattend_iso_cache }}/grub.cfg"
-            regexp: '(.*vmlinuz)(.*)'
+            regexp: '(.*/vmlinuz)(.*)'
             replace: "\\1 autoinstall \\2"
 
         - name: "Set timeout to 5 seconds at boot menu"
@@ -206,10 +206,9 @@
             replace: "set timeout=5"
 
         - name: "Update md5sum for Ubuntu live server ISO files"
-          ansible.builtin.shell: "{{ item }}"
-          with_items:
-            - "sed -i '#./boot/grub/grub.cfg#d' md5sum.txt"
-            - "echo \"`md5sum grub.cfg | awk '{print $1}'` ./boot/grub/grub.cfg\" >>md5sum.txt"
+          ansible.builtin.shell: |
+            md5=`md5sum grub.cfg | awk '{print $1}'`
+            sed -i "/.\/boot\/grub\/grub.cfg/ s/^[^ ]*/$md5/" md5sum.txt
           args:
             chdir: "{{ unattend_iso_cache }}"
       when: unattend_install_conf is match('Ubuntu/Server')
