@@ -89,11 +89,25 @@
 
 # Set facts about files and command for creating an autoinstall ISO for Ubuntu live server
 - block:
-    - name: "Set fact of files to be update for unattended install"
+    - name: "Set fact of files to be update for Ubuntu unattended install"
       ansible.builtin.set_fact:
         iso_files_to_update:
           - '/boot/grub/grub.cfg'
           - '/md5sum.txt'
+
+    - name: "Check whether BIOS boot config file isolinux/txt.cfg exists"
+      ansible.builtin.stat:
+        path: "{{ tmp_iso_mount_dir }}/isolinux/txt.cfg"
+      register: isolinux_cfg_stat
+
+    - name: "Add BIOS boot config file for updating"
+      ansible.builtin.set_fact:
+        iso_files_to_update: "{{ iso_files_to_update + ['/isolinux/txt.cfg'] }}"
+      when:
+        - isolinux_cfg_stat is defined
+        - isolinux_cfg_stat.stat is defined
+        - isolinux_cfg_stat.stat.exists is defined
+        - isolinux_cfg_stat.stat.exists
 
     - name: "Add command options to rebuild unattended install ISO for Ubuntu live server"
       ansible.builtin.set_fact:
@@ -191,9 +205,9 @@
           ansible.builtin.debug: var=update_initrd_output
       when: unattend_install_conf is match('Debian')
 
-    # Update autoinstall config files for Ubuntu live server
-    - block:
-        - name: "Add autoinstall to kernel command for Ubuntu live server"
+    - name: "Update autoinstall config files for Ubuntu live server"
+      block:
+        - name: "Add autoinstall to UEFI boot kernel command for Ubuntu live server"
           ansible.builtin.replace:
             path: "{{ unattend_iso_cache }}/grub.cfg"
             regexp: '(.*vmlinuz)(.*)'
@@ -205,12 +219,29 @@
             regexp: 'set timeout=.*'
             replace: "set timeout=5"
 
-        - name: "Update md5sum for Ubuntu live server ISO files"
+        - name: "Update md5sum for UEFI boot config file"
           ansible.builtin.shell: |
             md5=`md5sum grub.cfg | awk '{print $1}'`
             sed -i "/.\/boot\/grub\/grub.cfg/ s/^[^ ]*/$md5/" md5sum.txt
           args:
             chdir: "{{ unattend_iso_cache }}"
+
+        - name: "Update BIOS boot config file"
+          block:
+            - name: "Add autoinstall to BIOS boot kernel command for Ubuntu live server"
+              ansible.builtin.replace:
+                path: "{{ unattend_iso_cache }}/txt.cfg"
+                regexp: '(.*initrd)(.*)'
+                replace: "\\1 autoinstall \\2"
+
+            - name: "Update md5sum for BIOS boot config file"
+              ansible.builtin.shell: |
+                md5=`md5sum txt.cfg | awk '{print $1}'`
+                sed -i "/.\/isolinux\/txt.cfg/ s/^[^ ]*/$md5/" md5sum.txt
+              args:
+                chdir: "{{ unattend_iso_cache }}"
+          when: "'/isolinux/txt.cfg' in iso_files_to_update"
+
       when: unattend_install_conf is match('Ubuntu/Server')
 
     - name: "Rebuild ISO image with unattend install config file"
