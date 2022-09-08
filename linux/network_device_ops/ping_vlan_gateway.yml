@@ -1,8 +1,11 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Ping VLAN gateway {{ vlan_gateway }}"
-  ansible.builtin.command: ping -c 1 "{{ vlan_gateway }}"
+# Ping VLAN gateway from specific network interface
+# Parameters:
+#   ping_src_interface
+- name: "Ping VLAN gateway {{ vlan_gateway }} from interface {{ ping_src_interface }}"
+  ansible.builtin.command: "ping -c 5 -I {{ ping_src_interface }} {{ vlan_gateway }}"
   register: ping_gateway_result
   failed_when: false
   changed_when: false
@@ -10,8 +13,7 @@
 
 - name: Display the ping gateway result
   ansible.builtin.debug: var=ping_gateway_result
-  when: enable_debug is defined and enable_debug
 
 - name: "Set fact of ping result"
   ansible.builtin.set_fact:
-    success_ping: "{{ ping_gateway_result.rc == 0 }}"
+    ping_success: "{{ ping_gateway_result.rc == 0 }}"

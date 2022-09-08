@@ -21,11 +21,16 @@
         - guest_os_ansible_distribution in ["SLES", "SLED"]
         - guest_os_ansible_distribution_major_ver | int == 12
 
-    # Get eth0 device name in guest. Sometimes it is not 'eth0', e.g., 'ens192', 'ens33', etc.
-    - include_tasks: ../utils/ethernet_link_get.yml
-    - name: "Set fact of the first Ethernet name in guest OS"
+    - name: "Get existing network interface before hotadd testing"
+      include_tasks: ../utils/get_network_adapters_status.yml
+    - name: "Set fact of network adapter info before hotadd"
       ansible.builtin.set_fact:
-        eth0_name: "{{ guest_network_interfaces[0] }}"
+        network_adapters_before_hotadd: "{{ guest_network_adapters }}"
+
+    # Get eth0 device name in guest. Sometimes it is not 'eth0', e.g., 'ens192', 'ens33', etc.
+    - name: "Set fact of the first network adapter interface name in guest OS"
+      ansible.builtin.set_fact:
+        eth0_name: "{{ network_adapters_before_hotadd[0] }}"
 
     # Prepare router VM, vSwitch and portgroup
     - include_tasks: ../../common/network_testbed_setup.yml
