@@ -1,0 +1,48 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get persistent memory disk info in Windows guest OS 
+# Refer to this page: https://docs.microsoft.com/en-us/windows-server
+# /storage/storage-spaces/storage-class-memory-health
+#
+- name: "Initialize the persistent memory disk status"
+  ansible.builtin.set_fact:
+    win_pmem_disk_size: ""
+    win_pmem_disk_status: ""
+
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "get-physicaldisk | where BusType -eq 'SCM' | select FriendlyName, UniqueId, HealthStatus, OperationalStatus, OperationalDetails, MediaType, Size | fl"
+
+- name: "Get persistent memory disk status"
+  block:
+    - name: "Initialize the result dict"
+      ansible.builtin.set_fact:
+        win_pmem_disk_result: {}
+    - name: "Convert the result list to dict"
+      ansible.builtin.set_fact:
+        win_pmem_disk_result: "{{ win_pmem_disk_result | combine({item.split(':')[0].strip(): item.split(':')[1].strip()}) }}"
+      when: item | length != 0
+      with_items:
+        - "{{ win_powershell_cmd_output.stdout_lines }}"
+    - name: "Display persistent memory disk status"
+      ansible.builtin.debug: var=win_pmem_disk_result
+    
+    - name: "Set fact of persistent memory disk in MB"
+      ansible.builtin.set_fact:
+        win_pmem_disk_size: "{{ win_device_guard_result.Size | int / 1024 / 1024 }}"
+      when: "'Size' in win_device_guard_result"
+    - name: "Set fact of persistent memory disk status"
+      ansible.builtin.set_fact:
+        win_pmem_disk_status: "{{ win_device_guard_result.HealthStatus }}"
+      when: "'HealthStatus' in win_device_guard_result"
+  when:
+    - win_powershell_cmd_output is defined
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+
+- name: "Display the results"
+  ansible.builtin.debug:
+    msg:
+      - "Persistent memory disk status: {{ win_pmem_disk_status }}"
+      - "Persistent memory disk size: {{ win_pmem_disk_size }}"
