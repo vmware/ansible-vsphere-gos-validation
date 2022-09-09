@@ -9,10 +9,10 @@
   vars:
     vm_wait_connection_timeout: 20
 
-- name: "Get network adapter status after hot-add"
+- name: "Get network adapters status after hot-add"
   include_tasks: ../utils/get_network_adapters_status.yml
 
-- name: "Set fact of network adapter info after hot-add"
+- name: "Set fact of network adapters after hot-add"
   ansible.builtin.set_fact:
     network_adapters_after_hotadd: "{{ guest_network_adapters }}"
 
@@ -62,7 +62,7 @@
     network_adapter_name: "{{ new_network_adapter }}"
     network_adapter_status: "down"
 
-- name: "Ping vlan gateway after {{ new_network_adapter }} is down"
+- name: "Ping VLAN gateway after {{ new_network_adapter }} is down"
   include_tasks: ping_vlan_gateway.yml
   vars:
     ping_src_interface: "{{ new_network_adapter }}"
@@ -77,7 +77,7 @@
     network_adapter_name: "{{ new_network_adapter }}"
     network_adapter_status: "up"
 
-- name: "Ping vlan gateway after {{ new_network_adapter }} is up"
+- name: "Ping VLAN gateway after {{ new_network_adapter }} is up"
   include_tasks: ping_vlan_gateway.yml
   vars:
     ping_src_interface: "{{ new_network_adapter }}"
@@ -92,7 +92,7 @@
     netadapter_mac_addr: "{{ new_network_adapter_mac_addr }}"
     netadapter_connect: false
 
-- name: "Ping vlan gateway after {{ new_network_adapter }} is disconnected"
+- name: "Ping VLAN gateway after {{ new_network_adapter }} is disconnected"
   include_tasks: ping_vlan_gateway.yml
   vars:
     ping_src_interface: "{{ new_network_adapter }}"
@@ -107,7 +107,7 @@
     netadapter_mac_addr: "{{ new_network_adapter_mac_addr }}"
     netadapter_connect: true
 
-- name: "Ping vlan gateway after {{ new_network_adapter }} is reconnected"
+- name: "Ping VLAN gateway after {{ new_network_adapter }} is reconnected"
   include_tasks: ping_vlan_gateway.yml
   vars:
     ping_src_interface: "{{ new_network_adapter }}"
@@ -119,6 +119,7 @@
 - name: "Print network adapter test results"
   ansible.builtin.debug:
     msg:
+      - "Ping succeeded after {{ new_network_adapter }} hot-add: {{ ping_success_after_hotadd }}"
       - "Ping succeeded after {{ new_network_adapter }} down: {{ ping_success_after_ifdown }}"
       - "Ping succeeded after {{ new_network_adapter }} up: {{ ping_success_after_ifup }}"
       - "Ping succeeded after {{ new_network_adapter }} disconnect: {{ ping_success_after_disconnect }}"
@@ -127,11 +128,12 @@
 - name: "Assert network adapter ping results are as expected"
   ansible.builtin.assert:
     that:
+      - ping_success_after_hotadd
       - not ping_success_after_ifdown
       - ping_success_after_ifup
       - not ping_success_after_disconnect
       - ping_success_after_reconnect
-    fail_msg: "At least one result of ping vlan gateway is not correct"
+    fail_msg: "At least one result of ping VLAN gateway is not correct"
 
 - name: "Hot remove the new network adapter from VM"
   include_tasks: ../../common/vm_remove_network_adapter.yml
