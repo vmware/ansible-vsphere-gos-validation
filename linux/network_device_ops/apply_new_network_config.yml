@@ -60,7 +60,8 @@
     - ansible.builtin.debug: var=network_config.stdout_lines
   when: guest_os_ansible_distribution not in ["VMware Photon OS", "Astra Linux (Orel)"]
 
-- include_tasks: ../utils/get_network_manager.yml
+- name: "Get guest network device manage"
+  include_tasks: ../utils/get_network_manager.yml
 
 - name: "Apply new netplan configuration file in Ubuntu server"
   block:
@@ -82,22 +83,6 @@
   when:
     - guest_os_ansible_distribution == "Ubuntu"
     - guest_os_network_manager == "netplan"
-
-- include_tasks: ../utils/set_network_adapter_status.yml
-  vars:
-    network_adapter_name: "{{ new_network_adapter }}"
-    network_adapter_status: "down"
-  when: guest_os_network_manager not in ["NetworkManager", "wicked", "netplan"]
-
-- include_tasks: ../utils/set_network_adapter_status.yml
-  vars:
-    network_adapter_name: "{{ new_network_adapter }}"
-    network_adapter_status: "down"
-  when:
-    - guest_os_network_manager == "wicked"
-    - new_network_adapter_status.active
-    - (new_network_adapter_status.ipv4.address is undefined or
-       not new_network_adapter_status.ipv4.address)
 
 - include_tasks: ../utils/set_network_adapter_status.yml
   vars:
