@@ -1,0 +1,77 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Set network interface status to down or up
+# Parameters
+#   network_adapter_name: The network interface name
+#   network_adapter_status: down or up
+
+# Set fact of network config file in guest OSes except Photon OS
+- include_tasks: get_network_manager.yml
+  when: guest_os_network_manager is undefined or not guest_os_network_manager
+
+# RHEL/SLED/Ubuntu Desktop network interfaces are managed by NetworkManager
+- name: "Set network interface status with NetworkManager"
+  block:
+    - name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'" 
+      ansible.builtin.shell: "nmcli device connect {{ network_adapter_name }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      when: network_adapter_status | lower == "up"
+
+    - name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'" 
+      ansible.builtin.shell: "nmcli device disconnect {{ network_adapter_name }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      when: network_adapter_status | lower == "down"
+
+    # Get network adapter interface status
+    - name: "Get network interface '{{ network_adapter_name }}' status"
+      ansible.builtin.shell: "nmcli device status | grep '^{{ network_adapter_name }}\\s\\+' | awk '{print $3'}"
+      register: nmcli_device_status
+      changed_when: false
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Print the network adapter interface status"
+      ansible.builtin.debug:
+        msg: "After bringing {{ network_adapter_status }} {{ network_adapter_name }}, its status became '{{ nmcli_device_status.stdout }}'"
+      when:
+        - nmcli_device_status is defined
+        - nmcli_device_status.stdout is defined
+  when: guest_os_network_manager == "NetworkManager"
+
+# SLES is using Wicked to manage network interface
+- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'" 
+  ansible.builtin.shell: "wicked if{{ network_adapter_status | lower }} {{ network_adapter_name }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  when: guest_os_network_manager == "wicked"
+
+# Old RHEL or Debian is using ifdown/ifup to manage network interfaces
+- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'" 
+  ansible.builtin.shell: "if{{ network_adapter_status | lower }} {{ network_adapter_name }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  when: guest_os_network_manager == "traditional"
+
+# Photon OS/Flatcar is using systemd-networkd to manage network interface
+- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'" 
+  ansible.builtin.shell: "ip link set {{ network_adapter_name }} {{ network_adapter_status | lower }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  when: guest_os_network_manager in ["systemd-networkd", "netplan"]
+
+- name: "Get network adapter interface status"
+  block:
+    # Get network adapter interface status
+    - name: "Waiting for network interface '{{ network_adapter_name }}' status {{ network_adapter_status }}"
+      ansible.builtin.shell: "ip -br addr show {{ network_adapter_name }} | awk '{print $2}'"
+      register: ip_show_result
+      changed_when: false
+      until: network_adapter_status | lower == ip_show_result.stdout | lower
+      retries: 20
+      delay: 5
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Print the network adapter interface status"
+      ansible.builtin.debug:
+        msg: "After bringing {{ network_adapter_status }} {{ network_adapter_name }}, its status became '{{ ip_show_result.stdout }}'"
+      when:
+        - ip_show_result is defined
+        - ip_show_result.stdout is defined
+  when: guest_os_network_manager != "NetworkManager"

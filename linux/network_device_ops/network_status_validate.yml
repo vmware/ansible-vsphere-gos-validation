@@ -1,49 +1,159 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get existing Ethernet interface before hotadd testing
-- include_tasks: ../utils/ethernet_link_get.yml
-- name: "Set fact of Ethernet adapter info before hotadd"
-  ansible.builtin.set_fact:
-    eth_before_hotadd: "{{ guest_network_interfaces }}"
+- name: "Hotadd a new network adapter to VM"
+  include_tasks: ../../common/vm_add_network_adapter.yml
 
-# Hotadd a new network adapter to VM
-- include_tasks: ../../common/vm_add_network_adapter.yml
-
-# Get Ethernet interfaces after hotadd
-- include_tasks: ../utils/ethernet_link_get.yml
-- name: "Set fact of Ethernet adapter info after hotadd"
-  ansible.builtin.set_fact:
-    eth_after_hotadd: "{{ guest_network_interfaces }}"
-
-# Get new added Ethernet interface
-- name: "Set fact of new added Ethernet adapter"
-  ansible.builtin.set_fact:
-    new_eth: "{{ eth_after_hotadd | difference(eth_before_hotadd) }}"
-
-- name: "Assert detect new {{ adapter_type }} adapter interface succeed"
-  ansible.builtin.assert:
-    that:
-      - new_eth | length != 0
-      - new_eth[0]
-    fail_msg: "Fail to detect new added '{{ adapter_type }}' adapter on VM"
-    success_msg: "Get new added '{{ adapter_type }}' adapter on VM"
-
-# Check VM connection is not broken after hotadd
-- include_tasks: ../../common/vm_wait_connection.yml
+- name: "Check VM connection is not broken after hot-add"
+  include_tasks: ../../common/vm_wait_connection.yml
   vars:
     vm_wait_connection_timeout: 20
 
-# Bring new ethernet interface up
-- include_tasks: enable_new_ethernet.yml
-  vars:
-    eth_dev: "{{ new_eth[0] }}"
+- name: "Get network adapters status after hot-add"
+  include_tasks: ../utils/get_network_adapters_status.yml
 
-# Ping VLAN gateway to check hot-added ethernet adapter works
-- include: ping_vlan_gateway.yml
-- name: "Check ping vlan gateway result"
+- name: "Set fact of network adapters after hot-add"
+  ansible.builtin.set_fact:
+    network_adapters_after_hotadd: "{{ guest_network_adapters }}"
+
+- name: "Assert new {{ adapter_type }} adapter interface is detected"
   ansible.builtin.assert:
     that:
-      - success_ping
-    fail_msg: "Failed to ping vlan gateway from {{ new_eth[0] }}"
-    success_msg: "Successfully ping vlan gateway from {{ new_eth[0] }}"
+      - network_adapters_after_hotadd | difference(network_adapters_before_hotadd) | length > 0
+    fail_msg: "Fail to detect new added '{{ adapter_type }}' adapter on VM"
+
+# Get new added network interface
+- name: "Set fact of new added network adapter"
+  ansible.builtin.set_fact:
+    new_network_adapter: "{{ (network_adapters_after_hotadd | difference(network_adapters_before_hotadd))[0] }}"
+
+- name: "Print the new {{ adapter_type }} adapter interface name"
+  ansible.builtin.debug: var=new_network_adapter
+
+- name: "Set fact of new added network adapter status"
+  ansible.builtin.set_fact:
+    new_network_adapter_status: "{{ (guest_network_adapters_status | selectattr('device', 'equalto', new_network_adapter))[0] }}"
+
+- name: "Set the fact of new {{ adapter_type }} adapter interface mac address"
+  ansible.builtin.set_fact:
+    new_network_adapter_mac_addr: "{{ new_network_adapter_status.macaddress }}"
+
+- name: "Apply new network configuration"
+  include_tasks: apply_new_network_config.yml
+  when: >
+    new_network_adapter_status.active is undefined or
+    not new_network_adapter_status.active or
+    new_network_adapter_status.ipv4 is undefined or
+    new_network_adapter_status.ipv4.address is undefined or
+    not new_network_adapter_status.ipv4.address
+
+- name: "Ping VLAN gateway after hot adding new network adapter"
+  include_tasks: ping_vlan_gateway.yml
+  vars:
+    ping_src_interface: "{{ new_network_adapter }}"
+
+- name: "Set ping result after hot adding new network adapter"
+  ansible.builtin.set_fact:
+    ping_success_after_hotadd: "{{ ping_success }}"
+
+- name: "Bring down the new network adapter interface"
+  include_tasks: ../utils/set_network_adapter_status.yml
+  vars:
+    network_adapter_name: "{{ new_network_adapter }}"
+    network_adapter_status: "down"
+
+- name: "Ping VLAN gateway after {{ new_network_adapter }} is down"
+  include_tasks: ping_vlan_gateway.yml
+  vars:
+    ping_src_interface: "{{ new_network_adapter }}"
+
+- name: "Set ping result after bringing down the new network adapter"
+  ansible.builtin.set_fact:
+    ping_success_after_ifdown: "{{ ping_success }}"
+
+- name: "Bring up the new network adapter interface"
+  include_tasks: ../utils/set_network_adapter_status.yml
+  vars:
+    network_adapter_name: "{{ new_network_adapter }}"
+    network_adapter_status: "up"
+
+- name: "Ping VLAN gateway after {{ new_network_adapter }} is up"
+  include_tasks: ping_vlan_gateway.yml
+  vars:
+    ping_src_interface: "{{ new_network_adapter }}"
+
+- name: "Set ping result after bringing up the new network adapter"
+  ansible.builtin.set_fact:
+    ping_success_after_ifup: "{{ ping_success }}"
+
+- name: "Disconnect the new network adapter from VM"
+  include_tasks: ../../common/vm_configure_network_adapter.yml
+  vars:
+    netadapter_mac_addr: "{{ new_network_adapter_mac_addr }}"
+    netadapter_connect: false
+
+- name: "Ping VLAN gateway after {{ new_network_adapter }} is disconnected"
+  include_tasks: ping_vlan_gateway.yml
+  vars:
+    ping_src_interface: "{{ new_network_adapter }}"
+
+- name: "Set ping result after disconnecting the new network adapter"
+  ansible.builtin.set_fact:
+    ping_success_after_disconnect: "{{ ping_success }}"
+
+- name: "Reconnect the new network adapter to VM"
+  include_tasks: ../../common/vm_configure_network_adapter.yml
+  vars:
+    netadapter_mac_addr: "{{ new_network_adapter_mac_addr }}"
+    netadapter_connect: true
+
+- name: "Ping VLAN gateway after {{ new_network_adapter }} is reconnected"
+  include_tasks: ping_vlan_gateway.yml
+  vars:
+    ping_src_interface: "{{ new_network_adapter }}"
+
+- name: "Set ping result after reconnecting the new network adapter"
+  ansible.builtin.set_fact:
+    ping_success_after_reconnect: "{{ ping_success }}"
+
+- name: "Print network adapter test results"
+  ansible.builtin.debug:
+    msg:
+      - "Ping succeeded after {{ new_network_adapter }} hot-add: {{ ping_success_after_hotadd }}"
+      - "Ping succeeded after {{ new_network_adapter }} down: {{ ping_success_after_ifdown }}"
+      - "Ping succeeded after {{ new_network_adapter }} up: {{ ping_success_after_ifup }}"
+      - "Ping succeeded after {{ new_network_adapter }} disconnect: {{ ping_success_after_disconnect }}"
+      - "Ping succeeded after {{ new_network_adapter }} reconnect: {{ ping_success_after_reconnect }}"
+
+- name: "Assert network adapter ping results are as expected"
+  ansible.builtin.assert:
+    that:
+      - ping_success_after_hotadd
+      - not ping_success_after_ifdown
+      - ping_success_after_ifup
+      - not ping_success_after_disconnect
+      - ping_success_after_reconnect
+    fail_msg: "At least one result of ping VLAN gateway is not correct"
+
+- name: "Hot remove the new network adapter from VM"
+  include_tasks: ../../common/vm_remove_network_adapter.yml
+  vars:
+    netadapter_mac_addr: "{{ new_network_adapter_mac_addr }}"
+
+- name: "Check VM connection is not broken after hot-remove"
+  include_tasks: ../../common/vm_wait_connection.yml
+  vars:
+    vm_wait_connection_timeout: 20
+
+- name: "Get network adapter status after hot-remove"
+  include_tasks: ../utils/get_network_adapters_status.yml
+
+- name: "Set fact of network adapter info after hot-remove"
+  ansible.builtin.set_fact:
+    network_adapters_after_hotremove: "{{ guest_network_adapters }}"
+
+- name: "Assert new {{ adapter_type }} adapter interface is removed"
+  ansible.builtin.assert:
+    that:
+      - network_adapters_after_hotremove | difference(network_adapters_before_hotadd) | length == 0
+    fail_msg: "After hot removing the new network adapter, guest OS still can detect it"

@@ -1,0 +1,35 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get network adapter status
+- name: "Initialize the fact of network adapters status in guest"
+  ansible.builtin.set_fact:
+    guest_network_adapters: []
+    guest_network_adapters_status: []
+
+- include_tasks: ../../common/get_system_info.yml
+  vars:
+    filter: "ansible_*"
+
+- block:
+    - name: "Set the fact of network adapters in guest"
+      ansible.builtin.set_fact:
+        guest_network_adapters: "{{ guest_system_info.ansible_interfaces | reject('match', '^(lo|docker|virbr)') }}"
+
+    - name: "Get network adapters status"
+      ansible.builtin.set_fact:
+        guest_network_adapters_status: "{{ guest_network_adapters_status | union([guest_system_info['ansible_%s'|format(item.replace('-', '_'))] | dict2items | rejectattr('key', 'equalto', 'features') | items2dict ])  }}"
+      when: guest_system_info['ansible_%s'|format(item.replace('-', '_'))].type == "ether"
+      with_items: "{{ guest_network_adapters }}"
+
+    - name: "Update the fact of network adapters in guest"
+      ansible.builtin.set_fact:
+        guest_network_adapters: "{{ guest_network_adapters_status | map(attribute='device') | list }}"
+
+  when:
+    - guest_system_info is defined
+    - guest_system_info.ansible_interfaces is defined
+    - guest_system_info.ansible_interfaces | length >= 1
+
+- name: "Print guest OS network adapters status"
+  ansible.builtin.debug: var=guest_network_adapters_status

@@ -1,0 +1,114 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Parameters
+#   new_network_adapter: The name of new network adapter interface
+
+# Set fact of network config file in guest OS except Photon OS
+- block:
+    - name: "Set fact of the network configure file for RedHat"
+      ansible.builtin.set_fact:
+        network_conf_template: rhel_network_conf.j2
+        network_conf_path: "/etc/sysconfig/network-scripts/ifcfg-{{ new_network_adapter }}"
+      when: guest_os_family == "RedHat"
+
+    - name: "Set fact of the network configure file for Ubuntu desktop"
+      ansible.builtin.set_fact:
+        network_conf_template: debian_network_conf.j2
+        network_conf_path: "/etc/network/interfaces"
+      when: >
+        (guest_os_ansible_distribution == "Debian") or
+        (guest_os_ansible_distribution == "Ubuntu" and guest_os_with_gui is defined and guest_os_with_gui)
+
+    - block:
+        # Get netplan config file in Ubuntu server
+        - include_tasks: ../utils/get_netplan_config_file.yml
+        - name: "Set fact of the network configure file for Ubuntu server"
+          ansible.builtin.set_fact:
+            network_conf_template: ubuntu_netplan_conf.j2
+            network_conf_path: "{{ netplan_config_file }}"
+          when: netplan_config_file is defined
+      when:
+        - guest_os_ansible_distribution == "Ubuntu"
+        - guest_os_with_gui is defined and not guest_os_with_gui
+
+    - name: "Set fact of the network configure file for SLE"
+      ansible.builtin.set_fact:
+        network_conf_template: sles_network_conf.j2
+        network_conf_path: "/etc/sysconfig/network/ifcfg-{{ new_network_adapter }}"
+      when: guest_os_family == "Suse"
+
+    - name: "Set fact of the network configure file for Flatcar"
+      ansible.builtin.set_fact:
+        network_conf_template: flatcar_network_conf.j2
+        network_conf_path: "/etc/systemd/network/{{ new_network_adapter }}"
+      when: "'Flatcar' in guest_os_ansible_distribution"
+
+    # Create the network config file for new network interface
+    - name: "Create/Update network configure file '{{ network_conf_path }}'"
+      ansible.builtin.template:
+        src: "{{ network_conf_template }}"
+        dest: "{{ network_conf_path }}"
+        mode: "0666"
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Get content of network configure file '{{ network_conf_path }}'"
+      ansible.builtin.command: "cat {{ network_conf_path }}"
+      register: network_config
+      changed_when: false
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Print content of network configure file '{{ network_conf_path }}'"
+      ansible.builtin.debug: var=network_config.stdout_lines
+  when: guest_os_ansible_distribution not in ["VMware Photon OS", "Astra Linux (Orel)"]
+
+- name: "Get guest network device manager"
+  include_tasks: ../utils/get_network_manager.yml
+
+- name: "Apply new netplan configuration file in Ubuntu server"
+  block:
+    # IP could be changed after netplan apply
+    - name: "Apply netplan configuration file for new added nic {{ new_network_adapter }} in Ubuntu"
+      ansible.builtin.command: "netplan apply"
+      delegate_to: "{{ vm_guest_ip }}"
+      async: 20
+      poll: 0
+      ignore_errors: true
+      register: netplan_apply
+
+    - name: "Sleep 60s for netplan taking effect"
+      ansible.builtin.pause:
+        seconds: 60
+
+    # Update VM's guest IP
+    - include_tasks: ../../common/update_inventory.yml
+  when:
+    - guest_os_ansible_distribution == "Ubuntu"
+    - guest_os_network_manager == "netplan"
+
+- include_tasks: ../utils/set_network_adapter_status.yml
+  vars:
+    network_adapter_name: "{{ new_network_adapter }}"
+    network_adapter_status: "up"
+  when: guest_os_network_manager != "netplan"
+
+# Get IP address of new interface
+- name: "Get link '{{ new_network_adapter }}' status"
+  ansible.builtin.shell: "ip -br addr show {{ new_network_adapter }} | awk '{print $3}'"
+  register: link_status
+  changed_when: false
+  until: '"192.168" in link_status.stdout'
+  retries: 20
+  delay: 5
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Print the new networ adapter IP address"
+  ansible.builtin.debug: var=link_status
+
+- include_tasks: ../utils/get_network_adapters_status.yml
+- name: "Update the new network adapter status"
+  ansible.builtin.set_fact:
+    new_network_adapter_status: "{{ (guest_network_adapters_status | selectattr('device', 'equalto', new_network_adapter))[0] }}"
+
+- name: "Print the new network adapter status after applying new network config"
+  ansible.builtin.debug: var=new_network_adapter_status
