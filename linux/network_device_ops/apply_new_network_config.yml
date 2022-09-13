@@ -1,4 +1,4 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Parameters
@@ -52,12 +52,14 @@
         mode: "0666"
       delegate_to: "{{ vm_guest_ip }}"
 
-    - name: "Print content of network configure file '{{ network_conf_path }}'"
+    - name: "Get content of network configure file '{{ network_conf_path }}'"
       ansible.builtin.command: "cat {{ network_conf_path }}"
       register: network_config
       changed_when: false
       delegate_to: "{{ vm_guest_ip }}"
-    - ansible.builtin.debug: var=network_config.stdout_lines
+
+    - name: "Print content of network configure file '{{ network_conf_path }}'"
+      ansible.builtin.debug: var=network_config.stdout_lines
   when: guest_os_ansible_distribution not in ["VMware Photon OS", "Astra Linux (Orel)"]
 
 - name: "Get guest network device manager"
@@ -99,7 +101,9 @@
   retries: 20
   delay: 5
   delegate_to: "{{ vm_guest_ip }}"
-- ansible.builtin.debug: var=link_status
+
+- name: "Print the new networ adapter IP address"
+  ansible.builtin.debug: var=link_status
 
 - include_tasks: ../utils/get_network_adapters_status.yml
 - name: "Update the new network adapter status"
