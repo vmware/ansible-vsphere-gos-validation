@@ -1,10 +1,45 @@
 # Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+# VM should be in power off state when adding NVDIMM device
+- include_tasks: ../utils/shutdown_vm.yml
+
+# Get NVDIMM device before cold add
+- include_tasks: ../../common/vm_get_device_with_type.yml
+  vars:
+    device_vim_type: vim.vm.device.VirtualNVDIMM
+- name: "Set fact of NVDIMM device list before cold add"
+  ansible.builtin.set_fact:
+    nvdimm_list_before_add: "{{ device_info_with_type }}"
+
 # Add a new 256MB NVDIMM device to VM
 - include_tasks: ../../common/vm_add_remove_nvdimm.yml
   vars:
     vm_nvdimm_size_mb: 256
+- name: "Check adding NVDIMM device task result"
+  ansible.builtin.assert:
+    that:
+      - vm_config_nvdimm_result is defined
+      - vm_config_nvdimm_result.changed
+    fail_msg: "Add NVDIMM device to VM task result is not changed."
+
+# Get NVDIMM device list after cold add
+- include_tasks: ../../common/vm_get_device_with_type.yml
+  vars:
+    device_vim_type: vim.vm.device.VirtualNVDIMM
+- name: "Set fact of NVDIMM device list after cold add"
+  ansible.builtin.set_fact:
+    nvdimm_list_after_add: "{{ device_info_with_type }}"
+
+- name: "Check NVDIMM device list after cold add"
+  ansible.builtin.assert:
+    that:
+      - nvdimm_list_before_add | length + 1 == nvdimm_list_after_add | length
+    fail_msg: "NVDIMM device number after cold add is {{ nvdimm_list_after_add | length }}, before it's {{ nvdimm_list_before_add | length }}, not increase 1."
+
+- name: "Set fact of the new added NVDIMM device label"
+  ansible.builtin.set_fact:
+    new_nvdimm_device_label: ""
 
 # Power on VM
 - include_tasks: ../../common/vm_set_power_state.yml

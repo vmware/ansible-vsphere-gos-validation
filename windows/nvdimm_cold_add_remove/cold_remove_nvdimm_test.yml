@@ -1,0 +1,30 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# VM should be in power off state when removing NVDIMM device
+- include_tasks: ../utils/shutdown_vm.yml
+
+# Add a new 256MB NVDIMM device to VM
+- include_tasks: ../../common/vm_add_remove_nvdimm.yml
+  vars:
+    vm_config_nvdimm: "absent"
+    vm_nvdimm_label: "" 
+
+# Power on VM
+- include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+- include_tasks: ../../common/vm_get_ip.yml
+  vars:
+    vm_get_ip_timeout: 600
+- include_tasks: ../utils/win_check_winrm.yml
+- include_tasks: ../utils/add_windows_host.yml
+
+# Check NVDIMM device recognized in guest OS
+- include_tasks: ../utils/win_get_persistent_memory_disk.yml
+- name: "Check persistent memory disk status in guest OS"
+  ansible.builtin.assert:
+    that:
+      - win_pmem_disk_status is defined and win_pmem_disk_status == "Healthy"
+      - win_pmem_disk_size is defined and win_pmem_disk_size | int == 256
+    fail_msg: "Persistent memory disk status got in guest OS is not 'Healthy', or the size is not 256 MB."
