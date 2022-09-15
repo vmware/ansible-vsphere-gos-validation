@@ -61,7 +61,9 @@
             - block:
                 - name: "Known issue - ignore inbox drivers not loaded after VMware tools uninstall"
                   ansible.builtin.debug:
-                    msg: "Inbox pvscsi or vmxnet3 drivers are not loaded successfully after VMware tools uninstall, ignore this known issue on VMware tools 12.1.0 and earlier versions."
+                    msg:
+                      - "Get problem device in guest OS: {{ gos_problem_device_list }}"
+                      - "Inbox pvscsi or vmxnet3 drivers are not loaded successfully after VMware tools uninstall, ignore this known issue on VMware tools 12.1.0 and earlier versions."
                   tags:
                     - known_issue
                   when: gos_has_problem_device is defined and gos_has_problem_device
@@ -74,7 +76,7 @@
                 that:
                   - gos_has_problem_device is defined
                   - not gos_has_problem_device
-                fail_msg: "Problem devices were found on the system, please check listed problem devices."
+                fail_msg: "Problem devices were found on the system, please check listed problem devices: {{ gos_problem_device_list }}"
               when: vmtools_version is undefined or vmtools_version is version('12.1.0', '>')
 
             - name: "Remove added network adapter, portgroup and vSwitch"

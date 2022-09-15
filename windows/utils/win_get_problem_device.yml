@@ -18,10 +18,17 @@
     - guest_os_build_num is defined
     - guest_os_build_num | int >= 18362
 
-- name: "Get problem devices in guest OS"
+- name: "Get problem device in guest OS"
   ansible.builtin.set_fact:
     gos_has_problem_device: true
     gos_problem_device_list: "{{ win_powershell_cmd_output.stdout_lines }}"
   when:
     - win_powershell_cmd_output.stdout_lines | length > 1
     - "'No devices were found' not in win_powershell_cmd_output.stdout"
+
+- name: "Display the result of getting problem device"
+  ansible.builtin.debug:
+    msg:
+      - "Got problem device: {{ gos_has_problem_device }}"
+      - "Problem device list: {{ gos_problem_device_list }}"
+  when: enable_debug
