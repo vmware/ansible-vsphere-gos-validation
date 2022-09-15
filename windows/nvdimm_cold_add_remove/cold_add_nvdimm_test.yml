@@ -37,9 +37,14 @@
       - nvdimm_list_before_add | length + 1 == nvdimm_list_after_add | length
     fail_msg: "NVDIMM device number after cold add is {{ nvdimm_list_after_add | length }}, before it's {{ nvdimm_list_before_add | length }}, not increase 1."
 
-- name: "Set fact of the new added NVDIMM device label"
+- name: "Set fact of the new added NVDIMM device"
   ansible.builtin.set_fact:
-    new_nvdimm_device_label: ""
+    new_nvdimm_device: "{{ nvdimm_list_after_add | difference(nvdimm_list_before_add) }}"
+
+- name: "Set fact of the new added NVDIMM device label and vmdk path"
+  ansible.builtin.set_fact:
+    new_nvdimm_device_label: "{{ new_nvdimm_device }}"
+    new_nvdimm_device_vmdk: "{{ new_nvdimm_device }}"
 
 # Power on VM
 - include_tasks: ../../common/vm_set_power_state.yml
