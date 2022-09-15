@@ -4,10 +4,9 @@
 - name: "Initialize new added NVDIMM device info"
   ansible.builtin.set_fact:
     new_nvdimm_device: {}
+    new_nvdimm_device_guest: {}
     new_nvdimm_device_label: ""
     new_nvdimm_device_vmdk: ""
-    nvdimm_list_before_add: []
-    nvdimm_list_before_add_guest: []
 
 # Get VM NVDIMM device before cold add
 - include_tasks: ../../common/vm_get_device_with_type.yml
@@ -53,7 +52,9 @@
 
 - name: "Set fact of the new added NVDIMM device"
   ansible.builtin.set_fact:
-    new_nvdimm_device: "{{ nvdimm_list_after_add | difference(nvdimm_list_before_add) }}"
+    new_nvdimm_device: "{{ (nvdimm_list_after_add | difference(nvdimm_list_before_add))[0] }}"
+  when: (nvdimm_list_after_add | difference(nvdimm_list_before_add)) | length == 1
+
 - name: "Set fact of the new added NVDIMM device label"
   ansible.builtin.set_fact:
     new_nvdimm_device_label: "{{ new_nvdimm_device.deviceInfo.label }}"
@@ -96,16 +97,16 @@
     nvdimm_list_after_add_guest: "{{ win_pmem_disk_list }}"
 - name: "Set fact of new added PMem disk info"
   ansible.builtin.set_fact:
-    new_nvdimm_device_guest: "{{ nvdimm_list_after_add_guest | difference(nvdimm_list_before_add_guest) }}"
+    new_nvdimm_device_guest: "{{ (nvdimm_list_after_add_guest | difference(nvdimm_list_before_add_guest))[0] }}"
+  when: (nvdimm_list_after_add_guest | difference(nvdimm_list_before_add_guest)) | length == 1
 
 - name: "Check persistent memory disk status in guest OS"
   ansible.builtin.assert:
     that:
-      - new_nvdimm_device_guest | length == 1
-      - new_nvdimm_device_guest[0].Size is defined
-      - new_nvdimm_device_guest[0].Size | int / 1024 / 1024 == 256
-      - new_nvdimm_device_guest[0].HealthStatus is defined
-      - new_nvdimm_device_guest[0].HealthStatus == "Healthy"
+      - new_nvdimm_device_guest.Size is defined
+      - new_nvdimm_device_guest.Size | int / 1024 / 1024 == 256
+      - new_nvdimm_device_guest.HealthStatus is defined
+      - new_nvdimm_device_guest.HealthStatus == "Healthy"
     fail_msg: "Persistent memory disk status got in guest OS '{{ new_nvdimm_device_guest }}', which status is not 'Healthy', or the size got is not 256 MB."
 
 # Initialize and create partition on the pmem disk
