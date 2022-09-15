@@ -4,11 +4,45 @@
 # VM should be in power off state when removing NVDIMM device
 - include_tasks: ../utils/shutdown_vm.yml
 
-# Add a new 256MB NVDIMM device to VM
+# Remove new added NVDIMM device
 - include_tasks: ../../common/vm_add_remove_nvdimm.yml
   vars:
     vm_config_nvdimm: "absent"
-    vm_nvdimm_label: "" 
+    vm_nvdimm_label: "{{ new_nvdimm_device_label }}" 
+
+- name: "Check removing NVDIMM device task result"
+  ansible.builtin.assert:
+    that:
+      - vm_config_nvdimm_result is defined
+      - vm_config_nvdimm_result.changed
+    fail_msg: "Remove NVDIMM device from VM task result is not changed."
+
+# Get NVDIMM device list after cold remove
+- include_tasks: ../../common/vm_get_device_with_type.yml
+  vars:
+    device_vim_type: vim.vm.device.VirtualNVDIMM
+- name: "Set fact of NVDIMM device list after cold remove"
+  ansible.builtin.set_fact:
+    nvdimm_list_after_remove: "{{ device_info_with_type }}"
+- name: "Check NVDIMM device list after cold remove"
+  ansible.builtin.assert:
+    that:
+      - nvdimm_list_before_add == nvdimm_list_after_remove
+    fail_msg: "NVDIMM device after cold remove '{{ nvdimm_list_before_add }}', it's not the same as the device before cold add '{{ nvdimm_list_before_add }}'."
+
+- include_tasks: ../../common/esxi_check_delete_datastore_file.yml
+  vars:
+    file_in_datastore_ops: "file"
+    file_in_datastore: "{{ new_nvdimm_device_vmdk.split(']')[0].strip('[]') }}"
+    file_in_datastore_path: "{{ new_nvdimm_device_vmdk.split(']')[1].strip(' ') }}"
+    file_in_datastore_ops_timeout: 120
+    file_in_datastore_failed_ignore: true
+- name: "Check backing vmdk file not exist in datastore"
+  ansible.builtin.assert:
+    that:
+      - file_in_datastore_result is defined
+      - file_in_datastore_result == 'fail'
+    fail_msg: "Check vmdk file existence in datastore is '{{ file_in_datastore_result }}', which should be 'fail'."
 
 # Power on VM
 - include_tasks: ../../common/vm_set_power_state.yml
@@ -21,10 +55,23 @@
 - include_tasks: ../utils/add_windows_host.yml
 
 # Check NVDIMM device recognized in guest OS
-- include_tasks: ../utils/win_get_persistent_memory_disk.yml
+- include_tasks: ../utils/win_get_pmem_disk_list.yml
+- name: "Set fact of the PMem disk info got in guest OS"
+  ansible.builtin.set_fact:
+    nvdimm_list_after_remove_guest: "{{ win_pmem_disk_list }}"
 - name: "Check persistent memory disk status in guest OS"
   ansible.builtin.assert:
     that:
-      - win_pmem_disk_status is defined and win_pmem_disk_status == "Healthy"
-      - win_pmem_disk_size is defined and win_pmem_disk_size | int == 256
-    fail_msg: "Persistent memory disk status got in guest OS is not 'Healthy', or the size is not 256 MB."
+      - (nvdimm_list_after_remove_guest | difference(nvdimm_list_before_add_guest)) | length == 0
+    fail_msg: "Persistent memory disk status got in guest OS after remove is '{{ nvdimm_list_after_remove_guest }}', which is not the same as the status before add '{{ nvdimm_list_before_add_guest }}'"
+
+- include_tasks: ../utils/win_get_disk_volume_size.yml
+  vars:
+    win_disk_volume_letter: "{{ drive_letter_new }}"
+    win_execute_cmd_ignore_error: true
+- name: "Check no disk volume found in guest OS"
+  ansible.builtin.assert:
+    that:
+      - not win_get_volume_size_gb
+      - "'No MSFT_Volume objects found' in win_powershell_cmd_output.stdout"
+    fail_msg: "Get specified disk volume size not failed with keyword 'No MSFT_Volume objects found' in results."
