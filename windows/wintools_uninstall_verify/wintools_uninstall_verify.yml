@@ -13,6 +13,7 @@
   tasks:
     - block:
         - include_tasks: ../setup/test_setup.yml
+
         # VMware tools status got in test_setup before this test
         - name: Set fact of the VMware tools status before uninstall
           ansible.builtin.set_fact:
@@ -33,6 +34,13 @@
             msg: "VMware tools installed: {{ vmtools_is_installed_before }}, running: {{ vmtools_is_running_before }}"
           when: not vmtools_is_running_before
 
+        # Add a new pvscsi controller and vmxnet3 network adapter to the VM
+        # Will check no problem devices after VMware tools uninstall when there are inbox drivers
+        - include_tasks: add_new_devices_check_status.yml
+          when:
+            - guest_os_with_inbox_drivers is defined
+            - guest_os_with_inbox_drivers
+
         # Run uninstall tools if tools is installed and running
         - include_tasks: uninstall_vmtools.yml
         - include_tasks: ../../common/vm_get_vmtools_status.yml
@@ -43,7 +51,49 @@
               - not vmtools_is_installed | bool
               - vmtools_is_running is defined
               - not vmtools_is_running | bool
-            success_msg: "wintools_uninstall_verify_status test succeed"
-            fail_msg: "wintools_uninstall_verify_status test failed"
+            fail_msg: "Either VMware tools status is still installed or running after uninstall."
+
+        - name: "Check no problem device after VMware tools uninstall"
+          block:
+            - include_tasks: ../utils/win_get_problem_device.yml
+
+            # Known issue on VMware tools 12.1.0 and earlier versions
+            - block:
+                - name: "Known issue - ignore inbox drivers not loaded after VMware tools uninstall"
+                  ansible.builtin.debug:
+                    msg:
+                      - "Get problem device in guest OS: {{ gos_problem_device_list }}"
+                      - "Inbox pvscsi or vmxnet3 drivers are not loaded successfully after VMware tools uninstall, ignore this known issue on VMware tools 12.1.0 and earlier versions."
+                  tags:
+                    - known_issue
+                  when: gos_has_problem_device is defined and gos_has_problem_device
+              when:
+                - vmtools_version is defined
+                - vmtools_version is version('12.1.0', '<=')
+
+            - name: "Check no problem device listed"
+              ansible.builtin.assert:
+                that:
+                  - gos_has_problem_device is defined
+                  - not gos_has_problem_device
+                fail_msg: "Problem devices were found on the system, please check listed problem devices: {{ gos_problem_device_list }}"
+              when: vmtools_version is undefined or vmtools_version is version('12.1.0', '>')
+
+            - name: "Remove added network adapter, portgroup and vSwitch"
+              block:
+                - include_tasks: ../../common/vm_remove_network_adapter.yml
+                  vars:
+                    netadapter_mac_addr: "{{ new_network_adapter_mac }}"
+                - include_tasks: ../../common/esxi_remove_portgroup.yml
+                  vars:
+                    vswitch_name: "{{ new_device_vswitch }}"
+                    portgroup_name: "{{ new_device_pg }}"
+                - include_tasks: ../../common/esxi_remove_vswitch.yml
+                  vars:
+                    vswitch_name: "{{ new_device_vswitch }}"
+              when: new_network_adapter_mac is defined and new_network_adapter_mac
+          when:
+            - guest_os_with_inbox_drivers is defined
+            - guest_os_with_inbox_drivers
       rescue:
         - include_tasks: ../../common/test_rescue.yml
