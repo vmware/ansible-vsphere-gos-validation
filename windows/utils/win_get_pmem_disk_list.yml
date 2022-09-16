@@ -13,13 +13,14 @@
 # Get persistent memory disk unique ID list
 - include_tasks: win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "(get-physicaldisk | where BusType -eq 'SCM' | select UniqueId | fl | out-string).trim()"
-- name: "Set fact of persistent memory disk unique ID list"
-  ansible.builtin.set_fact:
-    win_pmem_disk_id_list: "{{ win_pmem_disk_id_list + [item.split(':')[1].strip()] }}"
-  when: item | length != 0 and item.split(':') | length > 1
-  with_items:
-    - "{{ win_powershell_cmd_output.stdout_lines }}"
+    win_powershell_cmd: "get-physicaldisk | where BusType -eq 'SCM' | select UniqueId | fl"
+- name: "Get persistent memory disk unique ID list"
+  block:
+    - name: "Set fact of persistent memory disk unique ID list"
+      ansible.builtin.set_fact:
+        win_pmem_disk_id_list: "{{ win_pmem_disk_id_list + [item.split(':')[1].strip()] }}"
+      when: item | length != 0 and item.split(':') | length > 1
+      with_items: "{{ win_powershell_cmd_output.stdout_lines }}"
   when:
     - win_powershell_cmd_output.stdout_lines is defined
     - win_powershell_cmd_output.stdout_lines | length > 0
