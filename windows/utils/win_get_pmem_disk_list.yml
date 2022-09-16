@@ -13,7 +13,7 @@
 # Get persistent memory disk unique ID list
 - include_tasks: win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "get-physicaldisk | where BusType -eq 'SCM' | select UniqueId | fl"
+    win_powershell_cmd: "(get-physicaldisk | where BusType -eq 'SCM' | select UniqueId | fl | out-string).trim()"
 - name: "Set fact of persistent memory disk unique ID list"
   ansible.builtin.set_fact:
     win_pmem_disk_id_list: "{{ win_pmem_disk_id_list + [item.split(':')[1].strip()] }}"
@@ -25,10 +25,10 @@
     - win_powershell_cmd_output.stdout_lines | length > 0
 
 - include_tasks: win_get_pmem_disk_by_id.yml
-  vars:
-    win_pmem_disk_unique_id: "{{ item }}"
-  when: item
   with_items: "{{ win_pmem_disk_id_list }}"
+  when: win_pmem_disk_unique_id
+  loop_control:
+    loop_var: win_pmem_disk_unique_id
 
 - name: "Display the persistent memory disk list"
   ansible.builtin.debug: var=win_pmem_disk_list
