@@ -117,6 +117,7 @@
 * esxi_get_hardware_versions.yml: Get supported hardware versions and default hardware version on ESXi host
 * esxi_get_guest_ids.yml: Get supported guest ids for a hardware version on ESXi host
 * esxi_get_guest_config_options.yml: Get VM config options for a guest id on a hardware version
+* esxi_get_pmem_info.yml: Get ESXi host total and available persistent memroy size in MB
 
 ### Tasks for ESXi datastores
 * esxi_add_datastore.yml: Add NFS or VMFS datastore to ESXi host

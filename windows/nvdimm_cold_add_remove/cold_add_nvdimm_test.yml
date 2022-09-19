@@ -1,8 +1,12 @@
 # Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+# When ESXi host available PMem size > 256 MB, then test
+# add a new 256 MB NVDIMM device, if available PMem size
+# < 256 MB, then test 16 MB new device
 - name: "Initialize new added NVDIMM device info"
   ansible.builtin.set_fact:
+    new_nvdimm_device_size: "{{ 256 if esxi_pmem_available_mb | int > 256 else 16 }}"
     new_nvdimm_device: {}
     new_nvdimm_device_guest: {}
     new_nvdimm_device_label: ""
@@ -25,10 +29,10 @@
 # VM should be in power off state when adding NVDIMM device
 - include_tasks: ../utils/shutdown_vm.yml
 
-# Add a new 256MB NVDIMM device to VM
+# Add a new NVDIMM device to VM
 - include_tasks: ../../common/vm_add_remove_nvdimm.yml
   vars:
-    vm_nvdimm_size_mb: 256
+    vm_nvdimm_size_mb: "{{ new_nvdimm_device_size }}"
 - name: "Check adding NVDIMM device task result"
   ansible.builtin.assert:
     that:
@@ -104,10 +108,10 @@
   ansible.builtin.assert:
     that:
       - new_nvdimm_device_guest.Size is defined
-      - new_nvdimm_device_guest.Size | int / 1024 / 1024 == 256
+      - new_nvdimm_device_guest.Size | int / 1024 / 1024 == new_nvdimm_device_size | int
       - new_nvdimm_device_guest.HealthStatus is defined
       - new_nvdimm_device_guest.HealthStatus == "Healthy"
-    fail_msg: "Persistent memory disk status got in guest OS '{{ new_nvdimm_device_guest }}', which status is not 'Healthy', or the size got is not 256 MB."
+    fail_msg: "Persistent memory disk status got in guest OS '{{ new_nvdimm_device_guest }}', which status is not 'Healthy', or the size got is not '{{ new_nvdimm_device_size }}' MB."
 
 # Initialize and create partition on the pmem disk
 - include_tasks: ../vhba_hot_add_remove/create_partition_raw_disk.yml
