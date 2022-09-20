@@ -18,13 +18,13 @@
     device_vim_type: vim.vm.device.VirtualNVDIMM
 - name: "Set fact of NVDIMM device list before cold add"
   ansible.builtin.set_fact:
-    nvdimm_list_before_add: "{{ device_info_with_type }}"
+    vm_nvdimm_list_before_add: "{{ device_info_with_type }}"
 
 # Get NVDIMM device in guest OS before cold add
 - include_tasks: ../utils/win_get_pmem_disk_list.yml
 - name: "Set fact of the PMem disk info got in guest OS"
   ansible.builtin.set_fact:
-    nvdimm_list_before_add_guest: "{{ win_pmem_disk_list }}"
+    guest_nvdimm_list_before_add: "{{ win_pmem_disk_list }}"
 
 # VM should be in power off state when adding NVDIMM device
 - include_tasks: ../utils/shutdown_vm.yml
@@ -46,18 +46,18 @@
     device_vim_type: vim.vm.device.VirtualNVDIMM
 - name: "Set fact of NVDIMM device list after cold add"
   ansible.builtin.set_fact:
-    nvdimm_list_after_add: "{{ device_info_with_type }}"
+    vm_nvdimm_list_after_add: "{{ device_info_with_type }}"
 
 - name: "Check NVDIMM device list after cold add"
   ansible.builtin.assert:
     that:
-      - nvdimm_list_before_add | length + 1 == nvdimm_list_after_add | length
-    fail_msg: "NVDIMM device number after cold add is {{ nvdimm_list_after_add | length }}, before it's {{ nvdimm_list_before_add | length }}, not increase 1."
+      - vm_nvdimm_list_before_add | length + 1 == vm_nvdimm_list_after_add | length
+    fail_msg: "NVDIMM device number after cold add is {{ vm_nvdimm_list_after_add | length }}, before it's {{ vm_nvdimm_list_before_add | length }}, not increase 1."
 
 - name: "Set fact of the new added NVDIMM device"
   ansible.builtin.set_fact:
-    new_nvdimm_device: "{{ (nvdimm_list_after_add | difference(nvdimm_list_before_add))[0] }}"
-  when: (nvdimm_list_after_add | difference(nvdimm_list_before_add)) | length == 1
+    new_nvdimm_device: "{{ (vm_nvdimm_list_after_add | difference(vm_nvdimm_list_before_add))[0] }}"
+  when: (vm_nvdimm_list_after_add | difference(vm_nvdimm_list_before_add)) | length == 1
 
 - name: "Set fact of the new added NVDIMM device label"
   ansible.builtin.set_fact:
@@ -98,11 +98,11 @@
 - include_tasks: ../utils/win_get_pmem_disk_list.yml
 - name: "Set fact of the PMem disk info got in guest OS"
   ansible.builtin.set_fact:
-    nvdimm_list_after_add_guest: "{{ win_pmem_disk_list }}"
+    guest_nvdimm_list_after_add: "{{ win_pmem_disk_list }}"
 - name: "Set fact of new added PMem disk info"
   ansible.builtin.set_fact:
-    new_nvdimm_device_guest: "{{ (nvdimm_list_after_add_guest | difference(nvdimm_list_before_add_guest))[0] }}"
-  when: (nvdimm_list_after_add_guest | difference(nvdimm_list_before_add_guest)) | length == 1
+    new_nvdimm_device_guest: "{{ (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add))[0] }}"
+  when: (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add)) | length == 1
 
 - name: "Check persistent memory disk status in guest OS"
   ansible.builtin.assert:

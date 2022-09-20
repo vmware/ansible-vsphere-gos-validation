@@ -23,6 +23,18 @@
             (esxi_version is version('6.7', '<')) or
             (vm_hardware_version_num | int < 14)
 
+        - include_tasks: ../../common/esxi_get_guest_config_options.yml
+          vars:
+            guest_id: "{{ vm_guest_id }}"
+            esxi_hardware_version: "{{ vm_hardware_version_num }}"
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "This guest ID '{{ vm_guest_id }}' with hardware version '{{ vm_hardware_version_num }}' does not support persistent memory, support_persistent_memory config option value is '{{ guest_config_options.support_persistent_memory | default('') }}'."
+            skip_reason: "Not Supported"
+          when: >
+            (guest_config_options.support_persistent_memory is undefined) or
+            (not guest_config_options.support_persistent_memory | bool)
+
         # Get ESXi host persistent memory info
         - include_tasks: ../../common/esxi_get_pmem_info.yml
         - include_tasks: ../../common/skip_test_case.yml
@@ -31,7 +43,6 @@
             skip_reason: "Blocked"
           when: >
             (esxi_pmem_total_mb | int == 0) or
-            (esxi_pmem_available_mb | int == 0) or
             (esxi_pmem_available_mb | int < 16)
 
         # Do cold add testing
