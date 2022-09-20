@@ -1,0 +1,41 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get persistent memory disk info in Windows guest OS through the
+# specified UniqueID.
+# Refer to this page: https://docs.microsoft.com/en-us/windows-server
+# /storage/storage-spaces/storage-class-memory-health
+# Parameters:
+#   win_pmem_disk_unique_id: the UniqueID property of the disk
+#
+- name: "Initialize the persistent memory disk status"
+  ansible.builtin.set_fact:
+    win_pmem_disk_result: {}
+
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "get-physicaldisk | where UniqueId -eq '{{ win_pmem_disk_unique_id }}' | select FriendlyName, UniqueId, HealthStatus, OperationalStatus, OperationalDetails, MediaType, Size | fl"
+
+- name: "Get persistent memory disk status"
+  block:
+    - name: "Set fact of persistent memory disk properties"
+      ansible.builtin.set_fact:
+        win_pmem_disk_result: "{{ win_pmem_disk_result | combine({disk_property.split(':')[0].strip(): disk_property.split(':')[1].strip()}) }}"
+      when: disk_property | length != 0 and disk_property.split(':') | length > 1
+      with_items: "{{ win_powershell_cmd_output.stdout_lines }}"
+      loop_control:
+        loop_var: disk_property
+  when:
+    - win_powershell_cmd_output is defined
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+
+- name: "Display persistent memory disk status"
+  ansible.builtin.debug: var=win_pmem_disk_result
+
+- name: "Add persistent memory disk to the list"
+  ansible.builtin.set_fact:
+    win_pmem_disk_list: "{{ win_pmem_disk_list | default([]) + [win_pmem_disk_result] }}"
+  when:
+    - win_pmem_disk_result | length != 0
+    - win_pmem_disk_result not in win_pmem_disk_list | default([])

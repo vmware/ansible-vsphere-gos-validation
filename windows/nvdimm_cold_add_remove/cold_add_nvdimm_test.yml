@@ -1,0 +1,120 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# When ESXi host available PMem size > 256 MB, then test
+# add a new 256 MB NVDIMM device, if available PMem size
+# < 256 MB, then test 16 MB new device
+- name: "Initialize new added NVDIMM device info"
+  ansible.builtin.set_fact:
+    new_nvdimm_device_size: "{{ 256 if esxi_pmem_available_mb | int > 256 else 16 }}"
+    new_nvdimm_device: {}
+    new_nvdimm_device_guest: {}
+    new_nvdimm_device_label: ""
+    new_nvdimm_device_vmdk: ""
+
+# Get VM NVDIMM device before cold add
+- include_tasks: ../../common/vm_get_device_with_type.yml
+  vars:
+    device_vim_type: vim.vm.device.VirtualNVDIMM
+- name: "Set fact of NVDIMM device list before cold add"
+  ansible.builtin.set_fact:
+    vm_nvdimm_list_before_add: "{{ device_info_with_type }}"
+
+# Get NVDIMM device in guest OS before cold add
+- include_tasks: ../utils/win_get_pmem_disk_list.yml
+- name: "Set fact of the PMem disk info got in guest OS"
+  ansible.builtin.set_fact:
+    guest_nvdimm_list_before_add: "{{ win_pmem_disk_list }}"
+
+# VM should be in power off state when adding NVDIMM device
+- include_tasks: ../utils/shutdown_vm.yml
+
+# Add a new NVDIMM device to VM
+- include_tasks: ../../common/vm_add_remove_nvdimm.yml
+  vars:
+    vm_nvdimm_size_mb: "{{ new_nvdimm_device_size }}"
+- name: "Check adding NVDIMM device task result"
+  ansible.builtin.assert:
+    that:
+      - vm_config_nvdimm_result is defined
+      - vm_config_nvdimm_result.changed
+    fail_msg: "Add NVDIMM device to VM task result is not changed."
+
+# Get NVDIMM device list after cold add
+- include_tasks: ../../common/vm_get_device_with_type.yml
+  vars:
+    device_vim_type: vim.vm.device.VirtualNVDIMM
+- name: "Set fact of NVDIMM device list after cold add"
+  ansible.builtin.set_fact:
+    vm_nvdimm_list_after_add: "{{ device_info_with_type }}"
+
+- name: "Check NVDIMM device list after cold add"
+  ansible.builtin.assert:
+    that:
+      - vm_nvdimm_list_before_add | length + 1 == vm_nvdimm_list_after_add | length
+    fail_msg: "NVDIMM device number after cold add is {{ vm_nvdimm_list_after_add | length }}, before it's {{ vm_nvdimm_list_before_add | length }}, not increase 1."
+
+- name: "Set fact of the new added NVDIMM device"
+  ansible.builtin.set_fact:
+    new_nvdimm_device: "{{ (vm_nvdimm_list_after_add | difference(vm_nvdimm_list_before_add))[0] }}"
+  when: (vm_nvdimm_list_after_add | difference(vm_nvdimm_list_before_add)) | length == 1
+
+- name: "Set fact of the new added NVDIMM device label"
+  ansible.builtin.set_fact:
+    new_nvdimm_device_label: "{{ new_nvdimm_device.deviceInfo.label }}"
+  when:
+    - new_nvdimm_device.deviceInfo is defined
+    - new_nvdimm_device.deviceInfo.label is defined
+- name: "Set fact of the new added NVDIMM device vmdk file path"
+  ansible.builtin.set_fact:
+    new_nvdimm_device_vmdk: "{{ new_nvdimm_device.backing.fileName }}"
+  when:
+    - new_nvdimm_device.backing is defined
+    - new_nvdimm_device.backing.fileName is defined
+
+- name: "Check new NVDIMM device backing vmdk file in PMem datastore"
+  ansible.builtin.assert:
+    that:
+      - "'PMemDS' in new_nvdimm_device_vmdk"
+    fail_msg: "'PMemDS' keyword is not in the backing vmdk file path of new NVDIMM device: {{ new_nvdimm_device_vmdk }}"
+- include_tasks: ../../common/esxi_check_delete_datastore_file.yml
+  vars:
+    file_in_datastore_ops: "file"
+    file_in_datastore: "{{ new_nvdimm_device_vmdk.split(']')[0].strip('[]') }}"
+    file_in_datastore_path: "{{ new_nvdimm_device_vmdk.split(']')[1].strip(' ') }}"
+    file_in_datastore_ops_timeout: 120
+
+# Power on VM
+- include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+- include_tasks: ../../common/vm_get_ip.yml
+  vars:
+    vm_get_ip_timeout: 600
+- include_tasks: ../utils/win_check_winrm.yml
+- include_tasks: ../utils/add_windows_host.yml
+
+# Check NVDIMM device recognized in guest OS
+- include_tasks: ../utils/win_get_pmem_disk_list.yml
+- name: "Set fact of the PMem disk info got in guest OS"
+  ansible.builtin.set_fact:
+    guest_nvdimm_list_after_add: "{{ win_pmem_disk_list }}"
+- name: "Set fact of new added PMem disk info"
+  ansible.builtin.set_fact:
+    new_nvdimm_device_guest: "{{ (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add))[0] }}"
+  when: (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add)) | length == 1
+
+- name: "Check persistent memory disk status in guest OS"
+  ansible.builtin.assert:
+    that:
+      - new_nvdimm_device_guest.Size is defined
+      - new_nvdimm_device_guest.Size | int / 1024 / 1024 == new_nvdimm_device_size | int
+      - new_nvdimm_device_guest.HealthStatus is defined
+      - new_nvdimm_device_guest.HealthStatus == "Healthy"
+    fail_msg: "Persistent memory disk status got in guest OS '{{ new_nvdimm_device_guest }}', which status is not 'Healthy', or the size got is not '{{ new_nvdimm_device_size }}' MB."
+
+# Initialize and create partition on the pmem disk
+- include_tasks: ../vhba_hot_add_remove/create_partition_raw_disk.yml
+  vars:
+    test_disk_controller_type: ""
+    test_purpose: "pmemdisk"

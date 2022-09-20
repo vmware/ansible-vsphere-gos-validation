@@ -1,0 +1,31 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get ESXi host total persistent memory size and available persistent memory size
+# Use this task on ESXi host version 6.7 and later
+#
+- name: "Initialize the ESXi host persistent memory info"
+  ansible.builtin.set_fact:
+    esxi_pmem_total_mb: 0
+    esxi_pmem_available_mb: 0
+
+- include_tasks: esxi_get_property.yml
+  vars:
+    esxi_host_property_list:
+      - hardware.persistentMemoryInfo
+      - summary.quickStats.availablePMemCapacity
+
+- name: "Set fact of ESXi host persistent memory info"
+  ansible.builtin.set_fact:
+    esxi_pmem_info: "{{ esxi_host_property_results.ansible_facts.hardware.persistentMemoryInfo }}"
+    esxi_pmem_available_mb: "{{ esxi_host_property_results.ansible_facts.summary.quickStats.availablePMemCapacity | int }}"
+- name: "Set fact of ESXi host total persistent memory"
+  ansible.builtin.set_fact:
+    esxi_pmem_total_mb: "{{ esxi_pmem_info.capacityInMB | int }}"
+  when: "'capacityInMB' in esxi_pmem_info"
+
+- name: "Display the ESXi host persistent memory info"
+  ansible.builtin.debug:
+    msg:
+      - "ESXi host total persistent memory in MB: {{ esxi_pmem_total_mb }}"
+      - "ESXi host available persistent memory in MB: {{ esxi_pmem_available_mb }}"

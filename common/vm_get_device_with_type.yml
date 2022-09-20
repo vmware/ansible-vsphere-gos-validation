@@ -1,0 +1,19 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VM NVDIMM device list
+# Parameters:
+#   device_vim_type: the device vim type, e.g. 'vim.vm.device.VirtualNVDIMM'
+# Return:
+#   device_info_with_type: the info of device with specified device type
+#
+- include_tasks: vm_get_config.yml
+  vars:
+    property_list: ['config.hardware.device']
+
+- name: "Get device list with type '{{ device_vim_type }}'"
+  ansible.builtin.set_fact:
+    device_info_with_type: "{{ vm_config.config.hardware.device | selectattr('_vimtype', 'equalto', device_vim_type) }}"
+
+- name: "Print device info"
+  ansible.builtin.debug: var=device_info_with_type

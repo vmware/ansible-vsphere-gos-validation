@@ -7,6 +7,10 @@
 # Return:
 #   win_get_volume_size_gb
 #
+- name: "Initialize the volume size"
+  ansible.builtin.set_fact:
+    win_get_volume_size_gb: 0
+
 - include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "[math]::Round(((Get-Volume -DriveLetter {{ win_disk_volume_letter }}).Size)/1GB)"
@@ -16,5 +20,6 @@
     win_get_volume_size_gb: "{{ win_powershell_cmd_output.stdout_lines[0] | int }}"
   when:
     - win_powershell_cmd_output.stdout_lines | length != 0
+    - not win_powershell_cmd_output.failed
 - ansible.builtin.debug:
     msg: "Get disk volume '{{ win_disk_volume_letter }}' size in guest OS: {{ win_get_volume_size_gb }}"
