@@ -9,7 +9,7 @@
     msg:
       - "The unattend install config file is {{ unattend_install_template }}"
 
-# unattend_install_conf is not for Ubuntu
+# unattend_install_conf is not for Ubuntu Server
 - block:
     - name: "Create temp folder for generating unattend install ISO file"
       include_tasks: ../../common/create_temp_file_dir.yml
@@ -63,6 +63,7 @@
       when:
         - unattend_install_conf is not match('Photon')
         - unattend_install_conf is not match('Debian')
+        - unattend_install_conf is not match('Ubuntu/Desktop/')
 
     # Build unattend install config file into OS ISO image
     - include_tasks: rebuild_unattend_install_iso.yml
@@ -70,10 +71,11 @@
         rebuilt_unattend_iso_path: "{{ generated_unattend_iso }}"
       when: >
         unattend_install_conf is match('Photon') or
-        unattend_install_conf is match('Debian')
-  when: unattend_install_conf is not match('Ubuntu')
+        unattend_install_conf is match('Debian') or
+        unattend_install_conf is match('Ubuntu/Desktop/')
+  when: unattend_install_conf is not match('Ubuntu/Server/')
 
-# unattend_install_conf is for Ubuntu
+# unattend_install_conf is for Ubuntu Server
 - block:
     - name: "Set fact for autoinstall start message to be printed to VM serial port"
       ansible.builtin.set_fact:
