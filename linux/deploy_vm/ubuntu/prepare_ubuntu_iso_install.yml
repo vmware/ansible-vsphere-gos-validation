@@ -9,14 +9,10 @@
   ansible.builtin.set_fact:
     ubuntu_version: "{{ ubuntu_iso_file_name | regex_search('\\d+.\\d+(.\\d+)?') }}"
     ubuntu_edition: |-
-      {%- if "'server' in ubuntu_iso_file_name" -%}server
-      {%- elif "'desktop' is ubuntu_iso_file_name" -%}desktop
+      {%- if ubuntu_iso_file_name.find("server") != -1 -%}server
+      {%- elif ubuntu_iso_file_name.find("desktop") != -1 -%}desktop
       {%- else -%}unknown
       {%- endif -%}
-
-- ansible.builtin.fail:
-    msg: "Ubuntu {{ ubuntu_edition }} is not supported by now"
-  when: ubuntu_edition != 'server'
 
 - name: "Set Ubuntu autoinstall method"
   ansible.builtin.set_fact:
@@ -30,4 +26,9 @@
 - name: "Set fact of Ubuntu unattend install file"
   ansible.builtin.set_fact:
     unattend_install_conf: "Ubuntu/Server/user-data.j2"
-  when: ubuntu_install_method == "cloud-init"
+  when: ubuntu_install_method is defined and ubuntu_install_method == "cloud-init"
+
+- name: "Set fact of Ubuntu desktop unattend install file"
+  ansible.builtin.set_fact:
+    unattend_install_conf: "Ubuntu/Desktop/ubuntu.seed"
+  when: ubuntu_edition == 'desktop'
