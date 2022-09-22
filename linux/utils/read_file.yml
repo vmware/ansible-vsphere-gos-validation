@@ -1,0 +1,29 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Read file content
+# Parameters:
+#   read_file_path: The file path to read
+# Return:
+#   read_file_content: The file content 
+#
+- name: "Initialize file content"
+  ansible.builtin.set_fact:
+    read_file_content: ""
+
+- name: "Read file {{ read_file_path }}"
+  ansible.builtin.shell: "cat {{ read_file_path }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: read_file_result
+
+- name: "Set the fact of file content"
+  ansible.builtin.set_fact: 
+    read_file_content: "{{ read_file_result.stdout }}"
+  when:
+    - read_file_result is defined
+    - read_file_result.stdout is defined
+
+- name: "Print the content of file {{ read_file_path }}"
+  ansible.builtin.debug: var=read_file_content
+  when: enable_debug | default(false)

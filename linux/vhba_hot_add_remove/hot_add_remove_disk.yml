@@ -26,9 +26,41 @@
     new_device_list: "{{ device_list_after_change }}"
     new_device_name: "{{ (device_list_after_change | difference(old_device_list))[0] }}"
 
-# Create new partition for new disk
-- include_tasks: prepare_new_disk.yml
-- include_tasks: run_iozone_test.yml
+# Create new partition and run test on the new disk
+- name: "Get new block device"
+  ansible.builtin.set_fact:
+    device: "{{ new_device_list | difference(old_device_list) }}"
+- name: "Print new device block name"
+  ansible.builtin.debug: var=device
+- name: "Check new device file is created"
+  ansible.builtin.assert:
+    that:
+      - device | length == 1
+    fail_msg: "Hotadd disk failed due to no new disk device on VM."
+    success_msg: "Hotadd disk succeed, new disk device on VM."
+
+- name: "Set new device block name"
+  ansible.builtin.set_fact:
+    device_name: "{{ device[0] }}"
+
+- name: "Print new device block name"
+  ansible.builtin.debug: var=device_name
+
+- name: "Create new partition on the new disk {{ device_name }}"
+  include_tasks: ../utils/create_disk_partition.yml
+  vars:
+    disk_name: "{{ device_name }}"
+
+- name: "Set fact of new partition name and device path"
+  ansible.builtin.set_fact:
+    new_partition_name: "{{ partition_name }}"
+    new_partition_device_path: "{{ partition_device_path }}"
+
+- name: "Run iozone test on new disk {{ device_name }}"
+  include_tasks: run_iozone_test.yml
+
+- name: "Test file read/write on new partition {{ new_partition_device_path }}"
+  include_tasks: ../utils/test_file_read_write.yml
 
 - include_tasks: ../../common/vm_hot_add_remove_disk.yml
   vars:

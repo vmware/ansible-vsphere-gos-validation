@@ -1,0 +1,130 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# When ESXi host available persistent memory size > 256 MB, then test
+# add a new 256 MB NVDIMM device, if available persistent memory size
+# < 256 MB, then test 16 MB new device
+- name: "Initialize new added NVDIMM device info"
+  ansible.builtin.set_fact:
+    vm_new_nvdimm_device_size: "{{ 256 if esxi_pmem_available_mb | int > 256 else 16 }}"
+    vm_new_nvdimm_device: {}
+    guest_new_nvdimm_device: {}
+    vm_new_nvdimm_device_label: ""
+    vm_new_nvdimm_device_vmdk: ""
+
+# Get VM NVDIMM device before cold add
+- include_tasks: ../../common/vm_get_device_with_type.yml
+  vars:
+    device_vim_type: vim.vm.device.VirtualNVDIMM
+- name: "Set fact of NVDIMM device list before cold add"
+  ansible.builtin.set_fact:
+    vm_nvdimm_list_before_add: "{{ device_info_with_type }}"
+
+# Get NVDIMM device in guest OS before cold add
+- include_tasks: ../utils/get_device_list.yml
+  vars:
+    guest_device_type: "pmem"
+
+- name: "Set fact of the persistent memory info got in guest OS"
+  ansible.builtin.set_fact:
+    guest_nvdimm_list_before_add: "{{ guest_device_list }}"
+
+# VM should be in power off state when adding NVDIMM device
+- include_tasks: ../utils/shutdown_vm.yml
+
+# Add a new NVDIMM device to VM
+- include_tasks: ../../common/vm_add_remove_nvdimm.yml
+  vars:
+    vm_nvdimm_size_mb: "{{ vm_new_nvdimm_device_size }}"
+- name: "Check adding NVDIMM device task result"
+  ansible.builtin.assert:
+    that:
+      - vm_config_nvdimm_result is defined
+      - vm_config_nvdimm_result.changed
+    fail_msg: "Add NVDIMM device to VM task result is not changed."
+
+# Get NVDIMM device list after cold add
+- include_tasks: ../../common/vm_get_device_with_type.yml
+  vars:
+    device_vim_type: vim.vm.device.VirtualNVDIMM
+- name: "Set fact of NVDIMM device list after cold add"
+  ansible.builtin.set_fact:
+    vm_nvdimm_list_after_add: "{{ device_info_with_type }}"
+
+- name: "Check NVDIMM device list after cold add"
+  ansible.builtin.assert:
+    that:
+      - vm_nvdimm_list_before_add | length + 1 == vm_nvdimm_list_after_add | length
+    fail_msg: "NVDIMM device number after cold add is {{ vm_nvdimm_list_after_add | length }}, before it's {{ vm_nvdimm_list_before_add | length }}, not increase 1."
+
+- name: "Set fact of the new added NVDIMM device"
+  ansible.builtin.set_fact:
+    vm_new_nvdimm_device: "{{ (vm_nvdimm_list_after_add | difference(vm_nvdimm_list_before_add))[0] }}"
+  when: (vm_nvdimm_list_after_add | difference(vm_nvdimm_list_before_add)) | length == 1
+
+- name: "Set fact of the new added NVDIMM device label"
+  ansible.builtin.set_fact:
+    vm_new_nvdimm_device_label: "{{ vm_new_nvdimm_device.deviceInfo.label }}"
+  when:
+    - vm_new_nvdimm_device.deviceInfo is defined
+    - vm_new_nvdimm_device.deviceInfo.label is defined
+- name: "Set fact of the new added NVDIMM device vmdk file path"
+  ansible.builtin.set_fact:
+    vm_new_nvdimm_device_vmdk: "{{ vm_new_nvdimm_device.backing.fileName }}"
+  when:
+    - vm_new_nvdimm_device.backing is defined
+    - vm_new_nvdimm_device.backing.fileName is defined
+
+- name: "Check new NVDIMM device backing vmdk file in PMem datastore"
+  ansible.builtin.assert:
+    that:
+      - "'PMemDS' in vm_new_nvdimm_device_vmdk"
+    fail_msg: "'PMemDS' keyword is not in the backing vmdk file path of new NVDIMM device: {{ vm_new_nvdimm_device_vmdk }}"
+- include_tasks: ../../common/esxi_check_delete_datastore_file.yml
+  vars:
+    file_in_datastore_ops: "file"
+    file_in_datastore: "{{ vm_new_nvdimm_device_vmdk.split(']')[0].strip('[]') }}"
+    file_in_datastore_path: "{{ vm_new_nvdimm_device_vmdk.split(']')[1].strip(' ') }}"
+    file_in_datastore_ops_timeout: 120
+
+# Power on VM
+- include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+- include_tasks: ../../common/update_inventory.yml
+
+# Check NVDIMM device recognized in guest OS
+- include_tasks: ../utils/get_device_list.yml
+  vars:
+    guest_device_type: "pmem"
+- name: "Set fact of the persistent memory info got in guest OS"
+  ansible.builtin.set_fact:
+    guest_nvdimm_list_after_add: "{{ guest_device_list }}"
+- name: "Set fact of new added persistent memory info"
+  ansible.builtin.set_fact:
+    guest_new_nvdimm_device: "{{ (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add))[0] }}"
+  when: (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add)) | length == 1
+
+- name: "Check persistent memory size in guest OS"
+  ansible.builtin.assert:
+    that:
+      - guest_new_nvdimm_device.size is defined
+      - guest_new_nvdimm_device.size | int / 1024 / 1024 == vm_new_nvdimm_device_size | int
+    fail_msg: "Persistent memory got in guest OS '{{ guest_new_nvdimm_device }}', the size of which is not '{{ vm_new_nvdimm_device_size }}' MB."
+
+# Initialize and create partition on the persistent memory
+- include_tasks: ../utils/create_disk_partition.yml
+  vars:
+    disk_name: "{{ guest_new_nvdimm_device.name }}"
+    partition_fs: "ext4"
+
+- name: "Set the fact of new partition name and device path on the persistent memory"
+  ansible.builtin.set_fact:
+    new_nvdimm_part_name: "{{ partition_name }}"
+    new_nvdimm_part_dev_path: "{{ partition_device_path }}"
+
+- name: "Run iozone test on new disk {{ guest_new_nvdimm_device.name }}"
+  include_tasks: ../vhba_hot_add_remove/run_iozone_test.yml
+
+- name: "Test file read/write on new partition {{ new_nvdimm_part_dev_path }}"
+  include_tasks: ../utils/test_file_read_write.yml
