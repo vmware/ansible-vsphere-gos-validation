@@ -110,7 +110,7 @@
       ansible.builtin.set_fact:
         os_installation_iso_list: ["[{{ datastore }}] {{ new_os_installation_iso }}"]
         os_install_iso_list_len: 1
-  when: unattend_install_conf is match('Ubuntu')
+  when: unattend_install_conf is match('Ubuntu/Server/')
 
 - name: "Set fact of unattended install ISO path on datastore {{ datastore }}"
   ansible.builtin.set_fact:
@@ -135,6 +135,7 @@
   when:
     - unattend_install_conf is not match('Photon')
     - unattend_install_conf is not match('Debian')
+    - unattend_install_conf is not match('Ubuntu/Desktop')
 
 - name: "Replace original install ISO file with unattend install ISO file"
   ansible.builtin.set_fact:
@@ -142,7 +143,8 @@
     os_install_iso_list_len: 1
   when: >
     unattend_install_conf is match('Photon') or
-    unattend_install_conf is match('Debian')
+    unattend_install_conf is match('Debian') or
+    unattend_install_conf is match('Ubuntu/Desktop')
 
 - name: "Copy generated unattend install config file to log folder"
   ansible.builtin.copy:
