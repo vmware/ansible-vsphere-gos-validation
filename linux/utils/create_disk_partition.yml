@@ -2,46 +2,54 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   Format and create new partition on a disk
+#   Format and create 1 new partition on a disk
 # Parameters:
 #   disk_name: The disk name to be formatted and create partition
-#   partition_fs: Create filesystem on new partition, which could be ext4, xfs
+#   partition_fstype: Create filesystem on new partition, which could be ext4, xfs
 #                         or btrfs, etc. The default filesystem is ext4.
+# Return:
+#   partition_name: The disk partition name
+#   partition_device_path: The disk partition device path
 #
+- name: "Initialize disk partition name and device path"
+  ansible.builtin.set_fact:
+    partition_name: ""
+    partition_device_path: ""
+
 - name: "Set filesystem"
   block:
     - name: "Check filesystem is supported by guest OS"
-      ansible.builtin.shell: "which mkfs.{{ partition_fs }}"
+      ansible.builtin.shell: "which mkfs.{{ partition_fstype }}"
       ignore_errors: true
       delegate_to: "{{ vm_guest_ip }}"
       register: check_fs
-    
-    - name: "Filesystem {{ partition_fs }} is not supported, change partition filesystem to ext4"
+
+    - name: "Filesystem {{ partition_fstype }} is not supported, change partition filesystem to ext4"
       ansible.builtin.set_fact:
-        partition_fs: "ext4"
+        partition_fstype: "ext4"
       when: >
         check_fs is undefined or
-        check_fs.rc is undefined
+        check_fs.rc is undefined or
         check_fs.rc != 0
   when:
-    - partition_fs is defined
-    - partition_fs 
+    - partition_fstype is defined
+    - partition_fstype
 
 - name: "Set default partition filesystem to ext4"
   ansible.builtin.set_fact:
-    partition_fs: "ext4"
+    partition_fstype: "ext4"
   when: >
-    partition_fs is undefined or
-    not partition_fs 
+    partition_fstype is undefined or
+    not partition_fstype
 
-- name: "Format partition on new disk"
+- name: "Create 1 partition on disk {{ disk_name }}"
   ansible.builtin.shell: |
     set -o pipefail
     (echo n; echo p; echo; echo; echo; echo w) | fdisk "/dev/{{ disk_name }}"
   args:
     executable: /bin/bash
-  become: true
   delegate_to: "{{ vm_guest_ip }}"
+  register: parted_result
 
 - name: "Set fact of partition name"
   ansible.builtin.set_fact:
@@ -49,27 +57,19 @@
       {%- if 'nvme' in disk_name or 'pmem' in disk_name -%}{{ disk_name }}p1
       {%- else -%}{{ disk_name }}1{%- endif -%}
 
-- name: "Set fact of device path of the new disk partition"
+- name: "Set fact of partition device path"
   ansible.builtin.set_fact:
     partition_device_path: "/dev/{{ partition_name }}"
 
 - name: "Print the new disk partition name and device path"
-  ansible.builtin.debug: var=partition_device_path
+  ansible.builtin.debug:
     msg:
      - "The new disk partition name: {{ partition_name }}"
      - "The new disk partition device path: {{ partition_device_path }}"
 
-- name: "Create {{ partition_fs }} file system on {{ partition_device_path }}"
-  ansible.builtin.shell: "mkfs.{{ partition_fs }} {{ partition_device_path }}"
-  ignore_errors: true
+- name: "Create filesystem on partition {{ partition_device_path }}"
+  community.general.filesystem:
+    fstype: "{{ partition_fstype }}"
+    dev: "{{ partition_device_path }}"
   delegate_to: "{{ vm_guest_ip }}"
-  register: create_fs_result
-
-- name: "Failed to create filesystem on {{ partition_device_path }}"
-  fail:
-    msg: "Failed to create filesystem on {{ partition_device_path }}, hit error: {{ create_fs_result.stderr | default('unknown') }}"
-  when: >
-    create_fs_result is undefined or
-    create_fs_result.rc is undefined or
-    create_fs_result.rc != 0
 

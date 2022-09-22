@@ -154,8 +154,8 @@ function test_partitions()
                 printf "Retry without option \"${mount_ops}\": "
                 mount $part_path $mount_point && echo "SUCCEED" || echo "FAIL"
             else
-                echo "Error: Could not mount $part_pat to $mount_point"
-                continue
+                echo "Error: Could not mount $part_path to $mount_point"
+                exit $ret
             fi
         else
             echo "SUCCEED"

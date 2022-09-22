@@ -50,17 +50,23 @@
   include_tasks: ../utils/create_disk_partition.yml
   vars:
     disk_name: "{{ device_name }}"
+    partition_fstype: "ext4"
 
 - name: "Set fact of new partition name and device path"
   ansible.builtin.set_fact:
     new_partition_name: "{{ partition_name }}"
     new_partition_device_path: "{{ partition_device_path }}"
+    new_partition_fstype: "ext4"
 
 - name: "Run iozone test on new disk {{ device_name }}"
   include_tasks: run_iozone_test.yml
 
 - name: "Test file read/write on new partition {{ new_partition_device_path }}"
-  include_tasks: ../utils/test_file_read_write.yml
+  include_tasks: test_file_read_write.yml
+  vars:
+    test_partition_name: "{{ new_partition_name }}"
+    test_partition_device_path: "{{ new_partition_device_path }}"
+    test_partition_fstype: "{{ new_partition_fstype }}"
 
 - include_tasks: ../../common/vm_hot_add_remove_disk.yml
   vars:
