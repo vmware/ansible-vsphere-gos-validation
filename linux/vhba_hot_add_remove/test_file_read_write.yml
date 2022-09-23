@@ -1,0 +1,87 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Test file read/write on new disk partition
+# Parameters:
+#   test_partition_name: The partition name
+#   test_partition_device_path: The partition device path to test file read/write
+#   test_partition_fstype: The filesystem type of the partition
+#
+- name: "Set the facts for testing read and write"
+  ansible.builtin.set_fact:
+    test_mount_path: "/mnt/{{ test_partition_name }}"
+    test_mount_opts: |-
+      {%- if 'pmem' in test_partition_name and test_partition_fstype in ['ext4', 'xfs'] -%}dax
+      {%- else -%}rw,relatime
+      {%- endif -%}
+    test_file_path: "/mnt/{{ test_partition_name }}/test_{{ test_partition_name }}.txt"
+    test_file_content: "This is a test file to test new partition {{ test_partition_device_path }}"
+
+- name: "Mount {{ test_partition_device_path }} to {{ test_mount_path }}"
+  include_tasks: ../utils/set_mount_point.yml
+  vars:
+    mount_point_path: "{{ test_mount_path }}"
+    mount_point_src: "{{ test_partition_device_path }}"
+    mount_fstype: "{{ test_partition_fstype }}"
+    mount_opts: "{{ test_mount_opts }}"
+    mount_state: "mounted"
+
+- name: "Create new file {{ test_file_path }}"
+  include_tasks: ../utils/create_file.yml
+  vars:
+    new_file_path: "{{ test_file_path }}"
+
+- name: "Write content to file {{ test_file_path }}"
+  include_tasks: ../utils/write_file.yml
+  vars:
+    write_file_path: "{{ test_file_path }}"
+    write_file_content: "{{ test_file_content }}"
+
+- name: "Read content of file {{ test_file_path }}"
+  include_tasks: ../utils/read_file.yml
+  vars:
+    read_file_path: "{{ test_file_path }}"
+
+- name: "Check file content is what has been write"
+  assert:
+    that:
+      - read_file_content is defined
+      - read_file_content == test_file_content
+    fail_msg: "{{ test_file_path }} file content is {{ read_file_content }}, not expected {{ test_file_content }}"
+
+- name: "Unmount device {{ test_partition_device_path }}"
+  include_tasks: ../utils/set_mount_point.yml
+  vars:
+    mount_point_path: "{{ test_mount_path }}"
+    mount_state: "absent"
+
+- name: "Reboot guest OS to check file content again"
+  include_tasks: ../utils/reboot.yml
+
+- name: "Mount {{ test_partition_device_path }} to {{ test_mount_path }}"
+  include_tasks: ../utils/set_mount_point.yml
+  vars:
+    mount_point_path: "{{ test_mount_path }}"
+    mount_point_src: "{{ test_partition_device_path }}"
+    mount_fstype: "{{ test_partition_fstype }}"
+    mount_opts: "{{ test_mount_opts }}"
+    mount_state: "mounted"
+
+- name: "Read content of file {{ test_file_path }} after guest OS reboot"
+  include_tasks: ../utils/read_file.yml
+  vars:
+    read_file_path: "{{ test_file_path }}"
+
+- name: "Check file content is what has been write after guest OS reboot"
+  assert:
+    that:
+      - read_file_content is defined
+      - read_file_content == test_file_content
+    fail_msg: "{{ test_file_path }} file content is {{ read_file_content }}, not expected {{ test_file_content }}"
+
+- name: "Unmount device {{ test_partition_device_path }}"
+  include_tasks: ../utils/set_mount_point.yml
+  vars:
+    mount_point_path: "{{ test_mount_path }}"
+    mount_state: "absent"
