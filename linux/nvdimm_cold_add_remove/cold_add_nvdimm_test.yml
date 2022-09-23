@@ -22,17 +22,18 @@
     vm_nvdimm_list_before_add: "{{ device_info_with_type }}"
 
 # Get NVDIMM device in guest OS before cold add
-- name: "Get persistent memory list before cold add in guest"
+- name: "Get guest persistent memory list before cold add"
   include_tasks: ../utils/get_device_list.yml
   vars:
     guest_device_type: "pmem"
 
-- name: "Set fact of the persistent memory info got in guest OS"
+- name: "Set fact of guest persistent memory list before cold add"
   ansible.builtin.set_fact:
     guest_nvdimm_list_before_add: "{{ guest_device_list }}"
 
 # VM should be in power off state when adding NVDIMM device
-- include_tasks: ../utils/shutdown_vm.yml
+- name: "Shutdown guest OS"
+  include_tasks: ../utils/shutdown_vm.yml
 
 # Add a new NVDIMM device to VM
 - name: "Cold add a NVDIMM device to VM"
@@ -93,22 +94,23 @@
     file_in_datastore_path: "{{ vm_new_nvdimm_device_vmdk.split(']')[1].strip(' ') }}"
     file_in_datastore_ops_timeout: 120
 
-# Power on VM
-- include_tasks: ../../common/vm_set_power_state.yml
+- name: "Power on VM"
+  include_tasks: ../../common/vm_set_power_state.yml
   vars:
     vm_power_state_set: "powered-on"
-- include_tasks: ../../common/update_inventory.yml
+- name: "Update inventory"
+  include_tasks: ../../common/update_inventory.yml
 
 # Check BIOS-e820
 - name: "Check BIOS-e820 has persistent memory device"
   include_tasks: check_bios_e820.yml
 
 # Check NVDIMM device recognized in guest OS
-- name: "Get persistent memory list after cold add in guest"
+- name: "Get guest persistent memory list after cold add"
   include_tasks: ../utils/get_device_list.yml
   vars:
     guest_device_type: "pmem"
-- name: "Set fact of the persistent memory info got in guest OS"
+- name: "Set fact of guest persistent memory list after cold add"
   ansible.builtin.set_fact:
     guest_nvdimm_list_after_add: "{{ guest_device_list }}"
 - name: "Set fact of new added persistent memory info"

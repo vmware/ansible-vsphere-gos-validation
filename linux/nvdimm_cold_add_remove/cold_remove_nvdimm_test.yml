@@ -2,10 +2,12 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # VM should be in power off state when removing NVDIMM device
-- include_tasks: ../utils/shutdown.yml
+- name: "Shutdown guest OS"
+  include_tasks: ../utils/shutdown.yml
 
 # Remove new added NVDIMM device
-- include_tasks: ../../common/vm_add_remove_nvdimm.yml
+- name: "Cold remove {{ new_nvdimm_device_label }} from VM"
+  include_tasks: ../../common/vm_add_remove_nvdimm.yml
   vars:
     vm_nvdimm_state: "absent"
     vm_nvdimm_label: "{{ new_nvdimm_device_label }}" 
@@ -18,7 +20,8 @@
     fail_msg: "Remove NVDIMM device from VM task result is not changed."
 
 # Get NVDIMM device list after cold remove
-- include_tasks: ../../common/vm_get_device_with_type.yml
+- name: "Get VM NVDIMM device list after cold remove"
+  include_tasks: ../../common/vm_get_device_with_type.yml
   vars:
     device_vim_type: vim.vm.device.VirtualNVDIMM
 - name: "Set fact of NVDIMM device list after cold remove"
@@ -30,7 +33,8 @@
       - vm_nvdimm_list_before_add == vm_nvdimm_list_after_remove
     fail_msg: "NVDIMM device after cold remove '{{ vm_nvdimm_list_after_remove }}', it's not the same as the device before cold add '{{ vm_nvdimm_list_before_add }}'."
 
-- include_tasks: ../../common/esxi_check_delete_datastore_file.yml
+- name: "Check new NVDIMM device backing vmdk file removed from PMem datastore"
+  include_tasks: ../../common/esxi_check_delete_datastore_file.yml
   vars:
     file_in_datastore_ops: "file"
     file_in_datastore: "{{ new_nvdimm_device_vmdk.split(']')[0].strip('[]') }}"
@@ -44,17 +48,19 @@
       - file_in_datastore_result == 'Fail'
     fail_msg: "Check vmdk file existence in datastore is '{{ file_in_datastore_result }}', which should be 'Fail'."
 
-# Power on VM
-- include_tasks: ../../common/vm_set_power_state.yml
+- name: "Power on VM"
+  include_tasks: ../../common/vm_set_power_state.yml
   vars:
     vm_power_state_set: "powered-on"
-- include_tasks: ../../common/update_inventory.yml
+- name: "Update inventory"
+  include_tasks: ../../common/update_inventory.yml
 
 # Get NVDIMM device in guest OS after cold remove
-- include_tasks: ../utils/get_device_list.yml
+- name: "Get guest persistent memory list after cold remove"
+  include_tasks: ../utils/get_device_list.yml
   vars:
     guest_device_type: "pmem"
-- name: "Set fact of the persistent memory info got in guest OS"
+- name: "Set fact of guest persistent memory list"
   ansible.builtin.set_fact:
     guest_nvdimm_list_after_remove: "{{ guest_device_list }}"
 - name: "Check persistent memory is removed from guest OS"
