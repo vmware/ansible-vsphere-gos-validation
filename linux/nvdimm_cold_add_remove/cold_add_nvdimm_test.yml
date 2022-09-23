@@ -22,14 +22,12 @@
     vm_nvdimm_list_before_add: "{{ device_info_with_type }}"
 
 # Get NVDIMM device in guest OS before cold add
-- name: "Get guest persistent memory list before cold add"
-  include_tasks: ../utils/get_device_list.yml
-  vars:
-    guest_device_type: "pmem"
+- name: "Get guest PMem device list before cold add"
+  include_tasks: ../utils/get_pmem_list.yml
 
-- name: "Set fact of guest persistent memory list before cold add"
+- name: "Set fact of guest PMem device list before cold add"
   ansible.builtin.set_fact:
-    guest_nvdimm_list_before_add: "{{ guest_device_list }}"
+    guest_nvdimm_list_before_add: "{{ guest_pmem_list }}"
 
 # VM should be in power off state when adding NVDIMM device
 - name: "Shutdown guest OS"
@@ -102,46 +100,51 @@
   include_tasks: ../../common/update_inventory.yml
 
 # Check BIOS-e820
-- name: "Check BIOS-e820 has persistent memory device"
+- name: "Check BIOS-e820 has PMem device"
   include_tasks: check_bios_e820.yml
 
 # Check NVDIMM device recognized in guest OS
-- name: "Get guest persistent memory list after cold add"
-  include_tasks: ../utils/get_device_list.yml
+- name: "Get guest PMem device list after cold add"
+  include_tasks: ../utils/get_pmem_list.yml
   vars:
     guest_device_type: "pmem"
-- name: "Set fact of guest persistent memory list after cold add"
+- name: "Set fact of guest PMem device list after cold add"
   ansible.builtin.set_fact:
-    guest_nvdimm_list_after_add: "{{ guest_device_list }}"
-- name: "Set fact of new added persistent memory info"
+    guest_nvdimm_list_after_add: "{{ guest_pmem_list }}"
+- name: "Set fact of new added PMem device info"
   ansible.builtin.set_fact:
     guest_new_nvdimm_device: "{{ (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add))[0] }}"
   when: (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add)) | length == 1
 
-- name: "Check persistent memory size in guest OS"
+- name: "Check PMem device size and health state in guest OS"
   ansible.builtin.assert:
     that:
       - guest_new_nvdimm_device.size is defined
       - guest_new_nvdimm_device.size | int / 1024 / 1024 == vm_new_nvdimm_device_size | int
-    fail_msg: "Persistent memory got in guest OS '{{ guest_new_nvdimm_device }}', the size of which is not '{{ vm_new_nvdimm_device_size }}' MB."
+      - guest_new_nvdimm_device.health is defined
+      - guest_new_nvdimm_device.health.health_state is defined
+      - guest_new_nvdimm_device.health.health_state | lower == "ok"
+    fail_msg: >-
+      The new PMem device is '{{ guest_new_nvdimm_device }}',
+      its size is not '{{ vm_new_nvdimm_device_size }}' MB.
 
-# Initialize and create partition on the persistent memory
+# Initialize and create partition on the PMem device
 - name: "Create new disk partition and filesystem on it"
   include_tasks: ../utils/create_disk_partition.yml
   vars:
-    disk_name: "{{ guest_new_nvdimm_device.name }}"
+    disk_name: "{{ guest_new_nvdimm_device.blockdev }}"
     partition_fstype: "ext4"
 
-- name: "Set the fact of new partition name and device path on the persistent memory"
+- name: "Set the fact of new partition name and device path on the PMem device"
   ansible.builtin.set_fact:
     new_nvdimm_part_name: "{{ partition_name }}"
     new_nvdimm_part_dev_path: "{{ partition_device_path }}"
     new_nvdimm_part_fstype: "ext4"
 
-- name: "Run I/O test on persistent memory {{ guest_new_nvdimm_device.name }}"
+- name: "Run I/O test on PMem device {{ guest_new_nvdimm_device.blockdev }}"
   include_tasks: ../vhba_hot_add_remove/test_disk_io.yml
   vars:
-    test_disk_name: "{{ guest_new_nvdimm_device.name }}"
+    test_disk_name: "{{ guest_new_nvdimm_device.blockdev }}"
 
 - name: "Test file read/write on new partition {{ new_nvdimm_part_dev_path }}"
   include_tasks: ../utils/test_file_read_write.yml

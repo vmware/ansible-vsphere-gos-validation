@@ -1,0 +1,72 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Get a list of PMem devices in guest OS
+# Return:
+#   guest_pmem_list: A list of PMem devices
+#
+- name: "Initialize the fact of device list and command"
+  ansible.builtin.set_fact:
+    guest_pmem_list: []
+
+- name: "Check ndctl is installed in guest OS"
+  include_tasks: get_installed_package_info.yml
+  vars:
+    package_name: "ndctl"
+
+- name: "Install ndctl for managing PMem devices"
+  include_tasks: install_uninstall_package.yml
+  vars:
+    package_name: "ndctl"
+    package_state: "present"
+  when:
+    - package_info is defined
+    - package_info | length == 0
+
+- name: "Get PMem devices in guest OS"
+  ansible.builtin.shell: "ndctl list -DHN"
+  delegate_to: "{{ vm_guest_ip }}"
+  changed_when: false
+  ignore_errors: true
+  register: ndctl_list_result
+
+- name: "Set the fact of PMem devices info"
+  block:
+    - name: "Set the fact of PMem dimms and namespaces info"
+      ansible.builtin.set_fact:
+        guest_pmem_dimms_ns_info: "{{ ndctl_list_result.stdout | from_json }}"
+
+    # Combine guest_pmem_dimms_ns_info.dimms and guest_pmem_dimms_ns_info.namespaces to one list
+    - name: "Update PMem devices size"
+      ansible.builtin.set_fact:
+        guest_pmem_list: >-
+          {{
+            guest_pmem_list +
+            [
+             item |
+             combine({'blockdev': item.dev | replace('nmem', 'pmem'),
+                      'size': 0}) |
+             combine((guest_pmem_dimms_ns_info.namespaces |
+                      selectattr('blockdev', 'equalto',
+                                 item.dev | replace('nmem', 'pmem')
+                                 ))[0] |
+                     default({}) |
+                     dict2items |
+                     selectattr('key', 'equalto', 'size') |
+                     items2dict)
+            ]
+          }}
+      with_items: "{{ guest_pmem_dimms_ns_info.dimms }}"
+      when:
+        - guest_pmem_dimms_ns_info.dimms is defined
+        - guest_pmem_dimms_ns_info.namespaces is defined
+        - guest_pmem_dimms_ns_info.dimms | length > 0
+  when:
+    - ndctl_list_result is defined
+    - ndctl_list_result.stdout is defined
+    - ndctl_list_result.stdout
+    - ndctl_list_result.stdout | from_json | length == 2
+
+- name: "Print guest PMem device list"
+  ansible.builtin.debug: var=guest_pmem_list

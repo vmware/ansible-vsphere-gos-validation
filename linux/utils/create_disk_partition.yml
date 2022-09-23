@@ -16,7 +16,7 @@
     partition_name: ""
     partition_device_path: ""
 
-- name: "Set filesystem"
+- name: "Set partition filesystem type"
   block:
     - name: "Check filesystem is supported by guest OS"
       ansible.builtin.shell: "which mkfs.{{ partition_fstype }}"
@@ -54,7 +54,7 @@
 - name: "Set fact of partition name"
   ansible.builtin.set_fact:
     partition_name: |-
-      {%- if 'nvme' in disk_name or 'pmem' in disk_name -%}{{ disk_name }}p1
+      {%- if disk_name is match('.*\\d$') -%}{{ disk_name }}p1
       {%- else -%}{{ disk_name }}1{%- endif -%}
 
 - name: "Set fact of partition device path"

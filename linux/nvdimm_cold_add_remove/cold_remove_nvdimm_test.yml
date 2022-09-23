@@ -6,11 +6,11 @@
   include_tasks: ../utils/shutdown.yml
 
 # Remove new added NVDIMM device
-- name: "Cold remove {{ new_nvdimm_device_label }} from VM"
+- name: "Cold remove {{ vm_new_nvdimm_device_label }} from VM"
   include_tasks: ../../common/vm_add_remove_nvdimm.yml
   vars:
     vm_nvdimm_state: "absent"
-    vm_nvdimm_label: "{{ new_nvdimm_device_label }}" 
+    vm_nvdimm_label: "{{ vm_new_nvdimm_device_label }}"
 
 - name: "Check removing NVDIMM device task result"
   ansible.builtin.assert:
@@ -37,8 +37,8 @@
   include_tasks: ../../common/esxi_check_delete_datastore_file.yml
   vars:
     file_in_datastore_ops: "file"
-    file_in_datastore: "{{ new_nvdimm_device_vmdk.split(']')[0].strip('[]') }}"
-    file_in_datastore_path: "{{ new_nvdimm_device_vmdk.split(']')[1].strip(' ') }}"
+    file_in_datastore: "{{ vm_new_nvdimm_device_vmdk.split(']')[0].strip('[]') }}"
+    file_in_datastore_path: "{{ vm_new_nvdimm_device_vmdk.split(']')[1].strip(' ') }}"
     file_in_datastore_ops_timeout: 120
     file_in_datastore_failed_ignore: true
 - name: "Check backing vmdk file not exist in datastore"
@@ -56,16 +56,16 @@
   include_tasks: ../../common/update_inventory.yml
 
 # Get NVDIMM device in guest OS after cold remove
-- name: "Get guest persistent memory list after cold remove"
-  include_tasks: ../utils/get_device_list.yml
-  vars:
-    guest_device_type: "pmem"
-- name: "Set fact of guest persistent memory list"
+- name: "Get guest PMem device list after cold remove"
+  include_tasks: ../utils/get_pmem_list.yml
+
+- name: "Set fact of guest PMem device list"
   ansible.builtin.set_fact:
-    guest_nvdimm_list_after_remove: "{{ guest_device_list }}"
-- name: "Check persistent memory is removed from guest OS"
+    guest_nvdimm_list_after_remove: "{{ guest_pmem_list }}"
+- name: "Check PMem device is removed from guest OS"
   ansible.builtin.assert:
     that:
       - (guest_nvdimm_list_after_remove | difference(guest_nvdimm_list_before_add)) | length == 0
-    fail_msg: "Persistent memory list got in guest OS after remove is '{{ guest_nvdimm_list_after_remove }}', which is not the same as the one before add '{{ guest_nvdimm_list_before_add }}'"
-
+    fail_msg: >-
+      PMem device list got in guest OS after cold remove is '{{ guest_nvdimm_list_after_remove }}',
+      which is not the same as the one before cold add '{{ guest_nvdimm_list_before_add }}'.

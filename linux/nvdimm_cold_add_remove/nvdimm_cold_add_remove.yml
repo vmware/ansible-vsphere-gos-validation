@@ -23,7 +23,8 @@
             skip_reason: "Not Supported"
           when: vm_hardware_version_num | int < 14
 
-        - include_tasks: ../../common/esxi_get_guest_config_options.yml
+        - name: "Get guest config options"
+          include_tasks: ../../common/esxi_get_guest_config_options.yml
           vars:
             guest_id: "{{ vm_guest_id }}"
             esxi_hardware_version: "{{ vm_hardware_version_num }}"
@@ -35,19 +36,23 @@
             (guest_config_options.support_persistent_memory is undefined) or
             (not guest_config_options.support_persistent_memory | bool)
 
-        # Get ESXi host persistent memory info
-        - include_tasks: ../../common/esxi_get_pmem_info.yml
+        - name: "Get ESXi host persistent memory info"
+          include_tasks: ../../common/esxi_get_pmem_info.yml
         - include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Test case '{{ ansible_play_name }}' is blocked because no persistent memory on ESXi host '{{ esxi_pmem_total_mb }}', or available size '{{ esxi_pmem_available_mb }}' is less than 16 MB."
+            skip_msg: >-
+              Test case '{{ ansible_play_name }}' is blocked because ESXi PMem is less than 16MB.
+              ESXi total persistent memory size is '{{ esxi_pmem_total_mb }} MB'
+              ESXi available persistent memory size is '{{ esxi_pmem_available_mb }} MB'
             skip_reason: "Blocked"
           when: >
             (esxi_pmem_total_mb | int == 0) or
             (esxi_pmem_available_mb | int < 16)
 
-        # Do cold add testing
-        - include_tasks: cold_add_nvdimm_test.yml
-        # Do cold remove testing
-        - include_tasks: cold_remove_nvdimm_test.yml
+        - name: "Test VM NVDIMM cold-add"
+          include_tasks: cold_add_nvdimm_test.yml
+
+        - name: "Test VM NVDIMM cold-remove"
+          include_tasks: cold_remove_nvdimm_test.yml
       rescue:
         - include_tasks: ../../common/test_rescue.yml
