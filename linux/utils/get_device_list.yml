@@ -24,6 +24,8 @@
 - name: "Get block device list"
   ansible.builtin.shell: "{{ get_device_list_cmd }}"
   delegate_to: "{{ vm_guest_ip }}"
+  changed_when: false
+  ignore_errors: true
   register: lsblk_result
 
 - name: "Set the fact of block device list"
@@ -38,6 +40,7 @@
   when:
     - lsblk_result is defined
     - lsblk_result.stdout_lines is defined
+    - lsblk_result.stdout_lines | length > 0
 
 - name: "Print device list in guest OS"
   ansible.builtin.debug: var=guest_device_list
