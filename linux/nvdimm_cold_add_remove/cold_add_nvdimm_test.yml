@@ -13,7 +13,8 @@
     vm_new_nvdimm_device_vmdk: ""
 
 # Get VM NVDIMM device before cold add
-- include_tasks: ../../common/vm_get_device_with_type.yml
+- name: "Get VM NVDIMM device list before cold add"
+  include_tasks: ../../common/vm_get_device_with_type.yml
   vars:
     device_vim_type: vim.vm.device.VirtualNVDIMM
 - name: "Set fact of NVDIMM device list before cold add"
@@ -21,7 +22,8 @@
     vm_nvdimm_list_before_add: "{{ device_info_with_type }}"
 
 # Get NVDIMM device in guest OS before cold add
-- include_tasks: ../utils/get_device_list.yml
+- name: "Get persistent memory list before cold add in guest"
+  include_tasks: ../utils/get_device_list.yml
   vars:
     guest_device_type: "pmem"
 
@@ -33,7 +35,8 @@
 - include_tasks: ../utils/shutdown_vm.yml
 
 # Add a new NVDIMM device to VM
-- include_tasks: ../../common/vm_add_remove_nvdimm.yml
+- name: "Cold add a NVDIMM device to VM"
+  include_tasks: ../../common/vm_add_remove_nvdimm.yml
   vars:
     vm_nvdimm_size_mb: "{{ vm_new_nvdimm_device_size }}"
 - name: "Check adding NVDIMM device task result"
@@ -44,7 +47,8 @@
     fail_msg: "Add NVDIMM device to VM task result is not changed."
 
 # Get NVDIMM device list after cold add
-- include_tasks: ../../common/vm_get_device_with_type.yml
+- name: "Get VM NVDIMM device list after cold add"
+  include_tasks: ../../common/vm_get_device_with_type.yml
   vars:
     device_vim_type: vim.vm.device.VirtualNVDIMM
 - name: "Set fact of NVDIMM device list after cold add"
@@ -80,7 +84,9 @@
     that:
       - "'PMemDS' in vm_new_nvdimm_device_vmdk"
     fail_msg: "'PMemDS' keyword is not in the backing vmdk file path of new NVDIMM device: {{ vm_new_nvdimm_device_vmdk }}"
-- include_tasks: ../../common/esxi_check_delete_datastore_file.yml
+
+- name: "Check new NVDIMM device backing vmdk file existing in PMem datastore"
+  include_tasks: ../../common/esxi_check_delete_datastore_file.yml
   vars:
     file_in_datastore_ops: "file"
     file_in_datastore: "{{ vm_new_nvdimm_device_vmdk.split(']')[0].strip('[]') }}"
@@ -93,8 +99,13 @@
     vm_power_state_set: "powered-on"
 - include_tasks: ../../common/update_inventory.yml
 
+# Check BIOS-e820
+- name: "Check BIOS-e820 has persistent memory device"
+  include_tasks: check_bios_e820.yml
+
 # Check NVDIMM device recognized in guest OS
-- include_tasks: ../utils/get_device_list.yml
+- name: "Get persistent memory list after cold add in guest"
+  include_tasks: ../utils/get_device_list.yml
   vars:
     guest_device_type: "pmem"
 - name: "Set fact of the persistent memory info got in guest OS"
@@ -113,7 +124,8 @@
     fail_msg: "Persistent memory got in guest OS '{{ guest_new_nvdimm_device }}', the size of which is not '{{ vm_new_nvdimm_device_size }}' MB."
 
 # Initialize and create partition on the persistent memory
-- include_tasks: ../utils/create_disk_partition.yml
+- name: "Create new disk partition and filesystem on it"
+  include_tasks: ../utils/create_disk_partition.yml
   vars:
     disk_name: "{{ guest_new_nvdimm_device.name }}"
     partition_fstype: "ext4"
