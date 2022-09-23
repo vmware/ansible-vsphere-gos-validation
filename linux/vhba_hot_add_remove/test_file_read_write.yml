@@ -11,10 +11,6 @@
 - name: "Set the facts for testing read and write"
   ansible.builtin.set_fact:
     test_mount_path: "/mnt/{{ test_partition_name }}"
-    test_mount_opts: |-
-      {%- if 'pmem' in test_partition_name and test_partition_fstype in ['ext4', 'xfs'] -%}dax
-      {%- else -%}rw,relatime
-      {%- endif -%}
     test_file_path: "/mnt/{{ test_partition_name }}/test_{{ test_partition_name }}.txt"
     test_file_content: "This is a test file to test new partition {{ test_partition_device_path }}"
 
@@ -24,7 +20,6 @@
     mount_point_path: "{{ test_mount_path }}"
     mount_point_src: "{{ test_partition_device_path }}"
     mount_fstype: "{{ test_partition_fstype }}"
-    mount_opts: "{{ test_mount_opts }}"
     mount_state: "mounted"
 
 - name: "Create new file {{ test_file_path }}"
@@ -65,7 +60,6 @@
     mount_point_path: "{{ test_mount_path }}"
     mount_point_src: "{{ test_partition_device_path }}"
     mount_fstype: "{{ test_partition_fstype }}"
-    mount_opts: "{{ test_mount_opts }}"
     mount_state: "mounted"
 
 - name: "Read content of file {{ test_file_path }} after guest OS reboot"
