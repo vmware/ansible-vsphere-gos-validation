@@ -38,28 +38,28 @@
     
     - name: Modify boot entry
       ansible.builtin.replace:
-        path: "{{ src_iso_file_dir }}/boot/grub/grub.cfg"
+        path: "{{ src_iso_file_dir }}/grub.cfg"
         regexp: "timeout=30"
         replace: "default=0\nset timeout=5"
 
     - name: Modify boot options
       ansible.builtin.replace:
-        path: "{{ src_iso_file_dir }}/boot/grub/grub.cfg"
+        path: "{{ src_iso_file_dir }}/grub.cfg"
         regexp: "/casper/vmlinuz file=/cdrom/preseed/ubuntu.seed maybe-ubiquity quiet splash ---"
         replace: "/casper/vmlinuz file=/cdrom/preseed/ubuntu.seed boot=casper debug-ubiquity automatic-ubiquity quiet splash noprompt ---"
 
     - name: "Check the content of modified file"
       debug:
-        msg: "{{ lookup('file', src_iso_file_dir + '/boot/grub/grub.cfg') }}"
+        msg: "{{ lookup('file', src_iso_file_dir + '/grub.cfg') }}"
     
     - name: Customize the ISO
       community.general.iso_customize:
         src_iso: "{{ src_iso_file_path }}"
         dest_iso: "{{ rebuilt_unattend_iso_path }}"
         add_files:
-          - src_file: "{{ src_iso_file_dir }}/boot/grub/grub.cfg"
+          - src_file: "{{ src_iso_file_dir }}/grub.cfg"
             dest_file: "/boot/grub/grub.cfg"
-          - src_file: "{{ unattend_install_conf }}"
+          - src_file: "{{ unattend_install_template }}"
             dest_file: "/preseed/ubuntu.seed"
   when: unattend_install_conf is match('Ubuntu/Desktop')
 
@@ -226,7 +226,7 @@
     - name: "set var ubuntu_bios_cfg_exist to true or not"
       ansible.builtin.set_fact: 
         ubuntu_bios_cfg_exist: true
-      #when: 'msg' not in check_file_result
+      when: 'msg' not in check_file_result
 
     - name: "Update BIOS boot config file if it exists"
       block:
