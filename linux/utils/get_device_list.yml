@@ -12,7 +12,7 @@
 - name: "Initialize the fact of device list and command" 
   ansible.builtin.set_fact:
     guest_device_list: []
-    get_device_list_cmd: "lsblk -o NAME,TYPE,SIZE,FSTYPE -b --nodeps"
+    get_device_list_cmd: "lsblk -o NAME,TYPE,SIZE,FSTYPE,UUID -b --nodeps"
 
 - name: "Update command to get device list with type of {{ guest_device_type }}"
   ansible.builtin.set_fact:
@@ -33,7 +33,8 @@
     guest_device_list: >
       {{
          guest_device_list | union([
-             dict(['name', 'type', 'size', 'fstype'] | zip_longest(item.split(), fillvalue=''))
+             dict(['name', 'type', 'size', 'fstype', 'uuid'] |
+                  zip_longest(item.split(), fillvalue=''))
          ])
       }}
   with_items: "{{ lsblk_result.stdout_lines }}"
