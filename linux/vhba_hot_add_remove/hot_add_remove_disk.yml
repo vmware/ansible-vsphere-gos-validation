@@ -1,9 +1,14 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+- name: "Set new disk size in GB"
+  ansible.builtin.set_fact:
+    new_disk_size_gb: 1
+
 - include_tasks: ../../common/vm_hot_add_ctrl_disk.yml
   vars:
     disk_controller_type: "{{ new_disk_ctrl_type }}"
+    disk_size_gb: "{{ new_disk_size_gb }}"
     ctrl_number: "{{ new_ctrl_number }}"
     unit_number: "{{ new_unit_number }}"
   when: add_new_controller
@@ -12,44 +17,54 @@
   vars:
     disk_operation: 'present'
     disk_controller_type: "{{ new_disk_ctrl_type }}"
+    disk_size_gb: "{{ new_disk_size_gb }}"
     ctrl_number: "{{ new_ctrl_number }}"
     unit_number: "{{ new_unit_number }}"
   when: not add_new_controller
 
 - include_tasks: wait_device_list_changed.yml
   vars:
-    device_list_before_change: "{{ old_device_list }}"
+    device_list_before_change: "{{ guest_disk_list_before_hotadd }}"
     wait_device_state: "present"
 
-- name: "Set fact of new device list and new device name"
-  ansible.builtin.set_fact:
-    new_device_list: "{{ device_list_after_change }}"
-    new_device_name: "{{ (device_list_after_change | difference(old_device_list))[0] }}"
+- name: "Get guest device list after hot add"
+  include_tasks: ../utils/get_device_list.yml
+  vars:
+    guest_device_type: "disk"
 
-# Create new partition and run test on the new disk
-- name: "Get new block device"
+- name: "Set the fact of guest device list after hot add"
   ansible.builtin.set_fact:
-    device: "{{ new_device_list | difference(old_device_list) }}"
-- name: "Print new device block name"
-  ansible.builtin.debug: var=device
-- name: "Check new device file is created"
+    guest_disk_list_after_hotadd: "{{ guest_device_list }}"
+
+- name: "Check new disk is recognized by guest OS"
   ansible.builtin.assert:
     that:
-      - device | length == 1
-    fail_msg: "Hotadd disk failed due to no new disk device on VM."
-    success_msg: "Hotadd disk succeed, new disk device on VM."
+      - guest_disk_list_after_hotadd | difference(guest_disk_list_before_hotadd) | length == 1
+    fail_msg: "Guest OS failed to recognize the new hot-added {{ new_disk_ctrl_type }} disk"
 
-- name: "Set new device block name"
+- name: "Print guest disk list after hot add"
+  ansible.builtin.debug: var=guest_disk_list_after_hotadd
+
+- name: "Set fact of the new guest disk info"
   ansible.builtin.set_fact:
-    device_name: "{{ device[0] }}"
+    new_guest_disk_info: "{{ (guest_disk_list_after_hotadd | difference(guest_disk_list_before_hotadd))[0] }}"
 
-- name: "Print new device block name"
-  ansible.builtin.debug: var=device_name
+- name: "Print the new disk info"
+  ansible.builtin.debug: var=new_guest_disk_info
 
-- name: "Create new partition on the new disk {{ device_name }}"
+- name: "Check the new disk name, size and UUID"
+  ansible.builtin.assert:
+    that:
+      - new_guest_disk_info.name is defined
+      - new_guest_disk_info.name
+      - new_guest_disk_info.size is defined
+      - (new_guest_disk_info.size | int) / 1024 / 1024 / 1024 == new_disk_size_gb
+    fail_msg: "The new disk '{{ new_guest_disk_info }}' has incorrect information"
+
+- name: "Create new partition on the new disk {{ new_guest_disk_info.name }}"
   include_tasks: ../utils/create_disk_partition.yml
   vars:
-    disk_name: "{{ device_name }}"
+    disk_name: "{{ new_guest_disk_info.name }}"
     partition_fstype: "ext4"
 
 - name: "Set fact of new partition name and device path"
@@ -57,18 +72,23 @@
     new_partition_name: "{{ partition_name }}"
     new_partition_device_path: "{{ partition_device_path }}"
     new_partition_fstype: "ext4"
+    new_partition_uuid: "{{ partition_uuid }}"
 
-- name: "Test disk I/O on new disk {{ device_name }}"
+- name: "Test disk I/O on new disk {{ new_guest_disk_info.name }}"
   include_tasks: test_disk_io.yml
   vars:
-    test_disk_name: "{{ device_name }}"
+    test_disk_name: "{{ new_guest_disk_info.name }}"
 
-- name: "Test file read/write on new partition {{ new_partition_device_path }}"
-  include_tasks: test_file_read_write.yml
-  vars:
-    test_partition_name: "{{ new_partition_name }}"
-    test_partition_device_path: "{{ new_partition_device_path }}"
-    test_partition_fstype: "{{ new_partition_fstype }}"
+# After reboot disk boot order might be changed, but at now 
+# community.vmware.vmware_guest_boot_info can't get the boot order info. 
+# So comment this out until boot disk reordering is resolved.
+#- name: "Test file read/write on new partition {{ new_partition_device_path }}"
+#  include_tasks: test_file_read_write.yml
+#  vars:
+#    test_partition_name: "{{ new_partition_name }}"
+#    test_partition_uuid: "{{ new_partition_uuid }}"
+#    test_partition_device_path: "{{ new_partition_device_path }}"
+#    test_partition_fstype: "{{ new_partition_fstype }}"
 
 - include_tasks: ../../common/vm_hot_add_remove_disk.yml
   vars:
@@ -79,6 +99,21 @@
 
 - include_tasks: wait_device_list_changed.yml
   vars:
-    device_list_before_change: "{{ new_device_list }}"
-    wait_device_name: "{{ new_device_name }}"
+    device_list_before_change: "{{ guest_disk_list_after_hotadd }}"
+    wait_device_name: "{{ new_guest_disk_info.name }}"
     wait_device_state: "absent"
+
+- name: "Get guest device list after hot add"
+  include_tasks: ../utils/get_device_list.yml
+  vars:
+    guest_device_type: "disk"
+
+- name: "Set the fact of guest device list after hot add"
+  ansible.builtin.set_fact:
+    guest_disk_list_after_hotremove: "{{ guest_device_list }}"
+
+- name: "Check new disk is removed from guest OS"
+  ansible.builtin.assert:
+    that:
+      - guest_disk_list_after_hotremove | difference(guest_disk_list_before_hotadd) | length == 0
+    fail_msg: "After disk hot-remove, the Guest OS still can see it"

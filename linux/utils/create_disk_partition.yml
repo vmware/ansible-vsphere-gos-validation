@@ -61,15 +61,42 @@
   ansible.builtin.set_fact:
     partition_device_path: "/dev/{{ partition_name }}"
 
-- name: "Print the new disk partition name and device path"
-  ansible.builtin.debug:
-    msg:
-     - "The new disk partition name: {{ partition_name }}"
-     - "The new disk partition device path: {{ partition_device_path }}"
-
 - name: "Create filesystem on partition {{ partition_device_path }}"
   community.general.filesystem:
     fstype: "{{ partition_fstype }}"
     dev: "{{ partition_device_path }}"
   delegate_to: "{{ vm_guest_ip }}"
 
+- name: "Get the UUID of partition {{ partition_device_path }}"
+  ansible.builtin.shell: "blkid --output export {{ partition_device_path }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: blkid_part_result
+
+- name: "Get partition UUID from the output"
+  block:
+    - name: "Get the line contains partition UUID"
+      ansible.builtin.set_fact:
+        blkid_part_uuid_lines: "{{ blkid_part_result.stdout_lines | select('match', '^UUID=.*') }}"
+
+    - name: "Set the fact of partition {{ partition_device_path }} UUID"
+      ansible.builtin.set_fact:
+        partition_uuid: "{{ blkid_part_uuid_lines[0].split('=')[-1] }}"
+      when: blkid_part_uuid_lines | length == 1
+  when:
+    - blkid_part_result is defined
+    - blkid_part_result.stdout_lines is defined
+    - blkid_part_result.stdout_lines | length > 0
+
+- name: "Check the UUID of partition {{ partition_device_path }}"
+  ansible.builtin.assert:
+    that:
+      - partition_uuid
+    fail_msg: "Failed to get UUID of partition {{ partition_device_path }}"
+
+- name: "Print the new disk partition name, UUID, device path, and filesystem"
+  ansible.builtin.debug:
+    msg:
+     - "The new disk partition name: {{ partition_name }}"
+     - "The new disk partition UUID: {{ partition_uuid }}"
+     - "The new disk partition device path: {{ partition_device_path }}"
+     - "The new disk partition filesystem: {{ partition_fstype }}"
