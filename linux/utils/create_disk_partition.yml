@@ -21,6 +21,7 @@
     - name: "Check filesystem is supported by guest OS"
       ansible.builtin.shell: "which mkfs.{{ partition_fstype }}"
       ignore_errors: true
+      changed_when: false
       delegate_to: "{{ vm_guest_ip }}"
       register: check_fs
 
@@ -69,6 +70,7 @@
 
 - name: "Get the UUID of partition {{ partition_device_path }}"
   ansible.builtin.shell: "blkid --output export {{ partition_device_path }}"
+  changed_when: false
   delegate_to: "{{ vm_guest_ip }}"
   register: blkid_part_result
 
@@ -96,7 +98,7 @@
 - name: "Print the new disk partition name, UUID, device path, and filesystem"
   ansible.builtin.debug:
     msg:
-     - "The new disk partition name: {{ partition_name }}"
-     - "The new disk partition UUID: {{ partition_uuid }}"
-     - "The new disk partition device path: {{ partition_device_path }}"
-     - "The new disk partition filesystem: {{ partition_fstype }}"
+      - "The new disk partition name: {{ partition_name }}"
+      - "The new disk partition UUID: {{ partition_uuid }}"
+      - "The new disk partition device path: {{ partition_device_path }}"
+      - "The new disk partition filesystem: {{ partition_fstype }}"

@@ -57,21 +57,22 @@
 
 - name: "Get the partition device path with UUID {{ test_partition_uuid }} after reboot"
   ansible.builtin.shell: "blkid --uuid {{ test_partition_uuid }}"
+  changed_when: false
   delegate_to: "{{ vm_guest_ip }}"
   register: blkid_uuid_result
 
 - name: "Check the partition of UUID {{ test_partition_uuid }} exists"
   ansible.builtin.assert:
     that:
-      - blkid_part_result is defined
-      - blkid_part_result.stdout is defined
-      - blkid_part_result.stdout
+      - blkid_uuid_result is defined
+      - blkid_uuid_result.stdout is defined
+      - blkid_uuid_result.stdout
     fail_msg: "Failed to find partition with UUID {{ test_partition_uuid }}"
 
 - name: "Set the fact of partition name and device path after reboot"
   ansible.builtin.set_fact:
-    test_partition_device_path: "{{ blkid_part_result.stdout }}"
-    test_partition_name: "{{ (blkid_part_result.stdout | split('/'))[-1] }}"
+    test_partition_device_path: "{{ blkid_uuid_result.stdout }}"
+    test_partition_name: "{{ (blkid_uuid_result.stdout | split('/'))[-1] }}"
 
 - name: "Mount {{ test_partition_device_path }} to {{ test_mount_path }}"
   include_tasks: ../utils/set_mount_point.yml
