@@ -57,7 +57,7 @@
 - name: "Check NVDIMM device list after cold add"
   ansible.builtin.assert:
     that:
-      - vm_nvdimm_list_before_add | length + 1 == vm_nvdimm_list_after_add | length
+      - (vm_nvdimm_list_after_add | difference(vm_nvdimm_list_before_add)) | length == 1
     fail_msg: >-
       NVDIMM device number after cold add is {{ vm_nvdimm_list_after_add | length }},
       before it's {{ vm_nvdimm_list_before_add | length }}, not increase 1.
@@ -65,7 +65,6 @@
 - name: "Set fact of the new added NVDIMM device"
   ansible.builtin.set_fact:
     vm_new_nvdimm_device: "{{ (vm_nvdimm_list_after_add | difference(vm_nvdimm_list_before_add))[0] }}"
-  when: (vm_nvdimm_list_after_add | difference(vm_nvdimm_list_before_add)) | length == 1
 
 - name: "Set fact of the new added NVDIMM device label"
   ansible.builtin.set_fact:
@@ -110,13 +109,26 @@
   include_tasks: ../utils/get_pmem_list.yml
   vars:
     guest_device_type: "pmem"
+
 - name: "Set fact of guest PMem device list after cold add"
   ansible.builtin.set_fact:
     guest_nvdimm_list_after_add: "{{ guest_pmem_list }}"
+
+- name: "Check the new PMem device is recognized by guest OS after cold add"
+  ansible.builtin.assert:
+    that:
+      - (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add)) | length == 1
+    fail_msg: >-
+      Guest PMem device list before cold add is {{ guest_nvdimm_list_before_add }},
+      after cold add is {{ guest_nvdimm_list_after_add }}, the new added PMem device
+      is not recognized.
+
 - name: "Set fact of new added PMem device info"
   ansible.builtin.set_fact:
     guest_new_nvdimm_device: "{{ (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add))[0] }}"
-  when: (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add)) | length == 1
+
+- name: "Print the new added PMem device info"
+  ansible.builtin.debug: var=guest_new_nvdimm_device
 
 - name: "Check PMem device size and health state in guest OS"
   ansible.builtin.assert:
