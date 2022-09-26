@@ -19,6 +19,12 @@
 
         - include_tasks: ../../common/skip_test_case.yml
           vars:
+            skip_msg: "{{ guest_os_ansible_distribution }} doesn't support NVDIMM"
+            skip_reason: "Not Supported"
+          when: "'Flatcar' in guest_os_ansible_distribution"
+
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
             skip_msg: "NVDIMM is not supported on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} {{ guest_os_bit }}"
             skip_reason: "Not Supported"
           when: guest_os_bit == "32-bit"
@@ -30,38 +36,6 @@
               VM hardware version is '{{ vm_hardware_version_num }}', which is not >= 14.
             skip_reason: "Not Supported"
           when: vm_hardware_version_num | int < 14
-
-        - name: "Get the module information about libnvdimm"
-          include_tasks: ../utils/get_module_info.yml
-          vars:
-            module_name: "libnvdimm"
-
-        - name: "Set the fact of libnvdimm module information"
-          ansible.builtin.set_fact:
-            guest_libnvdimm_module_info: "{{ guest_module_info }}"
-
-        - name: "Check libnvdimm module"
-          block:
-            - include_tasks: ../../common/skip_test_case.yml
-              vars:
-                skip_msg: "The guest OS doesn't support NVDIMM because it doesn't have libnvdimm module."
-                skip_reason: "Not Supported"
-              when: >
-                ('Flatcar' in guest_os_ansible_distribution) or
-                (guest_os_ansible_distribution == "Ubuntu")
-
-            - name: "No libnvdimm module in guest OS"
-              include_tasks: ../../common/skip_test_case.yml
-              vars:
-                skip_msg: >-
-                  Test case '{{ ansible_play_name }}' is blocked because guest OS doesn't have libnvdimm module.
-                skip_reason: "Blocked"
-              when:
-                - "'Flatcar' not in guest_os_ansible_distribution"
-                - guest_os_ansible_distribution != "Ubuntu"
-          when: >
-            (guest_module_info.filename is undefined) or
-            ('libnvdimm' not in guest_module_info.filename)
 
         - name: "Get guest config options"
           include_tasks: ../../common/esxi_get_guest_config_options.yml
@@ -78,6 +52,26 @@
           when: >
             (guest_config_options.support_persistent_memory is undefined) or
             (not guest_config_options.support_persistent_memory | bool)
+
+        - name: "Get the module information about libnvdimm"
+          include_tasks: ../utils/get_module_info.yml
+          vars:
+            module_name: "libnvdimm"
+
+        - name: "Set the fact of libnvdimm module information"
+          ansible.builtin.set_fact:
+            guest_libnvdimm_module_info: "{{ guest_module_info }}"
+
+        - name: "Test is blocked because of missing libnvdimm module in guest OS"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Test case '{{ ansible_play_name }}' is blocked because guest OS doesn't have libnvdimm module.
+            skip_reason: "Blocked"
+          when: >
+            (guest_module_info.filename is undefined) or
+            (('libnvdimm' not in guest_module_info.filename) and
+            ('builtin' not in guest_module_info.filename))
 
         - name: "Get ESXi host persistent memory info"
           include_tasks: ../../common/esxi_get_pmem_info.yml
