@@ -62,21 +62,33 @@
           when: guest_os_ansible_distribution_major_ver | int >= 9
       when: guest_os_ansible_distribution == "CentOS"
 
-    - name: "Set online repositories for Rocky Linux {{ guest_os_ansible_distribution_ver }}"
-      ansible.builtin.set_fact:
-        online_repos:
-          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
-            baseurl: "http://mirror.rockylinux.org/$contentdir/$releasever/BaseOS/$basearch/os/"
-            mirrorlist: "https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=BaseOS-$releasever"
-            gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial"
-          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
-            baseurl: "http://mirror.rockylinux.org/$contentdir/$releasever/AppStream/$basearch/os/"
-            mirrorlist: "https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=AppStream-$releasever"
-            gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial"
-          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
-            baseurl: "http://mirror.rockylinux.org/$contentdir/$releasever/PowerTools/$basearch/os/"
-            mirrorlist: "https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=PowerTools-$releasever"
-            gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial"
+    - name: "Set online repositories for Rocky Linux"
+      block:
+        - name: "Set GPG key path for Rocky Linux {{ guest_os_ansible_distribution_ver }}"
+          ansible.builtin.set_fact:
+            rocky_gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial"
+          when: guest_os_ansible_distribution_major_ver | int == 8
+
+        - name: "Set GPG key path for Rocky Linux {{ guest_os_ansible_distribution_ver }}"
+          ansible.builtin.set_fact:
+            rocky_gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-{{ guest_os_ansible_distribution_major_ver }}"
+          when: guest_os_ansible_distribution_major_ver | int >= 9
+
+        - name: "Set online repositories for Rocky Linux {{ guest_os_ansible_distribution_ver }}"
+          ansible.builtin.set_fact:
+            online_repos:
+              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
+                baseurl: "http://mirror.rockylinux.org/$contentdir/$releasever/BaseOS/$basearch/os/"
+                mirrorlist: "https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=BaseOS-$releasever"
+                gpg_key_path: "{{ rocky_gpg_key_path }}"
+              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
+                baseurl: "http://mirror.rockylinux.org/$contentdir/$releasever/AppStream/$basearch/os/"
+                mirrorlist: "https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=AppStream-$releasever"
+                gpg_key_path: "{{ rocky_gpg_key_path }}"
+              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
+                baseurl: "http://mirror.rockylinux.org/$contentdir/$releasever/PowerTools/$basearch/os/"
+                mirrorlist: "https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=PowerTools-$releasever"
+                gpg_key_path: "{{ rocky_gpg_key_path }}"
       when: guest_os_ansible_distribution == "Rocky"
 
     - include_tasks: add_repo_from_baseurl.yml

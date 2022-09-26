@@ -1,0 +1,75 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# VM should be in power off state when removing NVDIMM device
+- name: "Shutdown guest OS"
+  include_tasks: ../utils/shutdown.yml
+
+# Remove new added NVDIMM device
+- name: "Cold remove {{ vm_new_nvdimm_device_label }} from VM"
+  include_tasks: ../../common/vm_add_remove_nvdimm.yml
+  vars:
+    vm_nvdimm_state: "absent"
+    vm_nvdimm_label: "{{ vm_new_nvdimm_device_label }}"
+
+- name: "Check removing NVDIMM device task result"
+  ansible.builtin.assert:
+    that:
+      - vm_config_nvdimm_result is defined
+      - vm_config_nvdimm_result.changed
+    fail_msg: "Remove NVDIMM device from VM task result is not changed."
+
+# Get NVDIMM device list after cold remove
+- name: "Get VM NVDIMM device list after cold remove"
+  include_tasks: ../../common/vm_get_device_with_type.yml
+  vars:
+    device_vim_type: vim.vm.device.VirtualNVDIMM
+- name: "Set fact of NVDIMM device list after cold remove"
+  ansible.builtin.set_fact:
+    vm_nvdimm_list_after_remove: "{{ device_info_with_type }}"
+- name: "Check NVDIMM device list after cold remove"
+  ansible.builtin.assert:
+    that:
+      - vm_nvdimm_list_before_add == vm_nvdimm_list_after_remove
+    fail_msg: >-
+      NVDIMM device after cold remove '{{ vm_nvdimm_list_after_remove }}',
+      it's not the same as the device before cold add '{{ vm_nvdimm_list_before_add }}'.
+
+- name: "Check new NVDIMM device backing vmdk file removed from PMem datastore"
+  include_tasks: ../../common/esxi_check_delete_datastore_file.yml
+  vars:
+    file_in_datastore_ops: "file"
+    file_in_datastore: "{{ vm_new_nvdimm_device_vmdk.split(']')[0].strip('[]') }}"
+    file_in_datastore_path: "{{ vm_new_nvdimm_device_vmdk.split(']')[1].strip(' ') }}"
+    file_in_datastore_ops_timeout: 120
+    file_in_datastore_failed_ignore: true
+- name: "Check backing vmdk file not exist in datastore"
+  ansible.builtin.assert:
+    that:
+      - file_in_datastore_result is defined
+      - file_in_datastore_result == 'Fail'
+    fail_msg: >-
+      Check vmdk file existence in datastore is '{{ file_in_datastore_result }}',
+      which should be 'Fail'.
+
+- name: "Power on VM"
+  include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+- name: "Update inventory"
+  include_tasks: ../../common/update_inventory.yml
+
+# Get NVDIMM device in guest OS after cold remove
+- name: "Get guest PMem device list after cold remove"
+  include_tasks: ../utils/get_pmem_list.yml
+
+- name: "Set fact of guest PMem device list"
+  ansible.builtin.set_fact:
+    guest_nvdimm_list_after_remove: "{{ guest_pmem_list }}"
+- name: "Check PMem device is removed from guest OS"
+  ansible.builtin.assert:
+    that:
+      - guest_nvdimm_list_after_remove == guest_nvdimm_list_before_add
+    fail_msg: >-
+      PMem device list got in guest OS after cold remove is '{{ guest_nvdimm_list_after_remove }}',
+      which is not the same as the one before cold add '{{ guest_nvdimm_list_before_add }}'.

@@ -1,0 +1,58 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Mount or unmount a device or a volume
+# Parameters:
+#   mount_point_path: The path to mount or unmount
+#   mount_point_src: The source device or volume to mount
+#   mount_state: The state of mount point, which could be absent, mounted,
+#                present, unmounted, or remounted.
+#   mount_fstype: The filesystem type of mount point
+#   mount_opts: The mount options
+#
+- name: "Check mount_point_path and mount_state are set correctly"
+  ansible.builtin.assert:
+    that:
+      - mount_point_path is defined
+      - mount_point_path
+      - mount_state is defined
+      - mount_state in ['absent', 'mounted', 'present', 'unmounted', 'remounted']
+    fail_msg: "Either mount_point_path or mount_state is incorrect."
+
+- name: "Check mount_point_src is set for mounting"
+  ansible.builtin.assert:
+    that:
+      - mount_point_src is defined
+      - mount_point_src
+      - mount_fstype is defined
+      - mount_fstype
+    fail_msg: "Either mount_point_src or mount_fstype is not set for mounting"
+  when: mount_state in ['mounted', 'present', 'remounted']
+
+- block:
+    - name: "Check {{ mount_point_path }} exists"
+      ansible.builtin.stat:
+        path: "{{ mount_point_path }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: stat_mount_point_path
+
+    - name: "Mount point doesn't exists"
+      ansible.builtin.fail:
+        msg: "The mount point path {{ mount_point_path }} doesn't exist, which can't be unmounted"
+      when: not (stat_mount_point_path.stat.exists | default(false))
+  when: mount_state in ['absent', 'unmounted']
+
+- name: "Set mount point {{ mount_point_path }} to {{ mount_state }}"
+  ansible.posix.mount:
+    path: "{{ mount_point_path }}"
+    src: "{{ mount_point_src | default(omit) }}"
+    fstype: "{{ mount_fstype | default(omit) }}"
+    opts: "{{ mount_opts | default(omit) }}"
+    state: "{{ mount_state }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: set_mount_point_result
+
+- name: "Print the result of setting mount point {{ mount_point_path }} to {{ mount_state }}"
+  ansible.builtin.debug: var=set_mount_point_result
+  when: enable_debug | default(false)

@@ -1,0 +1,30 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Get a module information
+# Parameters:
+#   module_name: The module name
+# Return:
+#   guest_module_info: The module information
+#
+- name: "Initialize the fact of guest module information"
+  ansible.builtin.set_fact:
+    guest_module_info: {}
+
+- name: "Get information of module {{ module_name }}"
+  ansible.builtin.command: "modinfo {{ module_name }}"
+  register: modinfo_result
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: true
+
+- name: "Set the fact of guest module information"
+  ansible.builtin.set_fact:
+    guest_module_info: "{{ '\n'.join(modinfo_result.stdout_lines | select('match', '^\\w+\\s*:.*[^:]$')) | from_yaml }}"
+  when:
+    - modinfo_result is defined
+    - modinfo_result.stdout_lines is defined
+    - modinfo_result.stdout_lines | length > 0
+
+- name: "Print {{ module_name }} module information"
+  ansible.builtin.debug: var=guest_module_info

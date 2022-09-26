@@ -15,7 +15,6 @@ HAS_NVME="false"
 HAS_PVSCSI="false"
 IOZONE_PATH="/tmp/iozone"
 PART_FS="ext4"
-test_result=0
 
 function exec_cmd()
 {
@@ -27,9 +26,6 @@ function exec_cmd()
     output=`eval $cmd`
     ret=$?
     echo "Return Code: $ret"
-    if [ $ret != 0 ]; then
-       test_result=$ret
-    fi
 
     if [ "X$output" != "X" ]; then
         echo -e "Command output: \n$output"
@@ -51,69 +47,61 @@ function run_iozone()
     local part_size=
     local test_size=
 
-    if [ ! -e "$testdir_path" ]; then
-        printf "Create folder $testdir_path:  "
-        mkdir $testdir_path 
-        if [ $? -eq 0 ]; then 
-            echo "SUCCEED"
-        else
-            echo "FAIL"
-        fi
+    if [ -e "$testdir_path" ]; then
+        rm -rf $testdir_path
+    fi
+    printf "Create folder $testdir_path:  "
+    exec_cmd "mkdir $testdir_path"
+    if [ $ret -eq 0 ]; then
+        echo "SUCCEED"
+    else
+        echo "FAIL"
+        exit $ret
     fi
 
-    
     iozone_file="$testdir_path/iozone.csv"
-    md5_file="$testdir_path/md5"
-    if [ ! -e "$iozone_file" ]; then
-        # Get partition size
-        part_size=`lsblk -o NAME,SIZE,TYPE | grep -i part | grep -i ${part_name} | awk '{print $2}'`
-        echo "Partition $part_path size is $part_size"
+    # Get partition size
+    part_size=`lsblk -o NAME,SIZE,TYPE | grep -i part | grep -i ${part_name} | awk '{print $2}'`
+    echo "Partition $part_path size is $part_size"
 
-        if [[ "$part_size" =~ .G ]]; then
-            part_size=`echo $part_size | tr -d 'G'`
-            size_unit="G"
+    if [[ "$part_size" =~ .G ]]; then
+        part_size=`echo $part_size | tr -d 'G'`
+        size_unit="G"
+        test_size=128
+    else
+        part_size=`echo $part_size | tr -d 'M'`
+        size_unit="M"
+        if [ $part_size -gt 128 ]; then
             test_size=128
         else
-            part_size=`echo $part_size | tr -d 'M'`
-            size_unit="M"
-            if [ $part_size -gt 128 ]; then
-                test_size=128
-            else
-                test_size=$(($part_size/2))
-            fi
-        fi
-        
-        if [ "X$test_size" == "X" ] || [ "X$test_size" == "X0" ]; then
-            echo "Error: Incorrect size value for iozone"
-            exit 1
-        fi
-
-        echo "Go to $testdir_path"
-        cd "$testdir_path"
-        echo "Run iozone on $part_path" || continue
-        # Run iozone testing
-        if [ $part_size -gt 128 ]; then
-            ${IOZONE_PATH} -Ra -g 128M -i 0 -i 1 -b "$iozone_file"
-        else
-            ${IOZONE_PATH} -Ra -g ${test_size}M -i 0 -i 1 -b "$iozone_file"
-        fi
-
-        # Generate md5sum
-        if [ -e "$iozone_file" ]; then
-            exec_cmd "md5sum $iozone_file >$md5_file"
-        fi
-
-        #Return to work dir
-        cd "$cwd"
-    else
-        # Check md5sum
-        if [ -e "$md5_file" ]; then
-            echo "Check MD5 checksum of $iozone_file"
-            md5sum -c $md5_file
-        else
-            exec_cmd "md5sum $iozone_file >$md5_file"
+            test_size=$(($part_size/2))
         fi
     fi
+
+    if [ "X$test_size" == "X" ] || [ "X$test_size" == "X0" ]; then
+        echo "Error: Incorrect size value for iozone"
+        exit 1
+    fi
+
+    echo "Go to $testdir_path"
+    cd "$testdir_path"
+    echo "Run iozone on $part_path" || continue
+    # Run iozone testing
+    if [ $part_size -gt 128 ]; then
+        ${IOZONE_PATH} -Ra -g 128M -i 0 -i 1 -b "$iozone_file"
+    else
+        ${IOZONE_PATH} -Ra -g ${test_size}M -i 0 -i 1 -b "$iozone_file"
+    fi
+
+    ret=$?
+
+    if [ $ret -ne 0 ]; then
+        echo "iozone test failed"
+        exit $ret
+    fi
+
+    #Return to work dir
+    cd "$cwd"
 }
 
 
@@ -151,11 +139,13 @@ function test_partitions()
         if [ $ret -ne 0 ] ; then
             echo "FAIL"
             if [ "$PART_FS" == "ext4" ] && [ "$mount_ops" == "-o dax" ]; then
-                printf "Retry without option \"${mount_ops}\": "
-                mount $part_path $mount_point && echo "SUCCEED" || echo "FAIL"
-            else
-                echo "Error: Could not mount $part_pat to $mount_point"
-                continue
+                echo "Retry mount without option \"${mount_ops}\": "
+                exec_cmd "mount $part_path $mount_point && echo 'SUCCEED' || echo 'FAIL'"
+            fi
+            if [ $ret -ne 0 ] ; then
+                echo "FAIL"
+                echo "Could not mount $part_path to $mount_point"
+                exit $ret
             fi
         else
             echo "SUCCEED"
@@ -171,7 +161,7 @@ function test_partitions()
     echo "${dev_path} partitions:"
     exec_cmd "fdisk -l ${dev_path}"
 
-    umount $mount_point
+    exec_cmd "umount $mount_point"
 }
 
 
@@ -181,4 +171,4 @@ for dev_name in $1; do
     echo -e "\n>>>>>>>>>>>>>End of testing /dev/$dev_name<<<<<<<<<<<<<<<<<<\n"
 done
 
-exit $test_result
+exit 0

@@ -134,16 +134,12 @@
           tags:
             - known_issue
 
-        - include_tasks: ../utils/vm_reboot.yml
+        - include_tasks: ../utils/reboot.yml
       when: vm_boot_disk_ctrl_type == 'nvme'
   when:
     - new_disk_ctrl_type == 'nvme'
     - vm_hardware_version_num | int < 19
     - guest_os_ansible_distribution != 'VMware Photon OS'
-
-- name: "Initialize new device list after change"
-  ansible.builtin.set_fact:
-    device_list_after_change: []
 
 - name: "Wait for device to be {{ wait_device_state | lower }}"
   ansible.builtin.shell: "lsblk -o NAME,TYPE --nodeps| grep disk | awk '{print $1}'"
@@ -166,28 +162,4 @@
     - lsblk_result.unreachable is defined
     - lsblk_result.unreachable
 
-- name: "Check device list changed"
-  block:
-    - name: "Check new device to be present"
-      ansible.builtin.fail:
-        msg: "New device is not recognized in guest OS."
-      when: wait_device_state | lower == 'present'
 
-    - name: "Check {{ wait_device_name }} to be absent"
-      ansible.builtin.fail:
-        msg: "Disk '{{ wait_device_name }}' has been removed but still can be detected by guest OS."
-      when: wait_device_state | lower == 'absent'
-  when: >
-    (lsblk_result is undefined or
-     lsblk_result.stdout_lines is undefined or
-     (lsblk_result.stdout_lines | length) - (device_list_before_change | length) != (wait_device_diff | int))
-
-- name: "Set fact of new device list after change"
-  ansible.builtin.set_fact:
-    device_list_after_change: "{{ lsblk_result.stdout_lines }}"
-  when:
-    - lsblk_result is defined
-    - lsblk_result.stdout_lines is defined
-
-- name: "Print the new device list after change"
-  ansible.builtin.debug: var=device_list_after_change

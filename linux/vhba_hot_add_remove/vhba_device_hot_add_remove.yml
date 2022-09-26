@@ -45,12 +45,6 @@
         - new_disk_ctrl_type == 'lsilogic'
         - "'Flatcar' not in guest_os_ansible_distribution"
 
-    - name: "Set fact of the iozone file path"
-      ansible.builtin.set_fact:
-        iozone_tools_path: "{{ '../../tools/iozone_64bit' if guest_os_bit == '64-bit' else '../../tools/iozone_32bit' }}"
-    - ansible.builtin.debug:
-        msg: "Will use iozone tool to test new added disk: {{ iozone_tools_path }}"
-
     - name: "Get the vHBA type for {{ new_disk_ctrl_type }} controller"
       ansible.builtin.set_fact:
         new_vhba_type: "{{ new_disk_ctrl_type if new_disk_ctrl_type in ['sata', 'nvme'] else 'scsi' }}"
@@ -83,12 +77,16 @@
         new_unit_number: "0"
 
     # Get current device list in guest OS
-    - include_tasks: get_vm_device_list.yml
-    - name: "Set existing block device list"
+    - include_tasks: ../utils/get_device_list.yml
+      vars:
+        guest_device_type: "disk"
+
+    - name: "Set the fact of guest disk list before hot add"
       ansible.builtin.set_fact:
-        old_device_list: "{{ device_list }}"
-    - name: "Print existing block device list in guest OS"
-      ansible.builtin.debug: var=old_device_list
+        guest_disk_list_before_hotadd: "{{ guest_device_list }}"
+
+    - name: "Print guest disk list before hot add"
+      ansible.builtin.debug: var=guest_disk_list_before_hotadd
 
     - name: "Firstly hot add a new disk controller and disk at the same time"
       ansible.builtin.set_fact:

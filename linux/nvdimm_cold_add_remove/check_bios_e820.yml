@@ -1,0 +1,21 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Check the PMem device is recognised as 'type 7' in BIOS-e820 table.
+
+- name: "Get BIOS-e820 table"
+  ansible.builtin.shell: "dmesg | grep 'BIOS-e820: .* persistent (type 7)'"
+  args:
+    executable: /bin/bash
+  changed_when: false
+  delegate_to: "{{ vm_guest_ip }}"
+  register: check_bios_e820_result
+
+- name: "Fail the test as no type 7 device found in BIOS-e820 table"
+  ansible.builtin.fail:
+    msg: "The PMem device is not recognized as type 7 device in BIOS-e820 table"
+  when: >
+    check_bios_e820_result is undefined or
+    check_bios_e820_result.rc is undefined or
+    check_bios_e820_result.rc != 0
