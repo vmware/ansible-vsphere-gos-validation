@@ -16,32 +16,29 @@
     partition_name: ""
     partition_device_path: ""
 
-- name: "Set partition filesystem type"
-  block:
-    - name: "Check filesystem is supported by guest OS"
-      ansible.builtin.shell: "which mkfs.{{ partition_fstype }}"
-      ignore_errors: true
-      changed_when: false
-      delegate_to: "{{ vm_guest_ip }}"
-      register: check_fs
-
-    - name: "Filesystem {{ partition_fstype }} is not supported, change partition filesystem to ext4"
-      ansible.builtin.set_fact:
-        partition_fstype: "ext4"
-      when: >
-        check_fs is undefined or
-        check_fs.rc is undefined or
-        check_fs.rc != 0
-  when:
-    - partition_fstype is defined
-    - partition_fstype
-
 - name: "Set default partition filesystem to ext4"
   ansible.builtin.set_fact:
     partition_fstype: "ext4"
   when: >
     partition_fstype is undefined or
     not partition_fstype
+
+- name: "Check filesystem is supported by guest OS"
+  ansible.builtin.shell: "which mkfs.{{ partition_fstype }}"
+  ignore_errors: true
+  changed_when: false
+  delegate_to: "{{ vm_guest_ip }}"
+  register: check_fs
+
+- name: "Filesystem {{ partition_fstype }} is not supported"
+  ansible.builtin.fail:
+    msg: >-
+      Guest OS doesn't support Filesystem {{ partition_fstype }}, so it can't
+      create partition with filesystem {{ partition_fstype }} on disk {{ disk_name }}
+  when: >
+    check_fs is undefined or
+    check_fs.rc is undefined or
+    check_fs.rc != 0
 
 - name: "Create 1 partition on disk {{ disk_name }}"
   ansible.builtin.shell: |

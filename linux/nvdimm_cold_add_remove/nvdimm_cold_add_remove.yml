@@ -40,10 +40,25 @@
           ansible.builtin.set_fact:
             guest_libnvdimm_module_info: "{{ guest_module_info }}"
 
-        - include_tasks: ../../common/skip_test_case.yml
-          vars:
-            skip_msg: "The guest OS doesn't support NVDIMM because it doesn't have libnvdimm module."
-            skip_reason: "Not Supported"
+        - name: "Check libnvdimm module"
+          block:
+            - include_tasks: ../../common/skip_test_case.yml
+              vars:
+                skip_msg: "The guest OS doesn't support NVDIMM because it doesn't have libnvdimm module."
+                skip_reason: "Not Supported"
+              when: >
+                ('Flatcar' in guest_os_ansible_distribution) or
+                (guest_os_ansible_distribution == "Ubuntu")
+
+            - name: "No libnvdimm module in guest OS"
+              include_tasks: ../../common/skip_test_case.yml
+              vars:
+                skip_msg: >-
+                  Test case '{{ ansible_play_name }}' is blocked because guest OS doesn't have libnvdimm module.
+                skip_reason: "Blocked"
+              when:
+                - "'Flatcar' not in guest_os_ansible_distribution"
+                - guest_os_ansible_distribution != "Ubuntu"
           when: >
             (guest_module_info.filename is undefined) or
             ('libnvdimm' not in guest_module_info.filename)
