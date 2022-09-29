@@ -70,20 +70,17 @@ This project supports below scenarios for end-to-end guest OS validation testing
 | Oracle Linux 7.x, 8.x, 9.0                      | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Rocky Linux 8.x, 9.0                            | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | AlmaLinux 8.x, 9.0                              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| SUSE Linux Enterprise 15 SP3 and later               | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| SUSE Linux Enterprise 15 SP3 and later          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise 12 SP5, 15 SP0/SP1/SP2    |                                  |                          | :heavy_check_mark:                 |
-| Photon OS 3.x                                   | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
-| Photon OS 4.x                                   | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
-| Ubuntu 18.04 and later live-server   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Ubuntu 20.04 and later cloud image                 |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
-| Ubuntu 18.04 and later desktop       |                                  |                          | :heavy_check_mark:                 |
+| Photon OS 3.x, 4.x                              | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
+| Ubuntu 18.04 and later live-server              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Ubuntu 20.04 and later cloud image              |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
+| Ubuntu 18.04 and later desktop                  |                                  |                          | :heavy_check_mark:                 |
 | Flatcar 2592.0.0 and later                      |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
-| Debian 11.x                                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Debian 10.10 and later                          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Debian 9, 10.9 and earlier                      |                                  |                          | :heavy_check_mark:                 |
+| Debian 10.10 and later, 11.x                    | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Debian 9.x, 10.9 and earlier                    |                                  |                          | :heavy_check_mark:                 |
 | Windows 10, 11                                  | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Windows Server 2019, 2022                       | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Windows Server SAC releases                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 
 Note: This supported guest OS list is used for this project only. For guest OS support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
 
