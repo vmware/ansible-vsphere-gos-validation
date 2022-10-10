@@ -31,7 +31,7 @@
 # Rescan SCSI bus when hot adding/removing LSILogic disk
 - name: "Handle LSILogic disk"
   block:
-    - name: "Rescan in guest expect Flatcar and Ubuntu 22.04"
+    - name: "Rescan scsi devices in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       block:
         - name: "Rescan all scsi devices"
           ansible.builtin.command: "/usr/bin/rescan-scsi-bus.sh -a -r"
@@ -45,9 +45,10 @@
             - rescan_scsi_result.stdout_lines
       when:
         - "'Flatcar' not in guest_os_ansible_distribution"
-        - not (guest_os_ansible_distribution == "Ubuntu" and guest_os_ansible_distribution_ver == "22.04")
+        - not (guest_os_ansible_distribution == "Ubuntu" and
+               guest_os_ansible_distribution_major_ver == "22")
 
-    - name: "Rescan in guest for Flatcar and Ubuntu 22.04"
+    - name: "Rescan scsi devices in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       block:
         - name: "Rescan all hard disks"
           ansible.builtin.shell: |
@@ -81,7 +82,7 @@
       when: >
         ('Flatcar' in guest_os_ansible_distribution or
          (guest_os_ansible_distribution == "Ubuntu" and
-          guest_os_ansible_distribution_ver == "22.04"))
+          guest_os_ansible_distribution_major_ver == "22"))
   when: new_disk_ctrl_type == 'lsilogic'
 
 - name: "Handle NVMe disk"
