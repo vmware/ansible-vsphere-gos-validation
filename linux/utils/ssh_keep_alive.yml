@@ -1,21 +1,78 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+- name: "Initialize sshd service info and config file"
+  ansible.builtin.set_fact:
+    sshd_service_info: ""
+    sshd_config_file: "/etc/ssh/sshd_config"
+
+- name: "Check sshd configure file status"
+  ansible.builtin.stat:
+    path: "{{ sshd_config_file }}"
+  register: sshd_config_stat_result
+  delegate_to: "{{ vm_guest_ip }}"
+
 # Modify sshd config to keep connection alive
-- name: Set TCPKeepAlive=yes in /etc/ssh/sshd_config
-  ansible.builtin.replace:
-    path: /etc/ssh/sshd_config
-    regexp: "^#?TCPKeepAlive .*"
-    replace: "TCPKeepAlive yes"
-  register: replacement
-  delegate_to: "{{ vm_guest_ip }}"
+- name: "Modify sshd config to keep connection alive"
+  block:
+    - name: "Set TCPKeepAlive=yes in /etc/ssh/sshd_config"
+      ansible.builtin.replace:
+        path: "{{ sshd_config_file }}"
+        regexp: "^#?TCPKeepAlive .*"
+        replace: "TCPKeepAlive yes"
+      register: replacement
+      delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Restart sshd service"
-  ansible.builtin.service:
-    name: sshd
-    state: restarted
-  register: restart_sshd_result
-  delegate_to: "{{ vm_guest_ip }}"
+    - name: "Get sshd service info"
+      include_tasks: get_service_info.yml
+      vars:
+        service_name: "sshd"
 
-- name: "Service restart result"
-  ansible.builtin.debug: var=restart_sshd_result
+    - name: "Found {{ service_info.name }}, update sshd service info with it"
+      ansible.builtin.set_fact:
+        sshd_service_info: "{{ service_info }}"
+      when:
+        - service_info
+        - service_info.name is defined
+        - service_info.name
+        - service_info.state is defined
+        - service_info.state == "running"
+
+    - name: "Not found sshd service, try to get ssh service info"
+      include_tasks: get_service_info.yml
+      vars:
+        service_name: "ssh"
+
+    - name: "Found {{ service_info.name }}, update sshd service info with it"
+      ansible.builtin.set_fact:
+        sshd_service_info: "{{ service_info }}"
+      when:
+        - service_info
+        - service_info.name is defined
+        - service_info.name
+        - service_info.state is defined
+        - service_info.state == "running"
+
+    - name: "Check sshd service exists"
+      assert:
+        that:
+          - sshd_service_info
+          - sshd_service_info.name is defined
+          - sshd_service_info.name
+          - service_info.state is defined
+          - service_info.state == "running"
+        fail_msg: "Failed to find sshd or ssh service in guest OS"
+
+    - name: "Restart {{ sshd_service_info.name }}"
+      ansible.builtin.service:
+        name: "{{ sshd_service_info.name }}"
+        state: restarted
+      register: restart_sshd_result
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Print {{ sshd_service_info.name }} restart result"
+      ansible.builtin.debug: var=restart_sshd_result
+  when:
+    - sshd_config_stat_result is defined
+    - sshd_config_stat_result.stat is defined
+    - sshd_config_stat_result.stat.exists | default(false)
