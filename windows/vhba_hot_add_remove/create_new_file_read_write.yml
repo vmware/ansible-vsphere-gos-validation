@@ -47,7 +47,15 @@
   ansible.builtin.set_fact:
     get_file_content_result: "{{ win_powershell_cmd_output }}"
 
-- name: "Handle known issue"
+# If get new file content failed check disk status firstly
+- include_tasks: ../utils/win_check_disk_online.yml
+  vars:
+    win_check_disk_online_num: "{{ win_get_raw_disk_num }}"
+  when:
+    - get_file_content_result.rc is defined
+    - get_file_content_result.rc != 0
+
+- name: "Handle get new file content failure"
   block:
     - name: "Known issue - workaround of hot adding disk to new LSILogicSAS controller in Windows Server"
       ansible.builtin.debug:
@@ -66,6 +74,8 @@
   when:
     - get_file_content_result.rc is defined
     - get_file_content_result.rc != 0
+    - win_check_disk_online_result is defined
+    - not win_check_disk_online_result
     - test_disk_controller_type == 'lsilogicsas'
     - test_purpose == "hot-add"
     - guest_os_ansible_distribution is defined
