@@ -82,54 +82,6 @@
 
 # Create new file on new disk, write content to it and read from it
 # NVMe disk hot extend test case will not execute below tasks
-- block:
-    - name: "Set fact of the file path to do disk write test"
-      ansible.builtin.set_fact:
-        write_test_file_path_win: "{{ drive_letter_new }}:\\test_disk_write.txt"
-        test_line: "This is the test line to write to the file. "
-
-    - include_tasks: ../utils/win_create_file.yml
-      vars:
-        new_empty_file_path: "{{ write_test_file_path_win }}"
-    - include_tasks: ../utils/win_write_to_file.yml
-      vars:
-        write_file_path: "{{ write_test_file_path_win }}"
-        write_file_content: "{% for i in range(0, 20) %} '{{ test_line }}\n{{ test_line }}' {% endfor %}"
-
-    - include_tasks: ../utils/win_check_file_exist.yml
-      vars:
-        win_check_file_exist_file: "{{ write_test_file_path_win }}"
-    - name: Check file created on disk drive in guest OS
-      ansible.builtin.assert:
-        that:
-          - "{{ win_check_file_exist_result }}"
-        success_msg: "New created file found in guest OS"
-        fail_msg: "New created file not found in guest OS: {{ write_test_file_path_win }}"
-
-    - include_tasks: ../utils/win_execute_cmd.yml
-      vars:
-        win_powershell_cmd: "type {{ write_test_file_path_win }}"
-    - name: "Check file content"
-      ansible.builtin.assert:
-        that:
-          - win_powershell_cmd_output.stdout is defined
-          - win_powershell_cmd_output.stdout
-          - "test_line in win_powershell_cmd_output.stdout"
-        fail_msg: "The file content is '{{ win_powershell_cmd_output.stdout }}', which should be: '{{ test_line }}'"
-
-    # Check new created file still exist after guest OS restart
-    - include_tasks: ../utils/win_shutdown_restart.yml
-      vars:
-        set_win_power_state: "restart"
-    - include_tasks: ../utils/win_execute_cmd.yml
-      vars:
-        win_powershell_cmd: "type {{ write_test_file_path_win }}"
-    - name: "Check file content"
-      ansible.builtin.assert:
-        that:
-          - win_powershell_cmd_output.stdout is defined
-          - win_powershell_cmd_output.stdout
-          - "test_line in win_powershell_cmd_output.stdout"
-        fail_msg: "The file content is '{{ win_powershell_cmd_output.stdout }}', which should be: '{{ test_line }}'"
+- include_tasks: create_new_file_read_write.yml
   when:
     - not (test_disk_controller_type == "nvme" and test_purpose == "hot-extend")

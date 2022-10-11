@@ -1,0 +1,79 @@
+# Copyright 2021-2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of the file path to do disk write test"
+  ansible.builtin.set_fact:
+    write_test_file_path_win: "{{ drive_letter_new }}:\\test_disk_write.txt"
+    test_line: "This is the test line to write to the file. "
+
+- include_tasks: ../utils/win_create_file.yml
+  vars:
+    new_empty_file_path: "{{ write_test_file_path_win }}"
+- include_tasks: ../utils/win_write_to_file.yml
+  vars:
+    write_file_path: "{{ write_test_file_path_win }}"
+    write_file_content: "{% for i in range(0, 20) %} '{{ test_line }}\n{{ test_line }}' {% endfor %}"
+
+- include_tasks: ../utils/win_check_file_exist.yml
+  vars:
+    win_check_file_exist_file: "{{ write_test_file_path_win }}"
+- name: "Check file created on new disk in guest OS"
+  ansible.builtin.assert:
+    that:
+      - "{{ win_check_file_exist_result }}"
+    success_msg: "New created file found in guest OS"
+    fail_msg: "New created file not found in guest OS: {{ write_test_file_path_win }}"
+
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "type {{ write_test_file_path_win }}"
+- name: "Check file content"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.stdout is defined
+      - win_powershell_cmd_output.stdout
+      - "test_line in win_powershell_cmd_output.stdout"
+    fail_msg: "The file content is '{{ win_powershell_cmd_output.stdout }}', which should be: '{{ test_line }}'"
+
+# Check new created file still exist after guest OS restart
+- include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "type {{ write_test_file_path_win }}"
+    win_execute_cmd_ignore_error: true
+
+- name: "Handle known issue"
+  block:
+    - name: "Known issue - workaround of hot adding disk to new LSILogicSAS controller in Windows Server"
+      ansible.builtin.debug:
+        msg:
+          - "After Windows Server guest restart the new added disk to the new LSILogicSAS controller will be offline. Ignore this known issue."
+          - "Online this disk as a workaround for hot adding disk to the new LSILogicSAS controller test."
+      tags:
+        - known_issue
+    - include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "Get-Disk | where-object IsOffline -eq $True | Set-Disk -IsOffline $False"
+    - include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "type {{ write_test_file_path_win }}"
+        win_execute_cmd_ignore_error: true
+  when:
+    - win_powershell_cmd_output.rc is defined
+    - win_powershell_cmd_output.rc != 0
+    - test_disk_controller_type == 'lsilogicsas'
+    - test_purpose == "hot-add"
+    - guest_os_ansible_distribution is defined
+    - "'Windows Server' in guest_os_ansible_distribution" 
+
+- name: "Check file content"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.rc is defined
+      - win_powershell_cmd_output.rc == 0
+      - win_powershell_cmd_output.stdout is defined
+      - win_powershell_cmd_output.stdout
+      - "test_line in win_powershell_cmd_output.stdout"
+    fail_msg: "The file content is '{{ win_powershell_cmd_output.stdout }}', which should be: '{{ test_line }}'"
