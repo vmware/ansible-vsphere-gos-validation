@@ -28,27 +28,16 @@
       vars:
         service_name: "sshd"
 
-    - name: "Found {{ service_info.name }}, update sshd service info with it"
-      ansible.builtin.set_fact:
-        sshd_service_info: "{{ service_info }}"
-      when:
-        - service_info
-        - service_info.name is defined
-        - service_info.name
-        - service_info.state is defined
-        - service_info.state == "running"
-
     - name: "Not found sshd service, try to get ssh service info"
       include_tasks: get_service_info.yml
       vars:
         service_name: "ssh"
       when: >
-        service_info is undefined or
         not service_info or
         service_info.name is undefined or
         not service_info.name or
         service_info.state is undefined or
-        service_info.state != "running"
+        service_info.state != "running" 
 
     - name: "Found {{ service_info.name }}, update sshd service info with it"
       ansible.builtin.set_fact:
@@ -64,10 +53,6 @@
       assert:
         that:
           - sshd_service_info
-          - sshd_service_info.name is defined
-          - sshd_service_info.name
-          - service_info.state is defined
-          - service_info.state == "running"
         fail_msg: "Failed to find sshd or ssh service in guest OS"
 
     - name: "Restart {{ sshd_service_info.name }}"
