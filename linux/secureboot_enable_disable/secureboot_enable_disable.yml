@@ -21,37 +21,6 @@
       block:
         - include_tasks: ../setup/test_setup.yml
 
-        - include_tasks: ../../common/skip_test_case.yml
-          vars:
-            skip_msg: >-
-              Secure boot is not supported on VM of {{ guest_os_ansible_distribution }}
-              {{ guest_os_ansible_distribution_ver }} with hardware version {{ vm_hardware_version_num }}
-            skip_reason: "Not Supported"
-          when: >
-            (guest_os_ansible_distribution == "Rocky" and
-             guest_os_ansible_distribution_ver is version('8.4', '<=')) or
-            (guest_os_ansible_distribution == "Astra Linux (Orel)") or
-            (vm_hardware_version_num | int < 13)
-
-        - include_tasks: ../../common/skip_test_case.yml
-          vars:
-            skip_msg: >-
-              Secure boot is not supported on VM of {{ guest_os_ansible_distribution }}
-              {{ guest_os_ansible_distribution_ver }} with hardware version {{ vm_hardware_version_num }}.
-              Please refer to https://kb.vmware.com/s/article/88737.
-            skip_reason: "Not Supported"
-          when:
-            - vm_hardware_version_num | int >= 20
-            - ((guest_os_ansible_distribution in ["RedHat", "AlmaLinux", "Rocky"] and
-                guest_os_ansible_distribution_ver is version('8.4', '<=')) or
-               (guest_os_ansible_distribution == "CentOS" and
-                guest_os_ansible_distribution_ver is version('8.5', '<=')) or
-               (guest_os_ansible_distribution == "OracleLinux" and
-                guest_os_ansible_distribution_ver is version('8.3', '<=')) or
-               (guest_os_ansible_distribution == "" and
-                guest_os_ansible_distribution_ver is version('8.4', '<=')) or
-
-
         - include_tasks: ../../common/vm_get_boot_info.yml
 
         - include_tasks: ../../common/skip_test_case.yml
@@ -59,6 +28,9 @@
             skip_msg: "Secure boot is not applicable for VM with {{ vm_firmware }} firmware"
             skip_reason: "Not Applicable"
           when: vm_firmware | lower != "efi"
+
+        - name: "Check secure boot is supported or not"
+          include_tasks: check_secureboot_support_status.yml
 
         - name: "Initialize test result variables"
           ansible.builtin.set_fact:
