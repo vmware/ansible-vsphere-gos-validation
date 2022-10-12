@@ -51,9 +51,9 @@
     get_file_content_result2: "{{ win_powershell_cmd_output }}"
 
 # If get new file content failed check disk status firstly
-- include_tasks: ../utils/win_check_disk_online.yml
+- include_tasks: ../utils/win_get_set_disk_online.yml
   vars:
-    win_check_disk_online_num: "{{ win_get_raw_disk_num }}"
+    win_online_disk_uid: "{{ win_disk_unique_id }}"
   when:
     - get_file_content_result2.rc is defined
     - get_file_content_result2.rc != 0
@@ -67,9 +67,10 @@
           - "Online this disk as a workaround for hot adding disk to the new LSILogicSAS controller test."
       tags:
         - known_issue
-    - include_tasks: ../utils/win_set_disk_online.yml
+    - include_tasks: ../utils/win_get_set_disk_online.yml
       vars:
-        win_online_disk_num: "{{ win_get_raw_disk_num }}"
+        win_online_disk_uid: "{{ win_disk_unique_id }}"
+        win_online_disk_ops: 'set'
     - include_tasks: ../utils/win_execute_cmd.yml
       vars:
         win_powershell_cmd: "type {{ write_test_file_path_win }}"
@@ -80,8 +81,8 @@
   when:
     - get_file_content_result2.rc is defined
     - get_file_content_result2.rc != 0
-    - win_check_disk_online_result is defined
-    - not win_check_disk_online_result
+    - win_is_disk_online is defined
+    - not win_is_disk_online
     - test_disk_controller_type == 'lsilogicsas'
     - test_purpose == "hot-add"
     - guest_os_ansible_distribution is defined

@@ -29,20 +29,24 @@
     dest: "{{ current_test_log_folder }}/"
 
 - include_tasks: ../utils/win_get_raw_disk_num.yml
-- include_tasks: ../utils/win_get_unused_drive_letter.yml
-- include_tasks: ../utils/win_check_disk_online.yml
+- include_tasks: ../utils/win_get_disk_unique_id.yml
   vars:
-    win_check_disk_online_num: "{{ win_get_raw_disk_num }}"
+    win_get_disk_uid_num: "{{ win_raw_disk_num }}"
+- include_tasks: ../utils/win_get_unused_drive_letter.yml
+- include_tasks: ../utils/win_get_set_disk_online.yml
+  vars:
+    win_online_disk_num: "{{ win_raw_disk_num }}"
 
 # Edit diskpart script file
 - name: "Modify raw disk number in diskpart script file"
   ansible.builtin.lineinfile:
     path: "{{ diskpart_file_path_current }}"
     regexp: 'select disk *'
-    line: "select disk {{ win_get_raw_disk_num }}"
+    line: "select disk {{ win_raw_disk_num }}"
   when:
-    - win_get_raw_disk_num is defined
-    - win_get_raw_disk_num
+    - win_raw_disk_num is defined
+    - win_raw_disk_num != ''
+
 - name: "Modify new drive letter in diskpart script file"
   ansible.builtin.lineinfile:
     path: "{{ diskpart_file_path_current }}"
@@ -57,8 +61,8 @@
     regexp: 'online disk'
     state: absent
   when:
-    - win_check_disk_online_result is defined
-    - win_check_disk_online_result
+    - win_is_disk_online is defined
+    - win_is_disk_online
 
 # Transfer diskpart script file from local to remote Windows guest OS
 - include_tasks: ../utils/win_copy_file_from_local.yml
