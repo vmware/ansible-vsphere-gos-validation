@@ -29,6 +29,7 @@ from ansible import constants as C
 from ansible.playbook.task_include import TaskInclude
 from ansible.plugins.callback import CallbackBase
 from ansible.module_utils._text import to_bytes, to_native, to_text
+from process_task_result import extract_error_msg
 
 if sys.version_info.major == 2:
     reload(sys)
@@ -324,10 +325,10 @@ class CallbackModule(CallbackBase):
         if task_path:
             task_banner += "task path: {}\n".format(task_path)
 
-        msg = ""
+        task_details = ""
         # Print task banner if the task is changed
         if self._last_task_uuid != task._uuid:
-            msg += task_banner
+            task_details += task_banner
 
             # Update last task uuid
             self._last_task_uuid = result._task._uuid
@@ -336,8 +337,8 @@ class CallbackModule(CallbackBase):
         if task_status == "failed":
            e_traceback = self._get_exception_traceback(result._result)
            if e_traceback:
-               msg += str(e_traceback)
-               msg += "\n"
+               task_details += str(e_traceback)
+               task_details += "\n"
 
         if delegated_vars:
             result_host = "[{} -> {}]".format(result._host.get_name(), delegated_vars['ansible_host'])
@@ -347,32 +348,32 @@ class CallbackModule(CallbackBase):
         log_failed_tasks = False
         # Log task result facts
         if task_status == "ok":
-            msg += "ok: {}".format(result_host)
+            task_details += "ok: {}".format(result_host)
         elif task_status == "changed":
-            msg += "changed: {}".format(result_host)
+            task_details += "changed: {}".format(result_host)
         elif task_status == "failed":
             if result._task.loop:
-                msg += "failed: {}".format(result_host)
+                task_details += "failed: {}".format(result_host)
             else:
-                msg += "fatal: {}: FAILED!".format(result_host)
+                task_details += "fatal: {}: FAILED!".format(result_host)
             log_failed_tasks = True
         elif task_status == "unreachable":
-            msg += "fatal: {}: UNREACHABLE!".format(result_host)
+            task_details += "fatal: {}: UNREACHABLE!".format(result_host)
             log_failed_tasks = True
         elif task_status == "skipped":
-            msg += "skipping: {}".format(result_host)
+            task_details += "skipping: {}".format(result_host)
         else:
-            msg += result_host
+            task_details += result_host
 
         if result._task.loop:
-            msg += " => (item={})".format(loop_item)
+            task_details += " => (item={})".format(loop_item)
             if result._task._attributes['ignore_errors']:
                 ignore_errors = True
 
-        msg += " => {}".format(self._dump_results(result._result, indent=4))
+        task_details += " => {}".format(self._dump_results(result._result, indent=4))
 
         if ignore_errors:
-            msg += "\n...ignoring"
+            task_details += "\n...ignoring"
             log_failed_tasks = False
 
         if 'known_issue' in str(task_tags) and 'msg' in result._result:
@@ -398,15 +399,20 @@ class CallbackModule(CallbackBase):
             # in self.failed_tasks_log as well
             if task_path and task_path not in self._play_tasks_cache['failed']:
                 self._play_tasks_cache['failed'].append(task_path)
-                if task_path not in msg:
+                if task_path not in task_details:
                     log_header += task_banner
 
             if log_header:
                 self.write_to_logfile(self.failed_tasks_log, log_header)
 
+            # Extract error messages from task result and print it after task details
+            result_in_json = json.loads(result._result)
+            error_msg = extract_error_msg(result_in_json)
+            task_details += "error message:\n" + error_msg
+
             self.add_logger_file_handler(self.failed_tasks_log)
 
-        self.logger.info(msg)
+        self.logger.info(task_details)
 
         # Remove logger handler for known issues and failed tasks
         if 'known_issue' in str(task_tags) and 'msg' in result._result:
