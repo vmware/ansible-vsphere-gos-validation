@@ -1,0 +1,35 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Set offline disk to online status in Windows guest OS
+# Parameters:
+#   win_online_disk_num(optional): the disk number to be
+#   set to online. If not specified, will online all offline disks.
+#
+- name: "Set powershell commands to online disk '{{ win_online_disk_num }}'"
+  ansible.builtin.set_fact:
+    win_cmd_online_disk: "Set-Disk -Number {{ win_online_disk_num | int }} -IsOffline $False"
+    win_cmd_check_disk: "(Get-disk -Number {{ win_online_disk_num | int }}).OperationalStatus"
+  when: win_online_disk_num is defined
+
+- name: "Set powershell commands to set all offline disks to online"
+  ansible.builtin.set_fact:
+    win_cmd_online_disk: "Get-Disk | where-object IsOffline -eq $True | Set-Disk -IsOffline $False"
+    win_cmd_check_disk: "(Get-disk).OperationalStatus"
+  when: win_online_disk_num is undefined
+
+# Online disk firstly
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ win_cmd_online_disk }}"
+# Get disk status
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ win_cmd_check_disk }}"
+
+- name: "Check disk online status"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.stdout_lines | length != 0
+      - "'Offline' not in win_powershell_cmd_output.stdout_lines"
+    fail_msg: "After online disk, still get offline status in result: '{{ win_powershell_cmd_output.stdout_lines }}'"
