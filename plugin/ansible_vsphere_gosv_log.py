@@ -442,7 +442,7 @@ class CallbackModule(CallbackBase):
                 self.write_to_logfile(self.failed_tasks_log, log_header)
 
             # Extract error messages from task result and print it after task details
-            result_in_json = json.loads(result._result)
+            result_in_json = json.loads(self._dump_results(result._result, indent=4))
             error_msg = extract_error_msg(result_in_json)
             task_details += "\nerror message:\n" + error_msg
 
