@@ -19,7 +19,7 @@
     wait_ipv4: ""
   when: wait_ipv4 is undefined
 
-- name: Wait for VMware Tools collecting guest info
+- name: Wait for VMware Tools collecting guest IPv4 address
   community.vmware.vmware_guest_info:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -31,14 +31,30 @@
   delay: 5
   retries: "{{ ((vm_get_ip_timeout | default(300) | int) / 5) | int }}"
   register: vm_guest_facts
+  ignore_errors: true
   until:
-    - "'instance' in vm_guest_facts"
-    - "'hw_eth0' in vm_guest_facts.instance"
-    - "'ipaddresses' in vm_guest_facts.instance.hw_eth0"
-    - vm_guest_facts.instance.guest_tools_status == "guestToolsRunning"
-    - vm_guest_facts.instance.hw_eth0.ipaddresses
+    - vm_guest_facts.instance.guest_tools_status | default('') == "guestToolsRunning"
+    - vm_guest_facts.instance.hw_eth0.ipaddresses | default('')
     - vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.netcommon.ipv4
-    - ( not wait_ipv4 ) or ( wait_ipv4 and wait_ipv4 in vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.netcommon.ipv4)
+    - ((not wait_ipv4) or
+      (wait_ipv4 and wait_ipv4 in vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.netcommon.ipv4))
+
+- name: "Check VMware Tools is running and collects guest IPv4 address successfully"
+  assert:
+    that:
+      - vm_guest_facts.instance is defined
+      - vm_guest_facts.instance.guest_tools_status is defined
+      - vm_guest_facts.instance.guest_tools_status == "guestToolsRunning"
+      - vm_guest_facts.instance.hw_eth0 is defined
+      - vm_guest_facts.instance.hw_eth0.ipaddresses is defined
+      - vm_guest_facts.instance.hw_eth0.ipaddresses
+      - vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.netcommon.ipv4
+      - (((not wait_ipv4) or
+        (wait_ipv4 and wait_ipv4 in vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.netcommon.ipv4))
+    fail_msg: >-
+      It is timed out for VMware Tools collecting guest IPv4 address, tools running status is
+      {{ vm_guest_facts.instance.guest_tools_status | default('') }} and guest IP addresses are
+      {{ vm_guest_facts.instance.hw_eth0.ipaddresses | default('') }}
 
 # Retrieve IPv4 from eth0 ipaddresses to avoid getting virbr0 IP on RHEL-like guests
 - ansible.builtin.debug:

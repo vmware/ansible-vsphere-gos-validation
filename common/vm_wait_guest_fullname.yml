@@ -28,14 +28,26 @@
   delay: 5
   retries: "{{ ((vm_get_fullname_timeout | default(300) | int) / 5) | int }}"
   register: vm_guestinfo
+  ignore_errors: true
   until:
-    - "'instance' in vm_guestinfo"
-    - "'guest' in vm_guestinfo.instance"
-    - "'guestFullName' in vm_guestinfo.instance.guest"
-    - "'toolsRunningStatus' in vm_guestinfo.instance.guest"
-    - vm_guestinfo.instance.guest.guestFullName
+    - vm_guestinfo.instance.guest.toolsRunningStatus | default('') == "guestToolsRunning"
+    - vm_guestinfo.instance.guest.guestFullName | default('')
     - ( not wait_guest_fullname ) or ( wait_guest_fullname and wait_guest_fullname == vm_guestinfo.instance.guest.guestFullName )
-    - vm_guestinfo.instance.guest.toolsRunningStatus == "guestToolsRunning"
 
 - name: "Print VM guest info"
   ansible.builtin.debug: var=vm_guestinfo
+
+- name: "Check VMware Tools is running and collects guest OS fullname successfully"
+  assert:
+    that:
+      - vm_guestinfo.instance is defined
+      - vm_guestinfo.instance.guest is defined
+      - vm_guestinfo.instance.guest.toolsRunningStatus is defined
+      - vm_guestinfo.instance.guest.toolsRunningStatus == "guestToolsRunning"
+      - vm_guestinfo.instance.guest.guestFullName is defined
+      - vm_guestinfo.instance.guest.guestFullName
+      - ( not wait_guest_fullname ) or ( wait_guest_fullname and wait_guest_fullname == vm_guestinfo.instance.guest.guestFullName )
+    fail_msg: >-
+      It is timed out for VMware Tools collecting guest OS fullname, tools running status is
+      {{ vm_guestinfo.instance.guest.toolsRunningStatus | default('') }} and guest OS fullname is
+      {{ vm_guestinfo.instance.guest.guestFullName | default('') }}
