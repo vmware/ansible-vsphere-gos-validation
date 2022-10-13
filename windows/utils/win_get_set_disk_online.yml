@@ -1,0 +1,61 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Set disk status to online or get disk online status in Windows guest OS.
+# One of parameters 'win_online_disk_num', 'win_online_disk_uid' must be set,
+# 'win_online_disk_num' takes precedence.
+# Parameters:
+#   win_online_disk_num: the disk number.
+#   win_online_disk_uid: the disk UniqueId.
+#   win_online_disk_ops: 'set' or 'get' specified disk online status, default
+#   value is 'get'.
+#
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - win_online_disk_num is defined or win_online_disk_uid is defined
+    fail_msg: "win_online_disk_num or win_online_disk_uid parameter must be specified."
+
+- name: "Initialize the disk online status"
+  ansible.builtin.set_fact:
+    win_is_disk_online: false
+
+- name: "Set powershell commands to online disk '{{ win_online_disk_num }}'"
+  ansible.builtin.set_fact:
+    win_cmd_online_disk: "Set-Disk -Number {{ win_online_disk_num | int }} -IsOffline $False"
+    win_cmd_check_disk: "(Get-disk -Number {{ win_online_disk_num | int }}).OperationalStatus"
+  when: win_online_disk_num is defined
+
+- name: "Set powershell commands to online disk '{{ win_online_disk_uid }}'"
+  ansible.builtin.set_fact:
+    win_cmd_online_disk: "Set-Disk -UniqueId {{ win_online_disk_uid }} -IsOffline $False"
+    win_cmd_check_disk: "(Get-disk -UniqueId {{ win_online_disk_uid }}).OperationalStatus"
+  when: win_online_disk_num is undefined and win_online_disk_uid is defined
+
+# Set disk to online
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ win_cmd_online_disk }}"
+  when:
+    - win_online_disk_ops is defined
+    - win_online_disk_ops | lower == 'set'
+
+# Get disk online status
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ win_cmd_check_disk }}"
+- name: "Set fact of the disk online status"
+  ansible.builtin.set_fact:
+    win_is_disk_online: true
+  when:
+    - win_powershell_cmd_output.stdout_lines | length != 0
+    - win_powershell_cmd_output.stdout_lines[0] | lower == 'online'
+
+- name: "Check disk online status"
+  ansible.builtin.assert:
+    that:
+      - win_is_disk_online
+    fail_msg: "After online disk, still get offline status in result: '{{ win_powershell_cmd_output.stdout_lines }}'"
+  when:
+    - win_online_disk_ops is defined
+    - win_online_disk_ops | lower == 'set'

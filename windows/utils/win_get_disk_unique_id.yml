@@ -1,0 +1,24 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get disk UniqueId in Windows guest OS
+# Parameters:
+#   win_get_disk_uid_num: the disk number
+#
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - win_get_disk_uid_num is defined
+    fail_msg: "win_get_disk_uid_num is a required parameter, please specify it."
+
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-Disk -Number {{ win_get_disk_uid_num | int }}).UniqueId"
+
+- name: "Set fact of disk '{{ win_get_disk_uid_num }}' UniqueId"
+  ansible.builtin.set_fact:
+    win_disk_unique_id: "{{ win_powershell_cmd_output.stdout_lines[0] if win_powershell_cmd_output.stdout_lines | length != 0 else '' }}"
+
+- name: "Display disk UniqueId"
+  ansible.builtin.debug:
+    msg: "Get disk '{{ win_get_disk_uid_num }}' UniqueId in guest OS: {{ win_disk_unique_id }}"

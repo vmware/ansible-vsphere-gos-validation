@@ -1,0 +1,38 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Add or refresh the testing VM's IP in in-memory inventory hosts info
+# Parameters:
+#   update_inventory_timeout (optional): the timeout to get VM IP address
+#     and the timeout to wait IP to be connectable
+#
+- include_tasks: ../../common/vm_get_ip.yml
+  vars:
+    vm_get_ip_timeout: "{{ update_inventory_timeout | default(900) }}"
+- name: "Display the VM IP address"
+  ansible.builtin.debug:
+    msg: "Get '{{ vm_name }}' IP address: {{ vm_guest_ip }}"
+
+- include_tasks: ../../common/vm_wait_ping.yml
+  vars:
+    vm_wait_ping_ip: "{{ vm_guest_ip }}"
+    vm_wait_ping_timeout: "{{ update_inventory_timeout | default(900) }}"
+
+- include_tasks: win_check_winrm.yml
+  vars:
+    win_check_winrm_timeout: "{{ update_inventory_timeout | default(900) }}"
+
+- name: "Initialize the default update inventory to True"
+  ansible.builtin.set_fact:
+    update_inventory: true
+- name: "Check if VM IP already exist"
+  block:
+    - name: Loop groups to update update_inventory
+      ansible.builtin.set_fact:
+        update_inventory: false
+      when: vm_guest_ip == item
+      loop: "{{ groups['target_vm'] }}"
+  when: groups['target_vm'] is defined
+
+- include_tasks: add_windows_host.yml
+  when: update_inventory
