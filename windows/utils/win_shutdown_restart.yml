@@ -6,26 +6,27 @@
 #   set_win_power_state: specify the power operation, "shutdown" or "restart"
 #
 - name: "Shutdown guest OS inside OS"
-  ansible.builtin.raw: 'stop-computer -Force'
-  delegate_to: "{{ vm_guest_ip }}"
+  block:
+    - name: "Execute shutdown OS command"
+      ansible.builtin.raw: 'stop-computer -Force'
+      delegate_to: "{{ vm_guest_ip }}"
+    - name: "Set fact of the expected status"
+      ansible.builtin.set_fact:
+        expected_power_state: "poweredOff"
   when: set_win_power_state == "shutdown"
 
 - name: "Restart guest OS inside OS"
-  ansible.windows.win_reboot:
-  register: restart_guest_os
-  delegate_to: "{{ vm_guest_ip }}"
-  when: set_win_power_state == "restart"
-- name: "Display the win_reboot result"
-  ansible.builtin.debug: var=restart_guest_os
-  when: enable_debug is defined and enable_debug
-
-- name: "Set fact of the expected status"
-  ansible.builtin.set_fact:
-    expected_power_state: "poweredOff"
-  when: set_win_power_state == "shutdown"
-- name: "Set fact of the expected status"
-  ansible.builtin.set_fact:
-    expected_power_state: "poweredOn"
+  block:
+    - name: "Restart OS using win_reboot module"
+      ansible.windows.win_reboot:
+      register: restart_guest_os
+      delegate_to: "{{ vm_guest_ip }}"
+    - name: "Display the win_reboot result"
+      ansible.builtin.debug: var=restart_guest_os
+      when: enable_debug
+    - name: "Set fact of the expected status"
+      ansible.builtin.set_fact:
+        expected_power_state: "poweredOn"
   when: set_win_power_state == "restart"
 
 - name: "Wait 10 seconds to before checking power status"
