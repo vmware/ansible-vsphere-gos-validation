@@ -1,0 +1,57 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Check whether the guest OS version supports secureboot testing
+#
+- include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      Secure boot is not supported on VM with hardware version {{ vm_hardware_version_num }}.
+    skip_reason: "Not Supported"
+  when: vm_hardware_version_num | int < 13
+
+- include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} doesn't support secure boot.
+    skip_reason: "Not Supported"
+  when: >
+    (guest_os_ansible_distribution == "Rocky" and
+      guest_os_ansible_distribution_ver is version('8.4', '<=')) or
+    (guest_os_ansible_distribution == "Astra Linux (Orel)")
+
+- name: "Skip secureboot testing for OS version which has vulnerable bootloaders"
+  block:
+    - include_tasks: ../../common/skip_test_case.yml
+      vars:
+        skip_msg: >-
+          {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} image has vulnerable
+          bootloader, which is denied for secure boot from ESXi 8.0 release.
+          Please refer to https://kb.vmware.com/s/article/88737.
+        skip_reason: "Not Supported"
+      when: >
+        (guest_os_ansible_distribution in ["RedHat", "AlmaLinux"] and
+          guest_os_ansible_distribution_ver is version('8.4', '<=')) or
+        (guest_os_ansible_distribution == "CentOS" and
+          guest_os_ansible_distribution_ver is version('8.5', '<=')) or
+        (guest_os_ansible_distribution == "OracleLinux" and
+          guest_os_ansible_distribution_ver is version('8.3', '<=')) or
+        (guest_os_ansible_distribution == "Debian" and
+          guest_os_ansible_distribution_ver is version('10.9', '<=')) or
+        (guest_os_ansible_distribution in ["SLES", "SLED"] and
+          guest_os_ansible_distribution_ver is version('15.2', '<=')) or
+        (guest_os_ansible_distribution == "Ubuntu" and
+          ((guest_os_ansible_distribution_ver == '20.04' and
+              guest_os_ansible_kernel is version('5.4.0-113-generic', '<=')) or
+            (guest_os_ansible_distribution_ver == '18.04' and
+              guest_os_ansible_kernel is version('5.4.0-42-generic', '<=')) or
+            guest_os_ansible_distribution_ver in ['21.04', '20.10', '19.10', '19.04', '18.10'] or
+            guest_os_ansible_distribution_ver is version('18.04', '<'))) or
+        (guest_os_ansible_distribution == "VMware Photon OS" and
+          ((guest_os_ansible_distribution_ver == '4.0' and
+              guest_os_ansible_kernel is version('5.10.4-13.ph4-esx', '<=')) or
+           (guest_os_ansible_distribution_ver == '3.0' and
+              guest_os_ansible_kernel is version('4.19.132-5.ph3-esx', '<=')) or
+            guest_os_ansible_distribution_ver is version('2.0', '<=')))
+  when: vm_hardware_version_num | int >= 20
