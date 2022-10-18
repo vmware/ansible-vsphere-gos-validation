@@ -45,17 +45,26 @@
     vm_exists: true
 
 # When firmware is EFI, configure force EFI setup once
-- block:
-    # Add virtual TPM device
-    - include_tasks: ../../common/vm_add_vtpm_device.yml
-      vars:
-        vc_cert_path: "{{ current_test_log_folder }}"
-      when: virtual_tpm is defined and virtual_tpm | bool
-    # Enable secureboot
-    - include_tasks: ../../common/vm_set_boot_options.yml
-      vars:
-        secure_boot_enabled_set: "{{ secureboot_enabled | default(false) }}"
-        enter_bios_setup: true
+- name: "Handle VM with EFI firmware"
+  block:
+    - name: "Set features on 64bit VM"
+      block:
+        # Add virtual TPM device
+        - include_tasks: ../../common/vm_add_vtpm_device.yml
+          vars:
+            vc_cert_path: "{{ current_test_log_folder }}"
+          when: virtual_tpm is defined and virtual_tpm | bool
+        # Enable secureboot
+        - include_tasks: ../../common/vm_set_boot_options.yml
+          vars:
+            secure_boot_enabled_set: "{{ secureboot_enabled | default(false) }}"
+            enter_bios_setup: true
+        # Enable VBS
+        - include_tasks: ../utils/win_enable_vbs_vm.yml
+          vars:
+            win_enable_vbs: true
+          when: enable_vbs is defined and enable_vbs | bool
+      when: guest_id is defined and "'64' in guest_id"
     - include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: "powered-on"
