@@ -109,4 +109,18 @@
   ansible.builtin.pause:
     minutes: 1
 - include_tasks: ../utils/add_windows_host.yml
+
+- name: "Enable VBS in guest OS"
+  block:
+    - include_tasks: ../utils/win_enable_vbs_guest.yml
+    # Get VBS status in guest OS
+    - include_tasks: ../utils/win_get_vbs_guest.yml
+    - name: "Check VBS and running security service status"
+      ansible.builtin.assert:
+        that:
+          - win_vbs_status_guest | int == 2
+          - "'2' in win_vbs_running_service"
+        fail_msg: "VBS is not running '{{ win_vbs_status_guest }}', or HVCI is not running '{{ win_vbs_running_service }}'."
+  when: enable_vbs is defined and enable_vbs | bool
+
 - include_tasks: detach_cdrom_iso.yml
