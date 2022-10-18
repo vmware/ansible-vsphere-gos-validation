@@ -6,21 +6,7 @@
   ansible.builtin.set_fact:
     vm_wait_network_connect_timeout: "{{ vm_wait_network_connect_timeout | default(300) }}"
 
-- name: "Get network adapter info firstly"
-  include_tasks: vm_get_network_facts.yml
-
-- name: "Initialize the list of start connected network adapter"
-  ansible.builtin.set_fact:
-    start_connected_net_adapter: []
-- name: "Get start connected network adapter"
-  ansible.builtin.set_fact:
-    start_connected_net_adapter: "{{ start_connected_net_adapter + [item.key] }}"
-  with_dict: "{{ vm_network_adapters }}"
-  when: "'start_connected' in item.value and item.value.start_connected"
-- name: "Print the start connected network adapter list"
-  ansible.builtin.debug: var=start_connected_net_adapter
-
-- name: "Wait network adapter connected of VM '{{ vm_name }}'"
+- name: "Wait for start connected network adapters of VM '{{ vm_name }}' to be connected"
   community.vmware.vmware_guest_network:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -32,10 +18,43 @@
     name: "{{ vm_name }}"
     gather_network_info: true
   register: vm_netadapter_facts
-  until: "'network_data' in vm_netadapter_facts and vm_netadapter_facts.network_data[item].connected"
+  until:
+    - vm_netadapter_facts is defined
+    - vm_netadapter_facts.network_info is defined
+    - vm_netadapter_facts.network_info | selectattr('start_connected', 'equalto', true) | rejectattr('connected', 'equalto', true) | length == 0
   retries: "{{ ((vm_wait_network_connect_timeout | int) / 3) | int }}"
   delay: 3
-  with_items: "{{ start_connected_net_adapter }}"
+  ignore_errors: true
+
 - name: "Print the network adapter info"
   ansible.builtin.debug: var=vm_netadapter_facts
   when: enable_debug is defined and enable_debug
+
+- name: "VM has start connected VM network adapters disconnected"
+  block:
+    - name: "Initialize the list of start connected network adapters failed to be connected"
+      ansible.builtin.set_fact:
+        fail_connected_netadapter_info: []
+
+    - name: "Update the list of start connected network adapters failed to be connected"
+      ansible.builtin.set_fact:
+        fail_connected_netadapter_info: >-
+          {{
+            vm_netadapter_facts.network_info |
+            selectattr('start_connected', 'equalto',true) |
+            rejectattr('connected', 'equalto', true) |
+            sort(attribute='label')
+          }}
+      when:
+        - vm_netadapter_facts is defined
+        - vm_netadapter_facts.network_info is defined
+
+    - name: "Waiting for network adapter connected failed"
+      ansible.builtin.fail:
+        msg: >-
+          It's timed out to wait for start connected network adapters
+          '{{ ",".join(fail_connected_netadapter_info | map(attribute="label")) }}' to be connected
+          in {{ vm_wait_network_connect_timeout }} seconds.
+  when:
+    - vm_netadapter_facts.failed is defined
+    - vm_netadapter_facts.failed
