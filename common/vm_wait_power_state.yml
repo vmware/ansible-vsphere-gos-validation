@@ -8,6 +8,11 @@
 #   wait_power_state_timeout (optional): the timeout to wait for the expected power
 #     status, the default value is 120 seconds.
 #
+- name: "Initialize the timeout seconds for waiting expected power status"
+  ansible.builtin.set_fact:
+    wait_power_state_timeout: 120
+  when: wait_power_state_timeout is undefined or not wait_power_state_timeout
+
 - name: "Wait for VM power status to '{{ expected_power_status }}'"
   community.vmware.vmware_guest_info:
     validate_certs: "{{ validate_certs | default(false) }}"
@@ -35,8 +40,9 @@
       - vm_power_gather_facts.instance.hw_power_status is defined
       - vm_power_gather_facts.instance.hw_power_status == expected_power_status
     fail_msg: >-
-      It's timed out to wait for VM power status became '{{ expected_power_status }}'.
-      Current VM power status is '{{ vm_power_gather_facts.instance.hw_power_status | default("") }}'
+      It's timed out to wait for VM power status became '{{ expected_power_status }}'
+      in {{ wait_power_state_timeout }} seconds.
+      Current VM power status is '{{ vm_power_gather_facts.instance.hw_power_status | default("") }}'.
 
 # Pause 10 seconds after get expected VM power state to avoid power state
 # conflict issues

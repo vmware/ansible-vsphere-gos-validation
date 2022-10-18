@@ -14,7 +14,12 @@
     wait_guest_fullname: ""
   when: wait_guest_fullname is undefined
 
-- name: Wait for VMware Tools collecting guest OS fullname
+- name: "Initialize the timeout seconds to wait for VMware Tools collecting guest OS fullname"
+  ansible.builtin.set_fact:
+    vm_get_fullname_timeout: 300
+  when: vm_get_fullname_timeout is undefined or not vm_get_fullname_timeout
+
+- name: "Wait for VMware Tools collecting guest OS fullname"
   community.vmware.vmware_guest_info:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -32,7 +37,8 @@
   until:
     - vm_guestinfo.instance.guest.toolsRunningStatus | default('') == "guestToolsRunning"
     - vm_guestinfo.instance.guest.guestFullName | default('')
-    - ( not wait_guest_fullname ) or ( wait_guest_fullname and wait_guest_fullname == vm_guestinfo.instance.guest.guestFullName )
+    - ((not wait_guest_fullname) or
+      (wait_guest_fullname and wait_guest_fullname == vm_guestinfo.instance.guest.guestFullName))
 
 - name: "Print VM guest info"
   ansible.builtin.debug: var=vm_guestinfo
@@ -48,6 +54,6 @@
       - vm_guestinfo.instance.guest.guestFullName
       - ( not wait_guest_fullname ) or ( wait_guest_fullname and wait_guest_fullname == vm_guestinfo.instance.guest.guestFullName )
     fail_msg: >-
-      It's timed out for VMware Tools collecting guest OS fullname, tools running status
-      is '{{ vm_guestinfo.instance.guest.toolsRunningStatus | default("") }}'' and guest OS fullname
-      is '{{ vm_guestinfo.instance.guest.guestFullName | default("") }}''
+      It's timed out for VMware Tools collecting guest OS fullname in {{ vm_get_fullname_timeout }} seconds.
+      Current VMware Tools running status is '{{ vm_guestinfo.instance.guest.toolsRunningStatus | default("") }}',
+      and guest OS fullname is '{{ vm_guestinfo.instance.guest.guestFullName | default("") }}'.

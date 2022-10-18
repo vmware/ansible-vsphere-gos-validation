@@ -14,7 +14,12 @@
     wait_guest_hostname: ""
   when: wait_guest_hostname is undefined
 
-- name: Wait for VMware Tools collecting guest OS hostname
+- name: "Initialize the timeout seconds to wait for VMware Tools collecting guest OS hostname"
+  ansible.builtin.set_fact:
+    vm_get_hostname_timeout: 300
+  when: vm_get_hostname_timeout is undefined or not vm_get_hostname_timeout
+
+- name: "Wait for VMware Tools collecting guest OS hostname"
   community.vmware.vmware_guest_info:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -41,16 +46,17 @@
 - name: "Check VMware Tools collected guest OS hostname successfully"
   ansible.builtin.assert:
     that:
-    - vm_guest_facts.instance is defined
-    - vm_guest_facts.instance.guest.toolsRunningStatus is defined
-    - vm_guest_facts.instance.guest.toolsRunningStatus == "guestToolsRunning"
-    - vm_guest_facts.instance.guest.hostName is defined
-    - vm_guest_facts.instance.guest.hostName
-    - (not wait_guest_hostname) or (wait_guest_hostname and wait_guest_hostname == vm_guest_facts.instance.guest.hostName)
+      - vm_guest_facts.instance is defined
+      - vm_guest_facts.instance.guest.toolsRunningStatus is defined
+      - vm_guest_facts.instance.guest.toolsRunningStatus == "guestToolsRunning"
+      - vm_guest_facts.instance.guest.hostName is defined
+      - vm_guest_facts.instance.guest.hostName
+      - ((not wait_guest_hostname) or
+        (wait_guest_hostname and wait_guest_hostname == vm_guest_facts.instance.guest.hostName))
   fail_msg: >-
-    It's timed out for VMware Tools collecting guest OS hostname, tools running status
-    is '{{ vm_guest_facts.instance.guest.toolsRunningStatus | default("") }}' and guest OS hostname
-    is '{{ vm_guest_facts.instance.guest.hostName | default("") }}'
+    It's timed out for VMware Tools collecting guest OS hostname in {{ vm_get_hostname_timeout }} seconds.
+    Current VMware Tools running status is '{{ vm_guest_facts.instance.guest.toolsRunningStatus | default("") }}'
+    and guest OS hostname is '{{ vm_guest_facts.instance.guest.hostName | default("") }}'.
 
 - name: "Print VM guest OS hostname"
   ansible.builtin.debug:
