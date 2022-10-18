@@ -45,17 +45,26 @@
     vm_exists: true
 
 # When firmware is EFI, configure force EFI setup once
-- block:
-    # Add virtual TPM device
-    - include_tasks: ../../common/vm_add_vtpm_device.yml
-      vars:
-        vc_cert_path: "{{ current_test_log_folder }}"
-      when: virtual_tpm is defined and virtual_tpm | bool
-    # Enable secureboot
-    - include_tasks: ../../common/vm_set_boot_options.yml
-      vars:
-        secure_boot_enabled_set: "{{ secureboot_enabled | default(false) }}"
-        enter_bios_setup: true
+- name: "Handle VM with EFI firmware"
+  block:
+    - name: "Set features on 64bit VM"
+      block:
+        # Add virtual TPM device
+        - include_tasks: ../../common/vm_add_vtpm_device.yml
+          vars:
+            vc_cert_path: "{{ current_test_log_folder }}"
+          when: virtual_tpm is defined and virtual_tpm | bool
+        # Enable secureboot
+        - include_tasks: ../../common/vm_set_boot_options.yml
+          vars:
+            secure_boot_enabled_set: "{{ secureboot_enabled | default(false) }}"
+            enter_bios_setup: true
+        # Enable VBS
+        - include_tasks: ../utils/win_enable_vbs_vm.yml
+          vars:
+            win_enable_vbs: true
+          when: enable_vbs is defined and enable_vbs | bool
+      when: guest_id is defined and "'64' in guest_id"
     - include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: "powered-on"
@@ -100,4 +109,18 @@
   ansible.builtin.pause:
     minutes: 1
 - include_tasks: ../utils/add_windows_host.yml
+
+- name: "Enable VBS in guest OS"
+  block:
+    - include_tasks: ../utils/win_enable_vbs_guest.yml
+    # Get VBS status in guest OS
+    - include_tasks: ../utils/win_get_vbs_guest.yml
+    - name: "Check VBS and running security service status"
+      ansible.builtin.assert:
+        that:
+          - win_vbs_status_guest | int == 2
+          - "'2' in win_vbs_running_service"
+        fail_msg: "VBS is not running '{{ win_vbs_status_guest }}', or HVCI is not running '{{ win_vbs_running_service }}'."
+  when: enable_vbs is defined and enable_vbs | bool
+
 - include_tasks: detach_cdrom_iso.yml

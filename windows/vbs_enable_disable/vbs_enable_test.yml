@@ -1,13 +1,18 @@
 # Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Check VM VBS status
-- include_tasks: ../../common/vm_get_vbs_status.yml
-- name: "Set fact of VM VBS current status before testing"
+- name: "Initialize the VBS status of VM and VBS status in guest OS"
   ansible.builtin.set_fact:
-    vm_vbs_status_before: "{{ vm_vbs_enabled | default(false) }}"
+    vm_vbs_enabled_before: false
+    guest_vbs_enabled_before: false
 
-- name: "VM VBS not enabled"
+# Get VM VBS status before enable
+- include_tasks: ../../common/vm_get_vbs_status.yml
+- name: "Set fact of VM VBS current status before enable"
+  ansible.builtin.set_fact:
+    vm_vbs_enabled_before: "{{ vm_vbs_enabled }}"
+
+- name: "VM VBS is not enabled"
   block:
     # Shutdown guest OS before enabling VBS on VM
     - include_tasks: ../utils/win_shutdown_restart.yml
@@ -29,13 +34,26 @@
           - vm_vbs_enabled is defined
           - vm_vbs_enabled | bool
         fail_msg: "VM VBS status is not enabled after enabling it."
-  when: not vm_vbs_status_before
+  when: not vm_vbs_enabled_before
 
-# Enable VBS in guest OS
-- include_tasks: ../utils/win_enable_vbs_guest.yml
+- name: "VM VBS is enabled"
+  block:
+    # Get VBS status in guest OS
+    - include_tasks: ../utils/win_get_vbs_guest.yml
+    - name: "Set fact of HVCI and VBS running status in guest before enable"
+      ansible.builtin.set_fact:
+        guest_vbs_enabled_before: true
+      when:
+        - win_vbs_status_guest | int == 2
+        - "'2' in win_vbs_running_service"
+  when: vm_vbs_enabled_before
 
-# Get VBS status in guest OS
-- include_tasks: ../utils/win_get_vbs_guest.yml
+# Enable VBS in guest OS if HVCI is not running or VBS is not running
+- name: "Enable VBS in guest OS"
+  block:
+    - include_tasks: ../utils/win_enable_vbs_guest.yml
+    - include_tasks: ../utils/win_get_vbs_guest.yml
+  when: not guest_vbs_enabled_before
 
 # SecurityServicesRunning: 2 means HVCI is running
 # VirtualizationBasedSecurityStatus: 2 means VBS is enabled and running
