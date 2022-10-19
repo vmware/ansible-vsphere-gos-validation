@@ -64,22 +64,22 @@
 
     # Get network adapter interface status
     - name: "Waiting for network interface '{{ network_adapter_name }}' status '{{ network_adapter_status }}'"
-      ansible.builtin.shell: "ip -br addr show {{ network_adapter_name }}"
+      ansible.builtin.shell: "ip -br addr show {{ network_adapter_name }} | awk '{print $2}'"
       register: ip_show_result
       changed_when: false
       until:
-        - ip_show_result.stdout.split() | length >= 2
-        - ip_show_result.stdout.split()[1] == network_adapter_status | lower
+        - ip_show_result.stdout is defined
+        - ip_show_result.stdout | lower == network_adapter_status | lower
       retries: 20
       delay: 5
       delegate_to: "{{ vm_guest_ip }}"
-      ignore_erros: true
+      ignore_errors: true
 
     - name: "Set network interface '{{ network_adapter_name }}' current status"
       ansible.builtin.set_fact:
-        current_network_adapter_status: >-
-          {%- if ip_show_result.stdout is defined and ip_show_result.stdout -%}ip_show_result.stdout
-          {%- if ip_show_result.stderr is defined and ip_show_result.stderr -%}ip_show_result.stderr
+        current_network_adapter_status: |-
+          {%- if ip_show_result.stdout is defined and ip_show_result.stdout -%}{{ ip_show_result.stdout | lower }}
+          {%- elif ip_show_result.stderr is defined and ip_show_result.stderr -%}{{ ip_show_result.stderr }}
           {%- endif -%}
       when: ip_show_result is defined
 
@@ -87,8 +87,8 @@
       ansible.builtin.assert:
         that:
           - ip_show_result is defined
-          - ip_show_result.stdout.split() | length >= 2
-          - ip_show_result.stdout.split()[1] == network_adapter_status | lower
+          - ip_show_result.stdout is defined
+          - ip_show_result.stdout | lower == network_adapter_status | lower
         fail_msg: >-
           Failed to get network interface '{{ network_adapter_name }}' status '{{ network_adapter_status }}'
           after retrying 20 times. Its current status is '{{ current_network_adapter_status }}'

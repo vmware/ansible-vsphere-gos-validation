@@ -38,8 +38,12 @@
   register: vm_guest_facts
   ignore_errors: true
   until:
-    - vm_guest_facts.instance.guest_tools_status | default('') == "guestToolsRunning"
-    - vm_guest_facts.instance.hw_eth0.ipaddresses | default('')
+    - vm_guest_facts.instance is defined
+    - vm_guest_facts.instance.guest_tools_status is defined
+    - vm_guest_facts.instance.guest_tools_status == "guestToolsRunning"
+    - vm_guest_facts.instance.hw_eth0 is defined
+    - vm_guest_facts.instance.hw_eth0.ipaddresses is defined
+    - vm_guest_facts.instance.hw_eth0.ipaddresses
     - vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4
     - ((not wait_ipv4) or
       (wait_ipv4 and wait_ipv4 in vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4))
