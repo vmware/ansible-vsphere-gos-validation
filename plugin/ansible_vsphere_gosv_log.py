@@ -742,36 +742,37 @@ class CallbackModule(CallbackBase):
 
         if str(task.action) == "ansible.builtin.set_fact":
             set_fact_result = task_result.get('ansible_facts', None)
-            # Update deploy_vm test case name if deploy_casename is set
-            if self._last_test_name and self._last_test_name.startswith("deploy"):
-                deploy_casename = set_fact_result.get("deploy_casename", None)
-                if self._last_test_name in self.testcases and deploy_casename:
-                    old_test_name = self._last_test_name
-                    self._last_test_name = deploy_casename
-                    self.testcases[self._last_test_name] = self.testcases[old_test_name]
-                    del self.testcases[old_test_name]
-                    self.testcases.move_to_end(self._last_test_name, last=False)
-            if "get_windows_system_info.yml" == task_file or "get_linux_system_info.yml" == task_file:
-                vm_guest_os_distribution = set_fact_result.get("vm_guest_os_distribution", None)
-                if vm_guest_os_distribution and self.vm_info:
-                    self.vm_info.Guest_OS_Distribution = vm_guest_os_distribution
-            if "vm_get_vm_info.yml" == task_file:
-               if self.vm_info:
-                   self.vm_info.Config_Guest_Id = set_fact_result.get("vm_guest_id", '')
-                   self.vm_info.Hardware_Version = set_fact_result.get("vm_hardware_version", '')
-            if "vm_upgrade_hardware_version.yml" == task_file:
-               if self.vm_info:
-                   self.vm_info.Hardware_Version = set_fact_result.get("vm_hardware_version", '')
-            if "vm_get_guest_info.yml" == task_file:
-               if self.vm_info:
-                   self.vm_info.GuestInfo_Guest_Id = set_fact_result.get("guestinfo_guest_id", '')
-                   self.vm_info.GuestInfo_Guest_Full_Name = set_fact_result.get("guestinfo_guest_full_name", '')
-                   self.vm_info.GuestInfo_Guest_Family = set_fact_result.get("guestinfo_guest_family", '')
-                   self.vm_info.GuestInfo_Detailed_Data = set_fact_result.get("guestinfo_detailed_data", '')
-                   self.vm_info.VMTools_Version = set_fact_result.get("guestinfo_vmtools_info", '')
-            if "check_guest_os_gui.yml" == task_file:
-               if self.vm_info:
-                   self.vm_info.GUI_Installed = str(set_fact_result.get("guest_os_with_gui", ''))
+            if set_fact_result:
+                # Update deploy_vm test case name if deploy_casename is set
+                if self._last_test_name and self._last_test_name.startswith("deploy"):
+                    deploy_casename = set_fact_result.get("deploy_casename", None)
+                    if self._last_test_name in self.testcases and deploy_casename:
+                        old_test_name = self._last_test_name
+                        self._last_test_name = deploy_casename
+                        self.testcases[self._last_test_name] = self.testcases[old_test_name]
+                        del self.testcases[old_test_name]
+                        self.testcases.move_to_end(self._last_test_name, last=False)
+                if "get_windows_system_info.yml" == task_file or "get_linux_system_info.yml" == task_file:
+                    vm_guest_os_distribution = set_fact_result.get("vm_guest_os_distribution", None)
+                    if vm_guest_os_distribution and self.vm_info:
+                        self.vm_info.Guest_OS_Distribution = vm_guest_os_distribution
+                if "vm_get_vm_info.yml" == task_file:
+                   if self.vm_info:
+                       self.vm_info.Config_Guest_Id = set_fact_result.get("vm_guest_id", '')
+                       self.vm_info.Hardware_Version = set_fact_result.get("vm_hardware_version", '')
+                if "vm_upgrade_hardware_version.yml" == task_file:
+                   if self.vm_info:
+                       self.vm_info.Hardware_Version = set_fact_result.get("vm_hardware_version", '')
+                if "vm_get_guest_info.yml" == task_file:
+                   if self.vm_info:
+                       self.vm_info.GuestInfo_Guest_Id = set_fact_result.get("guestinfo_guest_id", '')
+                       self.vm_info.GuestInfo_Guest_Full_Name = set_fact_result.get("guestinfo_guest_full_name", '')
+                       self.vm_info.GuestInfo_Guest_Family = set_fact_result.get("guestinfo_guest_family", '')
+                       self.vm_info.GuestInfo_Detailed_Data = set_fact_result.get("guestinfo_detailed_data", '')
+                       self.vm_info.VMTools_Version = set_fact_result.get("guestinfo_vmtools_info", '')
+                if "check_guest_os_gui.yml" == task_file:
+                   if self.vm_info:
+                       self.vm_info.GUI_Installed = str(set_fact_result.get("guest_os_with_gui", ''))
 
         elif str(task.action) == "ansible.builtin.debug":
             if "skip_test_case.yml" == task_file and "Skip testcase:" in task.name:
