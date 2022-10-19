@@ -40,9 +40,9 @@
   until:
     - vm_guest_facts.instance.guest_tools_status | default('') == "guestToolsRunning"
     - vm_guest_facts.instance.hw_eth0.ipaddresses | default('')
-    - vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.netcommon.ipv4
+    - vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4
     - ((not wait_ipv4) or
-      (wait_ipv4 and wait_ipv4 in vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.netcommon.ipv4))
+      (wait_ipv4 and wait_ipv4 in vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4))
 
 - name: "Check VMware Tools is running and collects guest IPv4 address successfully"
   ansible.builtin.assert:
@@ -53,9 +53,9 @@
       - vm_guest_facts.instance.hw_eth0 is defined
       - vm_guest_facts.instance.hw_eth0.ipaddresses is defined
       - vm_guest_facts.instance.hw_eth0.ipaddresses
-      - vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.netcommon.ipv4
+      - vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4
       - ((not wait_ipv4) or
-        (wait_ipv4 and wait_ipv4 in vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.netcommon.ipv4))
+        (wait_ipv4 and wait_ipv4 in vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4))
     fail_msg: >-
       It's timed out for VMware Tools collecting guest IPv4 address in {{ vm_get_ip_timeout }} seconds.
       Current VMware Tools running status is '{{ vm_guest_facts.instance.guest_tools_status | default("") }}'
@@ -64,15 +64,15 @@
 # Retrieve IPv4 from eth0 ipaddresses to avoid getting virbr0 IP on RHEL-like guests
 - name: "Print VM guest IPv4 addresses"
   ansible.builtin.debug:
-    msg: "VM guest IP addresses in VM guest facts: {{ vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.netcommon.ipv4 }}"
+    msg: "VM guest IP addresses in VM guest facts: {{ vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4 }}"
   when:
     - vm_guest_facts.instance.hw_eth0.ipaddresses
-    - vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.netcommon.ipv4
+    - vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4
 
 # When retrieving IPv4 from eth0 ipaddresses fails, we can retrieve ipv4 instead
 - name: "Print VM guest IPv4 addresses"
   ansible.builtin.debug:
     msg: "Found VM guest IP address: {{ vm_guest_facts.instance.ipv4 }}"
   when:
-    - (not vm_guest_facts.instance.hw_eth0.ipaddresses) or (not vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.netcommon.ipv4)
+    - (not vm_guest_facts.instance.hw_eth0.ipaddresses) or (not vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4)
     - vm_guest_facts.instance.ipv4
