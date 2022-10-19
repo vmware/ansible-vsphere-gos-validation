@@ -16,9 +16,22 @@
   ansible.windows.win_shell: "(get-itemproperty -path 'HKLM:\\software\\microsoft\\Windows NT\\CurrentVersion\\Winlogon').AutoLogonCount"
   register: get_auto_logon_count
   delegate_to: "{{ vm_guest_ip }}"
-  until: get_auto_logon_count.stdout_lines | length != 0 and (get_auto_logon_count.stdout_lines[0] | int == customize_autologon_count | int - 1)
+  until:
+    - get_auto_logon_count.stdout_lines | length != 0
+    - get_auto_logon_count.stdout_lines[0] | int == customize_autologon_count | int - 1
   retries: 100
   delay: 3
+  ignore_errors: true
+
+- name: "Check auto admin logon count value after GOSC"
+  ansible.builtin.assert:
+    that:
+      - get_auto_logon_count is defined
+      - get_auto_logon_count.stdout_lines | length != 0
+      - get_auto_logon_count.stdout_lines[0] | int == customize_autologon_count | int - 1
+    fail_msg: >-
+      Auto admin logon count value after GOSC is incorrect after retrying 100 times.
+      Current auto admin logon count value is '{{ get_auto_logon_count.stdout_lines[0] | int | default("") }}'
 
 - ansible.builtin.debug:
     msg: "Get remain auto logon count: {{ get_auto_logon_count.stdout_lines[0] }}"

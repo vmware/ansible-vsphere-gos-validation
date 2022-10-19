@@ -5,7 +5,13 @@
 # Parameters:
 #   wait_gosc_log_file: The log file to check for GOSC complete message
 #   wait_gosc_msg_regexp: The regular expressions of GOSC completed message
+#   wait_gosc_msg_timeout: The timeout seconds to wait for GOSC completed message present
 #
+
+- name: "Set the time out seconds to wait for GOSC completed message"
+  ansible.builtin.set_fact:
+    wait_gosc_msg_timeout: "{{ wait_gosc_msg_timeout | default(100) }}"
+
 - name: "Wait for '{{ wait_gosc_msg_regexp }}' present in {{ wait_gosc_log_file }}"
   community.vmware.vmware_vm_shell:
     hostname: "{{ vsphere_host_name }}"
@@ -30,7 +36,19 @@
     - wait_gosc_log.exit_code is defined
     - wait_gosc_log.exit_code == 0
   delay: 5
-  retries: 20
+  retries: "{{ ((wait_gosc_msg_timeout | int) / 5) | int }}"
+  ignore_errors: true
 
-- name: Display the result of waiting for GOSC complete message
+- name: "Display the result of waiting for GOSC complete message"
   ansible.builtin.debug: var=wait_gosc_log
+  when: wait_gosc_log is defined
+
+- name: "Check GOSC complete message"
+  ansible.builtin.assert:
+    that:
+      - wait_gosc_log is defined
+      - wait_gosc_log.exit_code is defined
+      - wait_gosc_log.exit_code == 0
+    fail_msg: >-
+      It's timed out to wait for GOSC complete message '{{ wait_gosc_msg_regexp }}'
+      present in {{ wait_gosc_log_file }} in {{ wait_gosc_msg_timeout }} seconds.

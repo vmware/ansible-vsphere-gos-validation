@@ -13,12 +13,12 @@
 # RHEL/SLED/Ubuntu Desktop network interfaces are managed by NetworkManager
 - name: "Set network interface status with NetworkManager"
   block:
-    - name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'" 
+    - name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'"
       ansible.builtin.shell: "nmcli device connect {{ network_adapter_name }}"
       delegate_to: "{{ vm_guest_ip }}"
       when: network_adapter_status | lower == "up"
 
-    - name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'" 
+    - name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'"
       ansible.builtin.shell: "nmcli device disconnect {{ network_adapter_name }}"
       delegate_to: "{{ vm_guest_ip }}"
       when: network_adapter_status | lower == "down"
@@ -39,34 +39,59 @@
   when: guest_os_network_manager == "NetworkManager"
 
 # SLES is using Wicked to manage network interface
-- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'" 
+- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'"
   ansible.builtin.shell: "wicked if{{ network_adapter_status | lower }} {{ network_adapter_name }}"
   delegate_to: "{{ vm_guest_ip }}"
   when: guest_os_network_manager == "wicked"
 
 # Old RHEL or Debian is using ifdown/ifup to manage network interfaces
-- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'" 
+- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'"
   ansible.builtin.shell: "if{{ network_adapter_status | lower }} {{ network_adapter_name }}"
   delegate_to: "{{ vm_guest_ip }}"
   when: guest_os_network_manager == "traditional"
 
 # Photon OS/Flatcar is using systemd-networkd to manage network interface
-- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'" 
+- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'"
   ansible.builtin.shell: "ip link set {{ network_adapter_name }} {{ network_adapter_status | lower }}"
   delegate_to: "{{ vm_guest_ip }}"
   when: guest_os_network_manager in ["systemd-networkd", "netplan"]
 
 - name: "Get network adapter interface status"
   block:
+    - name: "Set facts for current network interface status"
+      ansible.builtin.set_fact:
+        current_network_adapter_status: ''
+
     # Get network adapter interface status
-    - name: "Waiting for network interface '{{ network_adapter_name }}' status {{ network_adapter_status }}"
-      ansible.builtin.shell: "ip -br addr show {{ network_adapter_name }} | awk '{print $2}'"
+    - name: "Waiting for network interface '{{ network_adapter_name }}' status '{{ network_adapter_status }}'"
+      ansible.builtin.shell: "ip -br addr show {{ network_adapter_name }}"
       register: ip_show_result
       changed_when: false
-      until: network_adapter_status | lower == ip_show_result.stdout | lower
+      until:
+        - ip_show_result.stdout.split() | length >= 2
+        - ip_show_result.stdout.split()[1] == network_adapter_status | lower
       retries: 20
       delay: 5
       delegate_to: "{{ vm_guest_ip }}"
+      ignore_erros: true
+
+    - name: "Set network interface '{{ network_adapter_name }}' current status"
+      ansible.builtin.set_fact:
+        current_network_adapter_status: >-
+          {%- if ip_show_result.stdout is defined and ip_show_result.stdout -%}ip_show_result.stdout
+          {%- if ip_show_result.stderr is defined and ip_show_result.stderr -%}ip_show_result.stderr
+          {%- endif -%}
+      when: ip_show_result is defined
+
+    - name: "Check network interface '{{ network_adapter_name }}' status is '{{ network_adapter_status }}'"
+      ansible.builtin.assert:
+        that:
+          - ip_show_result is defined
+          - ip_show_result.stdout.split() | length >= 2
+          - ip_show_result.stdout.split()[1] == network_adapter_status | lower
+        fail_msg: >-
+          Failed to get network interface '{{ network_adapter_name }}' status '{{ network_adapter_status }}'
+          after retrying 20 times. Its current status is '{{ current_network_adapter_status }}'
 
     - name: "Print the network adapter interface status"
       ansible.builtin.debug:

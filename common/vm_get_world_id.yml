@@ -21,10 +21,19 @@
   until: get_vm_world_id.stdout
   retries: "{{ ((vm_get_world_id_timeout | int) / 5) | int }}"
   delay: 5
+  ignore_errors: true
 
-- name: Display the result of getting VM world ID
+- name: "Display the result of getting VM world ID"
   ansible.builtin.debug: var=get_vm_world_id
   when: enable_debug is defined and enable_debug
+
+- name: "Check VM '{{ vm_name }}' word id"
+  ansible.builtin.assert:
+    that:
+      - get_vm_world_id is defined
+      - get_vm_world_id.stdout_lines is defined
+      - get_vm_world_id.stdout_lines | length >= 1
+    fail_msg: "Failed to get VM '{{ vm_name }}' word id in {{ vm_get_world_id_timeout }} seconds."
 
 - name: "Set fact of VM '{{ vm_name }}' world ID"
   ansible.builtin.set_fact:
