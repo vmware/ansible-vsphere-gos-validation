@@ -18,3 +18,14 @@
   retries: 10
   delegate_to: "{{ vm_guest_ip }}"
   changed_when: false
+  ignore_errors: true
+
+- name: "Check {{ mem_block_num }} memory blocks are present"
+  ansible.builtin.assert:
+    that:
+      - present_blocks_num is defined
+      - present_blocks_num.stdout_lines is defined
+      - present_blocks_num.stdout_lines | length  == mem_block_num | int
+    fail_msg: >-
+      It's timed out to wait for {{ mem_block_num }} memory blocks being present in 50s,
+      only '{{ present_blocks_num.stdout_lines | length | default("") }}'' CPUs are present.

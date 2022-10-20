@@ -21,6 +21,18 @@
     - get_service_status.stdout_lines is defined
     - get_service_status.stdout_lines | length != 0
     - get_service_status.stdout_lines[0] == 'Running'
+  ignore_errors: true
+
+- name: "Check service '{{ win_service_name }}' status in Windows"
+  ansible.builtin.assert:
+    that:
+      - get_service_status is defined
+      - get_service_status.stdout_lines is defined
+      - get_service_status.stdout_lines | length != 0
+      - get_service_status.stdout_lines[0] == 'Running'
+    fail_msg: >-
+      Windows service '{{ win_service_name }}' status is not running after 50 seconds.
+      Current service status is '{{ get_service_status.stdout_lines[0] | default("") }}'.
 
 - name: Display the powershell command result
   ansible.builtin.debug: var=get_service_status

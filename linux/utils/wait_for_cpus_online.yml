@@ -15,6 +15,17 @@
   delay: 5
   retries: 10
   delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: true
+
+- name: "Check {{ num_cpus }} CPUs are present"
+  ansible.builtin.assert:
+    that:
+      - present_cpu_num is defined
+      - present_cpu_num.stdout_lines is defined
+      - present_cpu_num.stdout_lines | length  == num_cpus | int
+    fail_msg: >-
+      It's timed out to wait for {{ num_cpus }} CPUs being present in 50 seconds,
+      only '{{ present_cpu_num.stdout_lines | length | default("") }}'' CPUs are present.
 
 # Cpu0 of some OS doesn't have online. So we only check the other CPUs.
 - name: "Wait for {{ num_cpus }} CPUs ready"

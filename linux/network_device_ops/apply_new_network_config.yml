@@ -93,14 +93,28 @@
   when: guest_os_network_manager != "netplan"
 
 # Get IP address of new interface
-- name: "Get link '{{ new_network_adapter }}' status"
+- name: "Wait for network adapter '{{ new_network_adapter }}' IPv4 address"
   ansible.builtin.shell: "ip -br addr show {{ new_network_adapter }} | awk '{print $3}'"
   register: link_status
   changed_when: false
-  until: '"192.168" in link_status.stdout'
+  until:
+    - link_status is defined
+    - link_status.stdout is defined
+    - '"192.168" in link_status.stdout'
   retries: 20
   delay: 5
   delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: true
+
+- name: "Check network adapter '{{ new_network_adapter }}' IPv4 address"
+  ansible.builtin.assert:
+    that:
+      - link_status is defined
+      - link_status.stdout is defined
+      - '"192.168" in link_status.stdout'
+    fail_msg: >-
+      Network adapter '{{ new_network_adapter }}' failed to obtain IPv4 address after 100 seconds.
+      Its current IPv4 address is '{{ link_status.stdout | default("") }}'.
 
 - name: "Print the new networ adapter IP address"
   ansible.builtin.debug: var=link_status

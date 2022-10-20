@@ -138,9 +138,17 @@
 
     # Collect cloud-init logs for deploying Ubuntu and Photon OVA
     - include_tasks: ../../common/vm_get_power_state.yml
-    - block:
+    - name: "Collect cloud-init logs"
+      block:
         - include_tasks: ../../common/vm_get_vmtools_status.yml
+          vars:
+            get_vmtools_status_retries: 10
         - include_tasks: ../utils/collect_cloudinit_logs.yml
+          when:
+            - vmtools_is_installed is defined
+            - vmtools_is_installed
+            - vmtools_is_running is defined
+            - vmtools_is_running
       when:
         - vm_power_state_get is defined
         - vm_power_state_get == "poweredOn"

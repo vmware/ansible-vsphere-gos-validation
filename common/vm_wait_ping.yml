@@ -11,12 +11,28 @@
     msg: "Please specify the 'vm_wait_ping_ip' parameter when calling this task"
   when: vm_wait_ping_ip is undefined
 
+- name: "Initialize the timeout seconds to wait for ping IP address successfully"
+  ansible.builtin.set_fact:
+    vm_wait_ping_timeout: 900
+  when: vm_wait_ping_timeout is undefined or not vm_wait_ping_timeout
+
 - name: "Try to ping IP"
-  ansible.builtin.command: ping -c 5 "{{ vm_wait_ping_ip }}"
+  ansible.builtin.command: "ping -c 5 {{ vm_wait_ping_ip }}"
   register: vm_wait_ping_result
   until: vm_wait_ping_result.rc == 0
   delay: 5
-  retries: "{{ ((vm_wait_ping_timeout | default(900) | int) / 5) | int }}"
+  retries: "{{ ((vm_wait_ping_timeout | int) / 5) | int }}"
   changed_when: false
+  ignore_errors: true
+
+- name: "Check ping IP address {{ vm_wait_ping_ip }} is successful"
+  ansible.builtin.assert:
+    that:
+      - vm_wait_ping_result is defined
+      - vm_wait_ping_result.rc is defined
+      - vm_wait_ping_result.rc == 0
+    fail_msg: >-
+      Pinging IP address {{ vm_wait_ping_ip }} failed in {{ vm_wait_ping_timeout }} seconds.
+
 - ansible.builtin.debug: var=vm_wait_ping_result
   when: enable_debug is defined and enable_debug

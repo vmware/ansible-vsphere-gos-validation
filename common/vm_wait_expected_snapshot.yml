@@ -7,7 +7,12 @@
 #   expected_snapshot_wait_time (optional): the time in seconds to wait for
 #     expected snapshot, default value is 30.
 #
-- name: "Get snapshot facts until current is '{{ expected_snapshot_name }}'"
+- name: "Initialize the timeout seconds for waiting expected snapshot"
+  ansible.builtin.set_fact:
+    expected_snapshot_wait_time: 30
+  when: expected_snapshot_wait_time is undefined or not expected_snapshot_wait_time
+
+- name: "Wait for current snapshot becomes '{{ expected_snapshot_name }}'"
   community.vmware.vmware_guest_snapshot_info:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -18,13 +23,23 @@
     name: "{{ vm_name }}"
   register: vm_snapshot_facts
   until:
-    - vm_snapshot_facts is defined
-    - vm_snapshot_facts.guest_snapshots is defined
-    - vm_snapshot_facts.guest_snapshots.current_snapshot is defined
-    - vm_snapshot_facts.guest_snapshots.current_snapshot.name == expected_snapshot_name
-  retries: "{{ (expected_snapshot_wait_time | default(30) | int / 3) | int }}"
+    - vm_snapshot_facts.guest_snapshots.current_snapshot.name | default('') == expected_snapshot_name
+  retries: "{{ (expected_snapshot_wait_time | int / 3) | int }}"
   delay: 3
+  ignore_errors: true
 
-- name: Display the snapshot facts
+- name: "Display the snapshot facts"
   ansible.builtin.debug: var=vm_snapshot_facts
   when: enable_debug is defined and enable_debug
+
+- name: "Check current snapshot name is {{ expected_snapshot_name }}"
+  ansible.builtin.assert:
+    that:
+      - vm_snapshot_facts is defined
+      - vm_snapshot_facts.guest_snapshots is defined
+      - vm_snapshot_facts.guest_snapshots.current_snapshot is defined
+      - vm_snapshot_facts.guest_snapshots.current_snapshot.name == expected_snapshot_name
+    fail_msg: >-
+      It's timed out to wait for current snapshot becoming expected '{{ expected_snapshot_name }}'
+      in {{ expected_snapshot_wait_time }} seconds.
+      Current snapshot name is '{{ vm_snapshot_facts.guest_snapshots.current_snapshot.name | default("") }}'.

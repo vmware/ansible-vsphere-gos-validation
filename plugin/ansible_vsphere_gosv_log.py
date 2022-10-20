@@ -36,6 +36,43 @@ if sys.version_info.major == 2:
 else:
     importlib.reload(sys)
 
+"""_summary_
+Extract error message from task result
+"""
+def extract_error_msg(json_obj):
+    message = ''
+    try:
+        for key, value in json_obj.items():
+            if key == 'msg':
+                if isinstance(value, str):
+                    message += value.strip()
+                    # Extract stderr or stdout from command output when rc != 0
+                    if 'non-zero return code' in value:
+                        if 'rc' in json_obj and str(json_obj['rc']) != '':
+                            message += ': ' + str(json_obj['rc'])
+                        if 'stderr_lines' in json_obj and len(json_obj['stderr_lines']) > 0:
+                            json_obj['stderr_lines'].remove("")
+                            message += '\n' + '\n'.join(json_obj['stderr_lines']).strip()
+                        elif 'stdout_lines' in json_obj and len(json_obj['stdout_lines']) > 0:
+                            json_obj['stdout_lines'].remove("")
+                            message += '\n' + '\n'.join(json_obj['stdout_lines']).strip()
+
+                elif isinstance(value, list):
+                    message += '\n'.join(value)
+                elif isinstance(value, dict):
+                    message += extract_error_msg(value)
+                else:
+                    message += str(value).strip()
+
+                if message != '' and not message.endswith('\n'):
+                    message += '\n'
+
+    except TypeError as e:
+        print("Failed to extract msg from below text as it is not in json format.\n" + str(e))
+        pass
+
+    return message
+
 class VmInfo(object):
     def __init__(self, vm_name):
         self.Name = vm_name
@@ -324,10 +361,10 @@ class CallbackModule(CallbackBase):
         if task_path:
             task_banner += "task path: {}\n".format(task_path)
 
-        msg = ""
+        task_details = ""
         # Print task banner if the task is changed
         if self._last_task_uuid != task._uuid:
-            msg += task_banner
+            task_details += task_banner
 
             # Update last task uuid
             self._last_task_uuid = result._task._uuid
@@ -336,8 +373,8 @@ class CallbackModule(CallbackBase):
         if task_status == "failed":
            e_traceback = self._get_exception_traceback(result._result)
            if e_traceback:
-               msg += str(e_traceback)
-               msg += "\n"
+               task_details += str(e_traceback)
+               task_details += "\n"
 
         if delegated_vars:
             result_host = "[{} -> {}]".format(result._host.get_name(), delegated_vars['ansible_host'])
@@ -347,32 +384,32 @@ class CallbackModule(CallbackBase):
         log_failed_tasks = False
         # Log task result facts
         if task_status == "ok":
-            msg += "ok: {}".format(result_host)
+            task_details += "ok: {}".format(result_host)
         elif task_status == "changed":
-            msg += "changed: {}".format(result_host)
+            task_details += "changed: {}".format(result_host)
         elif task_status == "failed":
             if result._task.loop:
-                msg += "failed: {}".format(result_host)
+                task_details += "failed: {}".format(result_host)
             else:
-                msg += "fatal: {}: FAILED!".format(result_host)
+                task_details += "fatal: {}: FAILED!".format(result_host)
             log_failed_tasks = True
         elif task_status == "unreachable":
-            msg += "fatal: {}: UNREACHABLE!".format(result_host)
+            task_details += "fatal: {}: UNREACHABLE!".format(result_host)
             log_failed_tasks = True
         elif task_status == "skipped":
-            msg += "skipping: {}".format(result_host)
+            task_details += "skipping: {}".format(result_host)
         else:
-            msg += result_host
+            task_details += result_host
 
         if result._task.loop:
-            msg += " => (item={})".format(loop_item)
+            task_details += " => (item={})".format(loop_item)
             if result._task._attributes['ignore_errors']:
                 ignore_errors = True
 
-        msg += " => {}".format(self._dump_results(result._result, indent=4))
+        task_details += " => {}".format(self._dump_results(result._result, indent=4))
 
         if ignore_errors:
-            msg += "\n...ignoring"
+            task_details += "\n...ignoring"
             log_failed_tasks = False
 
         if 'known_issue' in str(task_tags) and 'msg' in result._result:
@@ -398,15 +435,20 @@ class CallbackModule(CallbackBase):
             # in self.failed_tasks_log as well
             if task_path and task_path not in self._play_tasks_cache['failed']:
                 self._play_tasks_cache['failed'].append(task_path)
-                if task_path not in msg:
+                if task_path not in task_details:
                     log_header += task_banner
 
             if log_header:
                 self.write_to_logfile(self.failed_tasks_log, log_header)
 
+            # Extract error messages from task result and print it after task details
+            result_in_json = json.loads(self._dump_results(result._result, indent=4))
+            error_msg = extract_error_msg(result_in_json)
+            task_details += "\nerror message:\n" + error_msg
+
             self.add_logger_file_handler(self.failed_tasks_log)
 
-        self.logger.info(msg)
+        self.logger.info(task_details)
 
         # Remove logger handler for known issues and failed tasks
         if 'known_issue' in str(task_tags) and 'msg' in result._result:
@@ -700,36 +742,37 @@ class CallbackModule(CallbackBase):
 
         if str(task.action) == "ansible.builtin.set_fact":
             set_fact_result = task_result.get('ansible_facts', None)
-            # Update deploy_vm test case name if deploy_casename is set
-            if self._last_test_name and self._last_test_name.startswith("deploy"):
-                deploy_casename = set_fact_result.get("deploy_casename", None)
-                if self._last_test_name in self.testcases and deploy_casename:
-                    old_test_name = self._last_test_name
-                    self._last_test_name = deploy_casename
-                    self.testcases[self._last_test_name] = self.testcases[old_test_name]
-                    del self.testcases[old_test_name]
-                    self.testcases.move_to_end(self._last_test_name, last=False)
-            if "get_windows_system_info.yml" == task_file or "get_linux_system_info.yml" == task_file:
-                vm_guest_os_distribution = set_fact_result.get("vm_guest_os_distribution", None)
-                if vm_guest_os_distribution and self.vm_info:
-                    self.vm_info.Guest_OS_Distribution = vm_guest_os_distribution
-            if "vm_get_vm_info.yml" == task_file:
-               if self.vm_info:
-                   self.vm_info.Config_Guest_Id = set_fact_result.get("vm_guest_id", '')
-                   self.vm_info.Hardware_Version = set_fact_result.get("vm_hardware_version", '')
-            if "vm_upgrade_hardware_version.yml" == task_file:
-               if self.vm_info:
-                   self.vm_info.Hardware_Version = set_fact_result.get("vm_hardware_version", '')
-            if "vm_get_guest_info.yml" == task_file:
-               if self.vm_info:
-                   self.vm_info.GuestInfo_Guest_Id = set_fact_result.get("guestinfo_guest_id", '')
-                   self.vm_info.GuestInfo_Guest_Full_Name = set_fact_result.get("guestinfo_guest_full_name", '')
-                   self.vm_info.GuestInfo_Guest_Family = set_fact_result.get("guestinfo_guest_family", '')
-                   self.vm_info.GuestInfo_Detailed_Data = set_fact_result.get("guestinfo_detailed_data", '')
-                   self.vm_info.VMTools_Version = set_fact_result.get("guestinfo_vmtools_info", '')
-            if "check_guest_os_gui.yml" == task_file:
-               if self.vm_info:
-                   self.vm_info.GUI_Installed = str(set_fact_result.get("guest_os_with_gui", ''))
+            if set_fact_result:
+                # Update deploy_vm test case name if deploy_casename is set
+                if self._last_test_name and self._last_test_name.startswith("deploy"):
+                    deploy_casename = set_fact_result.get("deploy_casename", None)
+                    if self._last_test_name in self.testcases and deploy_casename:
+                        old_test_name = self._last_test_name
+                        self._last_test_name = deploy_casename
+                        self.testcases[self._last_test_name] = self.testcases[old_test_name]
+                        del self.testcases[old_test_name]
+                        self.testcases.move_to_end(self._last_test_name, last=False)
+                if "get_windows_system_info.yml" == task_file or "get_linux_system_info.yml" == task_file:
+                    vm_guest_os_distribution = set_fact_result.get("vm_guest_os_distribution", None)
+                    if vm_guest_os_distribution and self.vm_info:
+                        self.vm_info.Guest_OS_Distribution = vm_guest_os_distribution
+                if "vm_get_vm_info.yml" == task_file:
+                   if self.vm_info:
+                       self.vm_info.Config_Guest_Id = set_fact_result.get("vm_guest_id", '')
+                       self.vm_info.Hardware_Version = set_fact_result.get("vm_hardware_version", '')
+                if "vm_upgrade_hardware_version.yml" == task_file:
+                   if self.vm_info:
+                       self.vm_info.Hardware_Version = set_fact_result.get("vm_hardware_version", '')
+                if "vm_get_guest_info.yml" == task_file:
+                   if self.vm_info:
+                       self.vm_info.GuestInfo_Guest_Id = set_fact_result.get("guestinfo_guest_id", '')
+                       self.vm_info.GuestInfo_Guest_Full_Name = set_fact_result.get("guestinfo_guest_full_name", '')
+                       self.vm_info.GuestInfo_Guest_Family = set_fact_result.get("guestinfo_guest_family", '')
+                       self.vm_info.GuestInfo_Detailed_Data = set_fact_result.get("guestinfo_detailed_data", '')
+                       self.vm_info.VMTools_Version = set_fact_result.get("guestinfo_vmtools_info", '')
+                if "check_guest_os_gui.yml" == task_file:
+                   if self.vm_info:
+                       self.vm_info.GUI_Installed = str(set_fact_result.get("guest_os_with_gui", ''))
 
         elif str(task.action) == "ansible.builtin.debug":
             if "skip_test_case.yml" == task_file and "Skip testcase:" in task.name:
