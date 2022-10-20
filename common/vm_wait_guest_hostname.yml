@@ -31,7 +31,7 @@
     schema: "vsphere"
     properties: ['guest.toolsRunningStatus', 'guest.hostName']
   delay: 5
-  retries: "{{ ((vm_get_hostname_timeout | default(300) | int) / 5) | int }}"
+  retries: "{{ ((vm_get_hostname_timeout | int) / 5) | int }}"
   register: vm_guest_facts
   until:
     - vm_guest_facts.instance.guest.toolsRunningStatus | default('') == "guestToolsRunning"
@@ -41,7 +41,7 @@
 
 - name: "Display the retrieved guest info"
   ansible.builtin.debug: var=vm_guest_facts
-  when: enable_debug | default(false)
+  when: enable_debug
 
 - name: "Check VMware Tools collected guest OS hostname successfully"
   ansible.builtin.assert:
