@@ -8,7 +8,7 @@
 ```
 $ pip install -r requirements.txt
 ```
-3. Install required Ansible collections in requirements.yml
+3. Install required Ansible collections with latest version in requirements.yml
 ```
 $ ansible-galaxy install -r requirements.yml
 ```
