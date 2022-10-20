@@ -51,10 +51,12 @@ def extract_error_msg(json_obj):
                         if 'rc' in json_obj and str(json_obj['rc']) != '':
                             message += ': ' + str(json_obj['rc'])
                         if 'stderr_lines' in json_obj and len(json_obj['stderr_lines']) > 0:
-                            json_obj['stderr_lines'].remove("")
+                            if "" in json_obj['stderr_lines']:
+                                json_obj['stderr_lines'].remove("")
                             message += '\n' + '\n'.join(json_obj['stderr_lines']).strip()
                         elif 'stdout_lines' in json_obj and len(json_obj['stdout_lines']) > 0:
-                            json_obj['stdout_lines'].remove("")
+                            if "" in json_obj['stderr_lines']:
+                                json_obj['stdout_lines'].remove("")
                             message += '\n' + '\n'.join(json_obj['stdout_lines']).strip()
 
                 elif isinstance(value, list):
