@@ -104,30 +104,42 @@
   when: guest_os_ansible_distribution in ["CentOS", "Rocky"]
 
 - block:
-    - name: "Set default online repository for OracleLinux {{ guest_os_ansible_distribution_ver }}"
+    - name: "Set Oracle Linux online repository website"
       ansible.builtin.set_fact:
-        online_repos:
-          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_u{{ guest_os_ansible_distribution_minor_ver }}_base"
-            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL7/{{ guest_os_ansible_distribution_minor_ver | int }}/base/$basearch/"
-          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_UEKR3"
-            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL7/UEKR3/$basearch/"
-          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_UEKR4"
-            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL7/UEKR4/$basearch/"
-          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_UEKR5"
-            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL7/UEKR5/$basearch/"
-          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_UEKR6"
-            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL7/UEKR6/$basearch/"
-      when: guest_os_ansible_distribution_major_ver | int < 8
+        oraclelinux_repo_url: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL{{ guest_os_ansible_distribution_major_ver }}"
 
     - name: "Set default online repository for OracleLinux {{ guest_os_ansible_distribution_ver }}"
       ansible.builtin.set_fact:
         online_repos:
-          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_u{{ guest_os_ansible_distribution_minor_ver }}_BaseOS"
-            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL8/{{ guest_os_ansible_distribution_minor_ver | int }}/baseos/base//$basearch/"
-          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_AppStream"
-            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL8/appstream/$basearch/"
+          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_u{{ guest_os_ansible_distribution_minor_ver }}_base"
+            baseurl: "{{ oraclelinux_repo_url }}/{{ guest_os_ansible_distribution_minor_ver | int }}/base/$basearch/"
+          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_UEKR3"
+            baseurl: "{{ oraclelinux_repo_url }}/UEKR3/$basearch/"
+          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_UEKR4"
+            baseurl: "{{ oraclelinux_repo_url }}/UEKR4/$basearch/"
+          - name: "ol{{ guest_os_ansible_distribution_major_ver }}_UEKR5"
+            baseurl: "{{ oraclelinux_repo_url }}/UEKR5/$basearch/"
           - name: "ol{{ guest_os_ansible_distribution_major_ver }}_UEKR6"
-            baseurl: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL8/UEKR6/$basearch/"
+            baseurl: "{{ oraclelinux_repo_url }}/UEKR6/$basearch/"
+      when: guest_os_ansible_distribution_major_ver | int == 7
+
+    - name: "Set default online repository for OracleLinux {{ guest_os_ansible_distribution_ver }}"
+      block:
+        - name: "Set default UEK release packaged in OracleLinux {{ guest_os_ansible_distribution_ver }}"
+          ansible.builtin.set_fact:
+            oraclelinux_uek_release: |-
+              {%- if guest_os_ansible_distribution_major_ver == 8 -%}UEKR6
+              {%- else -%}UEKR7{%- endif -%}
+
+        - name: "Set default online repository for OracleLinux {{ guest_os_ansible_distribution_ver }}"
+          ansible.builtin.set_fact:
+            online_repos:
+              - name: "ol{{ guest_os_ansible_distribution_major_ver }}_u{{ guest_os_ansible_distribution_minor_ver }}_BaseOS"
+                baseurl: "{{ oraclelinux_repo_url }}/{{ guest_os_ansible_distribution_minor_ver | int }}/baseos/base/$basearch/"
+              - name: "ol{{ guest_os_ansible_distribution_major_ver }}_AppStream"
+                baseurl: "{{ oraclelinux_repo_url }}/appstream/$basearch/"
+              - name: "ol{{ guest_os_ansible_distribution_major_ver }}_{{ oraclelinux_uek_release }}"
+                baseurl: "{{ oraclelinux_repo_url }}/{{ oraclelinux_uek_release }}/$basearch/"
       when: guest_os_ansible_distribution_major_ver | int >= 8
 
     - include_tasks: add_repo_from_baseurl.yml
