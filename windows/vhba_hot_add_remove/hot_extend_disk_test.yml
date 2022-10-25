@@ -30,13 +30,36 @@
     seconds: 10
 
 # Get disk size in guest OS after hot extend
-# By default the hotadded disk above is 'disk 1' in guest OS
 - include_tasks: ../utils/win_get_disk_size.yml
   vars:
-    win_disk_num: 1
+    win_disk_uid: "{{ win_disk_unique_id }}"
 - name: "Set fact of disk size after extend"
   ansible.builtin.set_fact:
     win_disk_size_after: "{{ win_get_disk_size_gb }}"
+
+- block:
+    - name: "Known issue - workaround of hot extend NVMe disk size"
+      ansible.builtin.debug:
+        msg:
+          - "Hot extended NVMe disk size is not recognized in Windows guest when NVMe Spec v1.3 is emulated. Ignore this known issue on ESXi version <= 8.0 GA build 20513097."
+          - "Restart guest OS as a workaround for hot extend NVMe disk size."
+      tags:
+        - known_issue
+    - include_tasks: ../utils/win_shutdown_restart.yml
+      vars:
+        set_win_power_state: "restart"
+    - include_tasks: ../utils/win_get_disk_size.yml
+      vars:
+        win_disk_uid: "{{ win_disk_unique_id }}"
+    - name: "Set fact of disk size after extend"
+      ansible.builtin.set_fact:
+        win_disk_size_after: "{{ win_get_disk_size_gb }}"
+  when:
+    - esxi_version is defined and esxi_version
+    - esxi_build is defined and esxi_build
+    - esxi_version is version('8.0.0', '<') or (esxi_version is version('8.0.0', '=') and esxi_build | int <= 20513097)
+    - win_disk_size_after | int == win_disk_volume_size_before | int
+
 - name: "Check disk size after hot extend"
   ansible.builtin.assert:
     that:
@@ -46,7 +69,7 @@
 # Extend disk volume to the new size
 - include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "Resize-Partition -DiskNumber 1 -PartitionNumber 1 -Size (Get-PartitionSupportedSize -DiskNumber 1).SizeMax"
+    win_powershell_cmd: "Resize-Partition -DriveLetter {{ drive_letter_new }} -PartitionNumber 1 -Size (Get-PartitionSupportedSize -DiskNumber 1).SizeMax"
 
 # Get disk volume size in guest OS after extend
 - include_tasks: ../utils/win_get_disk_volume_size.yml

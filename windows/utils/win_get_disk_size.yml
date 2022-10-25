@@ -1,21 +1,45 @@
 # Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get disk size in GB in Windows guest OS
+# Get disk size in GB in Windows guest OS.
+# One of parameters 'win_disk_num', 'win_disk_uid' must be set.
+# 'win_disk_num' takes precedence.
 # Parameters:
-#   win_disk_num: the disk number in guest OS,
-#     e.g., 0, 1, ...
+#   win_disk_num: the disk number in guest OS, e.g., 0, 1, ...
+#   win_disk_uid: the disk Unique ID in guest OS
 # Return:
 #   win_get_disk_size_gb
 #
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - win_disk_num is defined or win_disk_uid is defined
+    fail_msg: "win_disk_num or win_disk_uid parameter must be specified."
+
+- name: "Initialize the disk size to 0"
+  ansible.builtin.set_fact:
+    win_get_disk_size_gb: 0
+
+- name: "Set powershell command to get size of disk '{{ win_disk_num }}'"
+  ansible.builtin.set_fact:
+    win_cmd_disk_size: "[math]::Round(((Get-Disk -Number {{ win_disk_num | int }}).Size)/1GB)"
+  when: win_disk_num is defined
+
+- name: "Set powershell command to get size of disk '{{ win_disk_uid }}'"
+  ansible.builtin.set_fact:
+    win_cmd_disk_size: "[math]::Round(((Get-Disk -UniqueId {{ win_disk_uid }}).Size)/1GB)"
+  when: win_disk_num is undefined and win_disk_uid is defined
+
 - include_tasks: win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "[math]::Round(((Get-Disk -Number {{ win_disk_num | int }}).Size)/1GB)"
+    win_powershell_cmd: "{{ win_cmd_disk_size }}"
 
-- name: Set fact of the disk size
+- name: "Set fact of the disk size"
   ansible.builtin.set_fact:
     win_get_disk_size_gb: "{{ win_powershell_cmd_output.stdout_lines[0] | int }}"
   when:
+    - win_powershell_cmd_output.stdout_lines is defined
     - win_powershell_cmd_output.stdout_lines | length != 0
-- ansible.builtin.debug:
-    msg: "Get disk '{{ win_disk_num }}' size in guest OS: {{ win_get_disk_size_gb }}"
+- name: "Display the disk size"
+  ansible.builtin.debug:
+    msg: "Get disk '{{ win_disk_uid if win_disk_uid is defined else win_disk_num }}' size in guest OS: {{ win_get_disk_size_gb }}"
