@@ -25,13 +25,37 @@
     src_file_path: "{{  seed_iso_path }}"
     dest_file_path: "{{ vm_dir_name }}/{{ seed_iso_path | basename }}"
 
+- name: "Initialize CDROM device for attaching seed.iso"
+  ansible.builtin.set_fact:
+    vm_cdrom_controller_type: "sata"
+    vm_cdrom_controller_num: 0
+    vm_cdrom_unit_num: 0
+
+- include_tasks: ../../../common/vm_get_cdrom_devices.yml
+
+- name: "Set facts of existing CDROM devices count and SATA CDROM device"
+  ansible.builtin.set_fact:
+    vm_sata_cdrom: "{{ cdrom_device_list | selectattr('controller_label', 'match', 'SATA.*') }}"
+  when:
+    - cdrom_device_list is defined
+    - cdrom_device_list | length > 0
+
+- name: "Set CDROM device for attaching seed.iso"
+  ansible.builtin.set_fact:
+    vm_cdrom_controller_num: "{{ (vm_sata_cdrom | length) / 2 - 1 }}"
+    vm_cdrom_unit_num: "{{ (vm_sata_cdrom | length) % 2 }}"
+  when:
+    - vm_sata_cdrom is defined
+    - vm_sata_cdrom | length > 0
+
 # Attach seed ISO to Ubuntu Linux VM
 - include_tasks: ../../../common/vm_configure_cdrom.yml
   vars:
     cdrom_type: iso
     cdrom_iso_file: "{{ vm_files_path_ds }}/{{ seed_iso_path | basename }}"
-    cdrom_controller_num: 0
-    cdrom_unit_num: 0
+    cdrom_controller_type: "{{ vm_cdrom_controller_type }}"
+    cdrom_controller_num: "{{ vm_cdrom_controller_num }}"
+    cdrom_unit_num: "{{ vm_cdrom_unit_num }}"
 
 # Power on VM to update login information
 - include_tasks: ../../common/vm_set_power_state.yml
@@ -52,19 +76,39 @@
   vars:
     update_inventory_timeout: 300
 
-# Eject seed ISO from guest
+# Eject all ISOs from guest
 - name: "Eject seed ISO from Ubuntu Linux"
   include_tasks: ../../utils/eject_cdrom_in_guest.yml
-  vars:
-    guest_cdrom_device_num: 0
 
-# Disconnect seed ISO from Ubuntu Linux VM
-- name: "Change VM's CD/DVD Drive 1 to client device"
-  include_tasks: ../../../common/vm_configure_cdrom.yml
-  vars:
-    cdrom_type: client
-    cdrom_controller_num: 0
-    cdrom_unit_num: 0
+# Get all CDROM devices on the Ubuntu Linux VM
+- include_tasks: ../../../common/vm_get_cdrom_devices.yml
+
+# Disconnect all ISOs from Ubuntu Linux VM
+- name: "Disconnect all ISOs from Ubuntu Linux VM"
+  block:
+    - name: "Change VM's {{ vm_cdrom.label }} to client device"
+      include_tasks: ../../../common/vm_configure_cdrom.yml
+      vars:
+        cdrom_type: client
+        cdrom_controller_type: "{% if 'IDE' in vm_cdrom.controller_label %}ide{% else %}sata{% endif %}"
+        cdrom_controller_num: "{{ vm_cdrom.bus_num }}"
+        cdrom_unit_num: "{{ vm_cdrom.unit_num }}"
+      with_items: "{{ cdrom_device_list }}"
+      loop_control:
+        loop_var: vm_cdrom
+
+    - name: "Remove the new added SATA CDROM device"
+      include_tasks: ../../../common/vm_configure_cdrom.yml
+      vars:
+        cdrom_type: client
+        cdrom_controller_type: "{{ vm_cdrom_controller_type }}"
+        cdrom_controller_num: "{{ vm_cdrom_controller_num }}"
+        cdrom_unit_num: "{{ vm_cdrom_unit_num }}"
+        cdrom_state: absent
+      when: cdrom_device_list | length > 1
+  when:
+    - cdrom_device_list is defined
+    - cdrom_device_list | length > 0
 
 # Remove temporary folders
 - name: "Remove temporary directory {{ tmp_seed_dir }}"
