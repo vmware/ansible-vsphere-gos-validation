@@ -42,7 +42,7 @@
 
 - name: "Set CDROM device for attaching seed.iso"
   ansible.builtin.set_fact:
-    vm_cdrom_controller_num: "{{ (vm_sata_cdrom | length) / 2 - 1 }}"
+    vm_cdrom_controller_num: "{{ (vm_sata_cdrom | length) / 2 }}"
     vm_cdrom_unit_num: "{{ (vm_sata_cdrom | length) % 2 }}"
   when:
     - vm_sata_cdrom is defined
@@ -80,13 +80,22 @@
 - name: "Eject seed ISO from Ubuntu Linux"
   include_tasks: ../../utils/eject_cdrom_in_guest.yml
 
+# Remove temporary folders
+- name: "Remove temporary directory {{ tmp_seed_dir }}"
+  include_tasks: ../../../common/delete_local_file.yml
+  vars:
+    local_path: "{{ tmp_seed_dir }}"
+
+# Shutdown VM to reconfigure CDROMs and remove serial port
+- include_tasks: ../utils/shutdown.yml
+
 # Get all CDROM devices on the Ubuntu Linux VM
 - include_tasks: ../../../common/vm_get_cdrom_devices.yml
 
 # Disconnect all ISOs from Ubuntu Linux VM
 - name: "Disconnect all ISOs from Ubuntu Linux VM"
   block:
-    - name: "Change VM's {{ vm_cdrom.label }} to client device"
+    - name: "Change VM's CDROM to client device"
       include_tasks: ../../../common/vm_configure_cdrom.yml
       vars:
         cdrom_type: client
@@ -109,15 +118,6 @@
   when:
     - cdrom_device_list is defined
     - cdrom_device_list | length > 0
-
-# Remove temporary folders
-- name: "Remove temporary directory {{ tmp_seed_dir }}"
-  include_tasks: ../../../common/delete_local_file.yml
-  vars:
-    local_path: "{{ tmp_seed_dir }}"
-
-# Remove serial port
-- include_tasks: ../utils/shutdown.yml
 
 - name: "Remove serial port from VM"
   block:
