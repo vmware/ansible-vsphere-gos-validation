@@ -1,0 +1,45 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# This test case is testing guest OS in-place upgrade.
+# Covered scenarios:
+# 1. When there is no inbox pvscsi and vmxnet3 drivers in the OS upgraded from,
+# boot disk controller is not pvscsi, no vmxnet3 network adapter before upgrade.
+# 2. When there is inbox pvscsi and vmxnet3 drivers in the OS upgraded from,
+# boot disk controller is pvscsi, vmxnet3 network adatper also in the VM before upgrade.
+#
+# For other VM configurations, this test case will be skipped.
+#
+- name: gos_in_place_upgrade
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - name: "Test case block"
+      block:
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case due to new_vm is set to '{{ new_vm | default(false) }}'"
+            skip_reason: "No Run"
+          when: gos_in_place_upgrade_to_iso is undefined or gos_in_place_upgrade_to_iso == ""
+
+        - include_tasks: ../setup/test_setup.yml
+          vars:
+            skip_test_no_vmtools: true
+
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case due to VM is not 64 bit: {{ guest_os_ansible_architecture | default('NA') }}"
+            skip_reason: "Not Applicable"
+          when: guest_os_ansible_architecture is undefined or guest_os_ansible_architecture != "64-bit"
+
+        # Check configured upgrade to OS installation ISO image
+        - include_tasks: esxi_check_delete_datastore_file.yml
+          vars:
+            file_in_datastore: "{{ item.split(']')[0].strip('[]') }}"
+            file_in_datastore_path: "{{ item.split(']')[1].strip(' ') }}"
+            file_in_datastore_ops: "file"
+            file_in_datastore_ops_timeout: 600
+      rescue:
+        - include_tasks: ../../common/test_rescue.yml
