@@ -39,12 +39,19 @@ d-i clock-setup/utc boolean true
 ### step 6 Account setup
 d-i passwd/user-fullname string {{ new_user }}
 d-i passwd/username string {{ new_user }}
-d-i passwd/user-password password {{ vm_password_hash }}
-d-i passwd/user-password-again password {{ vm_password_hash }}
+# Normal user's password, either in clear text
+#d-i passwd/user-password password insecure
+#d-i passwd/user-password-again password insecure
+# or encrypted using an MD5 hash.
+#d-i passwd/user-password-crypted password [MD5 hash]
+d-i passwd/user-password password {{ vm_password }}
+d-i passwd/user-password-again password {{ vm_password }}
 d-i passwd/auto-login boolean true
 d-i user-setup/encrypt-home boolean false
 d-i passwd/root-login boolean true
-d-i passwd/root-password-crypted password {{ vm_password_hash }}
+d-i passwd/root-password password {{ vm_password }}
+d-i passwd/root-password-again password {{ vm_password }}
+#d-i passwd/root-password-crypted password {{ vm_password_hash }}
 d-i user-setup/allow-password-weak boolean true
 
 d-i pkgsel/language-packs multiselect en, zh
@@ -59,6 +66,7 @@ d-i pkgsel/updatedb boolean false
 d-i finish-install/keep-consoles boolean true
 
 # Bootloader
+
 # This is fairly safe to set, it makes grub install automatically to the MBR
 # if no other operating system is detected on the machine.
 d-i grub-installer/only_debian boolean true
