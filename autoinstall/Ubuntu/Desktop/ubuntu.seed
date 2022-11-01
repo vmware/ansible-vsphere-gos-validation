@@ -19,6 +19,8 @@ d-i keyboard-configuration/xkb-keymap select us
 # Step 3 install Mode
 ubiquity ubiquity/minimal_install boolean true
 ubiquity ubiquity/download_updates boolean false
+ubiquity/use_nonfree boolean false
+ubiquity/nonfree_package ubuntu-restricted-addons
 
 #step 4 disk
 ubiquity partman-auto/disk string /dev/sda
@@ -78,9 +80,11 @@ d-i grub-installer/with_other_os boolean true
 
 # Install package
 ubiquity ubiquity/success_command \
-    in-target  apt-get update -y; \
-    in-target apt-get install -y --force-yes cloud-init openssh-server
+    in-target apt-get update -y; \
+    in-target apt-get install -y --force-yes cloud-init openssh-server; \
 {% if new_user is defined and new_user != 'root' %}
+    in-target su root; \
+    in-target {{ vm_password }}\n; \
     echo '{{ new_user }} ALL=(ALL) NOPASSWD:ALL' >/target/etc/sudoers.d/{{ new_user }}; \
     mkdir -p -m 700 /target/home/{{ new_user }}/.ssh; \
     echo "{{ ssh_public_key }}" > /target/home/{{ new_user }}/.ssh/authorized_keys; \
