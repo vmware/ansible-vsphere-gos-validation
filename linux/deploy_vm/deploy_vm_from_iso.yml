@@ -144,24 +144,6 @@
            ('CentOS' in unattend_install_conf) or
            ('Fedora' in unattend_install_conf))
 
-    # For Ubuntu desktop 20.04.x and later, it stuck in install mode stage
-    # We click "Continue" to let autoinstall go on
-    - block:
-        - name: "Wait 360s for install mode stage"
-          ansible.builtin.pause:
-            seconds: 60
-
-        - include_tasks: ../../common/vm_guest_send_key.yml
-          vars:
-            keys_send:
-              - TAB
-              - TAB
-              - TAB
-              - ENTER
-      when:
-        - unattend_install_conf is defined
-        - unattend_install_conf is match('Ubuntu/Desktop')
-
     # Wait autoinstall complete message appear in serial port output file
     - include_tasks: ../../common/vm_wait_log_msg.yml
       vars:
@@ -169,7 +151,6 @@
         vm_wait_log_msg: "{{ autoinstall_complete_msg }}"
         vm_wait_log_delay: 30
         vm_wait_log_retries: 120
-
 
     - name: "Wait 60s for OS rebooting"
       ansible.builtin.pause:
