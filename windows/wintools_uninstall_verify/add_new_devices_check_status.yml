@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # For Windows guest OS, if there are inbox pvscsi and vmxnet3 drivers
-# after VMware tools uninstall, tools installed pvscsi driver (pvscsi
-# disk is not the boot disk) and vmxnet3 driver will be removed,
+# after VMware Tools uninstall, VMware Tools installed pvscsi driver
+# (pvscsi disk is not the boot disk) and vmxnet3 driver will be removed,
 # then the inbox drivers should be loaded successfully.
 #
 # Add a new pvscsi controller to VM
@@ -74,3 +74,25 @@
       - gos_has_problem_device is defined
       - not gos_has_problem_device
     fail_msg: "Problem devices were found on the system, please check listed problem devices: {{ gos_problem_device_list }}"
+
+# Get loaded pvscsi and vmxnet3 driver version
+- include_tasks: ../utils/win_get_device_driver.yml
+  vars:
+    device_desc_keyword: 'pvscsi'
+- name: "Set fact of the loaded pvscsi driver info"
+  ansible.builtin.set_fact:
+    win_pvscsi_before_uninstall: "{{ win_guest_device_driver }}"
+
+- include_tasks: ../utils/win_get_device_driver.yml
+  vars:
+    device_desc_keyword: 'vmxnet3'
+- name: "Set fact of the loaded vmxnet3 driver info"
+  ansible.builtin.set_fact:
+    win_vmxnet3_before_uninstall: "{{ win_guest_device_driver }}"
+
+- name: "Check pvscsi and vmxnet3 driver info retrieved"
+  ansible.builtin.assert:
+    that:
+      - win_pvscsi_before_uninstall | length != 0
+      - win_vmxnet3_before_uninstall | length != 0
+    fail_msg: "Not get loaded pvscsi driver info '{{ win_pvscsi_before_uninstall }}', or vmxnet3 driver info '{{ win_vmxnet3_before_uninstall }}' before uninstalling VMware Tools."
