@@ -20,9 +20,17 @@
       block:
         - include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Skip test case due to new_vm is set to '{{ new_vm | default(false) }}'"
+            skip_msg: "Skip test case due to gos_in_place_upgrade_to_iso is set to '{{ gos_in_place_upgrade_to_iso | default('') }}'"
             skip_reason: "No Run"
           when: gos_in_place_upgrade_to_iso is undefined or gos_in_place_upgrade_to_iso == ""
+
+          # Check configured upgrade to OS installation ISO image
+        - include_tasks: esxi_check_delete_datastore_file.yml
+          vars:
+            file_in_datastore: "{{ item.split(']')[0].strip('[]') }}"
+            file_in_datastore_path: "{{ item.split(']')[1].strip(' ') }}"
+            file_in_datastore_ops: "file"
+            file_in_datastore_ops_timeout: 600
 
         - include_tasks: ../setup/test_setup.yml
           vars:
@@ -33,13 +41,5 @@
             skip_msg: "Skip test case due to VM is not 64 bit: {{ guest_os_ansible_architecture | default('NA') }}"
             skip_reason: "Not Applicable"
           when: guest_os_ansible_architecture is undefined or guest_os_ansible_architecture != "64-bit"
-
-        # Check configured upgrade to OS installation ISO image
-        - include_tasks: esxi_check_delete_datastore_file.yml
-          vars:
-            file_in_datastore: "{{ item.split(']')[0].strip('[]') }}"
-            file_in_datastore_path: "{{ item.split(']')[1].strip(' ') }}"
-            file_in_datastore_ops: "file"
-            file_in_datastore_ops_timeout: 600
       rescue:
         - include_tasks: ../../common/test_rescue.yml
