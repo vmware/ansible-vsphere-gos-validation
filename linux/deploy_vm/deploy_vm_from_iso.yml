@@ -9,13 +9,6 @@
     network_adapter_type: "{{ network_adapter_type if (network_adapter_type is defined and network_adapter_type) else 'vmxnet3' }}"
     autoinstall_complete_msg: "Autoinstall is completed."
 
-- name: "Set autoinstall complete message for Ubuntu Desktop"
-  ansible.builtin.set_fact:
-    autoinstall_complete_msg: "ubuntu login:"
-  when: 
-    - unattend_install_conf is defined
-    - unattend_install_conf is match('Ubuntu/Desktop')
-
 - name: "Set CPU number to {{ cpu_cores_per_socket }}"
   ansible.builtin.set_fact:
     cpu_number: "{{ cpu_cores_per_socket }}"
@@ -151,6 +144,13 @@
            ('CentOS' in unattend_install_conf) or
            ('Fedora' in unattend_install_conf))
 
+    - name: "Set autoinstall complete message for Ubuntu Desktop"
+      ansible.builtin.set_fact:
+        autoinstall_complete_msg: "ubuntu login:"
+      when: 
+        - unattend_install_conf is defined
+        - unattend_install_conf is match('Ubuntu/Desktop')
+  
     # Wait autoinstall complete message appear in serial port output file
     - include_tasks: ../../common/vm_wait_log_msg.yml
       vars:
