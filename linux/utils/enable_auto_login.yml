@@ -1,7 +1,7 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Enable GNOME auto login for user
+# Enable auto login for user
 # Parameter:
 #   autologin_user: The username to auto login
 #   autologin_delay: (Optional)Time to wait before the user is auto logged in.
@@ -11,50 +11,60 @@
     autologin_delay: 0
   when: autologin_delay is undefined or not autologin_delay
 
-- name: "Initialize the variable for GNOME auto login"
+- name: "Initialize facts for enabling auto login"
   ansible.builtin.set_fact:
-    enable_gnome_autologin: true
+    enable_autologin: false
+    dm_conf_file: ""
 
-- name: "Get GNOME configuration file for {{ guest_os_ansible_distribution }}"
+- name: "Set GNOME configuration file path"
+  block:
+    - name: "Set GNOME configuration file for {{ guest_os_ansible_distribution }}"
+      ansible.builtin.set_fact:
+        dm_conf_path: "/etc/gdm/custom.conf"
+      when: guest_os_family == "RedHat"
+    
+    - name: "Set GNOME configuration file for {{ guest_os_ansible_distribution }}"
+      ansible.builtin.set_fact:
+        dm_conf_path: "/etc/sysconfig/displaymanager"
+      when: guest_os_family == "Suse"
+    
+    - name: "Set GNOME configuration file for Ubuntu"
+      ansible.builtin.set_fact:
+        dm_conf_path: "/etc/gdm3/custom.conf"
+      when: guest_os_ansible_distribution == "Ubuntu"
+    
+    - name: "Set GNOME configuration file for Debian"
+      ansible.builtin.set_fact:
+        dm_conf_path: "/etc/gdm3/daemon.conf"
+      when: guest_os_ansible_distribution == "Debian"
+  when: guest_os_display_manager == "gdm"
+
+- name: "Set LightDM configuration file path"
   ansible.builtin.set_fact:
-    gdm_conf_path: "/etc/gdm/custom.conf"
-  when: guest_os_family == "RedHat"
+    dm_conf_path: "/etc/lightdm/lightdm.conf"
+  when: guest_os_display_manager == "lightdm"
 
-- name: "Get GNOME configuration file for {{ guest_os_ansible_distribution }}"
-  ansible.builtin.set_fact:
-    gdm_conf_path: "/etc/sysconfig/displaymanager"
-  when: guest_os_family == "Suse"
-
-- name: "Get GNOME configuration file for Ubuntu"
-  ansible.builtin.set_fact:
-    gdm_conf_path: "/etc/gdm3/custom.conf"
-  when: guest_os_ansible_distribution == "Ubuntu"
-
-- name: "Get GNOME configuration file for Debian"
-  ansible.builtin.set_fact:
-    gdm_conf_path: "/etc/gdm3/daemon.conf"
-  when: guest_os_ansible_distribution == "Debian"
-
-- name: "Check GNOME configure file status"
+- name: "Check display manager configuration file status"
   ansible.builtin.stat:
-    path: "{{ gdm_conf_path }}"
-  register: gdm_stat_result
+    path: "{{ dm_conf_path }}"
+  register: dm_stat_result
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: "{{ gdm_conf_path }} doesn't exist. No auto login will be enabled"
+- name: "{{ dm_conf_path }} exists. Auto login can be enabled"
   ansible.builtin.set_fact:
-    enable_gnome_autologin: false
-  when: >
-    (gdm_stat_result.stat is undefined) or
-    (gdm_stat_result.stat.exists is undefined) or
-    (not gdm_stat_result.stat.exists)
+    enable_autologin: true
+  when:
+    - dm_stat_result is defined
+    - dm_stat_result.stat is defined
+    - dm_stat_result.stat.exists is defined
+    - dm_stat_result.stat.exists
 
-# Enable GNOME auto login for RHEL/CentOS/OracleLinux/Ubuntu/Debian
-- block:
-    # Update [daemon] section
-    - include_tasks: ../../common/update_ini_style_file.yml
+- name: "Enable auto login for user {{ autologin_user }}"
+  block:
+    - name: "Enable GNOME auto login for user {{ autologin_user }} in {{ guest_os_ansible_distribution }}"
+      include_tasks: ../../common/update_ini_style_file.yml
       vars:
-        file_path: "{{ gdm_conf_path }}"
+        file_path: "{{ dm_conf_path }}"
         section_name: "daemon"
         option_name: "{{ item[0] }}"
         option_value: "{{ item[1] }}"
@@ -62,23 +72,30 @@
         - ['AutomaticLogin', '{{ autologin_user }}']
         - ['AutomaticLoginEnable', 'True']
       when:
-        - gdm_stat_result.stat is defined
-        - gdm_stat_result.stat.exists is defined
-        - gdm_stat_result.stat.exists
-  when:
-    - guest_os_family in ["RedHat", "Debian"]
-    - enable_gnome_autologin is defined
-    - enable_gnome_autologin
-
-# Enable auto login for SLES/SLED
-- block:
+        - guest_os_display_manager == "gdm"
+        - guest_os_family in ["RedHat", "Debian"]
+    
+    # Enable auto login for SLES/SLED
     - name: "Enable GNOME autologin for {{ guest_os_ansible_distribution }}"
       include_tasks: replace_or_add_line_in_file.yml
       vars:
-        file: "{{ gdm_conf_path }}"
+        file: "{{ dm_conf_path }}"
         reg_exp: "DISPLAYMANAGER_AUTOLOGIN=.*"
         line_content: "DISPLAYMANAGER_AUTOLOGIN={{ autologin_user }}"
-  when:
-    - guest_os_ansible_distribution in ["SLES", "SLED"]
-    - enable_gnome_autologin is defined
-    - enable_gnome_autologin
+      when:
+        - guest_os_display_manager == "gdm"
+        - guest_os_ansible_distribution in ["SLES", "SLED"]
+
+    - name: "Enable LightDM autologin for {{ guest_os_ansible_distribution }}"
+      block:
+        - include_tasks: ../../common/update_ini_style_file.yml
+          vars:
+            file_path: "{{ dm_conf_path }}"
+            section_name: "Seat:*"
+            option_name: "{{ item[0] }}"
+            option_value: "{{ item[1] }}"
+          with_list:
+            - ['autologin-user', '{{ autologin_user }}']
+            - ['autologin-user-timeout', '{{ autologin_delay }}']
+      when: guest_os_display_manager == "lightdm"
+  when: enable_autologin
