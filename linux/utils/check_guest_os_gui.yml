@@ -23,7 +23,7 @@
     - xorg_result.rc is defined
     - xorg_result.rc  == 0
 
-- name: "Get guest OS display manager"
+- name: "Get guest OS display manager for {{ guest_os_ansible_distribution }}"
   block:
     - name: "Get guest OS display manager service detail"
       ansible.builtin.shell: "systemctl status display-manager.service"
@@ -44,7 +44,17 @@
         - display_manager_status is defined
         - display_manager_status.stdout_lines is defined
         - display_manager_status.stdout_lines | length > 0
-  when: guest_os_with_gui | bool
+  when:
+    - guest_os_with_gui | bool
+    - guest_os_ansible_distribution != 'Astra Linux (Orel)'
+
+
+- name: "Set fact of guest OS display manager for {{ guest_os_ansible_distribution }}"
+  ansible.builtin.set_fact:
+    guest_os_display_manager: "fly-dm"
+  when:
+    - guest_os_with_gui | bool
+    - guest_os_ansible_distribution == 'Astra Linux (Orel)'
 
 - ansible.builtin.debug:
     msg:

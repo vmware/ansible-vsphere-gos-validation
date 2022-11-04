@@ -44,6 +44,11 @@
     dm_conf_path: "/etc/lightdm/lightdm.conf"
   when: guest_os_display_manager == "lightdm"
 
+- name: "Set FLY-DM configuration file path"
+  ansible.builtin.set_fact:
+    dm_conf_path: "/etc/X11/fly-dm/fly-dmrc"
+  when: guest_os_display_manager == "fly-dm"
+
 - name: "Check display manager configuration file status"
   ansible.builtin.stat:
     path: "{{ dm_conf_path }}"
@@ -62,15 +67,16 @@
 - name: "Enable auto login for user {{ autologin_user }}"
   block:
     - name: "Enable GNOME auto login for user {{ autologin_user }} in {{ guest_os_ansible_distribution }}"
-      include_tasks: ../../common/update_ini_style_file.yml
-      vars:
-        file_path: "{{ dm_conf_path }}"
-        section_name: "daemon"
-        option_name: "{{ item[0] }}"
-        option_value: "{{ item[1] }}"
-      with_list:
-        - ['AutomaticLogin', '{{ autologin_user }}']
-        - ['AutomaticLoginEnable', 'True']
+      block:
+        - include_tasks: ../../common/update_ini_style_file.yml
+          vars:
+            file_path: "{{ dm_conf_path }}"
+            section_name: "daemon"
+            option_name: "{{ item[0] }}"
+            option_value: "{{ item[1] }}"
+          with_list:
+            - ["AutomaticLogin", "{{ autologin_user }}"]
+            - ["AutomaticLoginEnable", "True"]
       when:
         - guest_os_display_manager == "gdm"
         - guest_os_family in ["RedHat", "Debian"]
@@ -98,4 +104,17 @@
             - ['autologin-user', '{{ autologin_user }}']
             - ['autologin-user-timeout', '{{ autologin_delay }}']
       when: guest_os_display_manager == "lightdm"
+
+    - name: "Enable FLY-DM autologin for {{ guest_os_ansible_distribution }}"
+      block:
+        - include_tasks: ../../common/update_ini_style_file.yml
+          vars:
+            file_path: "{{ dm_conf_path }}"
+            section_name: "X-:0-Core"
+            option_name: "{{ item[0] }}"
+            option_value: "{{ item[1] }}"
+          with_items:
+            - ["AutoLoginEnable", "true"]
+            - ["AutoLoginUser", "{{ autologin_user }}"]
+      when: guest_os_display_manager == "fly-dm"
   when: enable_autologin
