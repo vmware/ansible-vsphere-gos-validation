@@ -6,6 +6,14 @@
 # (pvscsi disk is not the boot disk) and vmxnet3 driver will be removed,
 # then the inbox drivers should be loaded successfully.
 #
+# Get VM boot disk controller type
+- name: "Set fact of new created VM boot disk controller type"
+  ansible.builtin.set_fact:
+    win_boot_disk_ctl_type: "{{ boot_disk_controller | default('paravirtual') }}"
+  when: new_vm is defined and new_vm | bool
+- include_tasks: ../utils/win_get_boot_disk_ctl_type.yml
+  when: new_vm is undefined or not new_vm | bool
+
 # Add a new pvscsi controller to VM
 - include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
   vars:
@@ -90,9 +98,13 @@
   ansible.builtin.set_fact:
     win_vmxnet3_before_uninstall: "{{ win_guest_device_driver }}"
 
+# Get installed pvscsi and vmxnet3 installers info
+- include_tasks: ../utils/win_get_pvscsi_vmxnet3_installers.yml
+
 - name: "Check pvscsi and vmxnet3 driver info retrieved"
   ansible.builtin.assert:
     that:
       - win_pvscsi_before_uninstall | length != 0
       - win_vmxnet3_before_uninstall | length != 0
-    fail_msg: "Not get loaded pvscsi driver info '{{ win_pvscsi_before_uninstall }}', or vmxnet3 driver info '{{ win_vmxnet3_before_uninstall }}' before uninstalling VMware Tools."
+      - win_pvscsi_vmxnet3_installers | length == 2
+    fail_msg: "Not get loaded pvscsi driver info '{{ win_pvscsi_before_uninstall }}', or vmxnet3 driver info '{{ win_vmxnet3_before_uninstall }}', or pvscsi and vmxnet3 installers info '{{ win_pvscsi_vmxnet3_installers }}' before uninstalling VMware Tools."
