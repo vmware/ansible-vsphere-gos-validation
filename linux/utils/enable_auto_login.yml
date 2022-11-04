@@ -66,6 +66,13 @@
     dm_autologin_options:  {"autologin": "{{ autologin_user }}"}
   when: guest_os_display_manager == "lxdm"
 
+- name: "Set facts for enabling SDDM auto login"
+  ansible.builtin.set_fact:
+    dm_conf_path: "/etc/sddm.conf.d/autologin.conf"
+    dm_conf_section: "Autologin"
+    dm_autologin_options:  {"User": "{{ autologin_user }}"}
+  when: guest_os_display_manager == "sddm"
+
 - name: "Enable autologin in display manager config file path"
   block:
     - name: "Check display manager config file status"
@@ -94,7 +101,7 @@
                 option_name: "{{ item.key }}"
                 option_value: "{{ item.value }}"
               with_list: "{{ dm_autologin_options | dict2items }}"
-          when: guest_os_display_manager in ["gdm", "lightdm", "fly-dm", "lxdm"]
+          when: guest_os_display_manager in ["gdm", "lightdm", "fly-dm", "lxdm", "sddm"]
 
         # Enable auto login for SLES/SLED
         - name: "Enable auto login for user {{ autologin_user }} in {{ guest_os_ansible_distribution }}"
@@ -103,6 +110,8 @@
             file: "{{ dm_conf_path }}"
             reg_exp: "DISPLAYMANAGER_AUTOLOGIN=.*"
             line_content: "DISPLAYMANAGER_AUTOLOGIN={{ autologin_user }}"
-          when: guest_os_display_manager == "xdm"
+          when:
+            - guest_os_display_manager == "xdm"
+            - guest_os_family == "Suse"
       when: enable_autologin
   when: dm_conf_path
