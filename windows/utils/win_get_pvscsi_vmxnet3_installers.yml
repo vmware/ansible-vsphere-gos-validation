@@ -1,0 +1,37 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get pvscsi and vmxnet3 drivers installers info in Windows guest OS
+# Return:
+#   win_pvscsi_vmxnet3_installers: the dict of pvscsi and vmxnet3 drivers
+#   installers info
+#
+- name: "Initialize the installers info of pvscsi and vmxnet3 drivers"
+  ansible.builtin.set_fact:
+    win_pvscsi_vmxnet3_installers: {}
+
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-ItemPropertyValue -Path 'HKLM:\\System\\CurrentControlSet\\Services\\pvscsi' -Name 'vwdk.installers'"
+- name: "Set fact of the installers info of pvscsi driver"
+  ansible.builtin.set_fact:
+    win_pvscsi_vmxnet3_installers: "{{ win_pvscsi_vmxnet3_installers | combine({'pvscsi': win_powershell_cmd_output.stdout_lines | select}) }}"
+  when:
+    - win_powershell_cmd_output is defined
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-ItemPropertyValue -Path 'HKLM:\\System\\CurrentControlSet\\Services\\vmxnet3ndis6' -Name 'vwdk.installers'"
+- name: "Set fact of the installers info of vmxnet3 driver"
+  ansible.builtin.set_fact:
+    win_pvscsi_vmxnet3_installers: "{{ win_pvscsi_vmxnet3_installers | combine({'vmxnet3': win_powershell_cmd_output.stdout_lines | select}) }}"
+  when:
+    - win_powershell_cmd_output is defined
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+
+- name: "Display the installers info of pvscsi and vmxnet3 drivers"
+  ansible.builtin.debug:
+    msg: "Get the installers info of pvscsi and vmxnet3 drivers in guest OS: {{ win_pvscsi_vmxnet3_installers }}"

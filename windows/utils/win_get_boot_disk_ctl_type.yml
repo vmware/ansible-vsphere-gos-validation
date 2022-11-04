@@ -1,0 +1,52 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get boot disk controller type in Windows guest OS
+# Return:
+#   win_boot_disk_ctl_type: SAS, NVMe, SATA, PVSCSI, IDE
+#
+- name: "Initialize the boot disk variables"
+  ansible.builtin.set_fact:
+    win_boot_disk_ctl_type: ""
+
+# Get boot disk BusType firstly
+- include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-Disk | where-object {$_.IsBoot -eq $true}).BusType"
+- name: "Set fact of boot disk BusType"
+  ansible.builtin.set_fact:
+    win_boot_disk_ctl_type: "{{ (win_powershell_cmd_output.stdout_lines | select)[0].split(' ')[0].strip() }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length > 0
+
+- debug: var=win_boot_disk_ctl_type
+
+# LSILogicSAS and PVSCSI disks are all returned 'SAS' BusType above
+- name: "Get SAS disk controller name"
+  block:
+    - include_tasks: win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: >-
+          $disk_uid = ((Get-Disk | where-object {$_.IsBoot -eq $true}).UniqueId -split ':')[0] -replace '[\\]','\\';
+          $disk_ctl_id = ((Get-WmiObject Win32_SCSIControllerDevice | where-object {$_.Dependent -like "*$disk_uid*"}).Antecedent -split 'DeviceID=')[-1].trim('"');
+          (Get-WmiObject Win32_SCSIController | where-object {$_.DeviceId -eq ($disk_ctl_id -replace '\\\\','\')}).Name
+    - name: "Set fact of boot disk controller type to PVSCSI"
+      ansible.builtin.set_fact:
+        win_boot_disk_ctl_type: 'PVSCSI'
+      when:  
+        - win_powershell_cmd_output.stdout_lines is defined
+        - win_powershell_cmd_output.stdout_lines | length > 0
+        - "'PVSCSI' in win_powershell_cmd_output.stdout_lines[0]"
+  when: win_boot_disk_ctl_type == 'SAS'
+
+- name: "Check boot disk controller type"
+  ansible.builtin.assert:
+    that:
+      - win_boot_disk_ctl_type
+      - win_boot_disk_ctl_type in ['SAS', 'NVMe', 'SATA', 'PVSCSI']
+    fail_msg: "Boot disk controller: '{{ win_boot_disk_ctl_type }}', which is not in this known list ['SAS', 'NVMe', 'SATA', 'PVSCSI']."
+
+- name: "Display boot disk controller type"
+  ansible.builtin.debug:
+    msg: "Boot disk controller type got in guest OS: {{ win_boot_disk_ctl_type }}"
