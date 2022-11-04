@@ -34,12 +34,12 @@
 
     - name: "Set fact of guest OS display manager"
       ansible.builtin.set_fact:
-        guest_os_display_manager: >-
-          {{
-            display_manager_status.stdout_lines[0] | lower |
-            regex_search('\w*\.service', ignorecase=True) |
-            replace('.service', '')
-          }}
+        guest_os_display_manager: |-
+          {%- if "GNOME Display Manager" in display_manager_status.stdout_lines[0] -%}gdm
+          {%- elif "Light Display Manager" in display_manager_status.stdout_lines[0] -%}lightdm
+          {%- elif "X Display Manager" in display_manager_status.stdout_lines[0] -%}xdm
+          {%- elif "LXDE Display Manager" in display_manager_status.stdout_lines[0] -%}lxdm
+          {%- endif -%}
       when:
         - display_manager_status is defined
         - display_manager_status.stdout_lines is defined
