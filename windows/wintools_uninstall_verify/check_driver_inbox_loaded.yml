@@ -3,7 +3,7 @@
 ---
 # VMware tools will uninstall pvscsi and vmxnet3 drivers in below situations:
 # 1. pvscsi is not boot disk controller,
-# 2. pvscsi, vmxnet3 drivers' first installer is not "Windows".
+# 2. pvscsi, vmxnet3 drivers' first installer is not "Windows", is "MSI".
 # then if there are inbox pvscsi and vmxnet3 drivers, inbox drivers should be loaded
 #
 - include_tasks: ../utils/win_get_problem_device.yml
@@ -14,14 +14,16 @@
       ansible.builtin.debug:
         msg:
           - "Get problem device in guest OS: {{ gos_problem_device_list }}"
-          - "Inbox pvscsi driver is not loaded successfully after VMware Tools uninstall when boot disk controller is not pvscsi and pvscsi first installer is not 'Windows', ignore this known issue on VMware Tools 12.1.0 and earlier versions."
+          - "Inbox pvscsi driver is not loaded successfully after VMware Tools uninstall when boot disk controller is not pvscsi and pvscsi first installer is 'MSI', ignore this known issue on VMware Tools 12.1.0 and earlier versions."
       tags:
         - known_issue
       when:
         - vmtools_version is defined
         - vmtools_version is version('12.1.0', '<=')
         - gos_has_problem_device is defined and gos_has_problem_device
-     - block:
+
+    - name: "Check inbox pvscsi driver is loaded"
+      block:
          - include_tasks: ../utils/win_get_device_driver.yml
            vars:
             device_desc_keyword: 'pvscsi'
@@ -35,27 +37,30 @@
               - win_pvscsi_after_uninstall.Signer == "Microsoft Windows"
               - win_pvscsi_after_uninstall.DriverVersion is defined
               - win_pvscsi_after_uninstall.DriverVersion == '1.3.15.0'
-            fail_msg: "Loaded pvscsi driver '{{ win_pvscsi_before_uninstall }}', or vmxnet3 driver '{{ win_vmxnet3_before_uninstall }}' is not inbox driver after uninstalling VMware Tools."
+            fail_msg: "Loaded pvscsi driver '{{ win_pvscsi_after_uninstall }}' is not the inbox driver after VMware Tools uninstall."
+      when: >
+        (vmtools_version is undefined) or
+        (vmtools_version is version('12.1.0', '>'))
   when:
     - win_boot_disk_ctl_type != 'paravirtual'
-    - win_pvscsi_vmxnet3_installers.pvscsi is defined
-    - win_pvscsi_vmxnet3_installers.pvscsi | length > 0
-    - win_pvscsi_vmxnet3_installers.pvscsi[0] != 'Windows'
+    - win_pvscsi_vmxnet3_installers.pvscsi[0] == 'MSI'
 
 - name: "Handle vmxnet3 driver"
   block:
-    - name: "Known issue - ignore inbox drivers not loaded after VMware Tools uninstall"
+    - name: "Known issue - ignore inbox vmxnet3 driver not loaded after VMware Tools uninstall"
       ansible.builtin.debug:
         msg:
           - "Get problem device in guest OS: {{ gos_problem_device_list }}"
-          - "Inbox pvscsi or vmxnet3 drivers are not loaded successfully after VMware Tools uninstall, ignore this known issue on VMware Tools 12.1.0 and earlier versions."
+          - "Inbox vmxnet3 driver is not loaded successfully after VMware Tools uninstall when vmxnet3 first installer is 'MSI', ignore this known issue on VMware Tools 12.1.0 and earlier versions."
       tags:
         - known_issue
       when:
         - vmtools_version is defined
         - vmtools_version is version('12.1.0', '<=')
         - gos_has_problem_device is defined and gos_has_problem_device
-    - block:
+
+    - name: "Check inbox vmxnet3 driver is loaded"
+      block:
         - include_tasks: ../utils/win_get_device_driver.yml
           vars:
             device_desc_keyword: 'vmxnet3'
@@ -69,16 +74,19 @@
               - win_vmxnet3_after_uninstall.Signer == "Microsoft Windows"
               - win_vmxnet3_after_uninstall.DriverVersion is defined
               - win_vmxnet3_after_uninstall.DriverVersion == '1.8.17.0'
-            fail_msg: "Loaded pvscsi driver '{{ win_pvscsi_before_uninstall }}', or vmxnet3 driver '{{ win_vmxnet3_before_uninstall }}' is not inbox driver after uninstalling VMware Tools."
+            fail_msg: "Loaded vmxnet3 driver '{{ win_vmxnet3_after_uninstall }}' is not the inbox driver after VMware Tools uninstall."
+      when: >
+        (vmtools_version is undefined) or
+        (vmtools_version is version('12.1.0', '>'))
   when:
-    - win_pvscsi_vmxnet3_installers.vmxnet3 is defined
-    - win_pvscsi_vmxnet3_installers.vmxnet3 | length > 0
-    - win_pvscsi_vmxnet3_installers.vmxnet3[0] != 'Windows'
+    - win_pvscsi_vmxnet3_installers.vmxnet3[0] == 'MSI'
 
 - name: "Check no problem device listed"
   ansible.builtin.assert:
     that:
       - gos_has_problem_device is defined
       - not gos_has_problem_device
-    fail_msg: "Problem devices found in guest OS, please check listed problem devices: {{ gos_problem_device_list }}"
-  when: vmtools_version is undefined or vmtools_version is version('12.1.0', '>')
+    fail_msg: "Problem devices found in guest after VMware Tools uninstall, please check listed problem devices: {{ gos_problem_device_list }}"
+  when: >
+    (vmtools_version is undefined) or
+    (vmtools_version is version('12.1.0', '>'))

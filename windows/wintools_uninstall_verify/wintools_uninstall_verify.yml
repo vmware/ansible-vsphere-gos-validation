@@ -35,15 +35,14 @@
           when: not vmtools_is_running_before
 
         # Add a new pvscsi controller and vmxnet3 network adapter to the VM
-        # Will check no problem devices and inbox drviers loaded successfully
-        # after VMware Tools uninstall when there are inbox drivers
+        # when there are inbox drivers
         - include_tasks: add_new_devices_check_status.yml
           when:
             - guest_os_with_inbox_drivers is defined
-            - guest_os_with_inbox_drivers
+            - guest_os_with_inbox_drivers | bool
 
         - include_tasks: uninstall_vmtools.yml
-        - include_tasks: verify_vmtools_after_uninstall.yml
+        - include_tasks: verify_uninstall.yml
 
         - name: "Remove added network adapter, portgroup and vSwitch"
           block:
@@ -59,7 +58,7 @@
                 vswitch_name: "{{ new_device_vswitch }}"
           when:
             - guest_os_with_inbox_drivers is defined
-            - guest_os_with_inbox_drivers
+            - guest_os_with_inbox_drivers | bool
             - new_network_adapter_mac is defined and new_network_adapter_mac
       rescue:
         - include_tasks: ../../common/test_rescue.yml

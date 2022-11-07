@@ -81,7 +81,7 @@
     that:
       - gos_has_problem_device is defined
       - not gos_has_problem_device
-    fail_msg: "Problem devices were found on the system, please check listed problem devices: {{ gos_problem_device_list }}"
+    fail_msg: "Problem devices were found in guest before VMware Tools uninstall, please check listed problem devices: {{ gos_problem_device_list }}"
 
 # Get loaded pvscsi and vmxnet3 driver version
 - include_tasks: ../utils/win_get_device_driver.yml
@@ -104,7 +104,10 @@
 - name: "Check pvscsi and vmxnet3 driver info retrieved"
   ansible.builtin.assert:
     that:
-      - win_pvscsi_before_uninstall | length != 0
-      - win_vmxnet3_before_uninstall | length != 0
-      - win_pvscsi_vmxnet3_installers | length == 2
+      - win_pvscsi_before_uninstall | length > 0
+      - win_vmxnet3_before_uninstall | length > 0
+      - win_pvscsi_vmxnet3_installers.pvscsi is defined
+      - win_pvscsi_vmxnet3_installers.pvscsi | length > 0
+      - win_pvscsi_vmxnet3_installers.vmxnet3 is defined
+      - win_pvscsi_vmxnet3_installers.vmxnet3 | length > 0
     fail_msg: "Not get loaded pvscsi driver info '{{ win_pvscsi_before_uninstall }}', or vmxnet3 driver info '{{ win_vmxnet3_before_uninstall }}', or pvscsi and vmxnet3 installers info '{{ win_pvscsi_vmxnet3_installers }}' before uninstalling VMware Tools."
