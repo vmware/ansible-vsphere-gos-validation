@@ -9,17 +9,22 @@
 
 - name: "Handle known issue"
   block:
-    - name: "Known issue - ignore inbox vmxnet3 driver not loaded after VMware Tools uninstall"
+    - name: "Known issue - workaround of inbox vmxnet3 driver not loaded successfully after VMware Tools uninstall"
       ansible.builtin.debug:
         msg:
           - "Get problem device in guest OS: {{ gos_problem_device_list }}"
           - "Inbox vmxnet3 driver is not loaded successfully after VMware Tools uninstall when vmxnet3 first installer is 'MSI', ignore this known issue on VMware Tools 12.1.0 and earlier versions."
       tags:
         - known_issue
+    # Remove problem device and rescan devices to let it load again
+    - include_tasks: win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "foreach ($device in (Get-PnpDevice | where-object {$_.FriendlyName -like '*vmxnet3*'})){&pnputil /remove-device $device.InstanceId;&pnputil /scan-devices}"
   when:
     - vmtools_version is defined
     - vmtools_version is version('12.1.0', '<=')
     - gos_has_problem_device is defined and gos_has_problem_device
+    - (gos_problem_device_list | selectattr('device_name', 'match', 'vmxnet3*') | selectattr('problem_code', 'equalto', '19')) | length > 0
 
 - include_tasks: ../utils/win_get_device_driver.yml
   vars:
@@ -35,11 +40,3 @@
       - win_vmxnet3_after_uninstall.DriverVersion is defined
       - win_vmxnet3_after_uninstall.DriverVersion == '1.8.17.0'
     fail_msg: "Loaded vmxnet3 driver '{{ win_vmxnet3_after_uninstall }}' is not inbox driver after VMware Tools uninstall."
-
-- include_tasks: ../utils/win_get_problem_device.yml
-- name: "Check no problem device listed"
-  ansible.builtin.assert:
-    that:
-      - gos_has_problem_device is defined
-      - not gos_has_problem_device
-    fail_msg: "Problem devices found in guest after VMware Tools uninstall, please check listed problem devices: {{ gos_problem_device_list }}"
