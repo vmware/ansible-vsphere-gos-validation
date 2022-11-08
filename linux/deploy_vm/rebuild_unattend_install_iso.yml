@@ -75,13 +75,13 @@
     
     - name: "Update timeout for boot menu"
       ansible.builtin.replace:
-        path: "{{ unattend_iso_cache }}/isolinux.cfg"
+        path: "{{ src_iso_file_dir }}/isolinux.cfg"
         regexp: "timeout 0"
         replace: "timeout 1"
 
     - name: "Update boot menu with kickstart for Photon OS"
       ansible.builtin.replace:
-        path: "{{ unattend_iso_cache }}/{{ item }}"
+        path: "{{ src_iso_file_dir }}/{{ item }}"
         regexp: '(.*)(root=[^ ]+)(.*)'
         replace: "\\1\\2 ks=cdrom:/isolinux/{{ unattend_install_file_name }} \\3"
       with_items:
@@ -99,7 +99,7 @@
             dest_file: "boot/grub2/grub.cfg"
           - src_file: "{{ src_iso_file_dir }}/isolinux.cfg"
             dest_file: "isolinux/isolinux.cfg"
-          - src_file: "{{ unattend_install_conf }}"
+          - src_file: "{{ new_unattend_install_conf }}"
             dest_file: "isolinux/ks.cfg"
   when: unattend_install_conf is match('Photon')
 
@@ -116,7 +116,7 @@
 
     - name: "Update timeout for boot menu"
       ansible.builtin.replace:
-        path: "{{ unattend_iso_cache }}/isolinux.cfg"
+        path: "{{ src_iso_file_dir }}/isolinux.cfg"
         regexp: "timeout 0"
         replace: "timeout 1"
 
@@ -131,13 +131,13 @@
 
     - name: "Update timeout for boot menu"
       ansible.builtin.replace:
-        path: "{{ unattend_iso_cache }}/isolinux.cfg"
+        path: "{{ src_iso_file_dir }}/isolinux.cfg"
         regexp: "default .*"
         replace: "default installgui"
 
     - name: "Update Debian grub.cfg for autoinstall"
       ansible.builtin.blockinfile:
-        path: "{{ unattend_iso_cache }}/grub.cfg"
+        path: "{{ src_iso_file_dir }}/grub.cfg"
         block: |
           set default="autoinstall"
           set timeout=5
@@ -149,7 +149,7 @@
 
     - name: "Update boot menu with preseed.cfg for Debian"
       ansible.builtin.replace:
-        path: "{{ unattend_iso_cache }}/gtk.cfg"
+        path: "{{ src_iso_file_dir }}/gtk.cfg"
         regexp: '(.*)(initrd.gz )(.*)'
         replace: "\\1\\2 auto=true file=/cdrom/{{ unattend_install_file_name }} \\3"
 
@@ -161,7 +161,7 @@
         - "sed -i '#./boot/grub/grub.cfg#d' md5sum.txt"
         - "echo \"`md5sum grub.cfg | awk '{print $1}'` ./boot/grub/grub.cfg\" >>md5sum.txt"
       args:
-        chdir: "{{ unattend_iso_cache }}"
+        chdir: "{{ src_iso_file_dir }}"
       register: update_initrd_output
 
     - name: "Print command output for updating initrd"
