@@ -1,8 +1,11 @@
 # Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get the list of problem devices in Windows guest OS
-# This used '/enum-devices' parameter avaialble starting in Windows 10 v1903
+# Get the list of problem devices with 'Error' status in Windows guest OS
+# Change to not use this command "pnputil /enum-devices /problem",
+# due to it requires error code and this '/enum-devices' parameter
+# avaialble starting and works in Windows 10 v1903.
+# Change to use "Get-PnpDevice" command.
 #
 - name: "Initialize the problem device status"
   ansible.builtin.set_fact:
@@ -11,24 +14,25 @@
 
 - include_tasks: win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "pnputil /enum-devices /problem"
-  when:
-    - guest_os_ansible_distribution_major_ver is defined
-    - guest_os_ansible_distribution_major_ver | int >= 10
-    - guest_os_build_num is defined
-    - guest_os_build_num | int >= 18362
+    win_powershell_cmd: "foreach ($device in (Get-PnpDevice | where-object {$_.Status -eq 'Error'})){Write-Host $device.FriendlyName: -NoNewLine;(Get-PnpDeviceProperty -KeyName DEVPKEY_Device_ProblemCode -InstanceId $device.InstanceId).data}"
 
-- name: "Get problem device in guest OS"
-  ansible.builtin.set_fact:
-    gos_has_problem_device: true
-    gos_problem_device_list: "{{ win_powershell_cmd_output.stdout_lines }}"
+- name: "Got problem devices"
+  block:
+    - name: "Set fact of problem device list"
+      ansible.builtin.set_fact:
+        gos_problem_device_list: "{{ gos_problem_device_list + [{'device_name': item.split(':')[0].strip(), 'problem_code': item.split(':')[1].strip()}] }}"
+      when: item | length != 0
+      with_items: "{{ win_powershell_cmd_output.stdout_lines }}"
+    - name: "Set fact of having problem device"
+      ansible.builtin.set_fact:
+        gos_has_problem_device: true
+      when: gos_problem_device_list | length > 0
   when:
-    - win_powershell_cmd_output.stdout_lines | length > 1
-    - "'No devices were found' not in win_powershell_cmd_output.stdout"
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length > 0
 
 - name: "Display the result of getting problem device"
   ansible.builtin.debug:
     msg:
-      - "Got problem device: {{ gos_has_problem_device }}"
-      - "Problem device list: {{ gos_problem_device_list }}"
-  when: enable_debug
+      - "Got problem device with 'Error' status: {{ gos_has_problem_device }}"
+      - "'Error' status device list: {{ gos_problem_device_list }}"

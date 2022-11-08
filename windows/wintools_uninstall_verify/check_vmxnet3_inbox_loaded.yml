@@ -1,0 +1,45 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# VMware Tools will uninstall vmxnet3 driver when vmxnet3 driver's
+# first installer value is "MSI" not "Windows", then if there is inbox
+# vmxnet3 driver, inbox driver should be loaded successfully
+#
+- include_tasks: ../utils/win_get_problem_device.yml
+
+- name: "Handle known issue"
+  block:
+    - name: "Known issue - ignore inbox vmxnet3 driver not loaded after VMware Tools uninstall"
+      ansible.builtin.debug:
+        msg:
+          - "Get problem device in guest OS: {{ gos_problem_device_list }}"
+          - "Inbox vmxnet3 driver is not loaded successfully after VMware Tools uninstall when vmxnet3 first installer is 'MSI', ignore this known issue on VMware Tools 12.1.0 and earlier versions."
+      tags:
+        - known_issue
+  when:
+    - vmtools_version is defined
+    - vmtools_version is version('12.1.0', '<=')
+    - gos_has_problem_device is defined and gos_has_problem_device
+
+- include_tasks: ../utils/win_get_device_driver.yml
+  vars:
+    device_desc_keyword: 'vmxnet3'
+- name: "Set fact of the loaded vmxnet3 driver info"
+  ansible.builtin.set_fact:
+    win_vmxnet3_after_uninstall: "{{ win_guest_device_driver }}"
+- name: "Check vmxnet3 driver is the inbox one"
+  ansible.builtin.assert:
+    that:
+      - win_vmxnet3_after_uninstall.Signer is defined
+      - win_vmxnet3_after_uninstall.Signer == "Microsoft Windows"
+      - win_vmxnet3_after_uninstall.DriverVersion is defined
+      - win_vmxnet3_after_uninstall.DriverVersion == '1.8.17.0'
+    fail_msg: "Loaded vmxnet3 driver '{{ win_vmxnet3_after_uninstall }}' is not inbox driver after VMware Tools uninstall."
+
+- include_tasks: ../utils/win_get_problem_device.yml
+- name: "Check no problem device listed"
+  ansible.builtin.assert:
+    that:
+      - gos_has_problem_device is defined
+      - not gos_has_problem_device
+    fail_msg: "Problem devices found in guest after VMware Tools uninstall, please check listed problem devices: {{ gos_problem_device_list }}"
