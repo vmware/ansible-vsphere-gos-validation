@@ -1,0 +1,31 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Enable or disable nested virtualization on VM
+# Parameters:
+#   vm_nested_virt: true or false.
+# if set to true, will expose full CPU virtualization to the guest operating system
+#
+- name: "Check parameter"
+  ansible.builtin.assert:
+    that:
+      - vm_nested_virt is defined
+      - vm_nested_virt | type_debug == 'bool'
+    fail_msg: "Parameter vm_nested_virt is required and set to be a boolean."
+
+- name: Enable VM CPU Virtualization
+  community.vmware.vmware_guest:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(False) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    hardware:
+      nested_virt: "{{ vm_nested_virt }}"
+  register: vm_guest_facts
+
+- name: Display the enable cpu virtualization result
+  ansible.builtin.debug: var=vm_guest_facts
+  when: enable_debug is defined and enable_debug

@@ -1,0 +1,28 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the binary file from guest os to local and convert it to text format.
+# Parameters:
+#   source_path: the source file path on remote host
+#   file_name: source file name
+# Return:
+#   new_file: the text format file on local host
+
+- include_tasks: ../utils/win_get_file.yml
+  vars:
+    win_get_file_src_path: "{{ source_path }}"
+    win_get_file_dst_path: "{{ current_test_log_folder }}"
+
+- name: set the fact of file
+  ansible.builtin.set_fact:
+    src_file: "{{ fetch_file.dest }}"
+    wsl_new_file: "{{ current_test_log_folder }}/{{ file_name }}"
+
+- name: covert the binary file to text file
+  ansible.builtin.shell: "tr -d '\\0' < {{ src_file }} > {{ wsl_new_file }} "
+
+- name: Display new file content
+  ansible.builtin.shell: "cat {{ wsl_new_file }}"
+  when: enable_debug is defined and enable_debug
+
+
