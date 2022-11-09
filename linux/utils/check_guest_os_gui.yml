@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Check whether guest OS has desktop environment and
-# get display manager if deskotp environment is installed"
-- name: "Set fact of guest OS having desktop environment and display manager"
+# get display manager if deskotp environment is installed
+- name: "Initialize facts of guest OS having desktop environment and display manager"
   ansible.builtin.set_fact:
     guest_os_with_gui: false
     guest_os_display_manager: ""
@@ -21,7 +21,7 @@
   when:
     - xorg_result is defined
     - xorg_result.rc is defined
-    - xorg_result.rc  == 0
+    - xorg_result.rc == 0
 
 - name: "Get guest OS display manager for {{ guest_os_ansible_distribution }}"
   block:
@@ -43,6 +43,8 @@
           {%- endif -%}
       when:
         - display_manager_status is defined
+        - display_manager_status.rc is defined
+        - display_manager_status.rc == 0
         - display_manager_status.stdout_lines is defined
         - display_manager_status.stdout_lines | length > 0
   when:
