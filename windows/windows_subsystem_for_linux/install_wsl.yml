@@ -1,0 +1,22 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+# Install WSL
+# Parameters:
+#     wsl_file_path: the path on Guest OS where the wsl command output messages are put
+
+# Install distribution
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "wsl --install -d Ubuntu | Out-File -FilePath {{ wsl_file_path }}\\wsl_install.txt"
+
+- include_tasks: wsl_convert_binary_to_txt.yml
+  vars:
+    source_path: "{{ wsl_file_path }}\\wsl_install.txt"
+    file_name: "wsl_install.txt"
+
+- include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+
