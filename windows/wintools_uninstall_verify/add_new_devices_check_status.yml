@@ -1,19 +1,6 @@
 # Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Add a new pvscsi controller to VM
-- include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
-  vars:
-    disk_controller_ops: "present"
-    disk_controller_type: "paravirtual"
-- name: "Check add new pvscsi controller config changes"
-  ansible.builtin.assert:
-    that:
-      - disk_controller_facts is defined
-      - disk_controller_facts.changed
-    fail_msg: "Add new pvscsi controller task result 'changed' is not true."
-
-# Add a new vmxnet3 network adapter to VM
 - name: "Set fact of timestamp"
   ansible.builtin.set_fact:
     new_device_timestamp: "{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
@@ -35,6 +22,19 @@
     - new_portgroup is defined
     - new_portgroup.changed
 
+# Add a new pvscsi controller to VM
+- include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
+  vars:
+    disk_controller_ops: "present"
+    disk_controller_type: "paravirtual"
+- name: "Check add new pvscsi controller config changes"
+  ansible.builtin.assert:
+    that:
+      - disk_controller_facts is defined
+      - disk_controller_facts.changed
+    fail_msg: "Add new pvscsi controller task result 'changed' is not true."
+
+# Add a new vmxnet3 network adapter to VM
 - include_tasks: ../../common/vm_add_network_adapter.yml
   vars:
     adapter_type: "vmxnet3"
