@@ -54,7 +54,7 @@ d-i passwd/root-login boolean true
 d-i passwd/root-password-crypted password {{ vm_password_md5 }}
 d-i user-setup/allow-password-weak boolean true
 
-d-i pkgsel/include string build-essential vim locales cloud-init openssh-server
+#d-i pkgsel/include string build-essential vim locales cloud-init openssh-server
 d-i pkgsel/language-packs multiselect en, zh
 d-i pkgsel/update-policy select none 
 d-i pkgsel/upgrade select none
@@ -73,6 +73,8 @@ d-i grub-installer/only_debian boolean true
 
 # Install package
 ubiquity ubiquity/success_command \
+    in-target apt-get update -y; \
+    in-target apt-get install -y --force-yes build-essential vim locales cloud-init openssh-server; \
 {% if new_user is defined and new_user != 'root' %}
     in-target su root; \
     in-target echo "{{ vm_password }}"; \
