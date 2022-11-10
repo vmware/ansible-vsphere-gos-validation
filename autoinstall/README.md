@@ -14,7 +14,7 @@
 13. For Debian 10.1x or 11.x unattend auto-install, please use file Debian/10/preseed.cfg.
 14. For UnionTech OS Server 20 1050a unattend auto-install, please use file UOS/Server/20/1050a/ks.cfg.
 15. For UnionTech OS Server 20 1050e unattend auto-install, please use file UOS/Server/20/1050e/ks.cfg.
-16. For Fedora 36 or later unattend auto-install, please use file Fedora/36/ks.cfg.
+16. For Fedora 36 or later unattend auto-install, please use file Fedora/36/Server/ks.cfg.
 
 # Notes
 ## For Windows
