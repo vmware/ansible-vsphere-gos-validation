@@ -1,6 +1,13 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+# Check whether guest OS has desktop environment and
+# get display manager if deskotp environment is installed
+- name: "Initialize facts of guest OS having desktop environment and display manager"
+  ansible.builtin.set_fact:
+    guest_os_with_gui: false
+    guest_os_display_manager: ""
+
 # Set default guest_os_with_gui by checking Xorg exists or not
 - name: "Check Xorg exists or not"
   ansible.builtin.shell: "type Xorg"
@@ -8,9 +15,51 @@
   delegate_to: "{{ vm_guest_ip }}"
   register: xorg_result
 
-- name: "Set fact of guest OS with/without desktop experience"
+- name: "Set fact of guest OS having desktop environment"
   ansible.builtin.set_fact:
-    guest_os_with_gui: "{% if xorg_result.rc == 0 %}True{% else %}False{% endif %}"
+    guest_os_with_gui: true
+  when:
+    - xorg_result is defined
+    - xorg_result.rc is defined
+    - xorg_result.rc == 0
+
+- name: "Get guest OS display manager for {{ guest_os_ansible_distribution }}"
+  block:
+    - name: "Get guest OS display manager service detail"
+      ansible.builtin.shell: "systemctl status display-manager.service"
+      register: "display_manager_status"
+      changed_when: false
+      ignore_errors: true
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Set fact of guest OS display manager"
+      ansible.builtin.set_fact:
+        guest_os_display_manager: |-
+          {%- if "GNOME Display Manager" in display_manager_status.stdout_lines[0] -%}gdm
+          {%- elif "Light Display Manager" in display_manager_status.stdout_lines[0] -%}lightdm
+          {%- elif "X Display Manager" in display_manager_status.stdout_lines[0] -%}xdm
+          {%- elif "LXDE Display Manager" in display_manager_status.stdout_lines[0] -%}lxdm
+          {%- elif "Simple Desktop Display Manager" in display_manager_status.stdout_lines[0] -%}sddm
+          {%- endif -%}
+      when:
+        - display_manager_status is defined
+        - display_manager_status.rc is defined
+        - display_manager_status.rc == 0
+        - display_manager_status.stdout_lines is defined
+        - display_manager_status.stdout_lines | length > 0
+  when:
+    - guest_os_with_gui | bool
+    - guest_os_ansible_distribution != 'Astra Linux (Orel)'
+
+
+- name: "Set fact of guest OS display manager for {{ guest_os_ansible_distribution }}"
+  ansible.builtin.set_fact:
+    guest_os_display_manager: "fly-dm"
+  when:
+    - guest_os_with_gui | bool
+    - guest_os_ansible_distribution == 'Astra Linux (Orel)'
 
 - ansible.builtin.debug:
-    msg: "Guest OS has desktop environment: {{ guest_os_with_gui }}"
+    msg:
+      - "Guest OS has desktop environment: {{ guest_os_with_gui }}"
+      - "Guest OS display manager: {{ guest_os_display_manager }}"

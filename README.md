@@ -81,6 +81,7 @@ This project supports below scenarios for end-to-end guest OS validation testing
 | Debian 9.x, 10.9 and earlier                    |                                  |                          | :heavy_check_mark:                 |
 | Windows 10, 11                                  | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Windows Server 2019, 2022                       | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| UnionTech OS Server 20 1050a                    | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 
 Note: This supported guest OS list is used for this project only. For guest OS support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
 
