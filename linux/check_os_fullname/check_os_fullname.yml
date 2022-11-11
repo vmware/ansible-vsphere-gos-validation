@@ -22,16 +22,17 @@
         - include_tasks: ../../common/esxi_get_version_build.yml
           when: esxi_version is undefined or esxi_update_version is undefined
 
-        - name: Get OS fullname in guest OS
+        - name: "Get OS fullname in guest OS"
           ansible.builtin.debug:
             msg: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
 
-        - name: "Initalize guest_fullnane to 'guest fullname not defined in test case'"
+        - name: "Initalize facts for checking guest full name"
           ansible.builtin.set_fact:
             guest_fullname: "guest fullname not defined in test case"
+            guest_is_otherlinux: false
 
         # Map Ubuntu
-        - name: Set guest_fullname variable for Ubuntu
+        - name: "Set guest_fullname variable for Ubuntu"
           ansible.builtin.set_fact:
             guest_fullname: "Ubuntu Linux ({{ guest_os_bit }})"
           when: guest_os_ansible_distribution == "Ubuntu"
@@ -52,16 +53,25 @@
           when: guest_os_ansible_distribution in ["Amazon", "CentOS", "OracleLinux", "AlmaLinux", "Rocky", "Debian"]
 
         # Map FreeBSD guest full name
-        - name: Set guest_fullname variable for FreeBSD
+        - name: "Set guest_fullname variable for FreeBSD"
           ansible.builtin.set_fact:
             guest_fullname: "FreeBSD {{ guest_os_ansible_distribution_major_ver }} ({{ guest_os_bit }})"
           when: guest_os_ansible_distribution == "FreeBSD"
 
+        # Map Fedora
+        - name: "Set guest_fullname variable for Fedora"
+          ansible.builtin.set_fact:
+            guest_fullname: "Red Hat Fedora ({{ guest_os_bit }})"
+          when: guest_os_ansible_distribution == "Fedora"
+
         # Map Other Linux
+        - name: "Set fact of the guest is other linux"
+          ansible.builtin.set_fact:
+            guest_is_otherlinux: true
+          when: guest_fullname == "guest fullname not defined in test case"
+
         - include_tasks: otherlinux_fullname_map.yml
-          when:
-            - guest_os_ansible_distribution not in ["RedHat", "CentOS", "OracleLinux", "AlmaLinux", "Rocky", "Amazon"]
-            - guest_os_ansible_distribution not in ["SLES", "SLED", "Ubuntu", "Debian", "VMware Photon OS", "FreeBSD"]
+          when: guest_is_otherlinux
 
         # Validate guest OS fullname in guestinfo
         - include_tasks: validate_os_fullname.yml
