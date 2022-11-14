@@ -123,10 +123,18 @@
         regexp: "timeout 0"
         replace: "timeout 1"
 
+    - name: "Search string in md5sum.txt"
+      ansible.builtin.shell: "cat {{ src_iso_file_dir }}/md5sum.txt | grep '/install\.386/'"
+      ignore_errors: true
+      register: result_search_str
+
+    - name: "Print the result of searching str in file md5sum.txt"
+      ansible.builtin.debug: var=result_search_str
+
     - name: "Set fact of Debian install type"
       ansible.builtin.set_fact:
         debian_install_type: |-
-          {%- if src_iso_file_name.find('amd64') != -1 -%}install.amd
+          {%- if result_search_str.failed -%}install.amd
           {%- else -%}install.386
           {%- endif -%}
 
