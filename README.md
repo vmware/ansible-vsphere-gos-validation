@@ -12,8 +12,7 @@ $ pip install -r requirements.txt
 ```
 $ ansible-galaxy install -r requirements.yml
 ```
-4. To test VMware Photon OS, Debian, and Ubuntu with ISO installation, it is also required to install `xorriso` package on your control machine.
-5. Log in to local control machine as root or a user in sudoers
+4. Log in to local control machine as root or a user in sudoers
 
 ### Steps to Launch Testing
 1. Git clone project from github to your workspace on control machine,
@@ -75,7 +74,8 @@ This project supports below scenarios for end-to-end guest OS validation testing
 | Photon OS 3.x, 4.x                              | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Ubuntu 18.04 and later live-server              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Ubuntu 20.04 and later cloud image              |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
-| Ubuntu 18.04 and later desktop                  |                                  |                          | :heavy_check_mark:                 |
+| Ubuntu 18.04 desktop                            |                                  |                          | :heavy_check_mark:                 |
+| Ubuntu 20.04 and later desktop                  | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Flatcar 2592.0.0 and later                      |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Debian 10.10 and later, 11.x                    | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Debian 9.x, 10.9 and earlier                    |                                  |                          | :heavy_check_mark:                 |
