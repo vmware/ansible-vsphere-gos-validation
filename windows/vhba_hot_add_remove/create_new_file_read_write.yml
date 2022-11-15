@@ -42,6 +42,7 @@
 - include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"
+
 - include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "type {{ write_test_file_path_win }}"
@@ -53,12 +54,12 @@
 # If get new file content failed check disk status firstly
 - name: "Get new disk online status after guest restart"
   block:
-    - include_tasks: ../utils/win_get_set_disk_online.yml
+    - include_tasks: ../utils/win_execute_cmd.yml
       vars:
-        win_online_disk_uid: "{{ win_disk_unique_id }}"
-    - name: "Set fact of new disk online status"
+        win_powershell_cmd: "Get-Disk | Where-Object IsOffline -eq $True | select DiskNumber,UniqueId | ft -hidetableheaders"
+    - name: "Set fact of offline disk status"
       ansible.builtin.set_fact:
-        new_disk_is_online: "{{ win_is_disk_online }}"
+        new_disk_is_online: "{{ true if win_powershell_cmd_output.stdout_lines is defined and win_powershell_cmd_output.stdout_lines | length == 0 else false }}"
   when:
     - get_file_content_result2.rc is defined
     - get_file_content_result2.rc != 0
@@ -72,10 +73,9 @@
           - "Online this disk as a workaround for hot adding disk to the new LSILogicSAS controller test."
       tags:
         - known_issue
-    - include_tasks: ../utils/win_get_set_disk_online.yml
+    - include_tasks: ../utils/win_execute_cmd.yml
       vars:
-        win_online_disk_uid: "{{ win_disk_unique_id }}"
-        win_online_disk_ops: 'set'
+        win_powershell_cmd: "Get-Disk | Where-Object IsOffline -eq $True | Set-Disk -IsOffline $False"
     - include_tasks: ../utils/win_execute_cmd.yml
       vars:
         win_powershell_cmd: "type {{ write_test_file_path_win }}"

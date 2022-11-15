@@ -109,8 +109,13 @@
       - new_nvdimm_device_guest.HealthStatus == "Healthy"
     fail_msg: "Persistent memory disk status got in guest OS '{{ new_nvdimm_device_guest }}', which status is not 'Healthy', or the size got is not '{{ new_nvdimm_device_size }}' MB."
 
+- include_tasks: ../utils/win_get_raw_disk_num.yml
+- include_tasks: ../utils/win_get_disk_unique_id.yml
+  vars:
+    win_get_disk_uid_num: "{{ win_raw_disk_num }}"
+
 # Initialize and create partition on the pmem disk
 - include_tasks: ../vhba_hot_add_remove/create_partition_raw_disk.yml
   vars:
-    test_disk_controller_type: ""
-    test_purpose: "pmemdisk"
+    test_disk_controller_type: "nvdimm"
+    test_purpose: "cold-add"
