@@ -1,0 +1,34 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VMware Tools status after uninstall
+- include_tasks: ../../common/vm_get_vmtools_status.yml
+- name: "Verify VMware Tools is not running and not installed after uninstall"
+  ansible.builtin.assert:
+    that:
+      - vmtools_is_installed is defined
+      - not vmtools_is_installed | bool
+      - vmtools_is_running is defined
+      - not vmtools_is_running | bool
+    fail_msg: "VMware Tools installed and running status: '{{ vmtools_is_installed }}/{{ vmtools_is_running }}', which should be 'false/false' after VMware Tools uninstall."
+
+- name: "Handle inbox drivers contained in guest OS situation"
+  block:
+    - include_tasks: check_pvscsi_not_uninstalled.yml
+
+    - include_tasks: check_vmxnet3_not_uninstalled.yml
+      when: win_pvscsi_vmxnet3_installers.vmxnet3[0] == 'Windows'
+
+    - include_tasks: check_vmxnet3_inbox_loaded.yml
+      when: win_pvscsi_vmxnet3_installers.vmxnet3[0] == 'MSI'
+
+    - include_tasks: ../utils/win_get_problem_device.yml
+    - name: "Check no problem device listed after VMware Tools uninstall"
+      ansible.builtin.assert:
+        that:
+          - gos_has_problem_device is defined
+          - not gos_has_problem_device
+        fail_msg: "Problem devices found in guest after VMware Tools uninstall, please check listed problem devices: {{ gos_problem_device_list }}"
+  when:
+    - guest_os_with_inbox_drivers is defined
+    - guest_os_with_inbox_drivers | bool

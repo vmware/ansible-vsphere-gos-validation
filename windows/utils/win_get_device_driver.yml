@@ -6,24 +6,33 @@
 #   device_desc_keyword: the keyword in device description, e.g.,
 #   vmxnet3, pvscsi.
 #
-- name: Check device keyword is specified
-  ansible.builtin.fail:
-    msg: "Keyword in device description must be specified by parameter 'device_desc_keyword'."
-  when: device_desc_keyword is undefined or not device_desc_keyword
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - device_desc_keyword is defined
+      - device_desc_keyword
+    msg: "Keyword in device description must be specified by parameter 'device_desc_keyword' to get matched driver info."
 
-- name: Initialize device driver info
+- name: "Initialize device driver info"
   ansible.builtin.set_fact:
-    win_guest_device_driver: []
+    win_guest_device_driver: {}
+
 - include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Get-CimInstance Win32_PnpSignedDriver | where-object {$_.Description -like '*{{ device_desc_keyword }}*'} | select DeviceName, DriverDate, DriverProviderName, DriverVersion, InfName, IsSigned, Manufacturer, Signer"
-    win_execute_cmd_ignore_error: true
 
-- name: Set fact of device driver info
-  ansible.builtin.set_fact:
-    win_guest_device_driver: "{{ win_powershell_cmd_output.stdout_lines }}"
+- name: "Set fact of device driver info"
+  block:
+    - name: "Set fact of device driver dict"
+      ansible.builtin.set_fact:
+        win_guest_device_driver: "{{ win_guest_device_driver | combine({item.split(':')[0].strip(): item.split(':')[1].strip()}) }}"
+      when: item | length != 0
+      with_items: "{{ win_powershell_cmd_output.stdout_lines }}" 
   when:
     - win_powershell_cmd_output is defined
     - win_powershell_cmd_output.stdout_lines is defined
-- ansible.builtin.debug:
+    - win_powershell_cmd_output.stdout_lines | length != 0
+
+- name: "Display device driver info"
+  ansible.builtin.debug:
     msg: "Get device '{{ device_desc_keyword }}' driver info: {{ win_guest_device_driver }}"

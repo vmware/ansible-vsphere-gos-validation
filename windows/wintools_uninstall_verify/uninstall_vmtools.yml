@@ -1,28 +1,28 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get VMware tools product ID from registry
+# Get VMware Tools product ID from registry
 - include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Get-ChildItem 'HKLM:\\software\\microsoft\\windows\\currentversion\\uninstall' | where-object {$_.getvalue('DisplayName') -match 'VMware Tools'} | foreach-object {$_.name} | split-path -leaf"
 
-- name: Set fact of VMware tools product ID
+- name: "Set fact of VMware Tools product ID"
   ansible.builtin.set_fact:
     get_product_id: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
 - ansible.builtin.debug:
-    msg: "Get VMware tools product ID: {{ get_product_id }}"
+    msg: "Get VMware Tools product ID: {{ get_product_id }}"
 
-- name: "Uninstall VMware tools in guest OS"
+- name: "Uninstall VMware Tools in guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "msiexec.exe /q /x '{{ get_product_id }}' /norestart"
-- name: Verify return code and no error message
+- name: "Verify return code and no error message"
   ansible.builtin.assert:
     that:
       - win_powershell_cmd_output.rc | int == 3010 or win_powershell_cmd_output.rc | int == 0
       - not win_powershell_cmd_output.stderr
-    success_msg: "VMware tools uninstall operation succeed in guest OS"
-    fail_msg: "VMware tools uninstall operation failed in guest OS"
+    success_msg: "VMware Tools uninstall operation succeed in guest OS"
+    fail_msg: "VMware Tools uninstall operation failed in guest OS"
 
 - include_tasks: ../utils/win_shutdown_restart.yml
   vars:
