@@ -3,23 +3,44 @@
 ---
 # Get the driver info for specified device in Windows guest OS.
 # Parameters:
-#   device_desc_keyword: the keyword in device description, e.g.,
+#   win_device_desc_keyword: the keyword in device description, e.g.,
 #   vmxnet3, pvscsi.
+#   win_get_device_driver_timeout: the timeout to get device driver
+#   info, the default value is 120 seconds.
 #
 - name: "Check required parameter"
   ansible.builtin.assert:
     that:
-      - device_desc_keyword is defined
-      - device_desc_keyword
-    msg: "Keyword in device description must be specified by parameter 'device_desc_keyword' to get matched driver info."
+      - win_device_desc_keyword is defined
+      - win_device_desc_keyword
+    msg: "Keyword in device description must be specified by parameter 'win_device_desc_keyword' to get matched driver info."
 
-- name: "Initialize device driver info"
+- name: "Initialize device driver info and command to execute"
   ansible.builtin.set_fact:
     win_guest_device_driver: {}
+    win_powershell_cmd: "Get-CimInstance Win32_PnpSignedDriver | where-object {$_.Description -like '*{{ win_device_desc_keyword }}*'} | select DeviceName, DriverDate, DriverProviderName, DriverVersion, InfName, IsSigned, Manufacturer, Signer"
 
-- include_tasks: win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "Get-CimInstance Win32_PnpSignedDriver | where-object {$_.Description -like '*{{ device_desc_keyword }}*'} | select DeviceName, DriverDate, DriverProviderName, DriverVersion, InfName, IsSigned, Manufacturer, Signer"
+- name: "Try to get device driver info in {{ win_get_device_driver_timeout | default(120) }}s"
+  ansible.windows.win_shell: "{{ win_powershell_cmd }}"
+  register: win_get_device_driver_result
+  delegate_to: "{{ vm_guest_ip }}"
+  until:
+    - win_get_device_driver_result is defined
+    - win_get_device_driver_result.stdout_lines is defined
+    - win_get_device_driver_result.stdout_lines | length != 0
+  retries: "{{ ((win_get_device_driver_timeout | default(120) | int) / 5) | int }}"
+  delay: 5
+  ignore_errors: true
+- name: "Display getting device driver info result"
+  ansible.builtin.debug: var=win_get_device_driver_result
+  when: enable_debug
+
+- name: "Getting device driver info failed"
+  ansible.builtin.fail:
+    msg: "Failed to get the driver info of device with description keyword '{{ win_device_desc_keyword }}' in {{ win_get_device_driver_timeout | default(120) }} seconds."
+  when:
+    - win_get_device_driver_result.failed is defined
+    - win_get_device_driver_result.failed
 
 - name: "Set fact of device driver info"
   block:
@@ -27,12 +48,13 @@
       ansible.builtin.set_fact:
         win_guest_device_driver: "{{ win_guest_device_driver | combine({item.split(':')[0].strip(): item.split(':')[1].strip()}) }}"
       when: item | length != 0
-      with_items: "{{ win_powershell_cmd_output.stdout_lines }}" 
+      with_items: "{{ win_get_device_driver_result.stdout_lines }}" 
   when:
-    - win_powershell_cmd_output is defined
-    - win_powershell_cmd_output.stdout_lines is defined
-    - win_powershell_cmd_output.stdout_lines | length != 0
+    - win_get_device_driver_result.failed is defined
+    - not win_get_device_driver_result.failed
+    - win_get_device_driver_result.stdout_lines is defined
+    - win_get_device_driver_result.stdout_lines | length != 0
 
 - name: "Display device driver info"
   ansible.builtin.debug:
-    msg: "Get device '{{ device_desc_keyword }}' driver info: {{ win_guest_device_driver }}"
+    msg: "Get device '{{ win_device_desc_keyword }}' driver info: {{ win_guest_device_driver }}"

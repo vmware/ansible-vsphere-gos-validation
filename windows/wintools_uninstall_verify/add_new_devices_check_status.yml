@@ -61,6 +61,21 @@
       - new_network_adapter_mac
     fail_msg: "Not get new added network adapter MAC address."
 
+# Get loaded pvscsi and vmxnet3 driver version
+- include_tasks: ../utils/win_get_device_driver.yml
+  vars:
+    win_device_desc_keyword: 'pvscsi'
+- name: "Set fact of the loaded pvscsi driver info"
+  ansible.builtin.set_fact:
+    win_pvscsi_before_uninstall: "{{ win_guest_device_driver }}"
+
+- include_tasks: ../utils/win_get_device_driver.yml
+  vars:
+    win_device_desc_keyword: 'vmxnet3'
+- name: "Set fact of the loaded vmxnet3 driver info"
+  ansible.builtin.set_fact:
+    win_vmxnet3_before_uninstall: "{{ win_guest_device_driver }}"
+
 # Check no problem device
 - include_tasks: ../utils/win_get_problem_device.yml
 - name: "Check no problem device listed"
@@ -69,21 +84,6 @@
       - gos_has_problem_device is defined
       - not gos_has_problem_device
     fail_msg: "Problem devices were found in guest before VMware Tools uninstall, please check listed problem devices: {{ gos_problem_device_list }}"
-
-# Get loaded pvscsi and vmxnet3 driver version
-- include_tasks: ../utils/win_get_device_driver.yml
-  vars:
-    device_desc_keyword: 'pvscsi'
-- name: "Set fact of the loaded pvscsi driver info"
-  ansible.builtin.set_fact:
-    win_pvscsi_before_uninstall: "{{ win_guest_device_driver }}"
-
-- include_tasks: ../utils/win_get_device_driver.yml
-  vars:
-    device_desc_keyword: 'vmxnet3'
-- name: "Set fact of the loaded vmxnet3 driver info"
-  ansible.builtin.set_fact:
-    win_vmxnet3_before_uninstall: "{{ win_guest_device_driver }}"
 
 # Get installed pvscsi and vmxnet3 installers info
 - include_tasks: ../utils/win_get_pvscsi_vmxnet3_installers.yml
