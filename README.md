@@ -33,9 +33,9 @@ $ ansible-galaxy install -r requirements.yml
   $ ansible-playbook main.yml -e "testing_vars_file=/path_to/test.yml testing_testcase_file=/path_to/gosv_testcase_list.yml"
 ```
 5. A new log folder will be created for current test run, which will include log files and files collected in test cases, e.g., `logs/test-vm/2021-07-06-09-27-51/`. You can find log files:
-  * `results.log` which has testbed information, VM information and test case results
-  * `full_debug.log` which has testing debug logs
-  * `failed_tasks.log` which has failed tasks logs
+  * `results.log` which contains testbed information, VM information and test case results
+  * `full_debug.log` which contains testing debug logs
+  * `failed_tasks.log` which contains failed tasks logs
   * `known_issues.log` which lists known issues meet in current test run
 
 ### Catalog
@@ -64,7 +64,7 @@ This project supports below scenarios for end-to-end guest operating system vali
 
 ### Compatible Guest Operating Systems
 
-| Guest Operating System Types/Versions                         | Automatic Install from ISO Image | Deploy from OVA Template | Existing VM And Installed Guest Operating System |
+| Guest Operating Systems                         | Automatic Install from ISO Image | Deploy from OVA Template | Existing VM with Guest Operating System Installed |
 | :---------------------------------------------- | :------------------------------: | :----------------------: | :--------------------------------: |
 | Red Hat Enterprise Linux 7.x, 8.x, 9.x          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | CentOS 7.x, 8.x                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
