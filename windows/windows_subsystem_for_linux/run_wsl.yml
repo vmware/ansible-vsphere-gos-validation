@@ -9,7 +9,18 @@
 
 - include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "wsl --distribution {{ wsl_distribution_name }} --user root"
+    win_powershell_cmd: "wsl --distribution {{ wsl_distribution_name }} --user root | Out-File {{ wsl_file_path }}\\wsl_run.txt"
+    win_execute_cmd_ignore_error: true
+
+- include_tasks: wsl_convert_binary_to_txt.yml
+  vars:
+    source_path: "{{ wsl_file_path }}\\wsl_run.txt"
+    file_name: "wsl_run.txt"
+
+- name: Check WSL start command result
+  ansible.builtin.fail:
+    msg: "WSL start distribution failed. Please check log file wsl_run.txt."
+  when: win_powershell_cmd_output.rc != 0
 
 - include_tasks: ../utils/win_execute_cmd.yml
   vars:
@@ -24,7 +35,7 @@
   ansible.builtin.shell: "grep running {{ wsl_new_file }}"
   register: cmd_output
 
-- name: "Validate the wsl running result"
+- name: Validate the wsl running result
   ansible.builtin.assert:
     that:
       - "{{cmd_output.rc==0 }}"
@@ -34,6 +45,7 @@
 - include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "wsl -d {{ wsl_distribution_name }} ls | Out-File {{ wsl_file_path }}\\wsl_execute_cmd.txt"
+    win_execute_cmd_ignore_error: true
 
 - include_tasks: wsl_convert_binary_to_txt.yml
   vars:
@@ -44,8 +56,8 @@
 #  ansible.builtin.shell: "grep {{ wsl_distribution_name }} {{ wsl_new_file }}"
 #  register: cmd_output
 
-- name: "Validate the wsl command execution result"
+- name: Validate the wsl command execution result
   ansible.builtin.assert:
     that:
       - "{{win_powershell_cmd_output.rc==0 }}"
-    fail_msg: "The command failed on WSL distribution"
+    fail_msg: "The command failed on WSL distribution."
