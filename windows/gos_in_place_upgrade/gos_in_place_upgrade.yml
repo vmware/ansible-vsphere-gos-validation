@@ -8,8 +8,6 @@
 # 2. When there is inbox pvscsi and vmxnet3 drivers in the OS upgraded from,
 # boot disk controller is pvscsi, vmxnet3 network adatper also in the VM before upgrade.
 #
-# For other VM configurations, this test case will be skipped.
-#
 - name: gos_in_place_upgrade
   hosts: localhost
   gather_facts: false
@@ -18,28 +16,42 @@
   tasks:
     - name: "Test case block"
       block:
-        - include_tasks: ../../common/skip_test_case.yml
-          vars:
-            skip_msg: "Skip test case due to gos_in_place_upgrade_to_iso is set to '{{ gos_in_place_upgrade_to_iso | default('') }}'"
-            skip_reason: "No Run"
-          when: gos_in_place_upgrade_to_iso is undefined or gos_in_place_upgrade_to_iso == ""
-
-          # Check configured upgrade to OS installation ISO image
-        - include_tasks: esxi_check_delete_datastore_file.yml
-          vars:
-            file_in_datastore: "{{ item.split(']')[0].strip('[]') }}"
-            file_in_datastore_path: "{{ item.split(']')[1].strip(' ') }}"
-            file_in_datastore_ops: "file"
-            file_in_datastore_ops_timeout: 600
-
+        # We only test VMware Tools installed scenario before OS upgrading
         - include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: true
 
-        - include_tasks: ../../common/skip_test_case.yml
+        # Check configured OS installation ISO image for upgrading
+        - include_tasks: esxi_check_delete_datastore_file.yml
           vars:
-            skip_msg: "Skip test case due to VM is not 64 bit: {{ guest_os_ansible_architecture | default('NA') }}"
-            skip_reason: "Not Applicable"
-          when: guest_os_ansible_architecture is undefined or guest_os_ansible_architecture != "64-bit"
+            file_in_datastore: "{{ gos_in_place_upgrade_to_iso.split(']')[0].strip('[]') }}"
+            file_in_datastore_path: "{{ gos_in_place_upgrade_to_iso.split(']')[1].strip(' ') }}"
+            file_in_datastore_ops: "file"
+            file_in_datastore_ops_timeout: 600
+            file_in_datastore_failed_ignore: true
+          when:
+            - gos_in_place_upgrade_to_iso is defined
+            - gos_in_place_upgrade_to_iso
+
+        # Parameter gos_in_place_upgrade_to_iso is required
+        - name: "Check upgrade to OS installation ISO Image"
+          block:
+            - name: "Set failure message"
+              ansible.builtin.set_fact:
+                failure_msg: "Skip test case due to required parameter 'gos_in_place_upgrade_to_iso' is not set or empty: '{{ gos_in_place_upgrade_to_iso | default('') }}'."
+              when: gos_in_place_upgrade_to_iso is undefined or gos_in_place_upgrade_to_iso == ""
+            - name: "Set failure message"
+              ansible.builtin.set_fact:
+                failure_msg: "Skip test case due to parameter 'gos_in_place_upgrade_to_iso' set file path does not exist: '{{ file_in_datastore_result | default('Fail') }}'."
+              when: file_in_datastore_result is undefined or file_in_datastore_result == 'Fail'
+            - include_tasks: ../../common/skip_test_case.yml
+              vars:
+                skip_msg: "{{ failure_msg }}'"
+                skip_reason: "Blocked"
+          when: >
+            (gos_in_place_upgrade_to_iso is undefined or gos_in_place_upgrade_to_iso == "") or
+            (file_in_datastore_result is undefined or file_in_datastore_result == 'Fail')
+
+        - include_tasks: gos_upgrade_test.yml
       rescue:
         - include_tasks: ../../common/test_rescue.yml

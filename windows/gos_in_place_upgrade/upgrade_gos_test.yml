@@ -1,0 +1,33 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get if VM with PVSCSI and VMXNET3 devices before OS upgrading
+- include_tasks: get_pvscsi_vmxnet3_info.yml
+
+- include_tasks: ../../common/vm_get_cdrom_devices.yml
+
+# Add a new CDROM when there is no CDROM on VM
+- include_tasks: ../../common/vm_add_sata_cdrom.yml
+  when: cdrom_device_list | length == 0
+
+# Unattach files from CDROM devices
+- include_tasks: ../../common/vm_configure_cdrom.yml
+  vars:
+    cdrom_type: 'client'
+    cdrom_controller_type: "{{ item.controller_label.split(' ')[0] | lower }}"
+    cdrom_controller_num: "{{ item.bus_num | int }}"
+    cdrom_unit_num: "{{ item.unit_num | int }}"
+    cdrom_state: 'present'
+  with_items: "{{ cdrom_device_list }}"
+  when: cdrom_device_list | length > 0
+
+- include_tasks: ../../common/vm_connect_cdrom_to_iso.yml
+  vars:
+    vm_cdrom_iso_file: "{{ gos_in_place_upgrade_to_iso }}"
+
+# Do in-place upgrade in guest OS
+# Check OS upgrade
+# Check VMware Tools
+# Check pvscsi or vmxnet3 devices
+# Uninstall VMware Tools
+# Reinstall VMware Tools

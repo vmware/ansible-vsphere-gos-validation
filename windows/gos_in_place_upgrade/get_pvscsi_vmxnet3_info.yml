@@ -1,0 +1,41 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Initialize the facts of VM with PVSCSI and VMXNET3 devices"
+  ansible.builtin.set_fact:
+    vm_has_pvscsi_boot_disk: false
+    vm_has_pvscsi_ctl: false
+    vm_has_vmxnet3_net: false
+
+# Check if boot disk controller is PVSCSI
+- name: "Set fact of VM with PVSCSI boot disk controller"
+  ansible.builtin.set_fact:
+    vm_has_pvscsi_boot_disk: true
+  when:
+    - new_vm is defined and new_vm
+    - boot_disk_controller is defined and boot_disk_controller == 'paravirtual'
+- name: "Get boot disk controller type for existing VM"
+  block:
+    - include_tasks: ../utils/win_get_boot_disk_ctl_type.yml
+    - name: "Set fact of VM with PVSCSI boot disk controller"
+      ansible.builtin.set_fact:
+        vm_has_pvscsi_boot_disk: true
+      when:
+        - win_boot_disk_ctl_type == 'paravirtual'
+  when: new_vm is undefined or not new_vm | bool
+
+# If not PVSCSI boot disk controller
+- name: "Check if VM with PVSCSI controller"
+  block:
+    - include_tasks: ../utils/win_get_pvscsi_ctl_num.yml
+    - name: "Set fact of VM with PVSCSI controller"
+      ansible.builtin.set_fact:
+        vm_has_pvscsi_ctl: true
+      when: ctl_num_guest | int > 0
+  when: not vm_is_pvscsi_boot_disk
+
+- include_tasks: ../utils/win_get_netadapter_num.yml
+- name: "Set fact of VM with VMXNET3 network adapter"
+  ansible.builtin.set_fact:
+    vm_has_vmxnet3_net: true
+  when: win_get_netadapter_num_dict.VMXNET3 | int > 0

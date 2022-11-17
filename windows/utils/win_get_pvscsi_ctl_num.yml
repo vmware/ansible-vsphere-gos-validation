@@ -2,14 +2,21 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Get PVSCSI controller number in Windows guest OS
-- name: Initialize the number of PVSCSI controllers
+- name: "Initialize the number of PVSCSI controller"
   ansible.builtin.set_fact:
     ctl_num_guest: 0
+
 - include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "(Get-WmiObject Win32_SCSIController | where-object {$_.Name -like '*PVSCSI*'} | measure).Count"
-- name: Set fact of PVSCSI controller number
+
+- name: "Set fact of PVSCSI controller number"
   ansible.builtin.set_fact:
     ctl_num_guest: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
-- ansible.builtin.debug:
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+
+- name: "Display PVSCSI controller number"
+  ansible.builtin.debug:
     msg: "PVSCSI controller number in guest OS: {{ ctl_num_guest }}"

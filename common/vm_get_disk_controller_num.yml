@@ -6,6 +6,9 @@
 # Parameters:
 #   disk_controller: valid values are 'scsi', 'sata', 'nvme'
 #
+- name: "Initialize the fact of disk controller number"
+  ansible.builtin.set_fact:
+    vhba_number: 0
 - name: "Set fact of the valid disk controller type list"
   ansible.builtin.set_fact:
     valid_ctl_list:
@@ -23,5 +26,11 @@
 - name: "Set fact of the number of '{{ disk_controller }}' controller"
   ansible.builtin.set_fact:
     vhba_number: "{{ disk_controller_facts.disk_controller_data[disk_controller] | length }}"
-- ansible.builtin.debug:
+  when:
+    - disk_controller_facts is defined
+    - disk_controller_facts.disk_controller_data is defined
+    - "'disk_controller' in disk_controller_facts.disk_controller_data"
+
+- name: "Display disk controller number"
+  ansible.builtin.debug:
     msg: "Total number of '{{ disk_controller }}' disk controller: {{ vhba_number }}"

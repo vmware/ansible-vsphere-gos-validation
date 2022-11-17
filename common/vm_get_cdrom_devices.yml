@@ -1,31 +1,31 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get all the CDROM devices on the VM
-#
+# Get the list of the VM CDROM devices' info
+- name: "Initialize variables of CDROM devices list"
+  ansible.builtin.set_fact:
+    cdrom_device_list: []
+    cdrom_device_list_config: []
+    cdrom_device_list_info_selected: []
+
 - include_tasks: vm_get_config.yml
   vars:
     property_list: ['config.hardware.device']
-
-- name: Set fact of CDROM devices list from VM config
+- name: "Set fact of CDROM devices list from VM config"
   ansible.builtin.set_fact:    
-    cdrom_device_list1: "{{ vm_config.config.hardware.device | selectattr('deviceInfo.label', 'match', 'CD/DVD drive') }}"
+    cdrom_device_list_config: "{{ vm_config.config.hardware.device | selectattr('deviceInfo.label', 'match', 'CD/DVD drive') }}"
 
-- name: Initialize CDROM devices info list
+- name: "Set fact of CDROM devices list with selected info"
   ansible.builtin.set_fact:
-    cdrom_device_list2: []
-- name: Set fact of CDROM devices info list
-  ansible.builtin.set_fact:
-    cdrom_device_list2: "{{ cdrom_device_list2 + [{'controller_key': item.controllerKey, 'label': item.deviceInfo.label, 'unit_num': item.unitNumber, 'connected': item.connectable.connected}] }}"
-  with_items: "{{ cdrom_device_list1 }}"
+    cdrom_device_list_info_selected: "{{ cdrom_device_list_info_selected + [{'controller_key': item.controllerKey, 'label': item.deviceInfo.label, 'unit_num': item.unitNumber, 'connected': item.connectable.connected}] }}"
+  with_items: "{{ cdrom_device_list_config }}"
+  when: cdrom_device_list_config | length != 0
 
-- name: Initialize CDROM devices info list
-  ansible.builtin.set_fact:
-    cdrom_device_list: []
-- name: Set fact of CDROM devices info list contain controller info
+- name: "Set fact of CDROM devices info list with controller info"
   ansible.builtin.set_fact:
     cdrom_device_list: "{{ cdrom_device_list + [item | combine( { 'bus_num': (vm_config.config.hardware.device | selectattr('key', 'equalto', item.controller_key))[0].busNumber, 'controller_label': (vm_config.config.hardware.device | selectattr('key', 'equalto', item.controller_key))[0].deviceInfo.label } )] }}" 
-  with_items: "{{ cdrom_device_list2 }}"
+  with_items: "{{ cdrom_device_list_info_selected }}"
+  when: cdrom_device_list_info_selected | length != 0
 
-- name: Print CDROM devices info list
+- name: "Print CDROM devices info list"
   ansible.builtin.debug: var=cdrom_device_list
