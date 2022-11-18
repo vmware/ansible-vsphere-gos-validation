@@ -38,6 +38,27 @@
       - "test_line in get_file_content_result1.stdout"
     fail_msg: "The file content is '{{ get_file_content_result1.stdout }}', which should contain: '{{ test_line }}'"
 
+- name: "Set boot disk"
+  block:
+    - name: "Known issue - workaround of hot-add disk to new SATA controller for OS with BIOS firmware"
+      ansible.builtin.debug:
+        msg:
+            - "After OS restarts the boot disk is set to the new added disk. Ignore this known issue."
+            - "Specify the boot disk as workaround."
+        tags:
+          - known_issue
+    - include_tasks: set_boot_disk.yml
+      vars:
+        hdd_name: "Hard disk 1"
+  when:
+    - add_new_controller
+    - test_purpose == "hot-add"
+    - test_disk_controller_type == 'sata'
+    - (boot_disk_controller | lower != 'sata')
+    - (boot_disk_controller | lower != 'ide')
+    - firmware is defined
+    - (firmware | lower == "bios")
+
 # Check new created file still exist after guest OS restart
 - include_tasks: ../utils/win_shutdown_restart.yml
   vars:
