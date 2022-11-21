@@ -60,14 +60,24 @@
       - "'setup.exe' in win_powershell_cmd_output.stdout_lines"
     fail_msg: "'boot', 'sources' or 'setup.exe' files or folders not found in the mounted drive: {{ win_powershell_cmd_output.stdout_lines | default('') }}"
 
-# Get Windows image index
-- include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "(Get-WindowsImage -ImagePath {{ upgrade_to_iso_drive }}:\\sources\install.wim | where-object {$_.ImageName -like '*Datacenter (Desktop Experience)'}).ImageIndex"
-- name: "Set fact of Windows Server Datacenter (Desktop Experience) image index"
-  ansible.builtin.set_fact:
-    win_image_index: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+- name: "Get Windows Server with desktop experience image index"
+  block:
+    - name: "Set fact of Windows image keyword to upgrade to"
+      ansible.builtin.set_fact:
+        win_upgrade_image_keyword: "*{{ guest_os_ansible_distribution.split(' ')[-1] }} (Desktop Experience)"
+    - include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "(Get-WindowsImage -ImagePath {{ upgrade_to_iso_drive }}:\\sources\install.wim | where-object {$_.ImageName -like '{{ win_upgrade_image_keyword }}'}).ImageIndex"
+    - name: "Set fact of Windows Server Datacenter (Desktop Experience) image index"
+      ansible.builtin.set_fact:
+        win_image_index: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+      when:
+        - win_powershell_cmd_output.stdout_lines is defined
+        - win_powershell_cmd_output.stdout_lines | length != 0
+    - name: "Check Windows Server with desktop experience image index"
+      ansible.builtin.assert:
+        that:
+          - win_image_index != ''
+        fail_msg: "Not get the image index of Windows Server with desktop experience: '{{ win_image_index }}', please check the images in the ISO."
   when:
-    - win_powershell_cmd_output is defined
-    - win_powershell_cmd_output.stdout_lines is defined
-    - win_powershell_cmd_output.stdout_lines | length != 0
+    - guest_os_product_type | lower == 'server'

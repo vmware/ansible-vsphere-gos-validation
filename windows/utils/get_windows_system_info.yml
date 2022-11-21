@@ -1,20 +1,26 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+- name: "Initialize the facts of Windows guest OS"
+  ansible.builtin.set_fact:
+    guest_os_build_num: ''
+    guest_os_with_inbox_drivers: false
+    vm_guest_os_distribution: ''
+
 - include_tasks: ../../common/get_guest_system_info.yml
 
-- name: Set guest OS product type to client
+- name: "Set guest OS product type to client"
   ansible.builtin.set_fact:
     guest_os_product_type: 'client'
   when: guest_os_product_type | lower == 'workstation'
 
-- name: Set fact of guest OS build number
+- name: "Set fact of guest OS build number"
   ansible.builtin.set_fact:
-    guest_os_build_num: "{{ guest_os_ansible_distribution_ver.split('.')[2] | default('') }}"
+    guest_os_build_num: "{{ guest_os_ansible_distribution_ver.split('.')[2] }}"
+  when:
+    - guest_os_ansible_distribution_ver
+    - guest_os_ansible_distribution_ver.split('.') | length > 2
 
-- name: "Initialize Windows without inbox drivers"
-  ansible.builtin.set_fact:
-    guest_os_with_inbox_drivers: false
 - name: "Set fact of Windows build with inbox drivers"
   ansible.builtin.set_fact:
     guest_os_with_inbox_drivers: true
@@ -41,6 +47,26 @@
 - name: "Set fact of VM guest OS type"
   ansible.builtin.set_fact:
     vm_guest_os_distribution: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} {{ guest_os_ansible_architecture }}"
+
+- name: "Check required facts of Windows guest OS information"
+  ansible.builtin.assert:
+    that:
+      - guest_os_ansible_distribution
+      - guest_os_ansible_architecture
+      - guest_os_ansible_distribution_major_ver
+      - guest_os_ansible_distribution_ver
+      - guest_os_product_type
+      - guest_os_build_num
+      - guest_os_with_inbox_drivers
+    fail_msg:
+      - "Below Windows guest OS information is empty, which must be retrieved and will be used:"
+      - "Guest OS: {{ guest_os_ansible_distribution }}"
+      - "Guest OS arch: {{ guest_os_ansible_architecture }}"
+      - "Guest OS major version: {{ guest_os_ansible_distribution_major_ver }}"
+      - "Guest OS version: {{ guest_os_ansible_distribution_ver }}"
+      - "Guest OS product type: {{ guest_os_product_type }}"
+      - "Guest OS build number: {{ guest_os_build_num }}"
+      - "Guest OS should contain inbox drivers: {{ guest_os_with_inbox_drivers }}"
 
 - name: "Set fact that ansible system information about guest OS has been retrieved"
   ansible.builtin.set_fact:

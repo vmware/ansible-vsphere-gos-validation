@@ -2,13 +2,36 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Refer to this doc: https://learn.microsoft.com/en-us/windows-server/get-started/kms-client-activation-keys
-- name: "Set fact of the dict of Windows versions and KMS client setup keys"
+- name: "Set fact of the KMS client setup key for OS upgrading"
   ansible.builtin.set_fact:
-    win_kms_client_setup_key:
-      "Microsoft Windows 10 Enterprise": "NPPR9-FWDCX-D2C8J-H872K-2YT43"
-      "Microsoft Windows Server 2022 Datacenter": "WX4NM-KYWYW-QJJR4-XV3QB-6VM33"
+    win_kms_client_setup_key: |-
+      {% if guest_os_product_type | lower == 'server' %}'WX4NM-KYWYW-QJJR4-XV3QB-6VM33'
+      {% elif guest_os_product_type | lower == 'client' %}'NPPR9-FWDCX-D2C8J-H872K-2YT43'
+      {% endif %}
 
 # Refer to this doc: https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/windows-setup-command-line-options?view=windows-11
 - name: "Set fact of the command of Windows upgrade"
   ansible.builtin.set_fact:
-    win_upgrade_setup_cmd: "{{ upgrade_to_iso_drive }}:\\setup.exe /auto upgrade /quiet /eula accept /compat scanonly /compat /ignorewarning /copylogs C:\\upgrade.log /dynamicupdate disable /MigNEO disable /NoReboot"
+    win_upgrade_setup_cmd: "{{ upgrade_to_iso_drive }}:\\setup.exe /auto upgrade /eula accept /compat ignorewarning /copylogs C:\\upgrade.log /dynamicupdate disable /MigNEO disable /NoReboot /pkey {{ win_kms_client_setup_key }}"
+- name: "Set fact of the command of Windows Server upgrade"
+  ansible.builtin.set_fact:
+    win_upgrade_setup_cmd: "{{ win_upgrade_setup_cmd }} /imageindex {{ win_image_index }}"
+  when: guest_os_product_type | lower == 'server'
+
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ win_upgrade_setup_cmd }}"
+
+# Windows will be offline a few minutes later
+- name: ""
+  ansible.windows.win_ping:
+  delegate_to: "{{ }}"
+  ignore_errors: true
+
+
+# Windows will be online a few minutes later
+
+# Restart Windows guest after it's back to online
+- include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
