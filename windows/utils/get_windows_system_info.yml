@@ -6,6 +6,7 @@
     guest_os_build_num: ''
     guest_os_with_inbox_drivers: false
     vm_guest_os_distribution: ''
+    guest_os_edition: ''
 
 - include_tasks: ../../common/get_guest_system_info.yml
 
@@ -28,6 +29,11 @@
     - guest_os_ansible_distribution_major_ver | int >= 10
     - (guest_os_product_type | lower == 'server' and guest_os_build_num | int >= 20348) or (guest_os_product_type | lower == 'client' and guest_os_build_num | int >= 22449)
 
+- name: "Set fact of Windows guest OS edition"
+  ansible.builtin.set_fact:
+    guest_os_edition: "{{ guest_os_ansible_distribution.split(' ')[-1] }}"
+  when: guest_os_ansible_distribution
+
 - name: "Print Windows guest OS information"
   ansible.builtin.debug:
     msg:
@@ -42,6 +48,7 @@
       - "Guest OS family: {{ guest_os_family }}"
       - "Guest OS product type: {{ guest_os_product_type }}"
       - "Guest OS build number: {{ guest_os_build_num }}"
+      - "Guest OS edition: {{ guest_os_edition }}"
       - "Guest OS should contain inbox drivers: {{ guest_os_with_inbox_drivers }}"
 
 - name: "Set fact of VM guest OS type"
@@ -57,6 +64,7 @@
       - guest_os_ansible_distribution_ver
       - guest_os_product_type
       - guest_os_build_num
+      - guest_os_edition
       - guest_os_with_inbox_drivers
     fail_msg:
       - "Below Windows guest OS information is empty, which must be retrieved and will be used:"
@@ -66,6 +74,7 @@
       - "Guest OS version: {{ guest_os_ansible_distribution_ver }}"
       - "Guest OS product type: {{ guest_os_product_type }}"
       - "Guest OS build number: {{ guest_os_build_num }}"
+      - "Guest OS edition: {{ guest_os_edition }}"
       - "Guest OS should contain inbox drivers: {{ guest_os_with_inbox_drivers }}"
 
 - name: "Set fact that ansible system information about guest OS has been retrieved"

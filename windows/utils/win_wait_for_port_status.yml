@@ -1,0 +1,30 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Waiting for a port to become available or unavailable in
+# Windows guest OS.
+# Parameters:
+#   win_port: port number to be wait for, default value is '5986'.
+#   win_wait_port_timeout: timeout in seconds.
+#   win_wait_port_state: valid values are 'started', 'stopped',
+#   or 'drained'. Default value is 'started'.
+#
+- name: "Wait for port {{ win_port | default(5986) }} to be {{ win_wait_port_state | default('started') }}"
+  ansible.builtin.wait_for:
+    host: "{{ vm_guest_ip }}"
+    port: "{{ win_port | default(5986) }}"
+    state: "{{ win_wait_port_state | default('started') }}"
+    sleep: 5
+    timeout: "{{ win_wait_port_timeout | default(600) }}"
+  register: win_wait_port_result
+  ignore_errors: true
+- name: "Display the wait for port status result"
+  ansible.builtin.debug: var=win_wait_port_result
+
+- name: "Check port status in task result"
+  ansible.builtin.assert:
+    that:
+      - not win_wait_port_result.failed
+      - win_wait_port_result.state is defined
+      - win_wait_port_result.state == win_wait_port_state
+    fail_msg: "Failed to wait for port {{ win_port | default(5986) }} in state: {{ win_wait_port_state | default('started') }}." 

@@ -39,11 +39,15 @@
             - name: "Set failure message"
               ansible.builtin.set_fact:
                 failure_msg: "Skip test case due to required parameter 'gos_in_place_upgrade_to_iso' is not set or empty: '{{ gos_in_place_upgrade_to_iso | default('') }}'."
-              when: gos_in_place_upgrade_to_iso is undefined or gos_in_place_upgrade_to_iso == ""
+              when: >
+                (gos_in_place_upgrade_to_iso is undefined) or
+                (gos_in_place_upgrade_to_iso == "")
             - name: "Set failure message"
               ansible.builtin.set_fact:
                 failure_msg: "Skip test case due to parameter 'gos_in_place_upgrade_to_iso' set file path does not exist: '{{ file_in_datastore_result | default('Fail') }}'."
-              when: file_in_datastore_result is undefined or file_in_datastore_result == 'Fail'
+              when: >
+                (file_in_datastore_result is undefined) or
+                (file_in_datastore_result == 'Fail')
             - include_tasks: ../../common/skip_test_case.yml
               vars:
                 skip_msg: "{{ failure_msg }}'"
@@ -52,6 +56,15 @@
             (gos_in_place_upgrade_to_iso is undefined or gos_in_place_upgrade_to_iso == "") or
             (file_in_datastore_result is undefined or file_in_datastore_result == 'Fail')
 
-        - include_tasks: gos_upgrade_test.yml
+        # Get PVSCSI and VMXNET3 driver info before OS upgrade
+        - include_tasks: ../wintools_uninstall_verify/get_pvscsi_vmxnet3_info.yml
+        # VM connect to upgrade ISO image
+        - include_tasks: mount_upgrade_to_iso.yml
+        # Do in-place upgrade in guest OS
+        - include_tasks: execute_upgrade_gos.yml
+        # Check OS upgrade
+        - include_tasks: check_after_gos_upgrade.yml
+        # Reset base snapshot
+        - include_tasks: ../../common/reset_base_snapshot.yml
       rescue:
         - include_tasks: ../../common/test_rescue.yml

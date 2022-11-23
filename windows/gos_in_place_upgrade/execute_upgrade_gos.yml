@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Refer to this doc: https://learn.microsoft.com/en-us/windows-server/get-started/kms-client-activation-keys
+# Note: please change below hardcoded KMS client setup key for new Windows releases when they're added in
+# above link.
 - name: "Set fact of the KMS client setup key for OS upgrading"
   ansible.builtin.set_fact:
     win_kms_client_setup_key: |-
@@ -9,7 +11,8 @@
       {% elif guest_os_product_type | lower == 'client' %}'NPPR9-FWDCX-D2C8J-H872K-2YT43'
       {% endif %}
 
-# Refer to this doc: https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/windows-setup-command-line-options?view=windows-11
+# Refer to this doc for setup.exe command line options:
+# https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/windows-setup-command-line-options?view=windows-11
 - name: "Set fact of the command of Windows upgrade"
   ansible.builtin.set_fact:
     win_upgrade_setup_cmd: "{{ upgrade_to_iso_drive }}:\\setup.exe /auto upgrade /eula accept /compat ignorewarning /copylogs C:\\upgrade.log /dynamicupdate disable /MigNEO disable /NoReboot /pkey {{ win_kms_client_setup_key }}"
@@ -22,14 +25,31 @@
   vars:
     win_powershell_cmd: "{{ win_upgrade_setup_cmd }}"
 
-# Windows will be offline a few minutes later
-- name: ""
-  ansible.windows.win_ping:
-  delegate_to: "{{ }}"
-  ignore_errors: true
+# Check guest OS is still online after upgrading command executed
+- include_tasks: ../utils/win_wait_for_port_status.yml
+  vars:
+    win_wait_port_timeout: 10
+# Guest OS will be offline a few minutes later
+- include_tasks: ../utils/win_wait_for_port_status.yml
+  vars:
+    win_wait_port_state: 'stopped'
+# Take a screenshot when guest OS is offline
+- include_tasks: ../../common/vm_take_screenshot.yml
+  vars:
+    vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
 
+# Then wait for guest OS back to online
+- include_tasks: ../utils/win_wait_for_port_status.yml
+  vars:
+    win_wait_port_timeout: 3600
 
-# Windows will be online a few minutes later
+# Take a screenshot after guest OS back to online
+- include_tasks: ../../common/vm_take_screenshot.yml
+  vars:
+    vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
+
+# Wait for guestinfo reported
+- include_tasks: ../../common/vm_wait_guest_fullname.yml
 
 # Restart Windows guest after it's back to online
 - include_tasks: ../utils/win_shutdown_restart.yml
