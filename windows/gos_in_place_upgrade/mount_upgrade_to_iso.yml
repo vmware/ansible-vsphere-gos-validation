@@ -31,11 +31,14 @@
 - include_tasks: ../../common/vm_connect_cdrom_to_iso.yml
   vars:
     vm_cdrom_iso_file: "{{ gos_in_place_upgrade_to_iso }}"
+- name: "Pause 5 seconds after ISO file attached"
+  ansible.builtin.pause:
+    seconds: 5
 
 # Get setup.exe path in mounted ISO image in guest
-- include_tasks: win_execute_cmd.yml
+- include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "(Get-Volume | where-object {$_.DriveType -eq 'CD-ROM' -and $_.OperationalStatus -eq 'OK'}.DriveLetter)"
+    win_powershell_cmd: "(Get-Volume | where-object {$_.DriveType -eq 'CD-ROM' -and $_.OperationalStatus -eq 'OK'}).DriveLetter"
 - name: "Set fact of mounted drive in guest OS"
   ansible.builtin.set_fact:
     upgrade_to_iso_drive: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
@@ -69,7 +72,7 @@
         win_upgrade_image_keyword: "*{{ guest_os_edition }} (Desktop Experience)"
     - include_tasks: ../utils/win_execute_cmd.yml
       vars:
-        win_powershell_cmd: "(Get-WindowsImage -ImagePath {{ upgrade_to_iso_drive }}:\\sources\install.wim | where-object {$_.ImageName -like '{{ win_upgrade_image_keyword }}'}).ImageIndex"
+        win_powershell_cmd: "(Get-WindowsImage -ImagePath {{ upgrade_to_iso_drive }}:\\sources\\install.wim | where-object {$_.ImageName -like '{{ win_upgrade_image_keyword }}'}).ImageIndex"
     - name: "Set fact of Windows Server with desktop experience image index"
       ansible.builtin.set_fact:
         win_image_index: "{{ win_powershell_cmd_output.stdout_lines[0] }}"

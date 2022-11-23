@@ -1,0 +1,45 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Wait until specified portgroup listed in the result
+# Parameters:
+#   esxi_wait_portgroup_timeout: the timeout of waiting
+#   for specified portgroup listed. Default value is 300s.
+#   wait_for_portgroup_name: the portgroup name to wait for.
+#
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - wait_for_portgroup_name is defined
+      - wait_for_portgroup_name
+    fail_msg: "Parameter 'wait_for_portgroup_name' is required to be set to a valid value: '{{ wait_for_portgroup_name | default('') }}'"
+
+- name: "Wait for portgroup '{{ wait_for_portgroup_name }}' info retrieved"
+  community.vmware.vmware_portgroup_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+  delay: 5
+  retries: "{{ ((esxi_wait_portgroup_timeout | default(300) | int) / 5) | int }}"
+  until:
+    - portgroup_facts is defined
+    - portgroup_facts.hosts_portgroup_info is defined
+    - portgroup_facts.hosts_portgroup_info[esxi_hostname] is defined
+    - portgroup_facts.hosts_portgroup_info[esxi_hostname] | length > 0
+    - (portgroup_facts.hosts_portgroup_info[esxi_hostname] | selectattr('portgroup', 'equalto', wait_for_portgroup_name)) | length != 0
+  ignore_errors: true
+  register: portgroup_facts
+
+- name: "Display the portgroup facts"
+  ansible.builtin.debug: var=portgroup_facts
+  when: enable_debug
+
+- name: "Check waiting for portgroup result"
+  ansible.builtin.assert:
+    that:
+      - portgroup_facts is defined
+      - portgroup_facts.failed is defined
+      - not portgroup_facts.failed
+    fail_msg: "Timed out waiting for portgroup '{{ wait_for_portgroup_name }}' info retrieved in {{ esxi_wait_portgroup_timeout | default(300) }} seconds."

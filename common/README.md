@@ -139,6 +139,7 @@
 * esxi_add_portgroup.yml: Add a new virtual switch port group
 * esxi_remove_portgroup.yml: Remove a virtual switch port group
 * esxi_get_portgroup_facts.yml: Get virtual switch port group facts
+* esxi_wait_portgroup.yml: Wait for specified port group info retrieved
 * esxi_add_vswitch.yml: Add a new standard virtual switch
 * esxi_remove_vswitch.yml: Remove a standard virtual switch
 * esxi_get_vswitch_facts.yml: Get virtual switch facts

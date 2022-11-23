@@ -15,11 +15,13 @@
 # https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/windows-setup-command-line-options?view=windows-11
 - name: "Set fact of the command of Windows upgrade"
   ansible.builtin.set_fact:
-    win_upgrade_setup_cmd: "{{ upgrade_to_iso_drive }}:\\setup.exe /auto upgrade /eula accept /compat ignorewarning /copylogs C:\\upgrade.log /dynamicupdate disable /MigNEO disable /NoReboot /pkey {{ win_kms_client_setup_key }}"
+    win_upgrade_setup_cmd: "{{ upgrade_to_iso_drive }}:\\setup.exe /auto upgrade /quiet /eula accept /compat ignorewarning /copylogs C:\\upgrade.log /dynamicupdate disable /MigNEO disable /NoReboot /pkey {{ win_kms_client_setup_key }}"
 - name: "Set fact of the command of Windows Server upgrade"
   ansible.builtin.set_fact:
-    win_upgrade_setup_cmd: "{{ win_upgrade_setup_cmd }} /imageindex {{ win_image_index }}"
+    win_upgrade_setup_cmd: "{{ upgrade_to_iso_drive }}:\\setup.exe /auto upgrade /quiet /eula accept /compat ignorewarning /copylogs C:\\upgrade.log /dynamicupdate disable /MigNEO disable /NoReboot /pkey {{ win_kms_client_setup_key }} /imageindex {{ win_image_index }}"
   when: guest_os_product_type | lower == 'server'
+- name: "Display the upgrade command to be executed"
+  ansible.builtin.debug: var=win_upgrade_setup_cmd
 
 - include_tasks: ../utils/win_execute_cmd.yml
   vars:
