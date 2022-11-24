@@ -17,12 +17,13 @@
     - name: "Test case block"
       block:
         # We only test VMware Tools installed scenario before OS upgrading
-        - include_tasks: ../setup/test_setup.yml
+        - name: "Execute test setup tasks"
+          include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: true
 
-        # Check configured OS installation ISO image for upgrading
-        - include_tasks: ../../common/esxi_check_delete_datastore_file.yml
+        - name: "Check configured OS installation ISO image existence"
+          include_tasks: ../../common/esxi_check_delete_datastore_file.yml
           vars:
             file_in_datastore: "{{ gos_in_place_upgrade_to_iso.split(']')[0].strip('[]') }}"
             file_in_datastore_path: "{{ gos_in_place_upgrade_to_iso.split(']')[1].strip(' ') }}"
@@ -48,7 +49,8 @@
               when: >
                 (file_in_datastore_result is undefined) or
                 (file_in_datastore_result == 'Fail')
-            - include_tasks: ../../common/skip_test_case.yml
+            - name: "Test case is blocked"
+              include_tasks: ../../common/skip_test_case.yml
               vars:
                 skip_msg: "{{ failure_msg }}'"
                 skip_reason: "Blocked"
@@ -56,15 +58,16 @@
             (gos_in_place_upgrade_to_iso is undefined or gos_in_place_upgrade_to_iso == "") or
             (file_in_datastore_result is undefined or file_in_datastore_result == 'Fail')
 
-        # Get PVSCSI and VMXNET3 driver info before OS upgrade
-        - include_tasks: ../wintools_uninstall_verify/get_pvscsi_vmxnet3_info.yml
-        # VM connect to upgrade ISO image
-        - include_tasks: mount_upgrade_to_iso.yml
-        # Do in-place upgrade in guest OS
-        - include_tasks: execute_upgrade_gos.yml
-        # Check OS upgrade
-        - include_tasks: check_after_gos_upgrade.yml
-        # Reset base snapshot
-        - include_tasks: ../../common/reset_base_snapshot.yml
+        - name: "Get PVSCSI and VMXNET3 driver info before OS upgrade"
+          include_tasks: ../wintools_uninstall_verify/get_pvscsi_vmxnet3_info.yml
+        - name: "Mount upgrade to ISO image"
+          include_tasks: mount_upgrade_to_iso.yml
+        - name: "Do in-place upgrade in guest OS"
+          include_tasks: execute_upgrade_gos.yml
+        - name: "Check OS upgrade"
+          include_tasks: check_after_gos_upgrade.yml
+        - name: "Reset base snapshot"
+          include_tasks: ../../common/reset_base_snapshot.yml
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Execute tasks when test failed"
+          include_tasks: ../../common/test_rescue.yml

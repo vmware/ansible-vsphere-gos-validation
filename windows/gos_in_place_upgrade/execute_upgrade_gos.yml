@@ -1,15 +1,25 @@
 # Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Refer to this doc: https://learn.microsoft.com/en-us/windows-server/get-started/kms-client-activation-keys
-# Note: please change below hardcoded KMS client setup key for new Windows releases when they're added in
-# above link.
-- name: "Set fact of the KMS client setup key for OS upgrading"
+- name: "Set fact of product key for Windows upgrade"
   ansible.builtin.set_fact:
-    win_kms_client_setup_key: |-
-      {% if guest_os_product_type | lower == 'server' %}'WX4NM-KYWYW-QJJR4-XV3QB-6VM33'
-      {% elif guest_os_product_type | lower == 'client' %}'NPPR9-FWDCX-D2C8J-H872K-2YT43'
-      {% endif %}
+    windows_product_key_upgrade: "{{ windows_product_key_upgrade | default('') }}"
+- name: "Get KMS client product key when product key is not set"
+  block:
+    - name: "Get KMS client product key"
+      include_tasks: ../utils/get_kms_client_product_key.yml
+      vars:
+        win_kms_client_distribution: "{{ win_image_name }}"
+        win_kms_client_key_file: "{{ current_test_log_folder }}/kms_client_keys"
+    - name: "Set fact of product key for Windows upgrade"
+      ansible.builtin.set_fact:
+        windows_product_key_upgrade: "{{ win_kms_client_key }}"
+  when: not windows_product_key_upgrade
+- name: "Check product key for Windows upgrade"
+  ansible.builtin.assert:
+    that:
+      - windows_product_key_upgrade
+    fail_msg: "Windows product key for OS upgrade is not set or can not get corresponding KMS client product key: {{ windows_product_key_upgrade }}"
 
 # Refer to this doc for setup.exe command line options:
 # https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/windows-setup-command-line-options?view=windows-11
@@ -18,42 +28,44 @@
     win_upgrade_setup_cmd: "{{ upgrade_to_iso_drive }}:\\setup.exe /auto upgrade /quiet /eula accept /compat ignorewarning /copylogs C:\\upgrade.log /dynamicupdate disable /MigNEO disable /NoReboot /pkey {{ win_kms_client_setup_key }}"
 - name: "Set fact of the command of Windows Server upgrade"
   ansible.builtin.set_fact:
-    win_upgrade_setup_cmd: "{{ upgrade_to_iso_drive }}:\\setup.exe /auto upgrade /quiet /eula accept /compat ignorewarning /copylogs C:\\upgrade.log /dynamicupdate disable /MigNEO disable /NoReboot /pkey {{ win_kms_client_setup_key }} /imageindex {{ win_image_index }}"
+    win_upgrade_setup_cmd: "{{ win_upgrade_setup_cmd }} ~ ' /imageindex ' ~ {{ win_image_index }}"
   when: guest_os_product_type | lower == 'server'
 - name: "Display the upgrade command to be executed"
   ansible.builtin.debug: var=win_upgrade_setup_cmd
 
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Execute setup.exe command to do OS upgrade"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "{{ win_upgrade_setup_cmd }}"
 
-# Check guest OS is still online after upgrading command executed
-- include_tasks: ../utils/win_wait_for_port_status.yml
+- name: "Check guest OS is still online after upgrading command executed"
+  include_tasks: ../utils/win_wait_for_port_status.yml
   vars:
     win_wait_port_timeout: 10
-# Guest OS will be offline a few minutes later
-- include_tasks: ../utils/win_wait_for_port_status.yml
+- name: "Check guest OS is offline a few minutes later"
+  include_tasks: ../utils/win_wait_for_port_status.yml
   vars:
     win_wait_port_state: 'stopped'
-# Take a screenshot when guest OS is offline
-- include_tasks: ../../common/vm_take_screenshot.yml
+
+- name: "Take a screenshot when guest OS is offline"
+  include_tasks: ../../common/vm_take_screenshot.yml
   vars:
     vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
 
-# Then wait for guest OS back to online
-- include_tasks: ../utils/win_wait_for_port_status.yml
+- name: "Wait for guest OS back to online"
+  include_tasks: ../utils/win_wait_for_port_status.yml
   vars:
     win_wait_port_timeout: 3600
 
-# Take a screenshot after guest OS back to online
-- include_tasks: ../../common/vm_take_screenshot.yml
+- name: "Take a screenshot after guest OS back to online"
+  include_tasks: ../../common/vm_take_screenshot.yml
   vars:
     vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
 
-# Wait for guestinfo reported
-- include_tasks: ../../common/vm_wait_guest_fullname.yml
+- name: "Wait for guestinfo reported"
+  include_tasks: ../../common/vm_wait_guest_fullname.yml
 
-# Restart Windows guest after it's back to online
-- include_tasks: ../utils/win_shutdown_restart.yml
+- name: "Restart Windows guest OS to complete upgrade"
+  include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"

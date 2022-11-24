@@ -6,11 +6,11 @@
     upgrade_to_iso_drive: ''
     win_image_index: ''
 
-# Get VM current CDROM devices
-- include_tasks: ../../common/vm_get_cdrom_devices.yml
+- name: "Get VM current CDROM devices"
+  include_tasks: ../../common/vm_get_cdrom_devices.yml
 
-# Add a new CDROM when there is no CDROM on VM
-- include_tasks: ../../common/vm_add_sata_cdrom.yml
+- name: "Add a new SATA CDROM to VM if there is no CDROM device"
+  include_tasks: ../../common/vm_add_sata_cdrom.yml
   when: cdrom_device_list | length == 0
 
 # Unattach files from all CDROM devices firstly
@@ -27,16 +27,16 @@
       with_items: "{{ cdrom_device_list }}"
   when: cdrom_device_list | length > 0
 
-# Connect to upgrade to ISO image
-- include_tasks: ../../common/vm_connect_cdrom_to_iso.yml
+- name: "Connect upgrade to ISO image to VM CDROM"
+  include_tasks: ../../common/vm_connect_cdrom_to_iso.yml
   vars:
     vm_cdrom_iso_file: "{{ gos_in_place_upgrade_to_iso }}"
 - name: "Pause 5 seconds after ISO file attached"
   ansible.builtin.pause:
     seconds: 5
 
-# Get setup.exe path in mounted ISO image in guest
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Get CDROM drive mounted with ISO image"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "(Get-Volume | where-object {$_.DriveType -eq 'CD-ROM' -and $_.OperationalStatus -eq 'OK'}).DriveLetter"
 - name: "Set fact of mounted drive in guest OS"
@@ -51,8 +51,8 @@
       - upgrade_to_iso_drive
     fail_msg: "Not get the drive letter of mounted upgrade ISO image in guest OS: {{ upgrade_to_iso_drive }}"
 
-# Get file items in the mounted drive path
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Get folders files list in the mounted ISO image"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Get-childitem -path {{ upgrade_to_iso_drive }}:\\ -name"
 - name: "Check Windows setup files or folders"
@@ -65,24 +65,17 @@
       - "'setup.exe' in win_powershell_cmd_output.stdout_lines"
     fail_msg: "'boot', 'sources' or 'setup.exe' files or folders not found in the mounted drive '{{ upgrade_to_iso_drive }}': {{ win_powershell_cmd_output.stdout_lines }}"
 
-- name: "Get Windows Server with desktop experience image index"
-  block:
-    - name: "Set fact of Windows Server image keyword to upgrade to"
-      ansible.builtin.set_fact:
-        win_upgrade_image_keyword: "*{{ guest_os_edition }} (Desktop Experience)"
-    - include_tasks: ../utils/win_execute_cmd.yml
-      vars:
-        win_powershell_cmd: "(Get-WindowsImage -ImagePath {{ upgrade_to_iso_drive }}:\\sources\\install.wim | where-object {$_.ImageName -like '{{ win_upgrade_image_keyword }}'}).ImageIndex"
-    - name: "Set fact of Windows Server with desktop experience image index"
-      ansible.builtin.set_fact:
-        win_image_index: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
-      when:
-        - win_powershell_cmd_output.stdout_lines is defined
-        - win_powershell_cmd_output.stdout_lines | length != 0
-    - name: "Check Windows Server with desktop experience image index"
-      ansible.builtin.assert:
-        that:
-          - win_image_index != ''
-        fail_msg: "Not get the image index of Windows Server by this keyword '{{ win_upgrade_image_keyword }}': '{{ win_image_index }}', please check the images in the ISO."
-  when:
-    - guest_os_product_type | lower == 'server'
+- name: "Set fact of Windows Server image keyword"
+  ansible.builtin.set_fact:
+    win_upgrade_image_keyword: "*{{ guest_os_edition }} (Desktop Experience)"
+  when: guest_os_product_type | lower == 'server'
+- name: "Set fact of Windows Client image keyword"
+  ansible.builtin.set_fact:
+    win_upgrade_image_keyword: "*{{ guest_os_edition }}"
+  when: guest_os_product_type | lower == 'client'
+
+- name: "Get upgrade to image index and name"
+  include_tasks: ../utils/win_get_image_index.yml
+  vars:
+    win_image_file_path: "{{ upgrade_to_iso_drive }}:\\sources\\install.wim"
+    win_image_keyword: "{{ win_upgrade_image_keyword }}"
