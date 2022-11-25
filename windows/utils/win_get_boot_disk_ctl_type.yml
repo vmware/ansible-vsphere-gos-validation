@@ -12,7 +12,7 @@
 
 - name: "Set fact of valid boot disk controller types list"
   ansible.builtin.set_fact:
-    win_valid_boot_disk_ctl: ['lsilogicsas', 'nvme', 'sata', 'pvscsi', 'ide']
+    win_valid_boot_disk_ctl: ['lsilogicsas', 'nvme', 'sata', 'paravirtual', 'ide']
 
 # Get boot disk BusType firstly
 - include_tasks: win_execute_cmd.yml
@@ -33,19 +33,10 @@
 # LSILogicSAS and PVSCSI disks are all returned 'SAS' BusType above
 - name: "Get SAS disk controller name"
   block:
-    - name: "Set fact of getting disk UniqueId command"
-      ansible.builtin.set_fact:
-        win_get_disk_uid_cmd: "$disk_uid = (((Get-Disk | where-object {$_.IsBoot -eq $true}).UniqueId -split '\\')[-1] -split ':')[0];"
-    - name: "Set fact of getting disk UniqueId command for Windows Server on ESXi {{ esxi_version }}"
-      ansible.builtin.set_fact:
-        win_get_disk_uid_cmd: "$disk_uid = ((Get-Disk | where-object {$_.IsBoot -eq $true}).Path -split '#')[-2];"
-      when:
-        - guest_os_product_type | lower == 'server'
-        - esxi_version is version('7.0.3', '<') or esxi_version is version('8.0.0', '>=')
     - include_tasks: win_execute_cmd.yml
       vars:
         win_powershell_cmd: >-
-          {{ win_get_disk_uid_cmd }}
+          $disk_uid = ((Get-Disk | where-object {$_.IsBoot -eq $true}).Path -split '#')[-2];
           $disk_ctl_id = ((Get-WmiObject Win32_SCSIControllerDevice | where-object {$_.Dependent -like "*$disk_uid*"}).Antecedent -split 'DeviceID=')[-1].trim('"');
           (Get-WmiObject Win32_SCSIController | where-object {$_.DeviceId -eq ($disk_ctl_id -replace '\\\\','\')}).Name
     - name: "Set fact of boot disk controller type"
