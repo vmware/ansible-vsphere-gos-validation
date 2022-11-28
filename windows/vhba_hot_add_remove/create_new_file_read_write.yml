@@ -38,6 +38,23 @@
       - "test_line in get_file_content_result1.stdout"
     fail_msg: "The file content is '{{ get_file_content_result1.stdout }}', which should contain: '{{ test_line }}'"
 
+- name: "Set boot disk"
+  block:
+    - name: "Boot order change of hot-add disk to new SATA controller for OS with BIOS firmware"
+      ansible.builtin.debug:
+        msg:
+            - "The disk boot order may be changed after hot-add new disk which causes failure of powering on VM."
+            - "Specify the boot disk as workaround. "
+
+    - include_tasks: ../../common/vm_set_boot_options.yml
+      vars:
+        boot_hdd_name: "{{ boot_disk_label }}"
+        boot_order_list:
+          - disk
+  when:
+    - boot_disk_label
+    - add_new_controller
+
 # Check new created file still exist after guest OS restart
 - include_tasks: ../utils/win_shutdown_restart.yml
   vars:
