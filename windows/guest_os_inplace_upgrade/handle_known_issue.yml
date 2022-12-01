@@ -1,9 +1,8 @@
 # Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# There is known issue on VMware Tools 12.0.5 and later,
-# Please refer to this KB:
-# https://kb.vmware.com/s/article/89290
+# There is known issue on PVSCSI driver and VMXNET3 driver in VMware Tools 12.0.5 and later,
+# Please refer to this KB article: https://kb.vmware.com/s/article/89290
 #
 - name: "Handle known issue"
   block:
@@ -14,10 +13,24 @@
           - "The workaround is deleting incompatible driver and install the compatible driver, then perform OS upgrade."
       tags:
         - known_issue
+    - name: "Remove PVSCSI driver and install compatible one"
+      include_tasks: remove_reinstall_driver.yml
+      vars:
+        win_driver_to_remove: "{{ win_pvscsi_before }}"
+      when:
+        - win_pvscsi_before.DriverVersion is version('1.3.25.0', '>=')
+    - name: "Remove VMXNET3 driver and install compatible one"
+      include_tasks: remove_reinstall_driver.yml
+      vars:
+        win_driver_to_remove: "{{ win_vmxnet3_before }}"
+      when:
+        - win_vmxnet3_before.DriverVersion is version('1.9.9.0', '>=')
+    - name: "Restart guest OS"
+      include_tasks: ../utils/win_shutdown_restart.yml
+      vars:
+        set_win_power_state: "restart"
   when:
     - "'Windows 10' in guest_os_ansible_distribution"
     - vmtools_version is defined
     - vmtools_version is version('12.0.5', '>=')
-    - win_pvscsi_before.DriverVersion is defined
-    - win_pvscsi_before.DriverVersion is version('1.3.25.0', '>=')
-    - vm_has_pvscsi_boot_disk
+    - (win_pvscsi_before.DriverVersion is defined and win_pvscsi_before.DriverVersion is version('1.3.25.0', '>=')) or (win_vmxnet3_before.DriverVersion and win_vmxnet3_before.DriverVersion is version('1.9.9.0', '>='))

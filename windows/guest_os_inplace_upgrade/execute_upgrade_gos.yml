@@ -1,21 +1,13 @@
 # Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Set fact of product key for Windows upgrade"
-  ansible.builtin.set_fact:
-    windows_product_key_upgrade: "{{ windows_product_key_upgrade | default('') }}"
-- name: "Get KMS client product key when product key is not set"
-  block:
-    - name: "Get KMS client product key"
-      include_tasks: ../utils/get_kms_client_product_key.yml
-      vars:
-        win_kms_client_distribution: "{{ win_image_name.split('(')[0].strip() }}"
-        win_kms_client_key_file: "{{ current_test_log_folder }}/kms_client_keys"
-    - name: "Set fact of product key for Windows upgrade"
-      ansible.builtin.set_fact:
-        windows_product_key_upgrade: "{{ win_kms_client_key }}"
-  when: not windows_product_key_upgrade
-- name: "Check product key for Windows upgrade"
+- name: "Enable test mode in guest OS for upgrading to pre-release build"
+  include_tasks: ../wintools_complete_install_verify/enable_test_signing.yml
+  when:
+    - enable_test_mode is defined
+    - enable_test_mode | bool
+
+- name: "Check product key for Windows Server upgrade"
   ansible.builtin.assert:
     that:
       - windows_product_key_upgrade

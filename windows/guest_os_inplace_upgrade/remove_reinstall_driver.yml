@@ -1,0 +1,49 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Check driver INF file name"
+  ansible.builtin.assert:
+    that:
+      - win_driver_to_remove.InfName is defined
+      - win_driver_to_remove.InfName
+    fail_msg: "Not get valid value of driver InfName in driver info dict: {{ win_driver_to_remove }}"
+
+- name: "Set fact of compatible PVSCSI driver file"
+  ansible.builtin.set_fact:
+    win_driver_cab_file: "win10_64_pvscsi_1-3-17-0.cab"
+    win_driver_cab_version: "1.3.17.0"
+  when:
+    - win_driver_to_remove.DeviceName is defined
+    - "'PVSCSI' in win_driver_to_remove.DeviceName"
+- name: "Set fact of compatible VMXNET3 driver file"
+  ansible.builtin.set_fact:
+    win_driver_cab_file: "win10_vmxnet3_1-9-5-0.cab"
+    win_driver_cab_vesion: "1.9.5.0"
+  when:
+    - win_driver_to_remove.DeviceName is defined
+    - "'vmxnet3' in win_driver_to_remove.DeviceName"
+ 
+- name: "Transfer compatible driver cab file to guest OS"
+  include_tasks: ../utils/win_copy_file_from_local.yml
+  vars:
+    src_path_local: "./drivers/{{ win_driver_cab_file }}"
+    dest_path_remote: "C:\\"
+
+- name: "Get tansferred file status in guest OS"
+  include_tasks: ../utils/win_check_file_exist.yml
+  vars:
+    win_check_file_exist_file: "C:\\{{ win_driver_cab_file }}"
+- name: "Check driver file transferred to guest OS"
+  ansible.builtin.assert:
+    that:
+      - "{{ win_check_file_exist_result }}"
+    fail_msg: "Compatible driver file not found in guest OS in this path: 'C:\\{{ win_driver_cab_file }}'"
+
+- name: "Install compatible driver in guest OS"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      pnputil /delete-driver "{{ win_driver_to_remove.InfName }}" /uninstall /force;
+      New-Item "C:\\{{ win_driver_cab_file.strip('.cab') }}" -ItemType Directory;
+      Expand "C:\\{{ win_driver_cab_file }}" -F:* "C:\\{{ win_driver_cab_file.strip('.cab') }}";
+      pnputil /add-driver "C:\\{{ win_driver_cab_file.strip('.cab') }}\\*.inf" /install
