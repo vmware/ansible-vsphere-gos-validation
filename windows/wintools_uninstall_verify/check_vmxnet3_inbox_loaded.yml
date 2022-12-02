@@ -13,7 +13,7 @@
       ansible.builtin.debug:
         msg:
           - "Get problem device in guest OS: {{ gos_problem_device_list }}"
-          - "Inbox vmxnet3 driver is not loaded successfully after VMware Tools uninstall when vmxnet3 first installer is 'MSI', ignore this known issue on VMware Tools 12.1.0 and earlier versions."
+          - "Inbox vmxnet3 driver is not loaded successfully after VMware Tools uninstall when vmxnet3 first installer is 'MSI', ignore this known issue on VMware Tools 12.1.5 and earlier versions."
       tags:
         - known_issue
     # Remove problem device and rescan devices to let it load again
@@ -22,7 +22,7 @@
         win_powershell_cmd: "foreach ($device in (Get-PnpDevice | where-object {$_.FriendlyName -like '*vmxnet3*'})){&pnputil /remove-device $device.InstanceId;&pnputil /scan-devices}"
   when:
     - vmtools_version is defined
-    - vmtools_version is version('12.1.0', '<=')
+    - vmtools_version is version('12.1.5', '<=')
     - gos_has_problem_device is defined and gos_has_problem_device
     - (gos_problem_device_list | selectattr('device_name', 'match', 'vmxnet3*')) | length > 0
 
