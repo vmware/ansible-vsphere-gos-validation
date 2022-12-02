@@ -1,6 +1,18 @@
 # Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+- name: "Set fact of expected guest OS distribution"
+  ansible.builtin.set_fact:
+    win_distr_expected: "{{ 'Microsoft ' ~ win_image_name.split('(')[0].strip() }}"
+- name: "Get guest system info after OS uprade"
+  include_tasks: ../utils/get_windows_system_info.yml
+- name: "Check guest OS distribution after upgrade"
+  ansible.builtin.assert:
+    that:
+      - win_distr_before_upgrade != guest_os_ansible_distribution
+      - guest_os_ansible_distribution == win_distr_expected
+    fail_msg: "Guest OS distribution after OS upgrade: '{{ win_distr_after_upgrade }}' is not as expected: '{{ win_distr_expected }}', or the same as before OS upgrade: '{{ win_distr_before_upgrade }}'."
+
 - name: "Get VMTools service status in guest OS"
   include_tasks: ../utils/win_get_service_status.yml
   vars:
@@ -9,32 +21,7 @@
   ansible.builtin.assert:
     that:
       - service_status == "Running"
-    fail_msg: "VMware Tools service is not 'Running': {{ service_status }}"
-
-- name: "Get guest system info after OS uprade"
-  include_tasks: ../../common/get_system_info.yml
-  vars:
-    filter: "ansible_*"
-- name: "Set facts of guest system info after upgrading"
-  ansible.builtin.set_fact:
-    win_distr_after_upgrade: "{{ guest_system_info.ansible_distribution | default('') }}"
-    win_distr_ver_after_upgrade: "{{ guest_system_info.ansible_distribution_version | default('') }}"
-
-- name: "Set fact of expected guest OS distribution"
-  ansible.builtin.set_fact:
-    win_distr_expected: "{{ 'Microsoft ' ~ win_image_name.split('(')[0].strip() }}"
-- name: "Display the guest OS info after OS upgrade"
-  ansible.builtin.debug:
-    msg:
-      - "Guest OS after OS upgrade: {{ win_distr_after_upgrade }}"
-      - "Guest OS version after OS upgrade: {{ win_distr_ver_after_upgrade }}"
-- name: "Check guest OS version after upgrade"
-  ansible.builtin.assert:
-    that:
-      - win_distr_after_upgrade
-      - win_distr_after_upgrade != guest_os_ansible_distribution
-      - win_distr_after_upgrade == win_distr_expected
-    fail_msg: "Guest OS distribution info got after OS upgrade: '{{ win_distr_after_upgrade }}' is not which got in image '{{ win_distr_expected }}'."
+    fail_msg: "VMware Tools service is not 'Running' after OS upgrade: {{ service_status }}"
 
 - name: "Get problem device list in guest OS"
   include_tasks: ../utils/win_get_problem_device.yml
@@ -75,7 +62,7 @@
       - "PVSCSI, after version: {{ win_pvscsi_after_upgrade.DriverVersion | default('') }}, before version: {{ win_pvscsi_before.DriverVersion | default('') }}."
       - "VMXNET3, after version: {{ win_vmxnet3_after_upgrade.DriverVersion | default('') }}, before version: {{ win_vmxnet3_before.DriverVersion | default('') }}"
   when:
-    - not (win_incompatible_driver_issue and "'Windows Server 2019' in guest_os_ansible_distribution")
+    - not (win_incompatible_driver_issue and "'Windows Server 2019' in win_distr_before_upgrade")
 
 - name: "Check loaded PVSCSI and VMXNET3 drivers version"
   ansible.builtin.assert:
@@ -90,4 +77,4 @@
       - "VMXNET3, after upgrade: {{ win_vmxnet3_after_upgrade.DriverVersion | default('') }}, inbox version: 1.8.17.0."
   when:
     - win_incompatible_driver_issue
-    - "'Windows Server 2019' in guest_os_ansible_distribution"
+    - "'Windows Server 2019' in win_distr_before_upgrade"

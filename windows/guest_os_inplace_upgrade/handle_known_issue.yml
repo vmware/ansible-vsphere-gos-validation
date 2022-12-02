@@ -20,11 +20,11 @@
       ansible.builtin.debug:
         msg:
           - "PVSCSI and VMXNET3 drivers installed by VMWare Tools 12.0.5 and later in Windows Server 2019 are not compatible with Windows Server 2022 and later after upgrade."
-          - "KB article: https://kb.vmware.com/s/article/89290."
-          - "Windows Server 2022 will load inbox PVSCSI and/or VMXNET3 drivers automatically when there is network connection during guest OS upgrading."
+          - "Refer to KB: https://kb.vmware.com/s/article/89290."
+          - "Windows Server 2022 will load inbox PVSCSI and VMXNET3 drivers automatically when there is network connection during guest OS upgrading."
       tags:
         - known_issue
-      when: "'Windows Server 2019' in guest_os_ansible_distribution"
+      when: "'Windows Server 2019' in win_distr_before_upgrade"
 
     - name: "Handle known issue for Windows 10"
       block:
@@ -66,7 +66,7 @@
               - win_vmxnet3_before.DriverVersion == "1.9.5.0"
             fail_msg: "After removing VMXNET3 driver '{{ win_incompatible_vmxnet3 }}' and install driver '1.9.5.0', now loaded driver version is not as expected: '{{ win_vmxnet3_before.DriverVersion }}'"
           when: win_vmxnet3_version is version('1.9.9.0', '>=')
-      when: "'Windows 10' in guest_os_ansible_distribution"
+      when: "'Windows 10' in win_distr_before_upgrade"
   when:
     - vmtools_version is defined
     - vmtools_version is version('12.0.5', '>=')

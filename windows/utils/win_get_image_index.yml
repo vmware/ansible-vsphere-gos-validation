@@ -26,7 +26,8 @@
     win_image_index: ''
     win_image_name: ''
 
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Get matched Windows image info"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "(Get-WindowsImage -ImagePath {{ win_image_file_path }} | where-object {$_.ImageName -like '{{ win_image_keyword }}'}) | select ImageIndex, ImageName | ft -hide"
 
@@ -45,11 +46,14 @@
     win_image_index: "{{ win_image_list[0].index }}"
     win_image_name: "{{ win_image_list[0].name }}"
   when: win_image_list | length != 0
+
 - name: "Display the Windows image index and name"
   ansible.builtin.debug:
     msg:
+      - "Got matched image list: {{ win_image_list }}"
       - "Got image index: {{ win_image_index }}"
       - "Got image name: {{ win_image_name }}"
+
 - name: "Check Windows image index and name"
   ansible.builtin.assert:
     that:

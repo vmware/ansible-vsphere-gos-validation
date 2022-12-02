@@ -1,0 +1,43 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get PVSCSI or VMXNET3 driver installer info in Windows guest OS
+# Parameters:
+#   win_get_driver_installer_name: valid values are 'pvscsi', 'vmxnet3'.
+# Return:
+#   win_driver_installer_list: the list of driver installer registry values
+#
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - win_get_driver_installer_name is defined
+      - win_get_driver_installer_name in ['pvscsi', 'vmxnet3']
+    fail_msg: "Parameter 'win_get_driver_installer_name' is set to '{{ win_get_driver_installer_name | default('') }}', while valid value is 'pvscsi' or 'vmxnet3'."
+
+- name: "Initialize the fact of driver installer info list"
+  ansible.builtin.set_fact:
+    win_driver_installer_list: []
+- name: "Set fact of driver service name"
+  ansible.builtin.set_fact:
+    win_driver_service: |-
+      {%- if win_get_driver_installer_name == 'pvscsi' -%}pvscsi
+      {%- elif win_get_driver_installer_name == 'vmxnet3' -%}vmxnet3ndis6
+      {%- else -%}{%- endif -%}
+
+- name: "Get driver installer registry info"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: |-
+      if ($(Test-Path -Path "HKLM:\System\CurrentControlSet\Services\{{ win_driver_service }}")) {
+          Get-ItemPropertyValue -Path "HKLM:\System\CurrentControlSet\Services\{{ win_driver_service }}" -Name 'vwdk.installers'
+      }
+- name: "Set fact of the driver installer info list"
+  ansible.builtin.set_fact:
+    win_driver_installer_list: "{{ win_powershell_cmd_output.stdout_lines | select }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+
+- name: "Display the driver installer info list"
+  ansible.builtin.debug:
+    msg: "Get '{{ win_get_driver_installer_name }}' driver installer info in guest OS: {{ win_driver_installer_list }}"
