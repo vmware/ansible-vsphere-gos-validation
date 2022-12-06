@@ -4,13 +4,6 @@
 - name: "Set fact of expected guest OS distribution"
   ansible.builtin.set_fact:
     win_distr_expected: "{{ 'Microsoft ' ~ win_image_name.split('(')[0].strip() }}"
-- name: "Get guest system info after OS uprade"
-  include_tasks: ../utils/get_windows_system_info.yml
-- name: "Check guest OS distribution after upgrade"
-  ansible.builtin.assert:
-    that:
-      - guest_os_ansible_distribution == win_distr_expected
-    fail_msg: "Guest OS distribution after OS upgrade is: '{{ guest_os_ansible_distribution }}', not the same as expected one: '{{ win_distr_expected }}'."
 
 - name: "Get VMTools service status in guest OS"
   include_tasks: ../utils/win_get_service_status.yml
@@ -21,6 +14,17 @@
     that:
       - service_status == "Running"
     fail_msg: "VMware Tools service is not 'Running' after OS upgrade: {{ service_status }}"
+
+- name: "Get guest system info after OS uprade"
+  include_tasks: ../utils/get_windows_system_info.yml
+- name: "Get guestinfo after OS upgrade"
+  include_tasks: ../../common/vm_get_guest_info.yml
+
+- name: "Check guest OS distribution after OS upgrade"
+  ansible.builtin.assert:
+    that:
+      - guest_os_ansible_distribution == win_distr_expected
+    fail_msg: "Guest OS distribution after OS upgrade is: '{{ guest_os_ansible_distribution }}', not the same as expected one: '{{ win_distr_expected }}'."
 
 - name: "Get problem device list in guest OS"
   include_tasks: ../utils/win_get_problem_device.yml
