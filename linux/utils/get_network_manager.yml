@@ -19,8 +19,8 @@
     - include_tasks: get_service_info.yml
       vars:
         service_name: "NetworkManager.service"
-    
-    # RHEL/SLED/Ubuntu Desktop network interfaces are managed by NetworkManager
+
+      # RHEL/SLED/Ubuntu Desktop network interfaces are managed by NetworkManager
     - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is NetworkManager"
       ansible.builtin.set_fact:
         guest_os_network_manager: "NetworkManager"
@@ -28,7 +28,7 @@
         - service_info
         - service_info.state is defined
         - service_info.state in ['active', 'running']
-    
+
     - name: "Set network device manager for guest OS which doesn't have NetworkManager"
       block:
         # SLES uses netplan to manage network interfaces
@@ -36,13 +36,13 @@
           ansible.builtin.set_fact:
             guest_os_network_manager: "wicked"
           when: guest_os_family == "Suse"
-    
-        # Ubuntu server uses netplan to manage network interfaces
+
+      # Ubuntu server uses netplan to manage network interfaces
         - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is netplan"
           ansible.builtin.set_fact:
             guest_os_network_manager: "netplan"
           when: guest_os_ansible_distribution == "Ubuntu"
-    
+
         # Old RHEL uses ifdown/ifup to manage network interfaces
         - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is traditional ifdown/ifup"
           ansible.builtin.set_fact:
@@ -53,7 +53,7 @@
         - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is systemd-networkd"
           ansible.builtin.set_fact:
             guest_os_network_manager: "systemd-networkd"
-          when: > 
+          when: >
             (guest_os_ansible_distribution == "VMware Photon OS") or
             ("Flatcar" in guest_os_ansible_distribution)
       when: >

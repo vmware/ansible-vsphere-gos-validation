@@ -1,0 +1,731 @@
+diff --git a/common/create_directory.yml b/common/create_directory.yml
+index ca2b3c0..8e0c539 100644
+--- a/common/create_directory.yml
++++ b/common/create_directory.yml
+@@ -4,7 +4,7 @@
+ # Create new directory with specified path
+ # Parameters:
+ #   dir_path: the new directory path to be created
+-#   dir_mode: the permission of new directory, defualt is '0755' 
++#   dir_mode: the permission of new directory, default is '0755'
+ #
+ - name: "Create new directory '{{ dir_path }}'"
+   ansible.builtin.file:
+diff --git a/common/esxi_check_delete_datastore_file.yml b/common/esxi_check_delete_datastore_file.yml
+index 730e858..e8acf07 100644
+--- a/common/esxi_check_delete_datastore_file.yml
++++ b/common/esxi_check_delete_datastore_file.yml
+@@ -44,7 +44,7 @@
+     - name: Set fact of the datastore file existence
+       ansible.builtin.set_fact:
+         file_in_datastore_result: "{{ 'Success' if ('status' in ds_file_result and ds_file_result.status == 200) else 'Fail' }}"
+-    - ansible.builtin.debug:
++      - ansible.builtin.debug:
+         msg: "File '{{ file_in_datastore_path }}' in datastore '{{ file_in_datastore }}': {{ file_in_datastore_result }}"
+   when: file_in_datastore_ops == 'file'
+ 
+@@ -53,7 +53,7 @@
+     - name: Set fact of the result of datastore file remove
+       ansible.builtin.set_fact:
+         file_in_datastore_result: "{{ 'Success' if not ds_file_result.failed else 'Fail' }}"
+-    - ansible.builtin.debug:
++      - ansible.builtin.debug:
+         msg: "Remove file '{{ file_in_datastore_path }}' in datastore '{{ file_in_datastore }}': {{ file_in_datastore_result }}"
+   when: file_in_datastore_ops == 'absent'
+ 
+diff --git a/common/esxi_get_guest_config_options.yml b/common/esxi_get_guest_config_options.yml
+index c710c4e..e9d4788 100644
+--- a/common/esxi_get_guest_config_options.yml
++++ b/common/esxi_get_guest_config_options.yml
+@@ -131,7 +131,7 @@
+       ansible.builtin.set_fact:
+         guest_config_options: >-
+           {{
+-            vm_config_name.values() | zip_longest([]) 
++            vm_config_name.values() | zip_longest([])
+             | items2dict(key_name=0, value_name=1)
+           }}
+ 
+@@ -159,14 +159,14 @@
+       register: guest_os_descriptor
+       ignore_errors: true
+       loop: "{{ vm_config_name.keys() }}"
+-      
++
+     - name: "Set fact for VM default config with guest id {{ guest_id }}"
+       ansible.builtin.set_fact:
+         guest_config_options: >-
+-          {{ 
+-            guest_config_options 
+-            | combine({vm_config_name[item.key]: 
+-                       vm_device_types[item.value] if item.value in vm_device_types else item.value}) 
++          {{
++            guest_config_options
++            | combine({vm_config_name[item.key]:
++                       vm_device_types[item.value] if item.value in vm_device_types else item.value})
+           }}
+       with_items: "{{ guest_os_descriptor.results | map(attribute='matches') | select('defined') | flatten | map('dict2items') }}"
+ 
+@@ -197,12 +197,12 @@
+     - name: "Set supported disk controllers for guest id {{ guest_id }}"
+       ansible.builtin.set_fact:
+         guest_config_options: >-
+-          {{ 
++          {{
+             guest_config_options
+             | combine({
+-                 'support_disk_controller': 
+-                 guest_supported_disk_ctrls.matches | map(attribute='e') | map('extract', vm_device_types) | list 
+-              })
++                 'support_disk_controller':
++                   guest_supported_disk_ctrls.matches | map(attribute='e') | map('extract', vm_device_types) | list
++                    })
+            }}
+       when:
+         - guest_supported_disk_ctrls is defined
+@@ -220,12 +220,12 @@
+     - name: "Set supported network adapters for guest id {{ guest_id }}"
+       ansible.builtin.set_fact:
+         guest_config_options: >-
+-          {{ 
++          {{
+             guest_config_options
+             | combine({
+-                 'support_ethernet_card': 
+-                 guest_supported_ethernet_card.matches | map(attribute='e') | map('extract', vm_device_types) | list 
+-              })
++                 'support_ethernet_card':
++                   guest_supported_ethernet_card.matches | map(attribute='e') | map('extract', vm_device_types) | list
++                      })
+            }}
+       when:
+         - guest_supported_ethernet_card is defined
+@@ -243,12 +243,12 @@
+     - name: "Set supported USB controllers for guest id {{ guest_id }}"
+       ansible.builtin.set_fact:
+         guest_config_options: >-
+-          {{ 
++          {{
+             guest_config_options
+             | combine({
+-                 'support_usb_controller': 
+-                 guest_supported_usb_ctrls.matches | map(attribute='e') | map('extract', vm_device_types) | list 
+-              })
++                 'support_usb_controller':
++                   guest_supported_usb_ctrls.matches | map(attribute='e') | map('extract', vm_device_types) | list
++                      })
+            }}
+       when:
+         - guest_supported_usb_ctrls is defined
+@@ -258,7 +258,7 @@
+     - name: "Combine guest_id and hardware version into guest_config_options"
+       ansible.builtin.set_fact:
+         guest_config_options: >-
+-          {{ 
++          {{
+             guest_config_options
+             | combine({
+                  'guest_id': guest_id,
+diff --git a/common/get_iso_file_list.yml b/common/get_iso_file_list.yml
+index f6fd7d7..a382388 100644
+--- a/common/get_iso_file_list.yml
++++ b/common/get_iso_file_list.yml
+@@ -5,7 +5,7 @@
+ # if os_installation_iso_url parameter is configured, will
+ # download and transfer ISO file to ESXi host datastore.
+ # Parameters:
+-#   os_installation_iso_url: the URL for downloading OS installation ISO file. 
++#   os_installation_iso_url: the URL for downloading OS installation ISO file.
+ #   os_installation_iso_list: the OS installation ISO files' paths list.
+ #
+ - block:
+diff --git a/common/vm_add_serial_port.yml b/common/vm_add_serial_port.yml
+index 5336456..994ab80 100644
+--- a/common/vm_add_serial_port.yml
++++ b/common/vm_add_serial_port.yml
+@@ -6,7 +6,7 @@
+ #   vm_serial_port_file_path: The serial port output file on datastore.
+ # Return:
+ #   vm_serial_port_output: The absolute path of the serial port output file
+-#   
++#
+ - name: "Set default serial port output file"
+   ansible.builtin.set_fact:
+     vm_serial_port_file_path: "{{ vm_files_path_ds.strip('\\/') }}/serial-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.log"
+diff --git a/common/vm_create.yml b/common/vm_create.yml
+index 039fe55..8dd6a00 100644
+--- a/common/vm_create.yml
++++ b/common/vm_create.yml
+@@ -7,7 +7,7 @@
+ #   guest_id (required): the guest ID of new created VM.
+ #   datastore (required): the name of datastore where new VM created.
+ #   vm_power_state (optional): the power state of VM after creation, valid values are
+-#     'poweredon', 'powered-on', 'poweredoff', 'powered-off', default value is 'poweredoff'. 
++#   'poweredon', 'powered-on', 'poweredoff', 'powered-off', default value is 'poweredoff'.
+ #   memory_mb (optional): the VM memory size in MB, default value is 4096.
+ #   cpu_number (optional): the VM CPU number, default value is 2.
+ #   num_cpu_cores_per_socket (optional): VM CPU cores per socket number, default is 1.
+@@ -18,7 +18,7 @@
+ #   vm_cdroms (optional): VM CDROM list, this parameter is optional, but if you want to install
+ #     guest OS after VM created, please configure the OS installation ISO files.
+ #   boot_disk_controller (optional): valid values are 'buslogic', 'lsilogic', 'lsilogicsas',
+-#     'paravirtual', 'sata' and 'nvme', default value is 'paravirtual'.
++#   'paravirtual', 'sata' and 'nvme', default value is 'paravirtual'.
+ #   boot_disk_size_gb (optional): the boot disk size in GB, default value is 32.
+ #   vm_disk_type (optional): the boot disk type, valid values are 'thin', 'thick',
+ #     'eagerzeroedthick', default value is 'thin'.
+diff --git a/common/vm_get_cdrom_devices.yml b/common/vm_get_cdrom_devices.yml
+index 3b227ff..f7279ea 100644
+--- a/common/vm_get_cdrom_devices.yml
++++ b/common/vm_get_cdrom_devices.yml
+@@ -8,7 +8,7 @@
+     property_list: ['config.hardware.device']
+ 
+ - name: Set fact of CDROM devices list from VM config
+-  ansible.builtin.set_fact:    
++  ansible.builtin.set_fact:
+     cdrom_device_list1: "{{ vm_config.config.hardware.device | selectattr('deviceInfo.label', 'match', 'CD/DVD drive') }}"
+ 
+ - name: Initialize CDROM devices info list
+@@ -24,7 +24,7 @@
+     cdrom_device_list: []
+ - name: Set fact of CDROM devices info list contain controller info
+   ansible.builtin.set_fact:
+-    cdrom_device_list: "{{ cdrom_device_list + [item | combine( { 'bus_num': (vm_config.config.hardware.device | selectattr('key', 'equalto', item.controller_key))[0].busNumber, 'controller_label': (vm_config.config.hardware.device | selectattr('key', 'equalto', item.controller_key))[0].deviceInfo.label } )] }}" 
++    cdrom_device_list: "{{ cdrom_device_list + [item | combine( { 'bus_num': (vm_config.config.hardware.device | selectattr('key', 'equalto', item.controller_key))[0].busNumber, 'controller_label': (vm_config.config.hardware.device | selectattr('key', 'equalto', item.controller_key))[0].deviceInfo.label } )] }}"
+   with_items: "{{ cdrom_device_list2 }}"
+ 
+ - name: Print CDROM devices info list
+diff --git a/common/vm_get_device_with_key.yml b/common/vm_get_device_with_key.yml
+index 7876235..e072edd 100644
+--- a/common/vm_get_device_with_key.yml
++++ b/common/vm_get_device_with_key.yml
+@@ -6,7 +6,7 @@
+ #   device_key: the device key
+ # Return:
+ #   device_info_with_key: the info of device with specified device key
+-# 
++#
+ 
+ - include_tasks: vm_get_config.yml
+   vars:
+diff --git a/common/vm_get_vm_info.yml b/common/vm_get_vm_info.yml
+index 0b2ba36..d510465 100644
+--- a/common/vm_get_vm_info.yml
++++ b/common/vm_get_vm_info.yml
+@@ -16,7 +16,7 @@
+     vm_guest_id: "{{ vm_config.config.guestId }}"
+     vm_hardware_version: "{{ vm_config.config.version }}"
+     vm_hardware_version_num: "{{ vm_config.config.version.split('-')[-1] }}"
+- 
++
+ - ansible.builtin.debug:
+     msg:
+       - "VM datastore: {{ datastore }}"
+diff --git a/common/vm_get_vmtools_status.yml b/common/vm_get_vmtools_status.yml
+index 8f55e3b..0f6b890 100644
+--- a/common/vm_get_vmtools_status.yml
++++ b/common/vm_get_vmtools_status.yml
+@@ -31,7 +31,7 @@
+   when:
+     - "'failed' in get_vmtools_info"
+     - not get_vmtools_info.failed
+-    - "'vmtools_info' in get_vmtools_info" 
++    - "'vmtools_info' in get_vmtools_info"
+ 
+ - block:
+     - name: Wait for VMware Tools running when it's executing scripts or not running
+diff --git a/common/vm_wait_guest_ip.yml b/common/vm_wait_guest_ip.yml
+index 7090124..52a34d1 100644
+--- a/common/vm_wait_guest_ip.yml
++++ b/common/vm_wait_guest_ip.yml
+@@ -12,8 +12,8 @@
+ # Parameters:
+ #   wait_ipv4: the IP address to wait for in guest info
+ #   vm_get_ip_timeout(optional): timeout for retrying get VM IP addresses in guest info,
+-# the default value is 300 seconds.
+-# 
++#   the default value is 300 seconds.
++#
+ - name: Initialize the wait for IP address
+   ansible.builtin.set_fact:
+     wait_ipv4: ""
+diff --git a/linux/check_ip_address/vm_wait_guest_all_ip.yml b/linux/check_ip_address/vm_wait_guest_all_ip.yml
+index 435f82f..7f0240a 100644
+--- a/linux/check_ip_address/vm_wait_guest_all_ip.yml
++++ b/linux/check_ip_address/vm_wait_guest_all_ip.yml
+@@ -10,7 +10,7 @@
+   when:
+     - vmtools_version is defined
+     - vmtools_version is version('10.1.0', '>=')
+- 
++
+ - block:
+     # Restart VMTools service to refresh networking information in guest info
+     # Restart vmtoolsd to refresh guest info
+diff --git a/linux/deploy_vm/deploy_vm_from_iso.yml b/linux/deploy_vm/deploy_vm_from_iso.yml
+index 6d522ce..57c7212 100644
+--- a/linux/deploy_vm/deploy_vm_from_iso.yml
++++ b/linux/deploy_vm/deploy_vm_from_iso.yml
+@@ -152,7 +152,7 @@
+     - name: "Wait 60s for OS rebooting"
+       ansible.builtin.pause:
+         seconds: 60
+- 
++
+     # For Photon OS and Ubuntu
+     - include_tasks: ../../common/vm_wait_guest_fullname.yml
+       when:
+diff --git a/linux/deploy_vm/get_boot_images_from_iso.yml b/linux/deploy_vm/get_boot_images_from_iso.yml
+index 6ebec1b..c44e81d 100644
+--- a/linux/deploy_vm/get_boot_images_from_iso.yml
++++ b/linux/deploy_vm/get_boot_images_from_iso.yml
+@@ -44,12 +44,12 @@
+         get_efi_part_result is undefined or
+         get_efi_part_result.stdout is undefined or
+         get_efi_part_result.stdout.split() | length < 3
+- 
++
+     - name: "Set facts of the start block and block count of EFI boot image partition"
+       ansible.builtin.set_fact:
+         efi_part_start_block: "{{ get_efi_part_result.stdout.split()[1] }}"
+         efi_part_block_count: "{{ get_efi_part_result.stdout.split()[2] }}"
+- 
++
+     - ansible.builtin.fail:
+         msg: "Failed to get partitoin blocks of EFI boot image from source ISO"
+       when: >
+diff --git a/linux/memory_hot_add_basic/memory_set_and_validate.yml b/linux/memory_hot_add_basic/memory_set_and_validate.yml
+index b2d4352..90aaf50 100644
+--- a/linux/memory_hot_add_basic/memory_set_and_validate.yml
++++ b/linux/memory_hot_add_basic/memory_set_and_validate.yml
+@@ -33,8 +33,8 @@
+         - include_tasks: ../../common/update_inventory.yml
+       when:
+         - mem_before_hotadd | int <= 3072
+-        - mem_after_hotadd | int > 3072 
+-    # Check VM connection is not broken after memory hot add
++        - mem_after_hotadd | int > 3072
++      # Check VM connection is not broken after memory hot add
+     - block:
+         - name: "Pause 5 seconds then check VM connection status"
+           ansible.builtin.pause:
+diff --git a/linux/utils/add_official_online_repo.yml b/linux/utils/add_official_online_repo.yml
+index 257057e..36b8ee1 100644
+--- a/linux/utils/add_official_online_repo.yml
++++ b/linux/utils/add_official_online_repo.yml
+@@ -11,7 +11,6 @@
+ 
+         - name: "Display repositories which use CentOS mirrors"
+           ansible.builtin.debug: var=list_centos_repos
+- 
+         - name: "Remove deprecated repositories"
+           ansible.builtin.file:
+             path: "{{ centos_repo_path }}"
+diff --git a/linux/utils/get_network_manager.yml b/linux/utils/get_network_manager.yml
+index 81d5cc2..80ac1a2 100644
+--- a/linux/utils/get_network_manager.yml
++++ b/linux/utils/get_network_manager.yml
+@@ -19,8 +19,8 @@
+     - include_tasks: get_service_info.yml
+       vars:
+         service_name: "NetworkManager.service"
+-    
+-    # RHEL/SLED/Ubuntu Desktop network interfaces are managed by NetworkManager
++
++      # RHEL/SLED/Ubuntu Desktop network interfaces are managed by NetworkManager
+     - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is NetworkManager"
+       ansible.builtin.set_fact:
+         guest_os_network_manager: "NetworkManager"
+@@ -28,7 +28,7 @@
+         - service_info
+         - service_info.state is defined
+         - service_info.state in ['active', 'running']
+-    
++
+     - name: "Set network device manager for guest OS which doesn't have NetworkManager"
+       block:
+         # SLES uses netplan to manage network interfaces
+@@ -36,13 +36,13 @@
+           ansible.builtin.set_fact:
+             guest_os_network_manager: "wicked"
+           when: guest_os_family == "Suse"
+-    
+-        # Ubuntu server uses netplan to manage network interfaces
++
++      # Ubuntu server uses netplan to manage network interfaces
+         - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is netplan"
+           ansible.builtin.set_fact:
+             guest_os_network_manager: "netplan"
+           when: guest_os_ansible_distribution == "Ubuntu"
+-    
++
+         # Old RHEL uses ifdown/ifup to manage network interfaces
+         - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is traditional ifdown/ifup"
+           ansible.builtin.set_fact:
+@@ -53,7 +53,7 @@
+         - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is systemd-networkd"
+           ansible.builtin.set_fact:
+             guest_os_network_manager: "systemd-networkd"
+-          when: > 
++          when: >
+             (guest_os_ansible_distribution == "VMware Photon OS") or
+             ("Flatcar" in guest_os_ansible_distribution)
+       when: >
+diff --git a/linux/utils/set_network_adapter_status.yml b/linux/utils/set_network_adapter_status.yml
+index 4af7b83..19f3422 100644
+--- a/linux/utils/set_network_adapter_status.yml
++++ b/linux/utils/set_network_adapter_status.yml
+@@ -13,12 +13,12 @@
+ # RHEL/SLED/Ubuntu Desktop network interfaces are managed by NetworkManager
+ - name: "Set network interface status with NetworkManager"
+   block:
+-    - name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'" 
++    - name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'"
+       ansible.builtin.shell: "nmcli device connect {{ network_adapter_name }}"
+       delegate_to: "{{ vm_guest_ip }}"
+       when: network_adapter_status | lower == "up"
+ 
+-    - name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'" 
++    - name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'"
+       ansible.builtin.shell: "nmcli device disconnect {{ network_adapter_name }}"
+       delegate_to: "{{ vm_guest_ip }}"
+       when: network_adapter_status | lower == "down"
+@@ -39,19 +39,19 @@
+   when: guest_os_network_manager == "NetworkManager"
+ 
+ # SLES is using Wicked to manage network interface
+-- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'" 
++- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'"
+   ansible.builtin.shell: "wicked if{{ network_adapter_status | lower }} {{ network_adapter_name }}"
+   delegate_to: "{{ vm_guest_ip }}"
+   when: guest_os_network_manager == "wicked"
+ 
+ # Old RHEL or Debian is using ifdown/ifup to manage network interfaces
+-- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'" 
++- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'"
+   ansible.builtin.shell: "if{{ network_adapter_status | lower }} {{ network_adapter_name }}"
+   delegate_to: "{{ vm_guest_ip }}"
+   when: guest_os_network_manager == "traditional"
+ 
+ # Photon OS/Flatcar is using systemd-networkd to manage network interface
+-- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'" 
++- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'"
+   ansible.builtin.shell: "ip link set {{ network_adapter_name }} {{ network_adapter_status | lower }}"
+   delegate_to: "{{ vm_guest_ip }}"
+   when: guest_os_network_manager in ["systemd-networkd", "netplan"]
+diff --git a/windows/check_os_fullname/check_os_fullname.yml b/windows/check_os_fullname/check_os_fullname.yml
+index cd23a13..0bfb326 100644
+--- a/windows/check_os_fullname/check_os_fullname.yml
++++ b/windows/check_os_fullname/check_os_fullname.yml
+@@ -33,7 +33,7 @@
+ 
+         # Get guest fullname from VM guest info
+         - include_tasks: ../../common/vm_get_guest_info.yml
+-        
++ 
+         - name: "Known issue - ignore incorrect guestID of Windows 11"
+           ansible.builtin.debug:
+             msg:
+@@ -64,7 +64,7 @@
+ 
+         - name: Initialize the expected guest fullname
+           ansible.builtin.set_fact:
+-            expected_guest_fullname: "" 
++            expected_guest_fullname: ""
+         # Set expected guest fullname for Windows client
+         - block:
+             - include_tasks: win10_fullname.yml
+@@ -87,7 +87,7 @@
+             - include_tasks: winsrvnext_fullname.yml
+               when:
+                 - guest_os_build_num is defined
+-                - guest_os_build_num | int >= 22424 
++                - guest_os_build_num | int >= 22424
+           when: guest_os_product_type != "client"
+ 
+         - ansible.builtin.debug:
+diff --git a/windows/cpu_hot_add_basic/cpu_hot_add_basic.yml b/windows/cpu_hot_add_basic/cpu_hot_add_basic.yml
+index 8a187c5..d5c5a5d 100755
+--- a/windows/cpu_hot_add_basic/cpu_hot_add_basic.yml
++++ b/windows/cpu_hot_add_basic/cpu_hot_add_basic.yml
+@@ -16,7 +16,7 @@
+   tasks:
+     - block:
+         - include_tasks: ../setup/test_setup.yml
+- 
++
+         - block:
+             # Refer to KB article https://kb.vmware.com/s/article/52584
+             - include_tasks: ../../common/vm_get_vbs_status.yml
+diff --git a/windows/deploy_vm/create_unattend_install_iso.yml b/windows/deploy_vm/create_unattend_install_iso.yml
+index 438c083..4a7f4b7 100644
+--- a/windows/deploy_vm/create_unattend_install_iso.yml
++++ b/windows/deploy_vm/create_unattend_install_iso.yml
+@@ -41,7 +41,7 @@
+     create_iso_src: "{{ unattend_install_file_list }}"
+     create_iso_dest: "{{ local_cache }}/{{ unattend_install_iso }}"
+ 
+-# Copy generated unattend install ISO file to ESXi host 
++# Copy generated unattend install ISO file to ESXi host
+ - include_tasks: ../../common/esxi_upload_datastore_file.yml
+   vars:
+     src_file_path: "{{ local_cache }}/{{ unattend_install_iso }}"
+diff --git a/windows/deploy_vm/deploy_vm.yml b/windows/deploy_vm/deploy_vm.yml
+index 4d3f3c1..500b9bd 100644
+--- a/windows/deploy_vm/deploy_vm.yml
++++ b/windows/deploy_vm/deploy_vm.yml
+@@ -31,7 +31,7 @@
+           register: create_log_path
+         - ansible.builtin.debug: var=create_log_path
+           when: enable_debug is defined and enable_debug
+-        
++
+         - include_tasks: deploy_vm_from_iso.yml
+           when: >
+             (vm_deploy_method is undefined) or
+@@ -40,8 +40,8 @@
+         - include_tasks: deploy_vm_from_ova.yml
+           when:
+             - vm_deploy_method is defined
+-            - vm_deploy_method | lower == 'ova' 
+-        
++            - vm_deploy_method | lower == 'ova'
++
+         - name: "Print VM guest IP address"
+           ansible.builtin.debug: var=vm_guest_ip
+           when: vm_guest_ip is defined
+diff --git a/windows/deploy_vm/deploy_vm_from_iso.yml b/windows/deploy_vm/deploy_vm_from_iso.yml
+index 04cdfdd..d50dc43 100644
+--- a/windows/deploy_vm/deploy_vm_from_iso.yml
++++ b/windows/deploy_vm/deploy_vm_from_iso.yml
+@@ -33,7 +33,7 @@
+ # Compose VM CDROMs with ISO file list
+ - include_tasks: ../../common/compose_vm_cdroms.yml
+ 
+-# Create new VM  
++# Create new VM
+ - include_tasks: ../../common/vm_create.yml
+   when: boot_disk_controller != 'ide'
+ - include_tasks: ../../common/vm_create_with_ide_disk.yml
+diff --git a/windows/deploy_vm/deploy_vm_from_ova.yml b/windows/deploy_vm/deploy_vm_from_ova.yml
+index 5c83dbf..5743703 100644
+--- a/windows/deploy_vm/deploy_vm_from_ova.yml
++++ b/windows/deploy_vm/deploy_vm_from_ova.yml
+@@ -61,4 +61,4 @@
+     ovf_vm_hardware_config_path: "{{ current_test_log_folder }}"
+ 
+ # Reconfigure deployed VM
+-# - include_tasks: reconfig_deployed_vm.yml 
++# - include_tasks: reconfig_deployed_vm.yml
+diff --git a/windows/deploy_vm/get_ansible_remote_config.yml b/windows/deploy_vm/get_ansible_remote_config.yml
+index c79f801..9767823 100644
+--- a/windows/deploy_vm/get_ansible_remote_config.yml
++++ b/windows/deploy_vm/get_ansible_remote_config.yml
+@@ -8,7 +8,7 @@
+   ansible.builtin.set_fact:
+     config_remote_windows: "https://raw.githubusercontent.com/ansible/ansible/devel/examples/scripts/ConfigureRemotingForAnsible.ps1"
+ - name: Set fact of the local path for downloaded script
+-  ansible.builtin.set_fact:  
++  ansible.builtin.set_fact:
+     config_remote_windows_local: "{{ local_cache }}/{{ config_remote_windows.split('/')[-1] }}"
+ 
+ - name: Download ConfigureRemotingForAnsible.ps1 script from URL
+diff --git a/windows/guest_customization/uninstall_onedrive.yml b/windows/guest_customization/uninstall_onedrive.yml
+index 0d4da2b..6d982cd 100644
+--- a/windows/guest_customization/uninstall_onedrive.yml
++++ b/windows/guest_customization/uninstall_onedrive.yml
+@@ -7,7 +7,7 @@
+   when:
+     - guest_os_ansible_distribution_ver is defined
+     - guest_os_ansible_distribution_ver == '10.0.22000.0'
+-- name: Set fact of OneDrive setup exe file path 
++- name: Set fact of OneDrive setup exe file path
+   ansible.builtin.set_fact:
+     one_drive_setup_exe: "C:\\Windows\\System32\\OneDriveSetup.exe"
+   when: one_drive_setup_exe is undefined
+@@ -38,7 +38,7 @@
+     - "'stdout_lines' in win_powershell_cmd_output"
+     - win_powershell_cmd_output.stdout_lines | length != 0
+     - win_powershell_cmd_output.stdout_lines[0]
+- 
++
+ - include_tasks: ../utils/win_execute_cmd.yml
+   vars:
+     win_powershell_cmd: "Remove-AppxPackage -Package {{ one_drive_appx_package_name }}"
+diff --git a/windows/memory_hot_add_basic/memory_hot_add_basic.yml b/windows/memory_hot_add_basic/memory_hot_add_basic.yml
+index da40ccb..7819f8e 100644
+--- a/windows/memory_hot_add_basic/memory_hot_add_basic.yml
++++ b/windows/memory_hot_add_basic/memory_hot_add_basic.yml
+@@ -14,9 +14,9 @@
+   tasks:
+     - block:
+         - include_tasks: ../setup/test_setup.yml
+- 
+-        - block: 
+-            # Refer to KB article https://kb.vmware.com/s/article/52584
++
++        - block:
++          # Refer to KB article https://kb.vmware.com/s/article/52584
+             - include_tasks: ../../common/vm_get_vbs_status.yml
+             - include_tasks: ../../common/skip_test_case.yml
+               vars:
+@@ -35,7 +35,7 @@
+           ansible.builtin.set_fact:
+             vm_initial_mem_mb: 4096
+           when: guest_os_ansible_architecture == "64-bit"
+-       
++
+         # Memory limit for 32bit Windows is 4GB:
+         # https://docs.microsoft.com/en-us/windows/win32/memory/memory-limits-for-windows-releases
+         - name: Set fact of memory hotadd list for 32bit Windows
+diff --git a/windows/nvdimm_cold_add_remove/cold_remove_nvdimm_test.yml b/windows/nvdimm_cold_add_remove/cold_remove_nvdimm_test.yml
+index 7b196f2..1576505 100644
+--- a/windows/nvdimm_cold_add_remove/cold_remove_nvdimm_test.yml
++++ b/windows/nvdimm_cold_add_remove/cold_remove_nvdimm_test.yml
+@@ -8,7 +8,7 @@
+ - include_tasks: ../../common/vm_add_remove_nvdimm.yml
+   vars:
+     vm_nvdimm_state: "absent"
+-    vm_nvdimm_label: "{{ new_nvdimm_device_label }}" 
++    vm_nvdimm_label: "{{ new_nvdimm_device_label }}"
+ 
+ - name: "Check removing NVDIMM device task result"
+   ansible.builtin.assert:
+diff --git a/windows/utils/win_get_pmem_disk_list.yml b/windows/utils/win_get_pmem_disk_list.yml
+index bb4ca59..80aaaeb 100644
+--- a/windows/utils/win_get_pmem_disk_list.yml
++++ b/windows/utils/win_get_pmem_disk_list.yml
+@@ -1,7 +1,7 @@
+ # Copyright 2022 VMware, Inc.
+ # SPDX-License-Identifier: BSD-2-Clause
+ ---
+-# Get persistent memory disk info in Windows guest OS 
++# Get persistent memory disk info in Windows guest OS
+ # Refer to this page: https://docs.microsoft.com/en-us/windows-server
+ # /storage/storage-spaces/storage-class-memory-health
+ #
+diff --git a/windows/utils/win_get_vmtools_driver_list.yml b/windows/utils/win_get_vmtools_driver_list.yml
+index 83cc477..fa65247 100644
+--- a/windows/utils/win_get_vmtools_driver_list.yml
++++ b/windows/utils/win_get_vmtools_driver_list.yml
+@@ -19,4 +19,4 @@
+     - win_powershell_cmd_output.stdout_lines is defined
+     - win_powershell_cmd_output.stdout_lines | length != 0
+ - ansible.builtin.debug:
+-    msg: "Get VMware driver list: {{ vmtools_driver_list }}"
++  msg: "Get VMware driver list: {{ vmtools_driver_list }}"
+diff --git a/windows/utils/win_get_vmtools_service_list.yml b/windows/utils/win_get_vmtools_service_list.yml
+index 463add2..2b6bb98 100644
+--- a/windows/utils/win_get_vmtools_service_list.yml
++++ b/windows/utils/win_get_vmtools_service_list.yml
+@@ -26,7 +26,7 @@
+ - name: Set fact of the service and service status dict
+   ansible.builtin.set_fact:
+     vmtools_service_dict: "{{ vmtools_service_dict | combine({item.split()[0]: item.split()[1]}) }}"
+-  when: item 
++  when: item
+   with_items: "{{ vmtools_service_list }}"
+ - ansible.builtin.debug:
+     msg: "Get VMware tools installed service dict: {{ vmtools_service_dict | to_yaml }}"
+diff --git a/windows/vbs_enable_disable/vbs_enable_disable.yml b/windows/vbs_enable_disable/vbs_enable_disable.yml
+index 1c6cfc5..253d000 100644
+--- a/windows/vbs_enable_disable/vbs_enable_disable.yml
++++ b/windows/vbs_enable_disable/vbs_enable_disable.yml
+@@ -15,13 +15,13 @@
+         - include_tasks: ../setup/test_setup.yml
+           vars:
+             skip_test_no_vmtools: false
+-       
++
+         - include_tasks: ../../common/skip_test_case.yml
+           vars:
+             skip_msg: "Skip test case due to VM is not 64 bit: {{ guest_os_ansible_architecture | default('NA') }}"
+             skip_reason: "Not Applicable"
+           when: guest_os_ansible_architecture is undefined or guest_os_ansible_architecture != "64-bit"
+- 
++
+         # Get VM firmware info
+         - include_tasks: ../../common/vm_get_boot_info.yml
+         - include_tasks: ../../common/skip_test_case.yml
+@@ -29,7 +29,7 @@
+             skip_msg: "Skip test case due to VM firmware is not EFI: {{ vm_firmware | default('NA') }}"
+             skip_reason: "Not Applicable"
+           when: vm_firmware is undefined or vm_firmware | lower != 'efi'
+- 
++
+         - include_tasks: vbs_enable_test.yml
+         - include_tasks: vbs_disable_test.yml
+       rescue:
+diff --git a/windows/vhba_hot_add_remove/get_vm_disk_ctl_num_bus.yml b/windows/vhba_hot_add_remove/get_vm_disk_ctl_num_bus.yml
+index 3c3afff..4940bd0 100644
+--- a/windows/vhba_hot_add_remove/get_vm_disk_ctl_num_bus.yml
++++ b/windows/vhba_hot_add_remove/get_vm_disk_ctl_num_bus.yml
+@@ -3,7 +3,7 @@
+ ---
+ # This task is used for getting existing disk controller number
+ # and new disk controller bus number
+-# 
++#
+ - name: "Set fact of the valid SCSI controller types list"
+   ansible.builtin.set_fact:
+     valid_scsi_controller_list: ['buslogic', 'paravirtual', 'lsilogicsas', 'lsilogic']
+diff --git a/windows/vhba_hot_add_remove/vhba_test.yml b/windows/vhba_hot_add_remove/vhba_test.yml
+index e7448c2..69ad899 100755
+--- a/windows/vhba_hot_add_remove/vhba_test.yml
++++ b/windows/vhba_hot_add_remove/vhba_test.yml
+@@ -16,7 +16,7 @@
+ # or not get the new disk controller bus number, this test case
+ # will be "No Run".
+ - block:
+-    - include_tasks: vhba_test_prepare.yml 
++    - include_tasks: vhba_test_prepare.yml
+     - include_tasks: hotadd_remove_vhba_test.yml
+       when: >
+         (test_purpose == "hot-add") or
+diff --git a/windows/wintools_complete_install_verify/enable_test_signing.yml b/windows/wintools_complete_install_verify/enable_test_signing.yml
+index 236d95e..dc9f453 100644
+--- a/windows/wintools_complete_install_verify/enable_test_signing.yml
++++ b/windows/wintools_complete_install_verify/enable_test_signing.yml
+@@ -9,7 +9,7 @@
+ - include_tasks: ../secureboot_enable_disable/change_secureboot_config.yml
+   vars:
+     change_secureboot: 'disable'
+-  when: vm_secureboot_enabled is defined and vm_secureboot_enabled | bool 
++  when: vm_secureboot_enabled is defined and vm_secureboot_enabled | bool
+ 
+ - include_tasks: ../utils/win_execute_cmd.yml
+   vars:
+diff --git a/windows/wintools_complete_install_verify/install_vmtools.yml b/windows/wintools_complete_install_verify/install_vmtools.yml
+index fe0af5e..f228bf2 100755
+--- a/windows/wintools_complete_install_verify/install_vmtools.yml
++++ b/windows/wintools_complete_install_verify/install_vmtools.yml
+@@ -4,7 +4,7 @@
+ - name: Set fact of VMware tools silent install command for 64bit GOS
+   ansible.builtin.set_fact:
+     vmtools_install_cmd: "D:\\setup64.exe /s /v ADDLOCAL=ALL /qn REBOOT=R"
+-  when:  
++  when:
+     - guest_os_ansible_architecture is defined
+     - guest_os_ansible_architecture == "64-bit"
+ - name: Set fact of VMware tools silent install command for 32bit GOS
+diff --git a/windows/wintools_complete_install_verify/wintools_complete_install_verify.yml b/windows/wintools_complete_install_verify/wintools_complete_install_verify.yml
+index b4e7acd..1a41afb 100755
+--- a/windows/wintools_complete_install_verify/wintools_complete_install_verify.yml
++++ b/windows/wintools_complete_install_verify/wintools_complete_install_verify.yml
+@@ -64,12 +64,12 @@
+ 
+         - include_tasks: enable_test_signing.yml
+           when: is_development_tools is defined and is_development_tools | bool
+-        
++
+         # Mount VMware tools ISO file to VM CDROM
+         - include_tasks: ../../common/vm_connect_cdrom_to_iso.yml
+           vars:
+-            vm_cdrom_iso_file: "{{ vmtools_iso_path }}" 
+-        
++            vm_cdrom_iso_file: "{{ vmtools_iso_path }}"
++
+         # Execute VMware tools installation
+         - include_tasks: install_vmtools.yml
+         - include_tasks: verify_vmtools.yml
