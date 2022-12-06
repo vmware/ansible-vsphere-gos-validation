@@ -1,12 +1,12 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Set fact of VMware tools silent install command for 64bit GOS"
+- name: "Set fact of VMware Tools silent install command for 64bit GOS"
   ansible.builtin.set_fact:
     vmtools_install_cmd: "D:\\setup64.exe /s /v ADDLOCAL=ALL /qn REBOOT=R"
   when:  
     - guest_os_ansible_architecture == "64-bit"
-- name: "Set fact of VMware tools silent install command for 32bit GOS"
+- name: "Set fact of VMware Tools silent install command for 32bit GOS"
   ansible.builtin.set_fact:
     vmtools_install_cmd: "D:\\setup.exe /s /v ADDLOCAL=ALL /qn REBOOT=R"
   when:
@@ -16,26 +16,32 @@
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Get-childitem -path D:\\ -name"
-- name: "Check VMware tools install files"
+- name: "Check VMware Tools install files"
   ansible.builtin.assert:
     that:
       - "'setup.exe' in win_powershell_cmd_output['stdout_lines']"
       - "'setup64.exe' in win_powershell_cmd_output['stdout_lines']"
       - "'VMwareToolsUpgrader.exe' in win_powershell_cmd_output['stdout_lines']"
-    fail_msg: "VMware tools installation setup files are not in D:\\"
-    success_msg: "VMware tools installation setup files are in D:\\"
+    fail_msg: "VMware Tools installation setup files are not in D:\\"
+    success_msg: "VMware Tools installation setup files are in D:\\"
 
-- name: "Execute VMware tools silent install command in guest"
+- name: "Execute VMware Tools silent install command in guest"
   ansible.windows.win_shell: "{{ vmtools_install_cmd }}"
   delegate_to: "{{ vm_guest_ip }}"
   ignore_errors: true
   register: wintools_install_result
-  async: 360
+  async: 600
   poll: 0
 - name: "Pause 2 minutes before checking task status"
   ansible.builtin.pause:
     minutes: 2
-- name: "Check VMware tools install task status every 3 seconds"
+- name: "Check VMware Tools install task started"
+  ansible.builtin.assert:
+    that:
+      - wintools_install_result is defined
+      - wintools_install_result.ansible_job_id is defined
+    fail_msg: "The result of above VMware Tools installation task executed in guest OS is not returned."
+- name: "Check VMware Tools install task status every 3 seconds"
   ansible.builtin.async_status:
     jid: "{{ wintools_install_result.ansible_job_id }}"
   register: job_result
