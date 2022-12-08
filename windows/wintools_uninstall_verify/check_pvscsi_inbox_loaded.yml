@@ -1,0 +1,43 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# VMware Tools will uninstall PVSCSI driver when PVSCSI is not boot disk controller,
+# and driver's first installer value is "MSI" not "Windows", then if there is inbox
+# PVSCSI driver, inbox driver should be loaded successfully.
+#
+- include_tasks: ../utils/win_get_problem_device.yml
+
+- name: "Handle known issue"
+  block:
+    - name: "Known issue - workaround of inbox PVSCSI driver not loaded successfully after VMware Tools uninstall"
+      ansible.builtin.debug:
+        msg:
+          - "Get problem device in guest OS: {{ gos_problem_device_list }}"
+          - "Inbox PVSCSI driver is not loaded successfully after VMware Tools uninstall when boot disk controller is not PVSCSI and PVSCSI driver installer is 'MSI', ignore this known issue on VMware Tools 12.1.5 and earlier versions."
+      tags:
+        - known_issue
+    # Remove problem device and rescan devices to let it load again
+    - include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "foreach ($device in (Get-PnpDevice | where-object {$_.FriendlyName -like '*PVSCSI*'})){&pnputil /remove-device $device.InstanceId;&pnputil /scan-devices}"
+  when:
+    - vmtools_version is defined
+    - vmtools_version is version('12.1.5', '<=')
+    - gos_has_problem_device
+    - (gos_problem_device_list | selectattr('device_name', 'match', '.*PVSCSI*')) | length > 0
+
+- include_tasks: ../utils/win_get_device_driver.yml
+  vars:
+    win_device_desc_keyword: 'pvscsi'
+    win_get_device_driver_timeout: 5
+- name: "Set fact of the loaded PVSCSI driver info"
+  ansible.builtin.set_fact:
+    win_pvscsi_after_uninstall: "{{ win_guest_device_driver }}"
+- name: "Check PVSCSI driver is the inbox one"
+  ansible.builtin.assert:
+    that:
+      - win_pvscsi_after_uninstall.Signer is defined
+      - win_pvscsi_after_uninstall.Signer == "Microsoft Windows"
+      - win_pvscsi_after_uninstall.DriverVersion is defined
+      - win_pvscsi_after_uninstall.DriverVersion == '1.3.15.0'
+    fail_msg: "Loaded PVSCSI driver '{{ win_pvscsi_after_uninstall }}' is not inbox driver after VMware Tools uninstall."

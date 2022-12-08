@@ -1,0 +1,62 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get image index and name by image keyword in install.wim file
+# in Windows installation ISO, if there are more than 1 image matched,
+# return the image index and name of the first one.
+# Parameters:
+#   win_image_file_path: the file path of install.wim
+#   win_image_keyword: the keyword in image name
+# Return:
+#   win_image_index: the index of first matched image
+#   win_image_name: the name of first matched image
+#
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - win_image_file_path is defined
+      - win_image_file_path
+      - win_image_keyword is defined
+      - win_image_keyword
+    fail_msg: "Parameter 'win_image_file_path': '{{ win_image_file_path | default('') }}' and/or 'win_image_keyword': '{{ win_image_keyword | default('') }}' are not specified or set to valid values."
+
+- name: "Initialize the fact of Windows image list"
+  ansible.builtin.set_fact:
+    win_image_list: []
+    win_image_index: ''
+    win_image_name: ''
+
+- name: "Get matched Windows image info"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-WindowsImage -ImagePath {{ win_image_file_path }} | where-object {$_.ImageName -like '{{ win_image_keyword }}'}) | select ImageIndex, ImageName | ft -hide"
+
+- name: "Set fact of Windows image list"
+  block:
+    - name: "Add Windows image info to the list"
+      ansible.builtin.set_fact:
+        win_image_list: "{{ win_image_list + [{'index': item.strip().split(' ')[0], 'name': (' ').join(item.strip().split(' ')[1:])}] }}"
+      with_items: "{{ win_powershell_cmd_output.stdout_lines | select }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+
+- name: "Set fact of Windows image index and name"
+  ansible.builtin.set_fact:
+    win_image_index: "{{ win_image_list[0].index }}"
+    win_image_name: "{{ win_image_list[0].name }}"
+  when: win_image_list | length != 0
+
+- name: "Display the Windows image index and name"
+  ansible.builtin.debug:
+    msg:
+      - "Got matched image list: {{ win_image_list }}"
+      - "Got image index: {{ win_image_index }}"
+      - "Got image name: {{ win_image_name }}"
+
+- name: "Check Windows image index and name"
+  ansible.builtin.assert:
+    that:
+      - win_image_index
+      - win_image_name
+    fail_msg: "In this install.wim file '{{ win_image_file_path }}' using keyword '{{ win_image_keyword }}' can not get correspongding image index: '{{ win_image_index }}', or image name: '{{ win_image_name }}'."

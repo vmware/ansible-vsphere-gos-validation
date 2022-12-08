@@ -3,7 +3,10 @@
 ---
 # Shutdown or restart Windows guest OS
 # Parameters:
-#   set_win_power_state: specify the power operation, "shutdown" or "restart"
+#   set_win_power_state: specify the power operation, valid values
+#     are "shutdown" or "restart".
+#   win_reboot_timeout: maximum seconds to wait for machine to re-appear on the network.
+#     Default value is 600 seconds.
 #
 - name: "Shutdown guest OS inside OS"
   block:
@@ -19,6 +22,7 @@
   block:
     - name: "Restart OS using win_reboot module"
       ansible.windows.win_reboot:
+        reboot_timeout: "{{ win_reboot_timeout | default(600) }}" 
       register: restart_guest_os
       delegate_to: "{{ vm_guest_ip }}"
     - name: "Display the win_reboot result"
@@ -29,9 +33,9 @@
         expected_power_state: "poweredOn"
   when: set_win_power_state == "restart"
 
-- name: "Wait 10 seconds to before checking power status"
+- name: "Wait 15 seconds to before checking power status"
   ansible.builtin.pause:
-    seconds: 10
+    seconds: 15
 
 - include_tasks: ../../common/vm_wait_power_state.yml
   vars:

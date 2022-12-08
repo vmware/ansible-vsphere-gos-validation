@@ -1,0 +1,51 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of timestamp"
+  ansible.builtin.set_fact:
+    new_device_timestamp: "{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
+- name: "Set fact of new vSwitch and portgroup names"
+  ansible.builtin.set_fact:
+    new_device_vswitch: "vSwitch{{ new_device_timestamp }}"
+    new_device_pg: "vSwitch{{ new_device_timestamp }}_PG"
+- include_tasks: ../../common/esxi_add_vswitch.yml
+  vars:
+    vswitch_name: "{{ new_device_vswitch }}"
+- include_tasks: ../../common/esxi_add_portgroup.yml
+  vars:
+    vswitch_name: "{{ new_device_vswitch }}"
+    portgroup_name: "{{ new_device_pg }}"
+- name: "Pause 10 seconds after new portgroup added"
+  ansible.builtin.pause:
+    seconds: 10
+# Make sure new portgroup added
+- include_tasks: ../../common/esxi_wait_portgroup.yml
+  vars:
+    wait_for_portgroup_name: "{{ new_device_pg }}"
+
+# Add a new vmxnet3 network adapter to VM
+- include_tasks: ../../common/vm_add_network_adapter.yml
+  vars:
+    adapter_type: "vmxnet3"
+    portgroup_name: "{{ new_device_pg }}"
+    network_connected: false
+    network_start_connected: false
+- name: "Check add new VMXNET3 network adapter config changes"
+  ansible.builtin.assert:
+    that:
+      - add_adapter is defined
+      - add_adapter.changed
+    fail_msg: "Add new VMXNET3 network adapter task result 'changed' is not true."
+
+# Get new added network adapter MAC address
+- name: "Set fact of new VMXNET3 network adapter MAC address"
+  ansible.builtin.set_fact:
+    new_network_adapter_mac: "{{ (add_adapter.diff.after.keys() | difference(add_adapter.diff.before.keys()))[0] }}"
+  when:
+    - add_adapter.diff.after.keys() | length == add_adapter.diff.before.keys() | length + 1
+- name: "Check getting new VMXNET3 network adapter MAC address"
+  ansible.builtin.assert:
+    that:
+      - new_network_adapter_mac is defined
+      - new_network_adapter_mac
+    fail_msg: "Not get new added VMXNET3 network adapter MAC address."

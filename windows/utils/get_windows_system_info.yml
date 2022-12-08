@@ -1,26 +1,38 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+- name: "Initialize the facts of Windows guest OS"
+  ansible.builtin.set_fact:
+    guest_os_build_num: ''
+    guest_os_with_inbox_drivers: false
+    vm_guest_os_distribution: ''
+    guest_os_edition: ''
+
 - include_tasks: ../../common/get_guest_system_info.yml
 
-- name: Set guest OS product type to client
+- name: "Set guest OS product type to client"
   ansible.builtin.set_fact:
     guest_os_product_type: 'client'
   when: guest_os_product_type | lower == 'workstation'
 
-- name: Set fact of guest OS build number
+- name: "Set fact of guest OS build number"
   ansible.builtin.set_fact:
-    guest_os_build_num: "{{ guest_os_ansible_distribution_ver.split('.')[2] | default('') }}"
+    guest_os_build_num: "{{ guest_os_ansible_distribution_ver.split('.')[2] }}"
+  when:
+    - guest_os_ansible_distribution_ver
+    - guest_os_ansible_distribution_ver.split('.') | length > 2
 
-- name: "Initialize Windows without inbox drivers"
-  ansible.builtin.set_fact:
-    guest_os_with_inbox_drivers: false
 - name: "Set fact of Windows build with inbox drivers"
   ansible.builtin.set_fact:
     guest_os_with_inbox_drivers: true
   when:
     - guest_os_ansible_distribution_major_ver | int >= 10
     - (guest_os_product_type | lower == 'server' and guest_os_build_num | int >= 20348) or (guest_os_product_type | lower == 'client' and guest_os_build_num | int >= 22449)
+
+- name: "Set fact of Windows guest OS edition"
+  ansible.builtin.set_fact:
+    guest_os_edition: "{{ guest_os_ansible_distribution.split(' ')[-1] }}"
+  when: guest_os_ansible_distribution
 
 - name: "Print Windows guest OS information"
   ansible.builtin.debug:
@@ -36,6 +48,7 @@
       - "Guest OS family: {{ guest_os_family }}"
       - "Guest OS product type: {{ guest_os_product_type }}"
       - "Guest OS build number: {{ guest_os_build_num }}"
+      - "Guest OS edition: {{ guest_os_edition }}"
       - "Guest OS should contain inbox drivers: {{ guest_os_with_inbox_drivers }}"
 
 - name: "Set fact of VM guest OS type"

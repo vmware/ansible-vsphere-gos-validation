@@ -1,0 +1,83 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of expected guest OS distribution"
+  ansible.builtin.set_fact:
+    win_distr_expected: "{{ 'Microsoft ' ~ win_image_name.split('(')[0].strip() }}"
+
+- name: "Get VMTools service status in guest OS"
+  include_tasks: ../utils/win_get_service_status.yml
+  vars:
+    win_service_name: "VMTools"
+- name: "Verify VMware Tools service is running in guest OS"
+  ansible.builtin.assert:
+    that:
+      - service_status == "Running"
+    fail_msg: "VMware Tools service is not 'Running' after OS upgrade: {{ service_status }}"
+
+- name: "Get guest system info after OS uprade"
+  include_tasks: ../utils/get_windows_system_info.yml
+- name: "Get guestinfo after OS upgrade"
+  include_tasks: ../../common/vm_get_guest_info.yml
+
+- name: "Check guest OS distribution after OS upgrade"
+  ansible.builtin.assert:
+    that:
+      - guest_os_ansible_distribution == win_distr_expected
+    fail_msg: "Guest OS distribution after OS upgrade is: '{{ guest_os_ansible_distribution }}', not the same as expected one: '{{ win_distr_expected }}'."
+
+- name: "Get problem device list in guest OS"
+  include_tasks: ../utils/win_get_problem_device.yml
+- name: "Check no problem device listed"
+  ansible.builtin.assert:
+    that:
+      - gos_has_problem_device is defined
+      - not gos_has_problem_device
+    fail_msg: "Problem devices are found in guest after guest OS upgrade, please check listed problem devices: {{ gos_problem_device_list }}"
+
+- name: "Get loaded PVSCSI driver info"
+  include_tasks: ../utils/win_get_device_driver.yml
+  vars:
+    win_device_desc_keyword: 'pvscsi'
+- name: "Set fact of the loaded PVSCSI driver info"
+  ansible.builtin.set_fact:
+    win_pvscsi_after_upgrade: "{{ win_guest_device_driver }}"
+
+- name: "Get loaded VMXNET3 driver info"
+  include_tasks: ../utils/win_get_device_driver.yml
+  vars:
+    win_device_desc_keyword: 'vmxnet3'
+- name: "Set fact of the loaded VMXNET3 driver info"
+  ansible.builtin.set_fact:
+    win_vmxnet3_after_upgrade: "{{ win_guest_device_driver }}"
+
+- name: "Check loaded PVSCSI and VMXNET3 drivers version"
+  ansible.builtin.assert:
+    that:
+      - win_pvscsi_after_upgrade.DriverVersion is defined
+      - win_pvscsi_before.DriverVersion is defined
+      - win_pvscsi_after_upgrade.DriverVersion == win_pvscsi_before.DriverVersion
+      - win_vmxnet3_after_upgrade.DriverVersion is defined
+      - win_vmxnet3_before.DriverVersion is defined
+      - win_vmxnet3_after_upgrade.DriverVersion == win_vmxnet3_before.DriverVersion
+    fail_msg:
+      - "After OS upgrade, the loaded PVSCSI or VMXNET3 driver version is not the same as before OS Upgrade."
+      - "PVSCSI, after version: {{ win_pvscsi_after_upgrade.DriverVersion | default('') }}, before version: {{ win_pvscsi_before.DriverVersion | default('') }}."
+      - "VMXNET3, after version: {{ win_vmxnet3_after_upgrade.DriverVersion | default('') }}, before version: {{ win_vmxnet3_before.DriverVersion | default('') }}"
+  when:
+    - not (win_incompatible_driver_issue and "'Windows Server 2019' in win_distr_before_upgrade")
+
+- name: "Check loaded PVSCSI and VMXNET3 drivers version"
+  ansible.builtin.assert:
+    that:
+      - win_pvscsi_after_upgrade.DriverVersion is defined
+      - win_pvscsi_after_upgrade.DriverVersion == "1.3.15.0"
+      - win_vmxnet3_after_upgrade.DriverVersion is defined
+      - win_vmxnet3_after_upgrade.DriverVersion == "1.8.17.0"
+    fail_msg:
+      - "After OS upgrade, the loaded PVSCSI or VMXNET3 driver version is not the inbox driver due to incompatible driver known issue."
+      - "PVSCSI, after upgrade: {{ win_pvscsi_after_upgrade.DriverVersion | default('') }}, inbox version: 1.3.15.0."
+      - "VMXNET3, after upgrade: {{ win_vmxnet3_after_upgrade.DriverVersion | default('') }}, inbox version: 1.8.17.0."
+  when:
+    - win_incompatible_driver_issue
+    - "'Windows Server 2019' in win_distr_before_upgrade"

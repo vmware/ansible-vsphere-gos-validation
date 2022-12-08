@@ -1,21 +1,22 @@
 # Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# If there is inbox pvscsi driver, pvscsi service is started
-# and it's installer value is "Windows", so VMware Tools uninstall
-# will not uninstall pvscsi driver
+# PVSCSI driver will not be uninstalled by VMware Tools in below 2 situations:
+# 1. If there is inbox PVSCSI driver, PVSCSI service is started and it's installer
+# value in registry is "Windows",
+# 2. If PVSCSI installer value in registry is 'MSI' but VM boot disk controller is PVSCSI.
 #
 - include_tasks: ../utils/win_get_device_driver.yml
   vars:
     win_device_desc_keyword: 'pvscsi'
     win_get_device_driver_timeout: 5
-- name: "Set fact of the loaded pvscsi driver info after VMware Tools uninstall"
+- name: "Set fact of the loaded PVSCSI driver info after VMware Tools uninstall"
   ansible.builtin.set_fact:
     win_pvscsi_after_uninstall: "{{ win_guest_device_driver }}"
-- name: "Check pvscsi driver version after VMware Tools uninstall"
+- name: "Check PVSCSI driver version after VMware Tools uninstall"
   ansible.builtin.assert:
     that:
       - win_pvscsi_after_uninstall.DriverVersion is defined
-      - win_pvscsi_before_uninstall.DriverVersion is defined
-      - win_pvscsi_after_uninstall.DriverVersion == win_pvscsi_before_uninstall.DriverVersion
-    fail_msg: "After VMware Tools uninstall, the loaded pvscsi driver version '{{ win_pvscsi_after_uninstall.DriverVersion }}' is not the same as the one loaded '{{ win_pvscsi_before_uninstall.DriverVersion }}' before VMware Tools uninstall."
+      - win_pvscsi_before.DriverVersion is defined
+      - win_pvscsi_after_uninstall.DriverVersion == win_pvscsi_before.DriverVersion
+    fail_msg: "After VMware Tools uninstall, the loaded PVSCSI driver version '{{ win_pvscsi_after_uninstall.DriverVersion }}' is not the same as the one loaded '{{ win_pvscsi_before.DriverVersion }}' before VMware Tools uninstall."

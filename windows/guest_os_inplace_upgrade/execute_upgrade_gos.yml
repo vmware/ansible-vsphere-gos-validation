@@ -1,0 +1,61 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Enable test mode in guest OS for upgrading to pre-release build"
+  include_tasks: ../wintools_complete_install_verify/enable_test_signing.yml
+  when:
+    - enable_test_mode is defined
+    - enable_test_mode | bool
+
+- name: "Product key is required for Windows Server upgrade"
+  ansible.builtin.assert:
+    that:
+      - windows_product_key_upgrade is defined
+      - windows_product_key_upgrade
+    fail_msg: "Windows product key for Windows Server upgrade is not set: {{ windows_product_key_upgrade | default('') }}."
+  when: guest_os_product_type | lower == 'server'
+
+# Refer to this doc for setup.exe command line options:
+# https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/windows-setup-command-line-options?view=windows-11
+- name: "Set fact of the command for Windows upgrade by setup.exe"
+  ansible.builtin.set_fact:
+    win_upgrade_setup_cmd: "{{ upgrade_to_iso_drive }}:\\setup.exe /auto upgrade /quiet /eula accept /compat ignorewarning /copylogs C:\\upgrade_log /dynamicupdate disable /MigNEO disable /NoReboot"
+
+- name: "Add product key parameter to the command"
+  ansible.builtin.set_fact:
+    win_upgrade_setup_cmd: "{{ win_upgrade_setup_cmd ~ ' /pkey ' ~ windows_product_key_upgrade }}"
+  when: windows_product_key_upgrade is defined and windows_product_key_upgrade
+
+- name: "Add image index parameter to the command for Windows Server upgrade"
+  ansible.builtin.set_fact:
+    win_upgrade_setup_cmd: "{{ win_upgrade_setup_cmd ~ ' /imageindex ' ~ win_image_index }}"
+  when: guest_os_product_type | lower == 'server'
+
+- name: "Display the upgrade command to be executed"
+  ansible.builtin.debug: var=win_upgrade_setup_cmd
+
+- name: "Execute setup.exe command to do guest OS upgrade"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ win_upgrade_setup_cmd }}"
+- name: "Wait 15 seconds after executing upgrade command"
+  ansible.builtin.pause:
+    seconds: 15
+- name: "Check guest OS is online after executing upgrade command"
+  include_tasks: ../utils/win_wait_for_port_status.yml
+  vars:
+    win_wait_port_timeout: 10
+
+- name: "Restart Windows guest OS to complete upgrade"
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+    win_reboot_timeout: 1800
+
+- name: "Take a screenshot after guest OS restart"
+  include_tasks: ../../common/vm_take_screenshot.yml
+  vars:
+    vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
+
+- name: "Wait for guestinfo reported"
+  include_tasks: ../../common/vm_wait_guest_fullname.yml

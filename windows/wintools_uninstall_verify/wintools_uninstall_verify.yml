@@ -34,13 +34,17 @@
             msg: "VMware tools installed: {{ vmtools_is_installed_before }}, running: {{ vmtools_is_running_before }}"
           when: not vmtools_is_running_before
 
-        # Add a new pvscsi controller and vmxnet3 network adapter to the VM
-        # when there are inbox drivers
-        - include_tasks: add_new_devices_check_status.yml
-          when:
-            - guest_os_with_inbox_drivers is defined
-            - guest_os_with_inbox_drivers | bool
+        - include_tasks: prepare_pvscsi_vmxnet3_device.yml
+          when: guest_os_with_inbox_drivers | bool
 
+        # Check no problem device
+        - include_tasks: ../utils/win_get_problem_device.yml
+        - name: "Check no problem device listed"
+          ansible.builtin.assert:
+            that:
+              - not gos_has_problem_device
+            fail_msg: "Problem devices were found in guest before VMware Tools uninstall, please check listed problem devices: {{ gos_problem_device_list }}"
+        
         - include_tasks: uninstall_vmtools.yml
         - include_tasks: verify_uninstall.yml
 
@@ -57,7 +61,6 @@
               vars:
                 vswitch_name: "{{ new_device_vswitch }}"
           when:
-            - guest_os_with_inbox_drivers is defined
             - guest_os_with_inbox_drivers | bool
             - new_network_adapter_mac is defined
             - new_network_adapter_mac

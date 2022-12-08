@@ -15,12 +15,20 @@
 - name: "Handle inbox drivers contained in guest OS situation"
   block:
     - include_tasks: check_pvscsi_not_uninstalled.yml
+      when: >
+        (win_pvscsi_installer[0] == 'Windows') or
+        (win_pvscsi_installer[0] == 'MSI' and vm_has_pvscsi_boot_disk)
+
+    - include_tasks: check_pvscsi_inbox_loaded.yml
+      when:
+        - win_pvscsi_installer[0] == 'MSI'
+        - not vm_has_pvscsi_boot_disk
 
     - include_tasks: check_vmxnet3_not_uninstalled.yml
-      when: win_pvscsi_vmxnet3_installers.vmxnet3[0] == 'Windows'
+      when: win_vmxnet3_installer[0] == 'Windows'
 
     - include_tasks: check_vmxnet3_inbox_loaded.yml
-      when: win_pvscsi_vmxnet3_installers.vmxnet3[0] == 'MSI'
+      when: win_vmxnet3_installer[0] == 'MSI'
 
     - include_tasks: ../utils/win_get_problem_device.yml
     - name: "Check no problem device listed after VMware Tools uninstall"
@@ -30,5 +38,4 @@
           - not gos_has_problem_device
         fail_msg: "Problem devices found in guest after VMware Tools uninstall, please check listed problem devices: {{ gos_problem_device_list }}"
   when:
-    - guest_os_with_inbox_drivers is defined
     - guest_os_with_inbox_drivers | bool

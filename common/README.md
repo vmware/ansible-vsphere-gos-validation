@@ -60,6 +60,7 @@
 * vm_get_disk_facts.yml: Get VM disk info
 * vm_get_disk_controller_facts.yml: Get VM disk controller info
 * vm_get_disk_controller_num.yml: Get VM disk controller number with specified type
+* vm_add_sata_cdrom.yml: Add a new CDROM attached to SATA controller
 
 ### Tasks for VM secureboot settings
 * vm_set_boot_options.yml: Set VM boot configurations
@@ -139,6 +140,7 @@
 * esxi_add_portgroup.yml: Add a new virtual switch port group
 * esxi_remove_portgroup.yml: Remove a virtual switch port group
 * esxi_get_portgroup_facts.yml: Get virtual switch port group facts
+* esxi_wait_portgroup.yml: Wait for specified port group info retrieved
 * esxi_add_vswitch.yml: Add a new standard virtual switch
 * esxi_remove_vswitch.yml: Remove a standard virtual switch
 * esxi_get_vswitch_facts.yml: Get virtual switch facts

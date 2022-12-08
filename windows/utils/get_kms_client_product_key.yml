@@ -1,0 +1,51 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get KMS client product key from this page:
+# https://learn.microsoft.com/en-us/windows-server/get-started/kms-client-activation-keys
+# according to specified Windows version and edition.
+# Parameters:
+#   win_kms_client_distribution: the string of Windows version with edition,
+#     e.g. 'Windows Server 2022 Datacenter'.
+#   win_kms_client_key_file: the local file path for saving KMS client product key html page,
+#     the default path is '/tmp/kms_client_keys'.
+# Return:
+#   win_kms_client_key: the KMS client product key got from above page.
+#
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - win_kms_client_distribution is defined
+      - win_kms_client_distribution
+    fail_msg: "Parameter 'win_kms_client_distribution' is required and set to a valid value: '{{ win_kms_client_distribution | default('') }}'"
+
+- name: "Initialize the facts of KMS client product key and URL"
+  ansible.builtin.set_fact:
+    win_kms_client_key: ''
+    win_kms_client_key_url: "https://learn.microsoft.com/en-us/windows-server/get-started/kms-client-activation-keys"
+    win_kms_client_key_file: "{{ win_kms_client_key_file | default('/tmp/kms_client_keys') }}"
+
+- name: "Get KMS client product key URL content"
+  ansible.builtin.get_url:
+    url: "{{ win_kms_client_key_url }}"
+    dest: "{{ win_kms_client_key_file }}"
+    validate_certs: false
+    mode: "0644"
+    timeout: 180
+  register: get_win_kms_url_result
+- name: "Display the result of getting KMS client product key URL content"
+  ansible.builtin.debug: var=get_win_kms_url_result
+  when: enable_debug
+
+- name: "Search KMS client product key by Windows version"
+  ansible.builtin.set_fact:
+    win_kms_client_key: "{{ lookup('file', win_kms_client_key_file) | regex_search('<td>' ~ win_kms_client_distribution ~ '</td>\n' ~ '<td>([A-Z0-9]{5}\\-){4}[A-Z0-9]{5}</td>') }}"
+
+- name: "Set fact of KMS client product key"
+  ansible.builtin.set_fact:
+    win_kms_client_key: "{{ win_kms_client_key.split('<td>')[-1].strip('</td>') }}"
+  when: win_kms_client_key
+
+- name: "Display the searched KMS client product key"
+  ansible.builtin.debug:
+    msg: "Get KMS client product key for '{{ win_kms_client_distribution }}': '{{ win_kms_client_key }}'"

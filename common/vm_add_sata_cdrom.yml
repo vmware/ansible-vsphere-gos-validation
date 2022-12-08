@@ -1,0 +1,59 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# If there is SATA controller, then add a new CDROM attached
+# to it, if there is no SATA controller, add a new SATA controller
+# firstly, then add a new CDROM attached to it.
+#
+- name: "Initialize the facts of new CDROM node info"
+  ansible.builtin.set_fact:
+    new_cdrom_ctl_num: ''
+    new_cdrom_unit_num: ''
+
+- name: "Get VM SATA controller number"
+  include_tasks: vm_get_disk_controller_num.yml
+  vars:
+    disk_controller: 'sata'
+- name: "Set fact of VM SATA controller number"
+  ansible.builtin.set_fact:
+    vm_sata_ctl_num: "{{ vhba_number }}"
+
+- name: "Set fact of new CDROM node info to new SATA controller"
+  ansible.builtin.set_fact:
+    new_cdrom_ctl_num: 0
+    new_cdrom_unit_num: 0
+  when: vm_sata_ctl_num | int == 0
+
+- name: "Set fact of new CDROM node info to existing SATA controller"
+  block:
+    - name: "Get new CDROM node info"
+      include_tasks: vm_get_new_disk_node_info.yml
+      vars:
+        existing_vhba_type: 'sata'
+    - name: "Set fact of new CDROM node info"
+      ansible.builtin.set_fact:
+        new_cdrom_ctl_num: "{{ existing_vhba_bus_number }}"
+        new_cdrom_unit_num: "{{ new_disk_unit_number }}"
+  when: vm_sata_ctl_num | int != 0
+
+- name: "Check new CDROM node info"
+  ansible.builtin.assert:
+    that:
+      - new_cdrom_ctl_num != ''
+      - new_cdrom_unit_num != ''
+    fail_msg: "Not get SATA controller bus number: '{{ new_cdrom_ctl_num }}', or new CDROM unit number: '{{ new_cdrom_unit_num }}'"
+
+- name: "Add new CDROM to VM"
+  include_tasks: vm_configure_cdrom.yml
+  vars:
+    cdrom_type: 'client'
+    cdrom_controller_num: "{{ new_cdrom_ctl_num }}"
+    cdrom_unit_num: "{{ new_cdrom_unit_num }}"
+    cdrom_state: 'present'
+- name: "Check add new CDROM task result"
+  ansible.builtin.assert:
+    that:
+      - vm_config_cdrom_result is defined
+      - vm_config_cdrom_result.changed is defined
+      - vm_config_cdrom_result.changed
+    fail_msg: "Adding new CDROM to SATA controller task result is not changed: {{ vm_config_cdrom_result.changed | default('') }}"
