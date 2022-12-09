@@ -42,7 +42,7 @@
 * vm_set_cpu_number.yml: Set VM CPU number, cores per socket is 1 by default
 * vm_enable_memory_hotadd.yml: Enable VM memory hotadd
 * vm_set_memory_size.yml: Set VM memory size in MB
-* vm_set_nested_virtual.yml: et if CPU virtualization can be exposed to the guest operating system
+* vm_set_nested_virtual.yml: Set if CPU virtualization can be exposed to the guest operating system
 
 ### Tasks for VM network settings
 * vm_add_network_adapter.yml: Add a new network adapter to VM
