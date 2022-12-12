@@ -1,0 +1,81 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Create a new virtual switch in Windows guest OS, please
+# make sure Hyper-V is already enabled in guest.
+# Parameters:
+#   win_vswitch_type: valid values are 'Private', 'Internal', 'External',
+#     the default value is 'Internal'.
+#   win_vswitch_name: the name of new vswitch.
+#   win_ethernet_name: the network adapter interface name, this parameter
+#     is required only when 'win_vswitch_type' is set to 'External'.
+#
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - win_vswitch_name is defined
+      - win_vswitch_name
+    fail_msg: "Parameter 'win_vswitch_name' is required and set to a valid value."
+
+- name: "Set fact of the default vitrual switch type"
+  ansible.builtin.set_fact:
+    win_vswitch_type: "{{ win_vswitch_type | default('Internal') }}"
+- name: "Check parameter value"
+  ansible.builtin.assert:
+    that:
+      - win_vswitch_type in ['Private', 'Internal', 'External']
+    fail_msg: "Accepted values of parameter 'win_vswitch_type' are 'Private', 'Internal', 'External', while it's set to '{{ win_vswitch_type }}.'"
+
+- name: "Set fact of 'External' virtual switch powershell commands"
+  block:
+    - name: "Check required parameter for External virtual switch"
+      ansible.builtin.assert:
+        that:
+          - win_ethernet_name is defined
+          - win_ethernet_name
+        fail_msg: "Parameter 'win_ethernet_name' is required and set to a valid value when 'win_vswitch_type' is 'External'."
+    - name: "Set fact of virtual switch powershell commands"
+      ansible.builtin.set_fact:
+        win_get_vswitch_cmd: "(Get-VMSwitch -SwitchType {{ win_vswitch_type }} | where-object {$_.Name -eq '{{ win_vswitch_name }}' -and $_.NetAdapterInterfaceDescription -eq '{{ win_ethernet_name }}'} | measure-object).Count"
+        win_create_vswitch_cmd: "New-VMSwitch -name '{{ win_vswitch_name }}' -NetAdapterName '{{ win_ethernet_name }}' -AllowManagementOS $true"
+  when: win_vswitch_type == 'External'
+
+- name: "Set fact of 'Internal/Private' virtual switch powershell commands"
+  ansible.builtin.set_fact:
+    win_get_vswitch_cmd: "(Get-VMSwitch -SwitchType {{ win_vswitch_type }} | where-object {$_.Name -eq '{{ win_vswitch_name }}' | measure-object).Count"
+    win_create_vswitch_cmd: "New-VMSwitch -name '{{ win_vswitch_name }}' -SwitchType {{ win_vswitch_type }}"
+  when: win_vswitch_type != 'External'
+
+- name: "Get vswitch with specified type and name"
+  include_tasks: win_execute_cmd.yml
+    vars:
+      win_powershell_cmd: "{{ win_get_vswitch_cmd }}"
+- name: "Set fact of specified vswitch number"
+  ansible.builtin.set_fact:
+    win_vswitch_exists: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length == 1
+
+- name: "vswitch with specified type and name not exist"
+  block:
+    - name: "Create new vswitch"
+      include_tasks: win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "{{ win_create_vswitch_cmd }}"
+    - name: "Get new vswitch"
+      include_tasks: win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "{{ win_get_vswitch_cmd }}"
+    - name: "Check new vswitch created"
+      ansible.builtin.assert:
+        that:
+          - win_powershell_cmd_output.stdout_lines is defined
+          - win_powershell_cmd_output.stdout_lines | length == 1
+          - win_powershell_cmd_output.stdout_lines[0] | int == 1
+        fail_msg: "Not get new vswitch with name '{{ win_vswitch_name }}' and type '{{ win_vswitch_type }}' after creation: '{{ win_powershell_cmd_output.stdout_lines | default('') }}'"
+  when: win_vswitch_exists | int == 0
+
+- name: "vswitch with specified type and name exists"
+  debug:
+    msg: "No need to create new vswitch '{{ win_vswitch_name }}' with type '{{ win_vswitch_type }}' due to it already exist."

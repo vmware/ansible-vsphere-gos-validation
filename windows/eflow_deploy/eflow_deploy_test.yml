@@ -1,0 +1,45 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Get VM power state"
+  include_tasks: ../../common/vm_get_power_state.yml
+- name: "Shutdown guest OS"
+  include_tasks: ../utils/shutdown_vm.yml
+  when: vm_power_state_get != "poweredOff"
+
+- name: "Enable hardware virtualization on VM"
+  include_tasks: ../../common/vm_set_nested_virtual.yml
+  vars:
+    vm_nested_virt: true
+
+- name: "Poweron VM"
+  include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+- name: "Get VM IP address"
+  include_tasks: ../utils/win_update_inventory.yml
+
+- name: "Get VM hardware virtualization enablement info"
+  include_tasks: vm_get_config.yml
+  vars:
+    property_list: ['config.nestedHVEnabled']
+- name: "Check VM hardware virtualization is enabled"
+  ansible.builtin.assert:
+    that:
+      - vm_config.config is defined
+      - vm_config.config.nestedHVEnabled is defined
+      - vm_config.config.nestedHVEnabled | bool
+    fail_msg: "VM hardware virtualization is not enabled: {{ vm_config.config.nestedHVEnabled | default('') }}"
+
+- name: "Enable Hyper-V in guest OS"
+  include_tasks: ../utils/win_enable_hyperv.yml
+
+- name: "Create new vswitch in Windows Server"
+  include_tasks: ../utils/win_create_vswitch.yml
+  vars:
+    win_vswitch_name: ""
+    win_vswitch_type: ""
+
+- name: "Deploy EFLOW in guest OS"
+
+- name: "Check EFLOW"
