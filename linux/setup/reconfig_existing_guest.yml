@@ -9,6 +9,16 @@
 - include_tasks: ../utils/disable_auto_update.yml
   when: guest_os_ansible_distribution in ["Ubuntu"]
 
+# Hit issue in Ubuntu 22.04: Temporary failure in name resolution. Restarting servcie can fix it
+- include_tasks: service_operation.yml
+  vars:
+    service_name: "systemd-resolved"
+    service_enabled: true
+    service_state: "restarted"
+  when: 
+    - guest_os_ansible_distribution == "Ubuntu"
+    - guest_os_ansible_distribution_ver == "22.04"
+
 - block:
     - include_tasks: ../../common/vm_get_vmtools_status.yml
       when: vmtools_is_running is undefined or not vmtools_is_running
