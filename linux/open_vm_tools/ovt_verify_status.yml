@@ -51,6 +51,13 @@
             loop_var: package_name
           when: "'Flatcar' not in guest_os_ansible_distribution"
 
+        - name: "Update the fact of processes for OS with desktop and enable autologin"
+          ansible.builtin.set_fact:
+            ovt_processes: "{{ ovt_processes | union([{'uid':'vmware', 'cmd':'vmtoolsd -n vmusr'}]) }}"
+          when:
+            - guest_os_with_gui is defined and guest_os_with_gui
+            - enable_autologin is defined and enable_autologin
+
         # Check open-vm-tools processes are running
         - include_tasks: ../utils/check_process_status.yml
           vars:
