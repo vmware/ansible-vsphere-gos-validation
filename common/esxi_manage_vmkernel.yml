@@ -1,8 +1,8 @@
-# Copyright 2022 VMware, Inc.
+# Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Add VMkernel network adapter on ESXi host to a vSphere Standard Switch (VSS) port group
-# or a vSphere Distributed Switch (VDS) port group
+# Add or remove VMkernel network adapter on ESXi host to a vSphere Standard Switch (VSS)
+# port group or a vSphere Distributed Switch (VDS) port group
 # Paramters:
 #   vmk_device: The VMkernel network adapter name.
 #   vmk_state: The VMkernel network adapter state: present or absent.
@@ -29,7 +29,7 @@
       - vmk_device is defined and vmk_device
       - vmk_state is defined and vmk_state in ['present', 'absent']
     fail_msg: >-
-      At least one of parmaeters 'vmk_portgroup_name', 'vmk_device' and 'vmk_state' is incorrect.
+      At least one of parameters 'vmk_portgroup_name', 'vmk_device' and 'vmk_state' is incorrect.
 
 - name: "Set operation for managing VMkernel network adapter"
   ansible.builtin.set_fact:
@@ -52,10 +52,10 @@
   delegate_to: localhost
   register: manage_vmk_result
  
-- debug: var=manage_vmk_result
-- name: "Check the result of adding VMkernel network adapter to port group"
+- name: "Check the result of managing VMkernel network adapter"
   ansible.builtin.assert:
     that:
       - manage_vmk_result is defined
-      - manage_vmk_result.changed is defined
-      - manage_vmk_result.changed
+      - manage_vmk_result.failed is defined
+      - not manage_vmk_result.failed
+    fail_msg: "Failed to {{ vmk_op }} VMkernel network adapter"

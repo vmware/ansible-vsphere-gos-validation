@@ -1,0 +1,65 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check whether target VM supports PVRDMA testing
+- name: "Skip test case for unsupported guest OS"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: "{{ guest_os_ansible_distribution }} doesn't support PVRDMA"
+    skip_reason: "Not Supported"
+  when: >
+    ('Flatcar' in guest_os_ansible_distribution or
+     guest_os_ansible_distribution in ['Debian', 'Fedora', 'VMware Photon OS'])
+
+- name: "Skip test case for unsupported Linux kernel"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      {{ guest_os_ansible_distribution }} with Linux kernel {{ guest_os_ansible_kernel }}
+      doesn't support PVRDMA. PVRDMA is supported in Linux kernel 4.6 or later.
+    skip_reason: "Not Supported"
+  when: guest_os_ansible_kernel is version('4.6', '<')
+
+- name: "Skip test case for unsupported VM hardware version"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      VM with hardware version {{ vm_hardware_version_num }} doesn't support PVRDMA.
+      PVRDMA is supported on VMs with hardware version 13 or later.
+    skip_reason: "Not Supported"
+  when: vm_hardware_version_num | int < 13
+
+- name: "Get module info about vmw_pvrdma"
+  include_tasks: ../utils/get_module_info.yml
+  vars:
+    module_name: "vmw_pvrdma"
+
+- name: "Set the fact of vmw_pvrdma module info"
+  ansible.builtin.set_fact:
+    guest_pvrdma_module_info: "{{ guest_module_info }}"
+
+- name: "Check inbox driver vmw_pvrdma"
+  block:
+    # Debian family except for Ubuntu may not have vmw_pvrdma driver
+    - name: "Skip test case for unsupported guest OS"
+      include_tasks: ../../common/skip_test_case.yml
+      vars:
+        skip_msg: "{{ guest_os_ansible_distribution }} doesn't support PVRDMA"
+        skip_reason: "Not Supported"
+      when:
+        - guest_os_family == "Debian"
+        - guest_os_ansible_distribution != "Ubuntu"
+
+    # Ubuntu, RHEL and Suse family should have vmw_pvrdma driver
+    - name: "Test is blocked because of missing vmw_pvrdma module in guest OS"
+      include_tasks: ../../common/skip_test_case.yml
+      vars:
+        skip_msg: >-
+          Test case '{{ ansible_play_name }}' is blocked because {{ guest_os_ansible_distribution }}
+          {{ guest_os_ansible_distribution_ver }} doesn't have vmw_pvrdma module.
+        skip_reason: "Blocked"
+      when: guest_os_ansible_distribution == "Ubuntu" or guest_os_family != "Debian"
+  when: >
+    (guest_pvrdma_module_info.filename is undefined) or
+    (('vmw_pvrdma' not in guest_pvrdma_module_info.filename) and
+    ('builtin' not in guest_pvrdma_module_info.filename))

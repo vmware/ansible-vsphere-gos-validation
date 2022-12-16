@@ -1,0 +1,47 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Install required packages and kernel modules
+- include_tasks: ../utils/install_uninstall_package.yml
+  vars:
+    package_name: "distrib-compat"
+    package_state: "present"
+  when:
+    - guest_os_ansible_distribution == "VMware Photon OS"
+    - guest_os_ansible_distribution_major_ver | int < 4
+
+- include_tasks: ../utils/kernel_module_install.yml
+  vars:
+    kernel_module_name: "8021q"
+  when:
+    - guest_os_ansible_distribution in ["SLES", "SLED"]
+    - guest_os_ansible_distribution_major_ver | int == 12
+
+# Install rmda-core for PVRDMA testing
+- name: "Install rdma packages for PVRDMA testing"
+  block:
+    - include_tasks: ../utils/install_uninstall_package.yml
+      vars:
+        package_name: ["rdma-core", "rdmacm-utils"]
+        package_state: "present"
+      when: guest_os_family == "Debian"
+
+    - include_tasks: ../utils/install_uninstall_package.yml
+      vars:
+        package_name: ["rdma-core", "librdmacm-utils"]
+        package_state: "present"
+      when: guest_os_family in ["Suse", "RedHat"]
+  when: adapter_type == "pvrdma"
+
+- name: "Get existing network interface before hotadd testing"
+  include_tasks: ../utils/get_network_adapters_status.yml
+
+- name: "Set fact of network adapter info before hotadd"
+  ansible.builtin.set_fact:
+    network_adapters_before_hotadd: "{{ guest_network_adapters }}"
+
+# Get eth0 device name in guest. Sometimes it is not 'eth0',
+# e.g., 'ens192', 'ens33', etc.
+- name: "Set fact of the first network adapter interface name in guest OS"
+  ansible.builtin.set_fact:
+    eth0_name: "{{ network_adapters_before_hotadd[0] }}"

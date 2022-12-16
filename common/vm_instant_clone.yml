@@ -1,0 +1,41 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Create an instant clone of VM
+# Paramters:
+#   parent_vm_name: The name of parent VM
+#   cloned_vm_name: The name of cloned VM
+#   cloned_vm_guestinfo_vars: The guest OS customization configs for cloned VM
+
+- name: "Check parameters for VM instant clone"
+  ansible.builtin.assert:
+    that:
+      - parent_vm_name is defined and parent_vm_name
+      - cloned_vm_name is defined and cloned_vm_name
+    fail_msg: >-
+      VM instant clone requires 'parent_vm_name' and 'cloned_vm_name'.
+      At least one of them is not set.
+
+- name: "Instant Clone a VM from '{{ parent_vm_name }}'"
+  community.vmware.vmware_guest_instant_clone:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+    datastore: "{{ datastore }}"
+    parent_vm: "{{ parent_vm_name }}"
+    name: "{{ cloned_vm_name }}"
+    guestinfo_vars: "{{ cloned_vm_guestinfo_vars | default(omit) }}"
+  register: vm_instant_clone
+
+- name: "Check VM instant clone result"
+  ansible.builtin.assert:
+    that:
+      - vm_instant_clone is defined
+      - vm_instant_clone.changed is defined
+      - vm_instant_clone.changed
+    fail_msg: "Failed to create instant clone VM '{{ cloned_vm_name }}' from '{{ parent_vm_name }}'"
+    success_msg: "Successfully created instant clone VM '{{ cloned_vm_name }}' from '{{ parent_vm_name }}'"

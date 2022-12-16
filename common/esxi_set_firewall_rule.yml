@@ -1,4 +1,4 @@
-# Copyright 2022 VMware, Inc.
+# Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Enable or disable ESXi host firewall rule
@@ -15,8 +15,7 @@
       - rule_name is defined and rule_name
       - rule_enabled is defined
       - rule_enabled | type_debug == 'bool'
-      - (not rule_enabled) or (rule_allowed_all is defined and rule_allowed_all | type_debug) == 'bool'
-    fail_msg: "'rule_name' must be set with a list of rules"
+    fail_msg: "At least one of parameters 'rule_name' or 'rule_enabled' is incorrect"
 
 - name: "Check parameter for enabling ESXi host firewall rule '{{ rule_name }}'"
   ansible.builtin.assert:
@@ -57,7 +56,7 @@
     - set_firewall_result is defined
     - set_firewall_result.rule_set_state is defined
 
-- name: "Check the result of {{ rule_op | regex_replace('e$', 'ing') }} ESXi host firewall rule '{{ rule_name }}'"
+- name: "Check the result of setting ESXi host firewall rule '{{ rule_name }}'"
   ansible.builtin.assert:
     that:
       - rule_state[esxi_hostname] is defined

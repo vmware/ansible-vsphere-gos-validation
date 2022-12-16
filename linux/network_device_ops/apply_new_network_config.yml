@@ -1,12 +1,70 @@
-# Copyright 2022 VMware, Inc.
+# Copyright 2022-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Parameters
 #   new_network_adapter: The name of new network adapter interface
 
+- name: "Get guest network device manager"
+  include_tasks: ../utils/get_network_manager.yml
+
+- name:  "Initialize facts of network config file tempate and path"
+  ansible.builtin.set_fact:
+    network_conf_template: ""
+    network_conf_path: ""
+
+- name: "Add network connection for {{ guest_os_ansible_distribution }}"
+  block:
+    - name: "Add network connection with static IP address"
+      block:
+        - name: "Add a network connection with static IP address for {{ new_network_adapter }}"
+          ansible.builtin.shell: >-
+            nmcli connection add type ethernet
+            ifname {{ new_network_adapter }}
+            con-name {{ new_network_adapter }}
+            ip4 {{ new_nic_ipv4 }}/{{ new_nic_net_prefix }}
+            gw4 {{ new_nic_gateway }}
+          delegate_to: "{{ vm_guest_ip }}"
+          register: nm_add_static_conn
+
+        - name: "Set result of adding network connection with static IP address"
+          ansible.builtin.set_fact:
+            nm_add_connection: "{{ nm_add_static_conn }}"
+      when:
+        - new_nic_ipv4 is defined and new_nic_ipv4
+        - new_nic_net_prefix is defined and new_nic_net_prefix
+        - new_nic_gateway is defined and new_nic_gateway
+
+    - name: "Add network connection with DHCP IP address"
+      block:
+        - name: "Add a network connection with DHCP IP address for {{ new_network_adapter }}"
+          ansible.builtin.shell: >-
+            nmcli connection add type ethernet
+            ifname {{ new_network_adapter }}
+            con-name {{ new_network_adapter }}
+          delegate_to: "{{ vm_guest_ip }}"
+          register: nm_add_dhcp_conn
+
+        - name: "Set result of adding network connection with DHCP IP address"
+          ansible.builtin.set_fact:
+            nm_add_connection: "{{ nm_add_dhcp_conn }}"
+      when: >-
+        (new_nic_ipv4 is undefined or not new_nic_ipv4) or
+        (new_nic_net_prefix is undefined or not new_nic_net_prefix) or
+        (new_nic_gateway is undefined or not new_nic_gateway)
+
+    - name: "Check network connection is added for {{ new_network_adapter }}"
+      ansible.builtin.assert:
+        that:
+          - nm_add_connection is defined
+          - nm_add_connection.rc is defined
+          - nm_add_connection.rc == 0
+        fail_msg: "Failed to add network connection"
+        success_msg: "{{ nm_add_connection.stdout | default('Successfully added network connection') }}"
+  when: guest_os_network_manager == "NetworkManager"
+
 # Set fact of network config file in guest OS except Photon OS
 - block:
-    - name: "Set fact of the network configure file for RedHat"
+    - name: "Set fact of the network configure file for {{ guest_os_ansible_distribution }}"
       ansible.builtin.set_fact:
         network_conf_template: rhel_network_conf.j2
         network_conf_path: "/etc/sysconfig/network-scripts/ifcfg-{{ new_network_adapter }}"
@@ -60,10 +118,9 @@
 
     - name: "Print content of network configure file '{{ network_conf_path }}'"
       ansible.builtin.debug: var=network_config.stdout_lines
-  when: guest_os_ansible_distribution not in ["VMware Photon OS", "Astra Linux (Orel)"]
-
-- name: "Get guest network device manager"
-  include_tasks: ../utils/get_network_manager.yml
+  when:
+    - guest_os_network_manager != "NetworkManager"
+    - guest_os_ansible_distribution not in ["VMware Photon OS", "Astra Linux (Orel)"]
 
 - name: "Apply new netplan configuration file in Ubuntu server"
   block:
@@ -93,6 +150,10 @@
   when: guest_os_network_manager != "netplan"
 
 # Get IP address of new interface
+- name: "Set fact of searching IPv4 address"
+  ansible.builtin.set_fact:
+    search_ip: "{% if adapter_type == 'pvrdma' %}{{ new_nic_ipv4 }}{% else %}192.168{% endif %}"
+
 - name: "Wait for network adapter '{{ new_network_adapter }}' IPv4 address"
   ansible.builtin.shell: "ip -br addr show {{ new_network_adapter }} | awk '{print $3}'"
   register: link_status
@@ -100,7 +161,7 @@
   until:
     - link_status is defined
     - link_status.stdout is defined
-    - '"192.168" in link_status.stdout'
+    - search_ip in link_status.stdout
   retries: 20
   delay: 5
   delegate_to: "{{ vm_guest_ip }}"
@@ -111,7 +172,7 @@
     that:
       - link_status is defined
       - link_status.stdout is defined
-      - '"192.168" in link_status.stdout'
+      - search_ip in link_status.stdout
     fail_msg: >-
       Network adapter '{{ new_network_adapter }}' failed to obtain IPv4 address after 100 seconds.
       Its current IPv4 address is '{{ link_status.stdout | default("") }}'.

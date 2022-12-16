@@ -1,33 +1,36 @@
-# Copyright 2022 VMware, Inc.
+# Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Cleanup vSphere Distributed Switch (VDS) networking, including:
 #   - Remove VMkenrel network adapters, ESXi host from the distributed port group,
-#   - Remove the distributed port group
+#   - Remove the vSphere Distributed Port Group
 #   - Remove the vSphere Distributed Switch
 # Parameters:
-#   
+#   vds_name: The vSphere Distributed Switch name
+#   vds_portgroup_name: The vSphere Distributed Port Group name
+#   vds_vmk_device: The VMkernel network adapter assigned to distributed port group
+#
 
-- name: "Cleanup vSphere Distributed Switch networking"
+- name: "Clean up vSphere Distributed Switch networking"
   block:
-    - name: "Remove VMkernel network adapter '{{ new_vmk_device }}' from ESXi host"
+    - name: "Remove VMkernel network adapter '{{ vds_vmk_device }}' from ESXi host"
       include_tasks: esxi_manage_vmkernel.yml
       vars:
-        vmk_device: "{{ new_vmk_device }}"
+        vmk_device: "{{ vds_vmk_device }}"
         vmk_state: "absent"
         vmk_vds_name: "{{ vds_name }}"
         vmk_portgroup_name: "{{ vds_portgroup_name }}"
-    
+
     - name: "Remove ESXi host from distributed port group '{{ vds_portgroup_name }}'"
       include_tasks: vcenter_manage_vds_host.yml
       vars:
         vds_host_state: "absent"
-    
+
     - name: "Remove distributed port group '{{ vds_portgroup_name }}'"
       include_tasks: vcenter_manage_vds_portgroup.yml
       vars:
         vds_portgroup_state: "absent"
-    
+
     - name: "Remove vSphere Distributed Switch '{{ vds_name }}'"
       include_tasks: vcenter_manage_vds.yml
       vars:

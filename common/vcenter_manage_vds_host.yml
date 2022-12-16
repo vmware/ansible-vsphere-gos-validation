@@ -1,4 +1,4 @@
-# Copyright 2022 VMware, Inc.
+# Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Add or remove ESXi host for a vSphere Distributed Switch
@@ -6,6 +6,7 @@
 #   vds_name: The vSphere Distributed Switch name.
 #   vds_host_state: The ESXi host state on the vSphere Distributed Switch: present or absent.
 #   vds_host_vmnics: A list of ESXi vmnics to use with the vSphere Distributed Switch.
+#     Default value is [].
 
 - name: "Check paramters for managing ESXi host on vSphere Distributed Switch"
   ansible.builtin.assert:
@@ -13,16 +14,16 @@
       - vds_name is defined and vds_name
       - vds_host_state is defined
       - vds_host_state in ['present', 'absent']
+      - vds_host_vmnics is undefined or vds_host_vmnics | type_debug == 'list'
     fail_msg: >-
-      At least one of parameters 'vds_name' and 'vds_host_state' is incorrect.
+      At least one of parameters 'vds_name', 'vds_host_state', or 'vds_host_vmnics' is incorrect.
 
-- name: "Check parameter 'vds_host_vmnics' is set to a vmnics list"
-  ansible.builtin.assert:
-    that:
-      - vds_host_vmnics is defined
-      - vds_host_vmnics | type_debug == 'list'
-    fail_msg: "'vds_host_vmnics' must be set with a list of ESXi physical adapters."
-  when: vds_host_state == 'present'
+- name: "Set default ESXi vmnics to use with the vSphere Distributed Switch"
+  ansible.builtin.set_fact:
+    vds_host_vmnics: []
+  when:
+    - vds_host_state == 'present'
+    - vds_host_vmnics is undefined
 
 - name: "Set operation for managing ESXi host on vSphere Distributed Switch"
   ansible.builtin.set_fact:
@@ -40,10 +41,10 @@
     vmnics: "{{ vds_host_vmnics | default(omit) }}"
   register: manage_vds_host_result
 
-- name: "Check the result of {{ vds_host_op | regex_replace('e$', 'ing') }} ESXi host for vSphere Distributed Switch"
+- name: "Check the result of managing ESXi host for vSphere Distributed Switch"
   ansible.builtin.assert:
     that:
       - manage_vds_host_result is defined
-      - manage_vds_host_result.changed is defined
-      - manage_vds_host_result.changed
+      - manage_vds_host_result.failed is defined
+      - not manage_vds_host_result.failed
     fail_msg: "Failed to {{ vds_host_op }} ESXi host '{{ esxi_hostname }}' for vSphere Distributed Switch"

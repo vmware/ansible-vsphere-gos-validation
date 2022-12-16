@@ -1,7 +1,7 @@
-# Copyright 2022 VMware, Inc.
+# Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Create or remove a distributed port group
+# Create or remove a vSphere Distributed Port Group
 # Parameters:
 #   vds_name: The vSphere Distributed Switch name where the port group is.
 #   vds_portgroup_name: The distributed port group name.
@@ -14,24 +14,18 @@
 #   vds_port_allocation(optional): The port allocation type. Choices are 'elastic' and 'fixed'.
 #     Default value is 'fixed'.
 
-- name: "Check paramters for create or remove a distributed port group"
+- name: "Check paramters for managing a distributed port group"
   ansible.builtin.assert:
     that:
       - vds_name is defined and vds_name
       - vds_portgroup_name is defined and vds_portgroup_name
       - vds_portgroup_state is defined
       - vds_portgroup_state in ['present', 'absent']
-    fail_msg: >-
-      At least one of parameters 'vds_name', 'vds_portgroup_name' and 'vds_portgroup_state'
-      is incorrect.
-
-- name: "Check ports numbers for creating new distributed port group"
-  ansible.builtin.assert:
-    that:
       - vds_port_number is defined
       - vds_port_number | int > 0
-    fail_msg: "Parameter 'vds_port_number' must be set with an integer"
-  when: vds_portgroup_state == 'present'
+    fail_msg: >-
+      At least one of parameters 'vds_name', 'vds_portgroup_name', 'vds_portgroup_state' or
+      'vds_port_number' is incorrect.
 
 - name: "Set operation for managing distributed port group"
   ansible.builtin.set_fact:
@@ -50,14 +44,14 @@
     port_allocation: "{{ vds_port_allocation | default('fixed') }}"
     num_ports: "{{ vds_port_number | default(omit) }}"
     state: "{{ vds_portgroup_state }}"
-  register: manage_dvc_portgroup_result
+  register: manage_vds_portgroup_result
 
-- name: "Check the result of {{ vds_portgroup_op | regex_replace('e$', 'ing') }} distributed port group"
+- name: "Check the result of managing distributed port group"
   ansible.builtin.assert:
     that:
-      - manage_dvc_portgroup_result is defined
-      - manage_dvc_portgroup_result.changed is defined
-      - manage_dvc_portgroup_result.changed
+      - manage_vds_portgroup_result is defined
+      - manage_vds_portgroup_result.changed is defined
+      - manage_vds_portgroup_result.changed
     fail_msg: "Failed to {{ vds_portgroup_op }} distributed port group '{{ vds_portgroup_name }}'"
 
 - name: "Wait for creating distributed port group is completed"

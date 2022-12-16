@@ -21,6 +21,7 @@
 * ovf_deploy.yml: Deploy OVF template to VM
 * ovf_export.yml: Export VM to OVF template
 * vm_remove.yml: Delete VM from ESXi host
+* vm_instant_clone.yml: Create an instant clone of VM
 
 ### Tasks for VM basic settings
 * vm_set_guest_id.yml: Set VM's guest id
@@ -122,7 +123,6 @@
 * esxi_get_pmem_info.yml: Get ESXi host total and available persistent memroy size in MB
 * esxi_configure_advanced_settings.yml: Configure advanced system settings on ESXi host
 * esxi_get_vmkernels.yml: Get ESXi host VMkernel network adapters
-* esxi_get_vmnics.yml: Get ESXi host physical network adapters (vmnics)
 * esxi_manage_vmkernel.yml: Add or remove a VMkernel network adapter on ESXi host 
 * esxi_set_firewall_rule.yml: Enable or disable a firewall rule on ESXi host
 
@@ -138,7 +138,7 @@
 
 ### Tasks for server information
 * esxi_get_host_facts.yml: Get ESXi server host facts
-* esxi_get_vmnic.yml: Get facts about phyical adapters (vmnics) on ESXi host
+* esxi_get_vmnic_facts.yml: Get phyical NICs facts on ESXi server
 * esxi_get_version_build.yml: Get ESXi release version and milestone
 * vcenter_get_version_build.yml: Get vCenter server version info
 * esxi_get_model.yml: Get ESXi server model and CPU model info
@@ -154,9 +154,7 @@
 
 ### Tasks for vSphere Distributed Switch (VDS) and Port Group 
 * vcenter_manage_vds.yml: Create or remove a vSphere Distributed Switch
-* vcenter_get_vds.yml: Get info about a vSphere Distributed Switch on vCenter Server
 * vcenter_manage_vds_portgroup.yml: Create or remove a distributed port group on vCenter Server
-* vcenter_get_vds_portgroup.yml: Get info about a distributed port group on vCenter Server
 * vcenter_manage_vds_host.yml: Add or remove an ESXi host for a distributed port group on vCenter Server
 
 ## Localhost tasks
