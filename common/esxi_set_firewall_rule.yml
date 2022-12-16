@@ -1,0 +1,82 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Enable or disable ESXi host firewall rule
+# Parameters:
+#   rule_name: The firewall rule name on ESXi host.
+#   rule_enabled: Whether to enable the firewall rule on ESXi host.
+#   rule_allowed_all: Whether to allow all hosts.
+#   rule_allowed_ip(optional): A list of allowed IP addresses.
+#   rule_allowed_networks(optional): A list of allowed IP networks.
+
+- name: "Check parameters for ESXi host firewall rule"
+  ansible.builtin.assert:
+    that:
+      - rule_name is defined and rule_name
+      - rule_enabled is defined
+      - rule_enabled | type_debug == 'bool'
+      - (not rule_enabled) or (rule_allowed_all is defined and rule_allowed_all | type_debug) == 'bool'
+    fail_msg: "'rule_name' must be set with a list of rules"
+
+- name: "Check parameter for enabling ESXi host firewall rule '{{ rule_name }}'"
+  ansible.builtin.assert:
+    that:
+      - rule_allowed_all is defined
+      - rule_allowed_all | type_debug == 'bool'
+    fail_msg: "'rule_allowed_all' must be set as a bool"
+  when: rule_enabled
+
+- name: "Set the config operation for ESXi host firewall rule '{{ rule_name }}'"
+  ansible.builtin.set_fact:
+    rule_op: "{% if rule_enabled | bool %}enable{% else %}disable{% endif %}"
+
+- name: "Initialize the state of ESXi host firewall rule '{{ rule_name }}'"
+  ansible.builtin.set_fact:
+    rule_state: {}
+  
+- name: "{{ rule_op | capitalize }} ESXi host firewall rule '{{ rule_name }}'"
+  community.vmware.vmware_host_firewall_manager:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+    rules:
+      - name: "{{ rule_name }}"
+        enabled: "{{ rule_enabled }}"
+        allowed_hosts:
+          all_ip: "{{ rule_allowed_all | default(omit) }}"
+          ip_address: "{{ rule_allowed_ip | default(omit) }}"
+          ip_network: "{{ rule_allowed_networks | default(omit) }}"
+  register: set_firewall_result
+
+- name: "Get the state of firewall rule '{{ rule_name }}'"
+  ansible.builtin.set_fact:
+    rule_state: "{{ set_firewall_result.rule_set_state }}"
+  when:
+    - set_firewall_result is defined
+    - set_firewall_result.rule_set_state is defined
+
+- name: "Check the result of {{ rule_op | regex_replace('e$', 'ing') }} ESXi host firewall rule '{{ rule_name }}'"
+  ansible.builtin.assert:
+    that:
+      - rule_state[esxi_hostname] is defined
+      - rule_state[esxi_hostname][rule_name] is defined
+      - rule_state[esxi_hostname][rule_name].current_state is defined
+      - rule_state[esxi_hostname][rule_name].current_state == rule_enabled | bool
+    fail_msg: "Failed to {{ rule_op }} ESXi host firewall rule: '{{ rule_name }}'"
+    success_msg: "ESXi host firewall rule '{{ rule_name }}' is {{ rule_op }}d"
+
+- name: "Check allowed hosts for ESXi host firewall rule '{{ rule_name }}'"
+  ansible.builtin.assert:
+    that:
+      - rule_state[esxi_hostname][rule_name].allowed_hosts is defined
+      - rule_state[esxi_hostname][rule_name].allowed_hosts.current_allowed_all is defined
+      - rule_state[esxi_hostname][rule_name].allowed_hosts.current_allowed_all == rule_allowed_all | bool
+      - rule_state[esxi_hostname][rule_name].allowed_hosts.current_allowed_ip is defined
+      - rule_state[esxi_hostname][rule_name].allowed_hosts.current_allowed_ip == rule_allowed_ip | default([])
+      - rule_state[esxi_hostname][rule_name].allowed_hosts.current_allowed_networks is defined
+      - rule_state[esxi_hostname][rule_name].allowed_hosts.current_allowed_networks == rule_allowed_networks | default([])
+    fail_msg: "Failed to set allowed hosts for ESXi host firewall rule: '{{ rule_name }}'"
+    success_msg: "Successfully set allowed hosts for ESXi host firewall rule: '{{ rule_name }}'"
+  when: rule_enabled | bool 

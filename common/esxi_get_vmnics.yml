@@ -1,0 +1,51 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Gather vmnics info about ESXi physical adapters
+# Return:
+#   esxi_vmnics_info: A dictionary of ESXi physical adapters vmnics info
+#   esxi_vmnics_available: A list of available and connected ESXi physical adapters
+#
+- name: "Initialize facts about ESXi physical adapters vmnics"
+  ansible.builtin.set_fact:
+    esxi_vmnics_info: {}
+    esxi_vmnics_abailable: []
+
+- name: "Gather vmnics info about ESXi physical adapters"
+  community.vmware.vmware_host_vmnic_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    esxi_hostname: "{{ esxi_hostname | default(omit) }}"
+  register: esxi_vmnics
+
+- name: "Set fact of ESXi physical adapters vmnics info"
+  ansible.builtin.set_fact:
+    esxi_vmnics_info: "{{ esxi_vmnics.hosts_vmnics_info[esxi_hostname] }}"
+  when:
+    - esxi_vmnics is defined
+    - esxi_vmnics.hosts_vmnics_info is defined
+    - esxi_vmnics.hosts_vmnics_info[esxi_hostname] is defined
+
+- name: "Print vmnics info about ESXi physical adapters"
+  ansible.builtin.debug: var=esxi_vmnics_info
+  when: enable_debug
+
+- name: "Set fact of ESXi physical adapters vmnics info"
+  ansible.builtin.set_fact:
+    esxi_vmnics_abailable: >-
+      {{
+        esxi_vmnics_info.vmnic_details |
+        selectattr('device', 'in', esxi_vmnics_info.available) |
+        selectattr('status', 'equalto', 'Connected') |
+        map(attribute='device')
+      }}
+  when:
+    - esxi_vmnics_info
+    - esxi_vmnics_info.available is defined
+    - esxi_vmnics_info.vmnic_details is defined
+
+- name: "Print available ESXi physical adapters"
+  ansible.builtin.debug: var=esxi_vmnics_abailable
+  when: enable_debug

@@ -1,0 +1,34 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get info about a specified vSphere Distributed Switch (VDS)
+# Parameters:
+#   vds_name: The vSphere Distributed Switch name
+#
+- name: "Initialize the fact about vSphere Distributed Switch"
+  ansible.builtin.set_fact:
+    vds_info: {}
+
+- name: "Get info about vSphere Distributed Switch '{{ vds_name }}'"
+  community.vmware.vmware_dvswitch_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    switch_name: "{{ vds_name }}"
+  register: get_vds_result
+
+- name: "Print the result of adding vSphere Distributed Switch"
+  ansible.builtin.debug: var=get_vds_result
+  when: enable_debug
+
+- name: "Set fact of vSphere Distributed Switch '{{ vds_name }}'"
+  ansible.builtin.set_fact:
+    vds_info: "{{ get_vds_result.distributed_virtual_switches[0] }}"
+  when:
+    - get_vds_result is defined
+    - get_vds_result.distributed_virtual_switches is defined
+    - get_vds_result.distributed_virtual_switches | length == 1
+
+- name: "Print the vSphere Distributed Switch info"
+  ansible.builtin.debug: var=vds_info

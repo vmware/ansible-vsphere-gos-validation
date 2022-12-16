@@ -1,0 +1,51 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Create or remove a vSphere Distributed Switch (VDS) in a datacenter
+# Parameters:
+#   vds_name: The name of vSphere Distributed Switch.
+#   vds_state: The state of vSphere Distributed Switch: present or absent.
+#   vds_version(optional): The version for creating new vSphere Distributed Switch. 
+#   vds_uplink_quantity(optional): Quantity of ESXi host uplinks for creating new 
+#     vSphere Distributed Switch. Default value is 1.
+#
+- name: "Check paramters for managing vSphere Distributed Switch"
+  ansible.builtin.assert:
+    that:
+      - vds_name is defined
+      - vds_name 
+      - vds_state is defined
+      - vds_state in ['present', 'absent']
+    fail_msg: "At least one of parameters 'vds_name', 'vds_state' is incorrect."
+
+- name: "Set default uplink quantity for creating new vSphere Distributed Switch"
+  ansible.builtin.set_fact:
+    vds_uplink_quantity: 1
+  when: 
+    - vds_state == 'present'
+    - vds_uplink_quantity is undefined or not vds_uplink_quantity
+
+- name: "Set operation for managing vSphere Distributed Switch"
+  ansible.builtin.set_fact:
+    vds_op: "{% if vds_state == 'present' %}create{% else %}remove{% endif %}"
+
+- name: "{{ vds_op | capitalize }} vSphere Distributed Switch '{{ vds_name }}'"
+  community.vmware.vmware_dvswitch:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    switch_name: "{{ vds_name }}"
+    switch_version: "{{ vds_version | default(omit) }}"
+    uplink_quantity: "{{ vds_uplink_quantity | default(omit) }}"
+    state: "{{ vds_state }}"
+  register: manage_vds_result
+
+- name: "Check the result of {{ vds_op | regex_replace('e$', 'ing') }} vSphere Distributed Switch '{{ vds_name }}'"
+  ansible.builtin.assert:
+    that:
+      - manage_vds_result is defined
+      - manage_vds_result.changed is defined
+      - manage_vds_result.changed
+    fail_msg: "Failed to {{ vds_op }} vSphere Distributed Switch '{{ vds_name }}'"

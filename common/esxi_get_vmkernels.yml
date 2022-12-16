@@ -1,0 +1,32 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Gather info about ESXi VMkernel adapters
+# Return:
+#   esxi_vmkernels_info: A list of VMkernel adapters info
+
+- name: "Initialize the fact of ESXi VMkernel adapters info"
+  ansible.builtin.set_fact:
+    esxi_vmkernels_info: []
+
+- name: "Gather info about ESXi VMkernel adapters"
+  community.vmware.vmware_vmkernel_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+  delegate_to: localhost
+  register: esxi_vmks
+ 
+- name: "Set fact of ESXi VMkernel adapters info"
+  ansible.builtin.set_fact:
+    esxi_vmkernels_info: "{{ esxi_vmks.host_vmk_info[esxi_hostname] }}"
+  when:
+    - esxi_vmks is defined
+    - esxi_vmks.host_vmk_info is defined
+    - esxi_vmks.host_vmk_info[esxi_hostname] is defined
+ 
+- name: "Print ESXi VMkernel adapters info"
+  ansible.builtin.debug: var=esxi_vmkernels_info
+  when: enable_debug

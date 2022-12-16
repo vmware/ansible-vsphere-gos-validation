@@ -1,0 +1,93 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Setup vSphere Distributed Switch (VDS) networking, include:
+#   - Create a new vSphere Distributed Switch
+#   - Create a new distributed port group
+#   - Add ESXi host to the distributed port group
+#   - Add a VMkernel network adapter on the ESXi host and assign with distributed port group
+
+- name: "Set facts for setting vSphere Distributed Switch networking"
+  ansible.builtin.set_fact:
+    vds_name: "DSwitch{{ testrun_timestamp }}"
+    vds_portgroup_name: "DPortGroup{{ testrun_timestamp }}"
+    vds_port_number: 4
+
+- name: "Create a new vSphere Distributed Switch '{{ vds_name }}'"
+  include_tasks: vcenter_manage_vds.yml
+  vars:
+    vds_state: "present"
+
+- name: "Create a new distributed port group"
+  include_tasks: vcenter_manage_vds_portgroup.yml
+  vars:
+    vds_portgroup_state: "present"
+
+- name: "Get available vmnics on ESXi host"
+  include_tasks: esxi_get_vmnics.yml
+
+- name: "No available vmnics blocks the test"
+  include_tasks: skip_test_case.yml
+  vars:
+    skip_msg: "Test case '{{ ansible_play_name }}' is blocked because there is no available vmnic"
+    skip_reason: "Blocked"
+  when: esxi_vmnics_abailable | length == 0
+
+- name: "Set fact of ESXi physical adapter vmnics used with the distributed switch"
+  ansible.builtin.set_fact:
+    vds_host_vmnics: ["{{ esxi_vmnics_abailable[0] }}"]
+
+- name: "Add ESXi host to the distributed port group"
+  include_tasks: vcenter_manage_vds_host.yml
+  vars:
+    vds_host_state: "present"
+
+- name: "Get all VMkernel network adapters on the ESXi host"
+  include_tasks: esxi_get_vmkernels.yml
+
+- name: "Get all existing VMkernel network adapter indices and number"
+  ansible.builtin.set_fact:
+    existing_vmk_indices: >-
+      {{
+        esxi_vmkernels_info |
+        map(attribute='device') |
+        map('replace', 'vmk', '') |
+        map('int') |
+        sort
+      }}
+    existing_vmk_num: "{{ esxi_vmkernels_info | length }}"
+
+- name: "Set fact of the new VMkernel network adapter device"
+  ansible.builtin.set_fact:
+    new_vmk_device: "vmk{{ existing_vmk_num }}"
+  when: (existing_vmk_num | int == 0) or (existing_vmk_indices[-1] == (existing_vmk_num | int - 1))
+
+- name: "Set fact of the new VMkernel network adapter device"
+  ansible.builtin.set_fact:
+    new_vmk_device: "vmk{{ range(0, existing_vmk_num | int) | difference(existing_vmk_indices) | min }}"
+  when:
+    - existing_vmk_num | int > 0
+    - existing_vmk_indices[-1] != existing_vmk_num | int - 1
+
+- name: "Add a VMkernel network adapter assigned to the distributed port group for the ESXi host"
+  include_tasks: esxi_manage_vmkernel.yml
+  vars:
+    vmk_device: "{{ new_vmk_device }}"
+    vmk_state: "present"
+    vmk_vds_name: "{{ vds_name }}"
+    vmk_portgroup_name: "{{ vds_portgroup_name }}"
+    vmk_network: {'type': 'dhcp'}
+    vmk_enable_mgmt: false
+
+- name: "Check the new VMkernel network adapter device name"
+  ansible.builtin.assert:
+    that:
+      - manage_vmk_result.device is defined
+      - manage_vmk_result.device == new_vmk_device
+    fail_msg: >-
+      The new added VMkernel network adapter is '{{ manage_vmk_result.device }}',
+      not expected '{{ new_vmk_device }}'
+
+- name: "Set fact of vSphere Distributed Switch networking is setup"
+  ansible.builtin.set_fact:
+    vds_network_is_setup: true

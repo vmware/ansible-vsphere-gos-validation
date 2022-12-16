@@ -120,6 +120,12 @@
 * esxi_get_guest_ids.yml: Get supported guest ids for a hardware version on ESXi host
 * esxi_get_guest_config_options.yml: Get VM config options for a guest id on a hardware version
 * esxi_get_pmem_info.yml: Get ESXi host total and available persistent memroy size in MB
+* esxi_configure_advanced_settings.yml: Configure advanced system settings on ESXi host
+* esxi_get_vmkernels.yml: Get ESXi host VMkernel network adapters
+* esxi_get_vmnics.yml: Get ESXi host physical network adapters (vmnics)
+* esxi_manage_vmkernel.yml: Add or remove a VMkernel network adapter on ESXi host 
+* esxi_set_firewall_rule.yml: Enable or disable a firewall rule on ESXi host
+
 
 ### Tasks for ESXi datastores
 * esxi_add_datastore.yml: Add NFS or VMFS datastore to ESXi host
@@ -132,19 +138,26 @@
 
 ### Tasks for server information
 * esxi_get_host_facts.yml: Get ESXi server host facts
-* esxi_get_vmnic_facts.yml: Get phyical NICs facts on ESXi server
+* esxi_get_vmnic.yml: Get facts about phyical adapters (vmnics) on ESXi host
 * esxi_get_version_build.yml: Get ESXi release version and milestone
 * vcenter_get_version_build.yml: Get vCenter server version info
 * esxi_get_model.yml: Get ESXi server model and CPU model info
 
-### Tasks for ESXi virtual switch and portgroup
+### Tasks for vSphere Standard Switch (VSS) and Port Group
 * esxi_add_portgroup.yml: Add a new virtual switch port group
 * esxi_remove_portgroup.yml: Remove a virtual switch port group
 * esxi_get_portgroup_facts.yml: Get virtual switch port group facts
 * esxi_wait_portgroup.yml: Wait for specified port group info retrieved
-* esxi_add_vswitch.yml: Add a new standard virtual switch
-* esxi_remove_vswitch.yml: Remove a standard virtual switch
+* esxi_add_vswitch.yml: Add a new vSphere Standard Switch
+* esxi_remove_vswitch.yml: Remove a vSphere Standard Switch
 * esxi_get_vswitch_facts.yml: Get virtual switch facts
+
+### Tasks for vSphere Distributed Switch (VDS) and Port Group 
+* vcenter_manage_vds.yml: Create or remove a vSphere Distributed Switch
+* vcenter_get_vds.yml: Get info about a vSphere Distributed Switch on vCenter Server
+* vcenter_manage_vds_portgroup.yml: Create or remove a distributed port group on vCenter Server
+* vcenter_get_vds_portgroup.yml: Get info about a distributed port group on vCenter Server
+* vcenter_manage_vds_host.yml: Add or remove an ESXi host for a distributed port group on vCenter Server
 
 ## Localhost tasks
 ### Tasks for NFS mount and unmount
@@ -167,6 +180,8 @@
 * router_vm_deploy.yml: Deploy a router VM for network testing or GOSC testing
 * network_testbed_setup.yml: Setup network adapter testing testbed
 * network_testbed_cleanup.yml: Cleanup network adapter testing testbed
+* vds_network_setup.yml: Setup vSphere Distributed Switch networking
+* vds_network_cleanup.yml: Cleanup vSphere Distributed Switch networking
 * test_rescue: Tasks executed when test case failure
 * skip_test_case.yml: Tasks for skipping testcase and ending play
 

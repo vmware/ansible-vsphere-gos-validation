@@ -1,0 +1,61 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Add VMkernel network adapter on ESXi host to a vSphere Standard Switch (VSS) port group
+# or a vSphere Distributed Switch (VDS) port group
+# Paramters:
+#   vmk_device: The VMkernel network adapter name.
+#   vmk_state: The VMkernel network adapter state: present or absent.
+#   vmk_vss_name: The vSphere Standard Switch name for the VMkernel network adapter.
+#   vmk_vds_name: The vSphere Distributed Switch name for the VMkernel network adapter.
+#   vmk_portgroup_name: The port group name for the VMkernel network adapter.
+#   vmk_network: The network config for the VMkernel network adapter.
+#   vmk_enable_mgmt: True to enable management on the VMkernel network adapter.
+#     Default value if false.
+#   
+- name: "Check the switch name for managing VMkernel network adapter"
+  ansible.builtin.assert:
+    that:
+      - (vmk_vss_name is defined and vmk_vss_name) or (vmk_vds_name is defined and vmk_vds_name)
+    fail_msg: >-
+      You must either set 'vmk_vss_name' with a vSphere Standard Switch name or
+      set 'vmk_vds_name' with a vSphere Distributed Switch name for managing
+      VMkenel network adapter.
+
+- name: "Check parameters for managing VMkernel network adapter"
+  ansible.builtin.assert:
+    that:
+      - vmk_portgroup_name is defined and vmk_portgroup_name
+      - vmk_device is defined and vmk_device
+      - vmk_state is defined and vmk_state in ['present', 'absent']
+    fail_msg: >-
+      At least one of parmaeters 'vmk_portgroup_name', 'vmk_device' and 'vmk_state' is incorrect.
+
+- name: "Set operation for managing VMkernel network adapter"
+  ansible.builtin.set_fact:
+    vmk_op: "{% if vmk_state == 'present' %}add{% else %}remove{% endif %}"
+
+- name: "{{ vmk_op | capitalize }} VMkernel network adapter for port group '{{ vmk_portgroup_name }}'"
+  community.vmware.vmware_vmkernel:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+    dvswitch_name: "{{ vmk_vds_name | default(omit) }}"
+    vswitch_name: "{{ vmk_vss_name | default(omit) }}"
+    portgroup_name: "{{ vmk_portgroup_name }}"
+    state: "{{ vmk_state }}"
+    device: "{{ vmk_device | default(omit) }}"
+    network: "{{ vmk_network | default(omit) }}"
+    enable_mgmt: "{{ vmk_enable_mgmt | default(false) }}"
+  delegate_to: localhost
+  register: manage_vmk_result
+ 
+- debug: var=manage_vmk_result
+- name: "Check the result of adding VMkernel network adapter to port group"
+  ansible.builtin.assert:
+    that:
+      - manage_vmk_result is defined
+      - manage_vmk_result.changed is defined
+      - manage_vmk_result.changed

@@ -1,0 +1,41 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get info about distributed port groups of vSphere Distributed Switch
+# Parameters:
+#   vds_portgroup_name: The distributed port group name.
+# Return:
+#   vds_portgroup_info: The info of a specific distributed port group
+
+- name: "Check parameter 'vds_portgroup_name' is set"
+  ansible.builtin.assert:
+    that:
+      - vds_portgroup_name is defined
+      - vds_portgroup_name
+    fail_msg: "'vds_portgroup_name' must be set for getting distributed port group info"
+
+- name: "Initialize facts about distributed port group"
+  ansible.builtin.set_fact:
+    vds_portgroups: []
+    vds_portgroup_info: {}
+
+- name: "Get info about vSphere distributed port groups"
+  community.vmware.vmware_dvs_portgroup_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+  register: get_vds_pg_result
+
+- name: "Set fact of all distributed port groups"
+  ansible.builtin.set_fact:
+    vds_portgroups: "{{ get_vds_pg_result.dvs_portgroup_info | dict2items | map(attribute='value') | flatten | selectattr('portgroup_name', 'equalto', vds_portgroup_name) }}"
+  when:
+    - get_vds_pg_result is defined
+    - get_vds_pg_result.dvs_portgroup_info is defined
+
+- name: "Set fact of distributed port group '{{ vds_portgroup_name }}'"
+  ansible.builtin.set_fact:
+    vds_portgroup_info: "{{ vds_portgroups[0] }}"
+  when: vds_portgroups | length > 0
