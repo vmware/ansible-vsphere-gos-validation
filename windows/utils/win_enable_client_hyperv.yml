@@ -1,28 +1,12 @@
 # Copyright 2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Enable Hyper-V feature in Windows guest OS.
-# Parameters:
-#   win_product_type: 'client' or 'server'.
+# Enable Hyper-V feature in Windows Client guest OS.
 #
-- name: "Check required parameter"
-  ansible.builtin.assert:
-    that:
-      - win_product_type is defined
-      - win_product_type | lower in ['client', 'server']
-    fail_msg: "Parameter 'win_product_type' is required and set to 'client' or 'server'."
-
-- name: "Set fact of Hyper-V powershell commands for Windows Client"
+- name: "Set fact of Hyper-V powershell commands"
   ansible.builtin.set_fact:
-    win_enable_hyperv_cmd: "Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All"
+    win_enable_hyperv_cmd: "Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All -NoRestart -WarningAction SilentlyContinue"
     win_check_hyperv_cmd: "(Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State"
-  when: win_product_type | lower == 'client'
-
-- name: "Set fact of Hyper-V powershell commands for Windows Server"
-  ansible.builtin.set_fact:
-    win_enable_hyperv_cmd: "Install-WindowsFeature -Name Hyper-V -IncludeManagementTools"
-    win_check_hyperv_cmd: "(Get-WindowsFeature Hyper-V).InstallState"
-  when: win_product_type | lower == 'server'
 
 - name: "Execute enable Hyper-V command in guest OS"
   include_tasks: win_execute_cmd.yml
@@ -41,6 +25,7 @@
   include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "{{ win_check_hyperv_cmd }}"
+
 - name: "Check Hyper-V feature installed in guest OS"
   ansible.builtin.assert:
     that:

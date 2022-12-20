@@ -42,14 +42,15 @@
 
 - name: "Set fact of 'Internal/Private' virtual switch powershell commands"
   ansible.builtin.set_fact:
-    win_get_vswitch_cmd: "(Get-VMSwitch -SwitchType {{ win_vswitch_type }} | where-object {$_.Name -eq '{{ win_vswitch_name }}' | measure-object).Count"
+    win_get_vswitch_cmd: "(Get-VMSwitch -SwitchType {{ win_vswitch_type }} | where-object {$_.Name -eq '{{ win_vswitch_name }}'} | measure-object).Count"
     win_create_vswitch_cmd: "New-VMSwitch -name '{{ win_vswitch_name }}' -SwitchType {{ win_vswitch_type }}"
   when: win_vswitch_type != 'External'
 
 - name: "Get vswitch with specified type and name"
   include_tasks: win_execute_cmd.yml
-    vars:
-      win_powershell_cmd: "{{ win_get_vswitch_cmd }}"
+  vars:
+    win_powershell_cmd: "{{ win_get_vswitch_cmd }}"
+
 - name: "Set fact of specified vswitch number"
   ansible.builtin.set_fact:
     win_vswitch_exists: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
@@ -79,3 +80,4 @@
 - name: "vswitch with specified type and name exists"
   debug:
     msg: "No need to create new vswitch '{{ win_vswitch_name }}' with type '{{ win_vswitch_type }}' due to it already exist."
+  when: win_vswitch_exists | int != 0

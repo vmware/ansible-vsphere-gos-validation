@@ -1,0 +1,115 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Get latest EFLOW LTS download link"
+  include_tasks: ../utils/get_eflow_lts_link.yml
+  vars:
+    win_eflow_releases_file: "{{ current_test_log_folder }}/eflow_releases"
+
+- name: "Get VM power state"
+  include_tasks: ../../common/vm_get_power_state.yml
+- name: "Shutdown guest OS"
+  include_tasks: ../utils/shutdown_vm.yml
+  when: vm_power_state_get != "poweredOff"
+
+- name: "Enable hardware virtualization on VM"
+  include_tasks: ../../common/vm_set_nested_virtual.yml
+  vars:
+    vm_nested_virt: true
+
+- name: "Poweron VM"
+  include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+- name: "Get VM IP address"
+  include_tasks: ../utils/win_update_inventory.yml
+
+- name: "Get VM hardware virtualization enablement info"
+  include_tasks: ../../common/vm_get_config.yml
+  vars:
+    property_list: ['config.nestedHVEnabled']
+- name: "Check VM hardware virtualization is enabled"
+  ansible.builtin.assert:
+    that:
+      - vm_config.config is defined
+      - vm_config.config.nestedHVEnabled is defined
+      - vm_config.config.nestedHVEnabled | bool
+    fail_msg: "VM hardware virtualization is not enabled: {{ vm_config.config.nestedHVEnabled | default('') }}"
+
+- name: "Enable Hyper-V in Windows Client"
+  include_tasks: ../utils/win_enable_client_hyperv.yml
+  when: guest_os_product_type | lower == 'client'
+
+- name: "Enable Hyper-V in Windows Server"
+  include_tasks: ../utils/win_enable_server_hyperv.yml
+  when: guest_os_product_type | lower == 'server'
+
+- name: "Create new vswitch in Windows Server"
+  include_tasks: ../utils/win_create_vswitch.yml
+  vars:
+    win_vswitch_name: "Default Switch"
+    win_vswitch_type: "Internal"
+  when: guest_os_product_type | lower == 'server'
+
+# Always test the lates LTS EFLOW release
+- name: "Get the download link of the latest EFLOW"
+  include_tasks: ../utils/win_get_latest_eflow.yml
+
+# Refer to doc: https://learn.microsoft.com/en-us/azure/iot-edge/how-to-provision-single-device-linux-on-windows-symmetric?view=iotedge-1.4&tabs=azure-portal%2Cpowershell
+- name: "Download and install EFLOW in guest OS"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      Set-ExecutionPolicy -ExecutionPolicy AllSigned -Force;
+      $msiPath = $([io.Path]::Combine($env:TEMP, 'AzureIoTEdge.msi'));
+      $ProgressPreference = 'SilentlyContinue';
+      Invoke-WebRequest "{{ eflow_lts_download_link }}" -OutFile $msiPath;
+      Start-Process -Wait msiexec -ArgumentList "/i",$msiPath,"/qn";
+      Start-Sleep -Seconds 5
+
+- name: "Deploy EFLOW virtual machine in guest OS"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      Set-ExecutionPolicy -ExecutionPolicy Bypass -Force;
+      Deploy-Eflow -acceptEula Yes -acceptOptionalTelemetry No
+    win_execute_cmd_ignore_error: true
+
+- name: "Known issue - deploy EFLOW failed in Windows guest OS on AMD ESXi host"
+  ansible.builtin.debug:
+    msg:
+      - "There is known issue of EFLOW deploy in Windows virtual machine on ESXi host with AMD processor."
+      - "Please refer to 'Deployment on Windows VM on VMware ESXi' in this doc: https://learn.microsoft.com/en-us/azure/iot-edge/nested-virtualization?view=iotedge-1.4"
+  tags:
+    - known_issue
+  when:
+    - "'AMD' in esxi_cpu_model_info"
+    - win_powershell_cmd_output.failed is defined
+    - win_powershell_cmd_output.failed
+
+- name: "Check EFLOW deploy result in guest OS"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.failed is defined
+      - not win_powershell_cmd_output.failed
+    fail_msg: "Deploy EFLOW failed in guest OS: {{ win_powershell_cmd_output }}"
+  when: "'AMD' not in esxi_cpu_model_info"
+
+- name: "Get EFLOW virtual machine configuration"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-EflowVM | Select -ExpandProperty VmConfiguration | Format-List"
+
+- name: "Check EFLOW running modules"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Invoke-EflowVmCommand -command 'sudo iotedge list'"
+
+- name: "Stop EFLOW virtual machine"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Stop-EflowVm"
+- name: "Start EFLOW virual machine"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Start-EflowVm"
