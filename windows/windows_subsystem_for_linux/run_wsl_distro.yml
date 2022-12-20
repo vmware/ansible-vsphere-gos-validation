@@ -1,0 +1,33 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+# Run WSL distribution
+# Parameters:
+#    wsl_file_path: the path on Guest OS where the wsl command output messages are put
+#    wsl_distribution_name: the WSL distribution name
+
+# execute command on the distribution
+- name: Set the command fact
+  ansible.builtin.set_fact:
+    distro_command: cat /etc/os-release
+
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "wsl -d {{ wsl_distribution_name }} {{ distro_command}} | Out-File {{ wsl_file_path }}\\wsl_execute_cmd.txt"
+    win_execute_cmd_ignore_error: true
+
+- include_tasks: wsl_convert_binary_to_txt.yml
+  vars:
+    source_path: "{{ wsl_file_path_win }}\\wsl_execute_cmd.txt"
+    file_name: "wsl_execute_cmd.txt"
+
+- name: check wsl command execution result
+  ansible.builtin.shell: "grep {{ wsl_distribution_name }} {{ wsl_new_file }}"
+  register: cmd_output
+
+- name: Validate the wsl command execution result
+  ansible.builtin.assert:
+    that:
+      - "{{win_powershell_cmd_output.rc==0 }}"
+    fail_msg: "The command {{ distro_command }} failed on WSL {{ wsl_distribution_name }} distribution."
