@@ -7,6 +7,25 @@
 #     wsl_file_path: the path on Guest OS where the wsl command output messages are put
 #     wsl_distribution_name: the WSL distribution name
 
+# Installing distribution with parameter --no-launch will get the packages from Microsoft Store, but not actually
+# install it
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "wsl --install --no-launch -d {{ wsl_distribution_name }}| Out-File -FilePath {{ wsl_file_path }}\\wsl_get_distro.txt"
+    win_execute_cmd_ignore_error: true
+
+- include_tasks: wsl_convert_binary_to_txt.yml
+  vars:
+    source_path: "{{ wsl_file_path }}\\wsl_get_distro.txt"
+    file_name: "wsl_get_distro.txt"
+
+- name: Check WSL installation command result
+  ansible.builtin.fail:
+    msg: "Getting distribution {{ wsl_distribution_name }} failed. Please check log file wsl_get_distro.txt."
+  when: win_powershell_cmd_output.rc != 0
+
+# To resolve the popup window during WSL distribution installation, put the installation command into PS1 file and
+# execute it on system startup
 - name: Set the facts for wsl powershell script
   ansible.builtin.set_fact:
     wsl_ps1_path: "{{ wsl_file_path }}\\install_wsl_distro.ps1"
@@ -17,9 +36,6 @@
   ansible.builtin.set_fact:
     startup_path: "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\wslscript.cmd"
     startup_content: "powershell.exe -ExecutionPolicy Unrestricted -File {{ wsl_ps1_path }} >> {{ wsl_ps1_log_path }}"
-
-# To resolve the popup window during WSL distribution installation, put the installation command into PS1 file and
-# execute it on system startup
 
 # Create the powershell script for installing WSL distribution
 - include_tasks: ../utils/win_create_file.yml
@@ -58,7 +74,7 @@
   ignore_unreachable: true
   until: win_powershell_cmd_output.rc == 0
   retries: 5
-  delay: 180
+  delay: 60
 
 - include_tasks: wsl_convert_binary_to_txt.yml
   vars:

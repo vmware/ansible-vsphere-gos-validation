@@ -5,12 +5,20 @@
 # Install inbox version of WSL
 # Parameters:
 #     wsl_file_path: the path on Guest OS where the wsl command output messages are put
+#     wsl_distribution_name: the WSL distribution name
 
 # Install distribution
 - include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "wsl --install --inbox --no-distribution | Out-File -FilePath {{ wsl_file_path }}\\wsl_install.txt"
+    win_powershell_cmd: "wsl --install --inbox -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path }}\\wsl_install.txt"
     win_execute_cmd_ignore_error: true
+  when: guest_os_product_type | lower == 'client'
+
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "wsl --install -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path }}\\wsl_install.txt"
+    win_execute_cmd_ignore_error: true
+  when: guest_os_product_type | lower == 'server'
 
 - include_tasks: wsl_convert_binary_to_txt.yml
   vars:

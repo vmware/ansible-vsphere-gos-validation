@@ -30,10 +30,17 @@
         - include_tasks: wsl_test_prepare.yml
 
         # Create temp directory on Guest OS to store the wsl output message
-        - name: Set the needed parameter wsl test
+        - name: Set fact of file path and distribution name
           ansible.builtin.set_fact:
             wsl_file_path_win: "C:\\temp"
             wsl_ds_name: "Ubuntu"
+
+        # Due to issue https://github.com/microsoft/WSL/issues/9258, install Debian on Windows Server.
+        # After the issue is resolved, change to Ubuntu.
+        - name: Set fact of wsl distribution name
+          ansible.builtin.set_fact:
+            wsl_ds_name: "Debian"
+          when: guest_os_product_type | lower == 'server'
 
         - include_tasks: ../utils/win_is_folder.yml
           vars:
@@ -50,11 +57,11 @@
             wsl_file_path: "{{ wsl_file_path_win }}"
             wsl_distribution_name: "{{ wsl_ds_name }}"
 
-        # Install distribution
-        - include_tasks: install_wsl_distro.yml
-          vars:
-            wsl_file_path: "{{ wsl_file_path_win }}"
-            wsl_distribution_name: "{{ wsl_ds_name }}"
+#        # Install distribution
+#        - include_tasks: install_wsl_distro.yml
+#          vars:
+#            wsl_file_path: "{{ wsl_file_path_win }}"
+#            wsl_distribution_name: "{{ wsl_ds_name }}"
 
         # Run the distribution
         - include_tasks: run_wsl_distro.yml
