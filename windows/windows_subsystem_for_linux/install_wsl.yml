@@ -12,13 +12,6 @@
   vars:
     win_powershell_cmd: "wsl --install --inbox -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path }}\\wsl_install.txt"
     win_execute_cmd_ignore_error: true
-  when: guest_os_product_type | lower == 'client'
-
-- include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "wsl --install -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path }}\\wsl_install.txt"
-    win_execute_cmd_ignore_error: true
-  when: guest_os_product_type | lower == 'server'
 
 - include_tasks: wsl_convert_binary_to_txt.yml
   vars:
@@ -34,7 +27,26 @@
   vars:
     set_win_power_state: "restart"
 
-# set wsl default version to 2 and check the WSL version
+# Update WSL to store version for Windows Server
+#- name: Update WSL for Windows Server
+#  block:
+#    - name: Execute powwershell command to update WSL for Windows Server
+#      ansible.windows.win_shell: "wsl --update | Out-File -FilePath {{ wsl_file_path }}\\wsl_update.txt"
+#      register: win_powershell_cmd_output
+#      ignore_errors: true
+#      delegate_to: "{{ vm_guest_ip }}"
+#      ignore_unreachable: true
+#      become: true
+#      become_method: runas
+#      become_user: Administrator
+#
+#    - include_tasks: wsl_convert_binary_to_txt.yml
+#      vars:
+#        source_path: "{{ wsl_file_path }}\\wsl_update.txt"
+#        file_name: "wsl_update.txt"
+#  when: guest_os_product_type | lower == 'server'
+
+# Set wsl default version to 2 and check the WSL version
 - include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "wsl --set-default-version 2"
