@@ -1,0 +1,33 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check EFLOW VM can be stopped and started again
+- name: "Stop EFLOW virtual machine"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Stop-EflowVm"
+- name: "Pause 5 seconds after stop EFLOW VM"
+  ansible.builtin.pause:
+    seconds: 5
+- name: "Get EFLOW virtual machine power state"
+  include_tasks: ../utils/win_get_eflow_vm_state.yml
+- name: "Check EFLOW virtual machine power state"
+  ansible.builtin.assert:
+    that:
+      - win_eflow_vm_power_state == 'Off'
+    fail_msg: "Get EFLOW virtual machine power state is not 'Off' after stop: {{ win_eflow_vm_power_state }}"
+
+- name: "Start EFLOW virual machine"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Start-EflowVm"
+- name: "Pause 15 seconds after start EFLOW VM"
+  ansible.builtin.pause:
+    seconds: 15
+- name: "Get EFLOW virtual machine power state"
+  include_tasks: ../utils/win_get_eflow_vm_state.yml
+- name: "Check EFLOW virtual machine power state"
+  ansible.builtin.assert:
+    that:
+      - win_eflow_vm_power_state == 'Running'
+    fail_msg: "Get EFLOW virtual machine power state is not 'Running' after start again: {{ win_eflow_vm_power_state }}"
