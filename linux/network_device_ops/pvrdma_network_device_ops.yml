@@ -28,7 +28,7 @@
           include_tasks: ../../common/esxi_configure_advanced_settings.yml
           vars:
             esxi_advanced_settings: {"Net.PVRDMAVmknic": "{{ vds_vmk_device }}"}
-    
+
         - name: "Enable ESXi host firewall rule for PVRDMA"
           include_tasks: ../../common/esxi_set_firewall_rule.yml
           vars:
@@ -36,12 +36,12 @@
             rule_enabled: true
             rule_allowed_all: true
 
-        - name:  "Set the port group name for new network adapter"
+        - name: "Set the port group name for new network adapter"
           ansible.builtin.set_fact:
             vm_portgroup_name: "{{ vds_portgroup_name }}"
 
         # On server VM
-        # Clone a new VM as client VM from current VM, and current VM as server 
+        # Clone a new VM as client VM from current VM, and current VM as server
         - name: "Set facts for PVRDMA server VM and client VM"
           ansible.builtin.set_fact:
             pvrdma_server_vm_name: "{{ vm_name }}"
@@ -113,8 +113,9 @@
           delegate_to: "{{ vm_guest_ip }}"
           register: rping_server_result
 
-        - debug: var=rping_server_result
- 
+        - name: "Display result of pinging PVRDMA server VM"
+          debug: var=rping_server_result
+
         - name: "Power off the cloned VM"
           include_tasks: ../../common/vm_set_power_state.yml
           vars:
@@ -133,7 +134,7 @@
           include_tasks: hot_remove_network_adapter.yml
           vars:
             new_network_adapter_mac_addr: "{{ new_nic_mac_addr }}"
-    
+
         - name: "Disable ESXi host firewall rule for PVRDMA"
           include_tasks: ../../common/esxi_set_firewall_rule.yml
           vars:
