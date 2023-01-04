@@ -53,3 +53,20 @@
 # Create a base snapshot if it does not exist
 - include_tasks: create_base_snapshot.yml
   when: not (base_snapshot_exists | bool)
+
+# Hit issue in Ubuntu 22.04 casually: Temporary failure in name resolution. Restarting servcie can fix it
+- block:
+    - name: Get DNS servers
+      ansible.builtin.command: "resolvectl status"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: dns_servers_output
+
+    - include_tasks: ../utils/service_operation.yml
+      vars:
+        service_name: "systemd-resolved"
+        service_enabled: true
+        service_state: "restarted"
+      when: dns_servers_output.stdout.find("DNS Servers:") == -1
+  when:
+    - guest_os_ansible_distribution == "Ubuntu"
+    - guest_os_ansible_distribution_ver == "22.04"
