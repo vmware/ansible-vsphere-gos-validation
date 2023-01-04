@@ -1,0 +1,54 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get RDMA devices info in guest OS
+
+- name: "Initialize RDMA devices info"
+  ansible.builtin.set_fact:
+    guest_rdma_device_info: []
+
+- name: "Check command 'ibv_devinfo' exists"
+  ansible.builtin.shell: "which ibv_devinfo"
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  register: check_ibv_devinfo
+
+- name: "Install libibverbs library utility"
+  block:
+    - include_tasks: ../utils/install_uninstall_package.yml
+      vars:
+        package_name: "ibverbs-utils"
+        package_state: "present"
+      when: guest_os_family == "Debian"
+
+    - include_tasks: ../utils/install_uninstall_package.yml
+      vars:
+        package_name: "libibverbs-utils"
+        package_state: "present"
+      when: guest_os_family in ["Suse", "RedHat"]
+  when: >
+    check_ibv_devinfo is undefined or
+    check_ibv_devinfo.rc is undefined or
+    check_ibv_devinfo.rc != 0
+
+- name: "Get RDMA devices info"
+  ansible.builtin.shell: "ibv_devinfo"
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: true
+  register: ibv_devinfo_result
+
+- name: "Set fact of RDMA devices info"
+  ansible.builtin.set_fact:
+    guest_rdma_device_info: "{{
+         ibv_devinfo_result.stdout |
+         regex_replace('\t+', '  ') |
+         regex_replace('(hca_id: +([^\n]*))', '\\2:\n  \\1') |
+         regex_replace(': +([^\n]*)', ': \"\\1\"') |
+         from_yaml | dict2items | map(attribute='value') }}"
+  when:
+    - ibv_devinfo_result is defined
+    - ibv_devinfo_result.stdout_lines is defined
+    - ibv_devinfo_result.stdout_lines | select | length > 0
+
+- name:  "Pring RDMA devices info"
+  debug: var=guest_rdma_device_info

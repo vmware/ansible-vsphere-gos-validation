@@ -5,8 +5,16 @@
 #
 
 - name: "Clear dmesg ring buffer"
-  ansible.builtin.shell: "dmesg -c"
+  ansible.builtin.shell: "dmesg --clear"
   delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Get RDMA device before hot-add"
+  block:
+    - include_tasks: ../utils/get_rdma_device_info.yml
+    - name: "Set fact of RDMA device before hot-add"
+      ansible.builtin.set_fact:
+        rdma_devices_before_hotadd: "{{ guest_rdma_device_info }}"
+  when: adapter_type == "pvrdma"
 
 - name: "Hot add a new network adapter to VM"
   include_tasks: ../../common/vm_add_network_adapter.yml
@@ -14,7 +22,7 @@
 - name: "Check VM connection is not broken after hot-add"
   include_tasks: ../../common/vm_wait_connection.yml
   vars:
-    vm_wait_connection_timeout: 20
+    vm_wait_connection_timeout: 60
 
 - name: "Get changes in dmesg ring buffer"
   ansible.builtin.shell: "dmesg"
@@ -34,14 +42,6 @@
     that:
       - new_network_adapter_dmesg | length > 0
     fail_msg: "There is no message about new network adapter in dmesg"
-
-- name: "Reload vmw_pvrdma module as there is fail message"
-  include_tasks: ../utils/reload_module.yml
-  vars:
-    module_name: "vmw_pvrdma"
-  when:
-    - adapter_type == "pvrdma"
-    - new_network_adapter_dmesg | select('match', '.*fail.*') | length > 0
 
 - name: "Get network adapters status after hot-add"
   include_tasks: ../utils/get_network_adapters_status.yml
@@ -80,3 +80,32 @@
     new_network_adapter_status.ipv4 is undefined or
     new_network_adapter_status.ipv4.address is undefined or
     not new_network_adapter_status.ipv4.address
+
+- name: "Check RDMA device status"
+  block:
+    - include_tasks: ../utils/get_rdma_device_info.yml
+    
+    - name: "Set fact of RDMA device after hot-add"
+      ansible.builtin.set_fact:
+        rdma_devices_after_hotadd: "{{ guest_rdma_device_info }}"
+
+    - name: "Check new RDMA device exists"
+      ansible.builtin.assert:
+        that:
+          - rdma_devices_after_hotadd | length > 0
+          - rdma_devices_after_hotadd | difference(rdma_devices_before_hotadd) | length == 1
+        fail_msg: "No new RDMA device is detected"
+
+    - name: "Set fact of new RDMA device"
+      ansible.builtin.set_fact:
+        new_rdma_device: "{{ (rdma_devices_after_hotadd | difference(rdma_devices_before_hotadd))[0] }}"
+
+    - name: "Reload vmw_pvrdma module"
+      include_tasks: ../utils/reload_module.yml
+      vars:
+        module_name: "vmw_pvrdma"
+      when: >
+        new_rdma_device.state is undefined or
+        ('PORT_ACTIVE' not in new_rdma_device.state | upper) or
+        esxi_version is version('7.0.1', '<=')
+  when: adapter_type == "pvrdma"
