@@ -3,6 +3,11 @@
 ---
 # Hot add a new network adapter and apply network config
 #
+
+- name: "Clear dmesg ring buffer"
+  ansible.builtin.shell: "dmesg -c"
+  delegate_to: "{{ vm_guest_ip }}"
+
 - name: "Hot add a new network adapter to VM"
   include_tasks: ../../common/vm_add_network_adapter.yml
 
@@ -10,6 +15,33 @@
   include_tasks: ../../common/vm_wait_connection.yml
   vars:
     vm_wait_connection_timeout: 20
+
+- name: "Get changes in dmesg ring buffer"
+  ansible.builtin.shell: "dmesg"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: dmesg_delta
+
+- name: "Set fact of device messages in dmesg ring buffer"
+  ansible.builtin.set_fact:
+    new_network_adapter_dmesg: >-
+      {{
+        dmesg_delta.stdout_lines | default([]) |
+        select('match', '.*' ~ adapter_type ~ '.*')
+      }}
+
+- name: "Assert messages about new network adapter is printed"
+  ansible.builtin.assert:
+    that:
+      - new_network_adapter_dmesg | length > 0
+    fail_msg: "There is no message about new network adapter in dmesg"
+
+- name: "Reload vmw_pvrdma module as there is fail message"
+  include_tasks: ../utils/reload_module.yml
+  vars:
+    module_name: "vmw_pvrdma"
+  when:
+    - adapter_type == "pvrdma"
+    - new_network_adapter_dmesg | select('match', '.*fail.*') | length > 0
 
 - name: "Get network adapters status after hot-add"
   include_tasks: ../utils/get_network_adapters_status.yml
