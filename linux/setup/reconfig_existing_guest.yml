@@ -5,19 +5,42 @@
 - include_tasks: ../utils/ssh_keep_alive.yml
   when: guest_os_family == "Debian"
 
-# Hit issue in Ubuntu 22.04: Temporary failure in name resolution. Restarting servcie can fix it
-- include_tasks: ../utils/service_operation.yml
-  vars:
-    service_name: "systemd-resolved"
-    service_enabled: true
-    service_state: "restarted"
-  when: 
-    - guest_os_ansible_distribution == "Ubuntu"
-    - guest_os_ansible_distribution_ver == "22.04"
-    
 # Diable auto update for Ubuntu
 - include_tasks: ../utils/disable_auto_update.yml
   when: guest_os_ansible_distribution in ["Ubuntu"]
+
+# Hit issue in Ubuntu 22.04 casually: Temporary failure in name resolution. Restarting servcie can fix it
+- block:
+    - name: Get DNS servers
+      ansible.builtin.command: "resolvectl status"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: dns_servers_output
+
+    - name: Display DNS servers
+      ansible.builtin.debug: var=dns_servers_output
+
+    - include_tasks: ../utils/service_operation.yml
+      vars:
+        service_name: "systemd-resolved"
+        service_enabled: true
+        service_state: "restarted"
+      when: dns_servers_output.stdout.find("DNS Servers:") == -1
+
+    - name: Get DNS servers after restart systemd-resolved service
+      ansible.builtin.command: "resolvectl status"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: dns_servers_output
+    
+    - name: Display DNS servers after restart systemd-resolved service
+      ansible.builtin.debug: var=dns_servers_output
+    
+    - name: Check if we get the DNS Servers or not
+      ansible.builtin.fail:
+        msg: "Failed to get DNS Servers after restart systemd-resolved service"
+      when: dns_servers_output.stdout.find("DNS Servers:") == -1
+  when: 
+    - guest_os_ansible_distribution == "Ubuntu"
+    - guest_os_ansible_distribution_ver == "22.04"
 
 - block:
     - include_tasks: ../../common/vm_get_vmtools_status.yml
