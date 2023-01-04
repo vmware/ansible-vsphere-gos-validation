@@ -124,12 +124,14 @@
 #     - known_issue
 #   when:
 #     - "'AMD' in esxi_cpu_model_info"
-#     - win_powershell_cmd_output.failed is defined
-#     - win_powershell_cmd_output.failed
+#     - win_powershell_cmd_output.stdout is defined
+#     - "'failed' in win_powershell_cmd_output.stdout"
 
 - name: "Check EFLOW deploy result"
   ansible.builtin.assert:
     that:
       - win_powershell_cmd_output.failed is defined
       - not win_powershell_cmd_output.failed
-    fail_msg: "Deploy EFLOW virtual machine failed in guest OS, please check the failure in above powershell command result."
+      - win_powershell_cmd_output.stdout is defined
+      - "'failed' not in win_powershell_cmd_output.stdout"
+    fail_msg: "Deploy EFLOW virtual machine task failed or there is 'failed' keyword found in the output, please check the failure in above powershell command result."
