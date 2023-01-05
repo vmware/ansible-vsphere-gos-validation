@@ -1,0 +1,137 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# By default there is special vswitch named 'Default Switch' created
+# after enable Hyper-V in Windows Client.
+# In Windows Server need to create a new switch explictly.
+#
+- name: "Set fact of default vswitch name for Windows {{ guest_os_product_type }}"
+  ansible.builtin.set_fact:
+    win_vswitch_name: |-
+      {%- if guest_os_product_type | lower == 'server' -%}EFLOW-Int
+      {%- else -%}Default Switch
+      {%- endif -%}
+
+# In this test case we always install the latest EFLOW LTS release
+- name: "Get latest EFLOW LTS download link"
+  include_tasks: ../utils/get_eflow_lts_link.yml
+  vars:
+    win_eflow_releases_file: "{{ current_test_log_folder }}/eflow_releases"
+
+# Enable VM hardware virtualization exposed to guest firstly
+- name: "Get VM nested hardware virtualization enablement info"
+  include_tasks: ../../common/vm_get_config.yml
+  vars:
+    property_list: ['config.nestedHVEnabled']
+- name: "Set fact of VM nested hardware virtualization enablement info"
+  ansible.builtin.set_fact:
+    vm_nested_hv_before: "{{ vm_config.config.nestedHVEnabled if (vm_config.config is defined and vm_config.config.nestedHVEnabled is defined) else false }}"
+
+- name: "Enable VM nested hardware virtualization"
+  block:
+    - name: "Get VM power state"
+      include_tasks: ../../common/vm_get_power_state.yml
+    - name: "Shutdown guest OS"
+      include_tasks: ../utils/shutdown_vm.yml
+      when: vm_power_state_get != "poweredOff"
+
+    - name: "Enable VM nested hardware virtualization"
+      include_tasks: ../../common/vm_set_nested_virtual.yml
+      vars:
+        vm_nested_virt: true
+
+    - name: "Poweron VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: "powered-on"
+    - name: "Get VM IP address"
+      include_tasks: ../utils/win_update_inventory.yml
+
+    - name: "Get VM nested hardware virtualization enablement info"
+      include_tasks: ../../common/vm_get_config.yml
+      vars:
+        property_list: ['config.nestedHVEnabled']
+    - name: "Check VM nested hardware virtualization is enabled"
+      ansible.builtin.assert:
+        that:
+          - vm_config.config is defined
+          - vm_config.config.nestedHVEnabled is defined
+          - vm_config.config.nestedHVEnabled | bool
+        fail_msg: "Not get VM nested hardware virtualization info or it's not enabled after enablement."
+  when: not vm_nested_hv_before
+
+# Enable Hyper-V
+- name: "Enable Hyper-V in Windows Client"
+  include_tasks: ../utils/win_enable_client_hyperv.yml
+  when: guest_os_product_type | lower == 'client'
+- name: "Enable Hyper-V in Windows Server"
+  include_tasks: ../utils/win_enable_server_hyperv.yml
+  when: guest_os_product_type | lower == 'server'
+
+- name: "Add vswitch in Windows Server"
+  block:
+    - name: "Create new Internal vswitch" 
+      include_tasks: ../utils/win_create_vswitch.yml
+      vars:
+        win_vswitch_type: "Internal"
+    - name: "Pause 5 seconds after new vswitch created"
+      ansible.builtin.pause:
+        seconds: 5
+    - name: "Configure new Internal vswitch"
+      include_tasks: ../utils/win_config_vswitch.yml
+    - name: "Set facts of EFLOW VM static IP info"
+      ansible.builtin.set_fact:
+        eflow_vm_static_ip: "{{ ('.').join(win_vswitch_ip.split('.')[0:-1]) ~ '.249' }}"
+        eflow_vm_gateway_ip: "{{ win_vswitch_gateway_ip }}"
+  when: guest_os_product_type | lower == 'server'
+
+# Refer to doc: https://learn.microsoft.com/en-us/azure/iot-edge/how-to-provision-single-device-linux-on-windows-symmetric?view=iotedge-1.4&tabs=azure-portal%2Cpowershell
+- name: "Download and install EFLOW in guest OS"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      Set-ExecutionPolicy -ExecutionPolicy AllSigned -Force;
+      $msiPath = $([io.Path]::Combine($env:TEMP, 'AzureIoTEdge.msi'));
+      $ProgressPreference = 'SilentlyContinue';
+      Invoke-WebRequest "{{ eflow_lts_download_link }}" -OutFile $msiPath;
+      Start-Process -Wait msiexec -ArgumentList "/i",$msiPath,"/qn";
+      Start-Sleep -Seconds 5
+
+# For Windows client, use the default created vswitch "Default Switch" with default DHCP IP.
+# For Windows server, use the new created Internal vswitch "EFLOW-Int" with static IP.
+- name: "Set fact of deploy EFLOW command"
+  ansible.builtin.set_fact:
+    deploy_eflow_command: |-
+      {%- if guest_os_product_type | lower == 'server' -%}Deploy-Eflow -vSwitchType 'Internal' -vSwitchName '{{ win_vswitch_name }}' -ip4Address {{ eflow_vm_static_ip }} -ip4GatewayAddress {{ eflow_vm_gateway_ip }} -ip4PrefixLength 24
+      {%- else -%}Deploy-Eflow
+      {%- endif -%}
+
+- name: "Deploy EFLOW virtual machine in guest OS"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      Set-ExecutionPolicy -ExecutionPolicy Bypass -Force;
+      {{ deploy_eflow_command }} -acceptEula Yes -acceptOptionalTelemetry No
+    win_execute_cmd_ignore_error: true
+
+# Comment handling known issue now due to bug is still open
+# - name: "Known issue - deploy EFLOW failed in Windows guest OS on AMD ESXi host"
+#   ansible.builtin.debug:
+#     msg:
+#       - "There is known issue of EFLOW deploy in Windows virtual machine on ESXi host with AMD processor."
+#       - "Please refer to 'Deployment on Windows VM on VMware ESXi' in this doc: https://learn.microsoft.com/en-us/azure/iot-edge/nested-virtualization?view=iotedge-1.4"
+#   tags:
+#     - known_issue
+#   when:
+#     - "'AMD' in esxi_cpu_model_info"
+#     - win_powershell_cmd_output.stdout is defined
+#     - "'failed' in win_powershell_cmd_output.stdout"
+
+- name: "Check EFLOW deploy result"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.failed is defined
+      - not win_powershell_cmd_output.failed
+      - win_powershell_cmd_output.stdout is defined
+      - "'failed' not in win_powershell_cmd_output.stdout"
+    fail_msg: "Deploy EFLOW virtual machine task failed or there is 'failed' keyword found in the output, please check the failure in above powershell command result."

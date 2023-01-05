@@ -1,0 +1,60 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Enable Hyper-V feature and VirtualMachinePlatform feature
+# in Windows Server guest OS.
+#
+- name: "Set fact of state of Hyper-V and VirtualMachinePlatform features"
+  ansible.builtin.set_fact:
+    win_hyperv_state: ''
+    win_vmplatform_state: ''
+
+- name: "Set fact of powershell commands"
+  ansible.builtin.set_fact:
+    win_enable_hyperv_cmd: "Install-WindowsFeature -Name Hyper-V -IncludeManagementTools"
+    win_enable_vmplatform_cmd: "Enable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -All -NoRestart -WarningAction SilentlyContinue"
+    win_check_hyperv_cmd: "(Get-WindowsFeature Hyper-V).InstallState"
+    win_check_vmplatform_cmd: "(Get-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform).State"
+
+- name: "Execute enable Hyper-V and VirtualMachinePlatform commands in guest OS"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ item }}"
+  with_items: ["{{ win_enable_hyperv_cmd }}", "{{ win_enable_vmplatform_cmd }}"]
+
+- name: "Wait 10 seconds before restart guest OS"
+  ansible.builtin.pause:
+    seconds: 10
+- name: "Restart guest OS after enable Hyper-V"
+  include_tasks: win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+
+- name: "Get Hyper-V feature state in guest OS"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ win_check_hyperv_cmd }}"
+- name: "Set fact of Hyper-V feature state"
+  ansible.builtin.set_fact:
+    win_hyperv_state: "{{ win_powershell_cmd_output.stdout_lines[0].strip() }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length == 1
+
+- name: "Get VirtualMachinePlatform feature state in guest OS"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ win_check_vmplatform_cmd }}"
+- name: "Set fact of VirtualMachinePlatform feature state"
+  ansible.builtin.set_fact:
+    win_vmplatform_state: "{{ win_powershell_cmd_output.stdout_lines[0].strip() }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length == 1
+
+- name: "Check Hyper-V feature installed in guest OS"
+  ansible.builtin.assert:
+    that:
+      - win_hyperv_state in ['Installed', 'Enabled']
+      - win_vmplatform_state in ['Installed', 'Enabled']
+    fail_msg: "Hyper-V feature state is not 'Installed' or 'Enabled': {{ win_hyperv_state }}, or VirtualMachinePlatform feature state is not 'Installed' or 'Enabled': {{ win_vmplatform_state }}"

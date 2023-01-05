@@ -1,0 +1,44 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the download link of EFLOW LTS release latest version
+# from this page: https://github.com/Azure/iotedge-eflow/releases
+# Parameter:
+#   win_eflow_releases_file: the destination file path saved locally
+# 
+- name: "Initialize the facts of EFLOW releases URL link and download link"
+  ansible.builtin.set_fact:
+    eflow_releases_url: "https://github.com/Azure/iotedge-eflow/releases"
+    eflow_releases_file: "{{ win_eflow_releases_file | default('/tmp/eflow_releases') }}"
+    eflow_lts_download_link: ""
+
+- name: "Get EFLOW releases URL content"
+  ansible.builtin.get_url:
+    url: "{{ eflow_releases_url }}"
+    dest: "{{ eflow_releases_file }}"
+    validate_certs: false
+    mode: "0644"
+    timeout: 180
+  register: get_eflow_url_result
+- name: "Display the result of getting EFLOW releases URL content"
+  ansible.builtin.debug: var=get_eflow_url_result
+  when: enable_debug
+
+- name: "Set fact of EFLOW LTS releases"
+  ansible.builtin.set_fact:
+    eflow_lts_releases: "{{ lookup('file', eflow_releases_file) | regex_search('<h2.*>([0-9]+\\.){3}[0-9]+ LTS</h2>') }}"
+- name: "Set fact of EFLOW LTS download URL"
+  ansible.builtin.set_fact:
+    eflow_lts_download_link: "{{ 'https://aka.ms/AzEFLOW-X64-' ~ eflow_lts_releases.split('>')[1].split('LTS')[0].strip() | replace('.', '_') }}"
+  when:
+    - eflow_lts_releases
+    - eflow_lts_releases.split('>') | length > 1
+
+- name: "Display the download link of EFLOW LTS release"
+  debug: var=eflow_lts_download_link
+
+- name: "Check download link of EFLOW LTS release"
+  ansible.builtin.assert:
+    that:
+      - eflow_lts_download_link
+    fail_msg: "Failed to get the download link of EFLOW LTS release: {{ eflow_lts_download_link }}, please check manually on page {{ eflow_releases_url }}"

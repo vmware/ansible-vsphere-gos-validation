@@ -1,0 +1,69 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Setup virtual switch in Windows guest OS, please make sure specified
+# virtual switch exists in guest OS.
+# Parameters:
+#   win_vswitch_name: the name of vswitch.
+#
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - win_vswitch_name is defined
+      - win_vswitch_name
+    fail_msg: "Parameter 'win_vswitch_name' need to be set to a valid value."
+
+- name: "Initialize the facts of vswitch network adapter info"
+  ansible.builtin.set_fact:
+    win_vswitch_ifindex: ''
+    win_vswitch_ip: ''
+
+- name: "Get vswitch network adapter interface index"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-NetAdapter -Name '{{ 'vEthernet (' ~ win_vswitch_name ~ ')' }}').ifIndex"
+- name: "Set fact of vswitch network adapter interface index"
+  ansible.builtin.set_fact:
+    win_vswitch_ifindex: "{{ win_powershell_cmd_output.stdout_lines[0].strip() }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length == 1
+
+- name: "Check vswitch network adapter interface index"
+  ansible.builtin.assert:
+    that:
+      - win_vswitch_ifindex != ''
+    fail_msg: "Failed to get vswitch '{{ win_vswitch_name }}' network adapter interface index: {{ win_vswitch_ifindex }}"
+
+- name: "Get vswitch network adapter IP address"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-NetIPAddress -AddressFamily IPv4  -InterfaceIndex {{ win_vswitch_ifindex }}).IPAddress"
+- name: "Set fact of vswitch network adapter IP address"
+  ansible.builtin.set_fact:
+    win_vswitch_ip: "{{ win_powershell_cmd_output.stdout_lines[0].strip() }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length == 1
+
+- name: "Check vswitch network adapter IP address"
+  ansible.builtin.assert:
+    that:
+      - win_vswitch_ip
+      - win_vswitch_ip | ansible.utils.ipv4
+    fail_msg: "Failed to get vswitch '{{ win_vswitch_name }}' network adapter IP address: {{ win_vswitch_ip }}"
+
+- name: "Set facts of gateway IP and NAT IP"
+  ansible.builtin.set_fact:
+    win_vswitch_gateway_ip: "{{ ('.').join(win_vswitch_ip.split('.')[0:-1]) ~ '.1' }}"
+    win_vswitch_nat_ip: "{{ ('.').join(win_vswitch_ip.split('.')[0:-1]) ~ '.0' }}"
+
+- name: "Set vswitch network adapter gateway IP address"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "New-NetIPAddress -IPAddress {{ win_vswitch_gateway_ip }} -PrefixLength 24 -InterfaceIndex {{ win_vswitch_ifindex }}"
+
+- name: "Create NAT object"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "New-NetNat -Name '{{ win_vswitch_name }}' -InternalIPInterfaceAddressPrefix '{{ win_vswitch_nat_ip }}/24'"

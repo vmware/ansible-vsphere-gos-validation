@@ -1,0 +1,73 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check EFLOW VM info
+- name: "Get EFLOW virtual machine power state"
+  include_tasks: ../utils/win_get_eflow_vm_state.yml
+- name: "Check EFLOW virtual machine power state"
+  ansible.builtin.assert:
+    that:
+      - win_eflow_vm_power_state == 'Running'
+    fail_msg: "Get EFLOW virtual machine power state in guest OS: {{ win_eflow_vm_power_state }}, not expected 'Running'."
+
+# Check EFLOW VM OS info
+- name: "Get EFLOW virtual machine OS info"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Invoke-EflowVmCommand -command 'cat /etc/os-release'"
+- name: "Check EFLOW virtual machine OS info"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.stdout is defined
+      - "'Common Base Linux Mariner' in win_powershell_cmd_output.stdout"
+    fail_msg: "Not get 'Common Base Linux Mariner' keyword in file '/etc/os-release' in EFLOW virtual machine."
+
+# Check EFLOW VM network info
+- name: "Get EFLOW virtual machine network info"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-EflowVmEndpoint"
+- name: "Set fact of EFLOW virtual machine network info"
+  ansible.builtin.set_fact:
+    get_eflow_vm_network_info: "{{ win_powershell_cmd_output.stdout if win_powershell_cmd_output.stdout is defined else '' }}"
+- name: "Get EFLOW VM IP address assigned"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: |-
+      Invoke-EflowVmCommand -command "ip -br -4 addr show eth0 | tr -s ' ' | cut -d ' ' -f3 | cut -d '/' -f1"
+- name: "Set fact of IP address of EFLOW VM"
+  ansible.builtin.set_fact:
+    get_eflow_vm_ip: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+- name: "Check getting EFLOW VM IPv4 address"
+  ansible.builtin.assert:
+    that:
+      - get_eflow_vm_ip is defined
+      - get_eflow_vm_ip | ansible.utils.ipv4
+    fail_msg: "Failed to get valid EFLOW VM IPv4 address: {{ get_eflow_vm_ip | default('') }}"
+
+- name: "Check EFLOW virtual machine network info"
+  ansible.builtin.assert:
+    that:
+      - get_eflow_vm_network_info
+      - "'currentState:OK' in get_eflow_vm_network_info"
+      - "'SubNet={{ win_vswitch_name }}' in get_eflow_vm_network_info"
+    fail_msg: "'currentState:OK' or 'SubNet={{ win_vswitch_name }}' info is not displayed in EFLOW virutal machine endpoint info result: {{ get_eflow_vm_network_info }}"
+
+- name: "Check EFLOW VM static IP address for Windows Server"
+  ansible.builtin.assert:
+    that:
+      - eflow_vm_static_ip is defined
+      - eflow_vm_static_ip
+      - get_eflow_vm_ip == eflow_vm_static_ip 
+    fail_msg: "IP address got in EFLOW VM: '{{ get_eflow_vm_ip }}', which is not the same as the specified static one: '{{ eflow_vm_static_ip | default('') }}'"
+  when: guest_os_product_type | lower == 'server'
+
+- name: "Check EFLOW VM network connectivity"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: |-
+      Invoke-EflowVmCommand -command 'sudo systemctl stop iptables';
+      ping -n 3 {{ get_eflow_vm_ip }}
