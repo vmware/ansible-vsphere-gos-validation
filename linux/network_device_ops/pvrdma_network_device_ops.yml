@@ -21,6 +21,14 @@
 
         - include_tasks: prepare_network_device_test.yml
 
+        - include_tasks: ../utils/get_rdma_device_info.yml
+        - name: "Set fact of RDMA device before hot-add"
+          ansible.builtin.set_fact:
+            rdma_devices_before_hotadd: "{{ guest_rdma_device_info }}"
+
+        - name: "Disable firewall in guest OS"
+          include_tasks: ../utils/disable_firewall.yml
+
         - name: "Pepare vSphere Distributed Switch and Port Group for PVRDMA testing"
           include_tasks: ../../common/vds_network_setup.yml
 
@@ -40,8 +48,6 @@
           ansible.builtin.set_fact:
             vm_portgroup_name: "{{ vds_portgroup_name }}"
 
-        # On server VM
-        # Clone a new VM as client VM from current VM, and current VM as server
         - name: "Set facts for PVRDMA server VM and client VM"
           ansible.builtin.set_fact:
             pvrdma_server_vm_name: "{{ vm_name }}"
@@ -51,12 +57,14 @@
             pvrdma_client_vm_name: "{{ vm_name }}_{{ timestamp }}"
             pvrdma_client_vm_ipv4: "{{ vds_vmk_ip_addr | ansible.utils.ipmath(2) }}"
 
+        # Clone a new VM as client VM from current VM, and current VM as server
         - name: "Clone a new VM as PVRDMA client VM from current VM"
           include_tasks: ../../common/vm_instant_clone.yml
           vars:
             parent_vm_name: "{{ pvrdma_server_vm_name }}"
             cloned_vm_name: "{{ pvrdma_client_vm_name }}"
 
+        # On server VM
         - name: "Initialize the static IP address for the server VM"
           ansible.builtin.set_fact:
             new_nic_network: "{{ (pvrdma_server_vm_ipv4 ~ '/' ~ pvrdma_server_vm_net_prefix) | ansible.utils.ipaddr('network') }}"
@@ -73,6 +81,9 @@
 
         - name: "Validate network adapter status changes on server VM"
           include_tasks: network_status_validate.yml
+
+        - name: "Check PVRDMA device status and reload it if it is down on server VM"
+          include_tasks: check_and_reload_pvrdma.yml
 
         - name: "Start a listening service for PVRDMA on server VM"
           include_tasks: start_pvrdma_server.yml
@@ -96,25 +107,34 @@
             vm_name: "{{ pvrdma_client_vm_name }}"
             new_nic_ipv4: "{{ pvrdma_client_vm_ipv4 }}"
 
-        - name: "Ping gateway from client VM to test network connectable"
-          include_tasks: ping_vlan_gateway.yml
-          vars:
-            ping_src_interface: "{{ new_network_adapter }}"
-
         - name: "Check the result of pinging gateway from client VM"
           ansible.builtin.assert:
             that:
-              - ping_success
-            fail_msg: "Failed to ping gateway from client VM"
+              - ping_success_after_hotadd | bool
+            fail_msg: "Failed to ping gateway from client VM PVRDMA device"
+
+        - name: "Check PVRDMA device status and reload it if it is down on client VM"
+          include_tasks: check_and_reload_pvrdma.yml
 
         # rping server VM from client VM
-        - name: "Ping PVRDMA server VM '{{ pvrdma_server_vm_name }}' from client VM '{{ pvrdma_client_vm_name }}'"
+        - name: "RDMA ping server VM '{{ pvrdma_server_vm_name }}' from client VM '{{ pvrdma_client_vm_name }}'"
           ansible.builtin.shell: "rping -c -I {{ pvrdma_client_vm_ipv4 }} -a {{ pvrdma_server_vm_ipv4 }} -C 5 -vV"
           delegate_to: "{{ vm_guest_ip }}"
+          ignore_errors: true
           register: rping_server_result
 
-        - name: "Display result of pinging PVRDMA server VM"
-          debug: var=rping_server_result
+        - name: "Display RDMA ping result"
+          ansible.builtin.debug: var=rping_server_result
+
+        - name: "Check the result of RDMA pinging server VM from client VM PVRDMA device"
+          ansible.builtin.assert:
+            that:
+              - rping_server_result is defined
+              - rping_server_result.rc is defined
+              - rping_server_result.rc == 0
+            fail_msg: >-
+              Failed to RDMA ping server VM from client VM PVRDMA device.
+              Received error '{{ rping_server_result.stderr | default() }}'
 
         - name: "Power off the cloned VM"
           include_tasks: ../../common/vm_set_power_state.yml

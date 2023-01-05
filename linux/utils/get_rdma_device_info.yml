@@ -41,10 +41,12 @@
   ansible.builtin.set_fact:
     guest_rdma_device_info: "{{
          ibv_devinfo_result.stdout |
-         regex_replace('\t+', '  ') |
+         regex_replace('\t', '  ') |
+         regex_replace('( +)(phys_port_cnt: +\\d+)', '\\1\\2\n\\1ports:') |
+         regex_replace('( +port): +(\\d+)', '\\1_\\2:') |
          regex_replace('(hca_id: +([^\n]*))', '\\2:\n  \\1') |
          regex_replace(': +([^\n]*)', ': \"\\1\"') |
-         from_yaml | dict2items | map(attribute='value') }}"
+        from_yaml | dict2items | map(attribute='value') }}"
   when:
     - ibv_devinfo_result is defined
     - ibv_devinfo_result.stdout_lines is defined

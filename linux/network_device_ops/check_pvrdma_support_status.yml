@@ -20,14 +20,21 @@
     skip_reason: "Not Supported"
   when: guest_os_ansible_kernel is version('4.6', '<')
 
-- name: "Skip test case for unsupported VM hardware version"
-  include_tasks: ../../common/skip_test_case.yml
+- name: "Get guest config options"
+  include_tasks: ../../common/esxi_get_guest_config_options.yml
+  vars:
+    guest_id: "{{ vm_guest_id }}"
+    esxi_hardware_version: "{{ vm_hardware_version_num }}"
+
+- include_tasks: ../../common/skip_test_case.yml
   vars:
     skip_msg: >-
-      VM with hardware version {{ vm_hardware_version_num }} doesn't support PVRDMA.
-      PVRDMA is supported on VMs with hardware version 13 or later.
+      This guest ID '{{ vm_guest_id }}' with hardware version '{{ vm_hardware_version_num }}'
+      does not support PVRDMA network adapter.
     skip_reason: "Not Supported"
-  when: vm_hardware_version_num | int < 13
+  when: >
+    (guest_config_options.support_ethernet_card is undefined) or
+    ('pvrdma' not in guest_config_options.support_ethernet_card)
 
 - name: "Get module info about vmw_pvrdma"
   include_tasks: ../utils/get_module_info.yml
