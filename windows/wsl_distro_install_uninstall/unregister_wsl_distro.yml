@@ -1,0 +1,46 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+# Unregister and uninstall a WSL distribution
+
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "wsl --unregister {{ wsl_distribution_name }} | Out-File {{ wsl_file_path_win }}\\wsl_unregister_distro.txt"
+    win_execute_cmd_ignore_error: true
+
+- name: "Pause for 10 seconds to wait for distribution unregister"
+  ansible.builtin.pause:
+    seconds: 10
+
+- name: "Process the WSL output message"
+  include_tasks: wsl_convert_binary_to_txt.yml
+  vars:
+    source_path: "{{ wsl_file_path_win }}\\wsl_unregister_distro.txt"
+    file_name: "wsl_unregister_distro.txt"
+
+- name: "Check WSL unregister command result"
+  ansible.builtin.fail:
+    msg: "WSL distribution unregister failed. Please check log file wsl_unregister_distro.txt."
+  when:
+    - win_powershell_cmd_output.rc is defined
+    - win_powershell_cmd_output.rc != 0
+
+# Check there is no distribution
+- name: "Check WSL distribution status after unregister"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "wsl --list | Out-File {{ wsl_file_path_win }}\\wsl_list_distro_2.txt "
+    win_execute_cmd_ignore_error: true
+
+- name: "Process the WSL output message"
+  include_tasks: wsl_convert_binary_to_txt.yml
+  vars:
+    source_path: "{{ wsl_file_path_win }}\\wsl_list_distro_2.txt"
+    file_name: "wsl_list_distro_2.txt"
+
+- name: "Validate the WSL command execution result"
+  ansible.builtin.assert:
+    that:
+      - lookup('ansible.builtin.file', wsl_new_file) is search("has no installed distributions")
+    fail_msg: "The WSL distribution {{ wsl_distribution_name }} is not unregistered."

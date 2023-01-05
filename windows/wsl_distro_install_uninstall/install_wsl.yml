@@ -1,0 +1,59 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+# Install inbox version of WSL
+
+# Install WSL and distribution
+- name: "Install WSL and distribution"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "wsl --install --inbox -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_install.txt"
+    win_execute_cmd_ignore_error: true
+
+- name: "Process the WSL output message"
+  include_tasks: wsl_convert_binary_to_txt.yml
+  vars:
+    source_path: "{{ wsl_file_path_win }}\\wsl_install.txt"
+    file_name: "wsl_install.txt"
+
+- name: "Check WSL installation command result"
+  ansible.builtin.fail:
+    msg: "WSL installation failed. Please check log file wsl_install.txt."
+  when:
+    - win_powershell_cmd_output.rc is defined
+    - win_powershell_cmd_output.rc != 0
+
+- name: "Restart the guest OS."
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+
+# Set WSL default version to 2 and check the WSL version
+- name: "Set WSL default version to 2"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "wsl --set-default-version 2"
+    win_execute_cmd_ignore_error: true
+
+- name: "Check WSL status"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "wsl --status | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_status.txt"
+    win_execute_cmd_ignore_error: true
+
+- name: "Process the WSL output message"
+  include_tasks: wsl_convert_binary_to_txt.yml
+  vars:
+    source_path: "{{ wsl_file_path_win }}\\wsl_status.txt"
+    file_name: "wsl_status.txt"
+
+- name: "Set fact of expected WSL version"
+  ansible.builtin.set_fact:
+    expected_wsl_version: "Default Version: 2"
+
+- name: "Validate the WSL version"
+  ansible.builtin.assert:
+    that:
+      - lookup('ansible.builtin.file', wsl_new_file) is search(expected_wsl_version)
+    fail_msg: "Keyword {{ expected_wsl_version }} is not found in the output of command 'wsl --status'."

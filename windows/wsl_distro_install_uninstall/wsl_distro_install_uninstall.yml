@@ -1,8 +1,8 @@
-# Copyright 2022 VMware, Inc.
+# Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is to install WSL in guest os.
+#   This test case is to install WSL in guest OS.
 # The Windows Subsystem for Linux (WSL) is available for installation on:
 # 1. Windows Server 2019 (version 1709) and later
 #    https://docs.microsoft.com/en-us/windows/wsl/install-on-server
@@ -16,7 +16,8 @@
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
-    - block:
+    - name: "Installation and uninstallation test for WSL and distribution"
+      block:
         - include_tasks: ../setup/test_setup.yml
         - include_tasks: ../../common/skip_test_case.yml
           vars:
@@ -35,38 +36,13 @@
 
         - include_tasks: wsl_test_prepare.yml
 
-        # Create temp directory on Guest OS to store the wsl output message
-        - name: Set fact of file path and distribution name
-          ansible.builtin.set_fact:
-            wsl_file_path_win: "C:\\temp"
-            wsl_ds_name: "Ubuntu"
-
-        - include_tasks: ../utils/win_is_folder.yml
-          vars:
-            win_is_folder_path: "{{ wsl_file_path_win }}"
-
-        - include_tasks: ../utils/win_execute_cmd.yml
-          vars:
-            win_powershell_cmd: "mkdir {{ wsl_file_path_win }}"
-          when: not win_is_folder_result
-
         # Install WSL and distribution
         - include_tasks: install_wsl.yml
-          vars:
-            wsl_file_path: "{{ wsl_file_path_win }}"
-            wsl_distribution_name: "{{ wsl_ds_name }}"
 
         # Run the distribution
         - include_tasks: run_wsl_distro.yml
-          vars:
-            wsl_file_path: "{{ wsl_file_path_win }}"
-            wsl_distribution_name: "{{ wsl_ds_name }}"
 
         # Uninstall the distribution
         - include_tasks: unregister_wsl_distro.yml
-          vars:
-            wsl_file_path: "{{ wsl_file_path_win }}"
-            wsl_distribution_name: "{{ wsl_ds_name }}"
-
       rescue:
         - include_tasks: ../../common/test_rescue.yml
