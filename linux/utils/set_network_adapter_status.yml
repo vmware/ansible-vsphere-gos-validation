@@ -1,4 +1,4 @@
-# Copyright 2022 VMware, Inc.
+# Copyright 2022-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Set network interface status to down or up
@@ -13,29 +13,52 @@
 # RHEL/SLED/Ubuntu Desktop network interfaces are managed by NetworkManager
 - name: "Set network interface status with NetworkManager"
   block:
-    - name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'"
-      ansible.builtin.shell: "nmcli device connect {{ network_adapter_name }}"
-      delegate_to: "{{ vm_guest_ip }}"
+    - name: "Bring {{ network_adapter_status }} network interface"
+      block:
+        - name: "Connect network interface '{{ network_adapter_name }}'"
+          ansible.builtin.shell: "nmcli device connect {{ network_adapter_name }}"
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - name: "Set expected network interface status to 'connected'"
+          ansible.builtin.set_fact:
+            expected_nmcli_device_status: "connected"
       when: network_adapter_status | lower == "up"
 
-    - name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'"
-      ansible.builtin.shell: "nmcli device disconnect {{ network_adapter_name }}"
-      delegate_to: "{{ vm_guest_ip }}"
+    - name: "Bring {{ network_adapter_status }} network interface"
+      block:
+        - name: "Disconnect network interface '{{ network_adapter_name }}'"
+          ansible.builtin.shell: "nmcli device disconnect {{ network_adapter_name }}"
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - name: "Set expected network interface status to 'disconnected'"
+          ansible.builtin.set_fact:
+            expected_nmcli_device_status: "disconnected"
       when: network_adapter_status | lower == "down"
 
     # Get network adapter interface status
     - name: "Get network interface '{{ network_adapter_name }}' status"
       ansible.builtin.shell: "nmcli device status | grep '^{{ network_adapter_name }}\\s\\+' | awk '{print $3'}"
       register: nmcli_device_status
-      changed_when: false
-      delegate_to: "{{ vm_guest_ip }}"
-
-    - name: "Print the network adapter interface status"
-      ansible.builtin.debug:
-        msg: "After bringing {{ network_adapter_status }} {{ network_adapter_name }}, its status became '{{ nmcli_device_status.stdout }}'"
-      when:
+      retries: 12
+      delay: 5
+      until:
         - nmcli_device_status is defined
         - nmcli_device_status.stdout is defined
+        - expected_nmcli_device_status in nmcli_device_status.stdout
+      changed_when: false
+      ignore_errors: true
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Check network interface '{{ network_adapter_name }}' status"
+      ansible.builtin.assert:
+        that:
+          - nmcli_device_status is defined
+          - nmcli_device_status.stdout is defined
+          - expected_nmcli_device_status in nmcli_device_status.stdout
+        fail_msg: >-
+          It's timed out to wait for {{ network_adapter_name }} status
+          becoming '{{ expected_nmcli_device_status }}' in 60 seconds.
+          Current status is '{{ nmcli_device_status.stdout | default('') }}'
   when: guest_os_network_manager == "NetworkManager"
 
 # SLES is using Wicked to manage network interface
