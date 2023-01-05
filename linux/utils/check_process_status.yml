@@ -27,15 +27,13 @@
     - name: "Get user '{{ process_uid }}' process '{{ process_name }}' }}"
       ansible.builtin.set_fact:
         running_process_info: "{{ process_list | selectattr('uid', 'equalto', process_uid) | selectattr('cmd', 'match', '(.*/)?' + process_name) }}"
-      when: process_list is defined
 
-    - ansible.builtin.debug: var=running_process_info
+    - name: "Print running process info"
+      ansible.builtin.debug: var=running_process_info
 
     - name: "Check process '{{ process_name }}' is running"
       ansible.builtin.assert:
         that:
-          - process_list is defined
-          - running_process_info is defined
           - running_process_info | length >= 1
         fail_msg: "User '{{ process_uid }}' doesn't have running process '{{ process_name }}'"
         success_msg: "User '{{ process_uid }}' has running process '{{ process_name }}'"
@@ -44,7 +42,6 @@
 - name: "Check process '{{ process_name }}' is not running"
   ansible.builtin.assert:
     that:
-      - process_list is defined
       - process_list | length == 0
     fail_msg: "The '{{ process_name }}' process is running"
     success_msg: "The '{{ process_name }}' process is not running"
