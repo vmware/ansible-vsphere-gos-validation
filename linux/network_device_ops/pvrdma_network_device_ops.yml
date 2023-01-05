@@ -82,10 +82,10 @@
         - name: "Validate network adapter status changes on server VM"
           include_tasks: network_status_validate.yml
 
-        - name: "Check PVRDMA device status and reload it if it is down on server VM"
+        - name: "Check PVRDMA device status and reload it if necessary on server VM"
           include_tasks: check_and_reload_pvrdma.yml
 
-        - name: "Start a listening service for PVRDMA on server VM"
+        - name: "Start a listening service for RDMA connection on server VM"
           include_tasks: start_pvrdma_server.yml
 
         # Switch to client VM
@@ -113,7 +113,7 @@
               - ping_success_after_hotadd | bool
             fail_msg: "Failed to ping gateway from client VM PVRDMA device"
 
-        - name: "Check PVRDMA device status and reload it if it is down on client VM"
+        - name: "Check PVRDMA device status and reload it if necessary on client VM"
           include_tasks: check_and_reload_pvrdma.yml
 
         # rping server VM from client VM
@@ -126,15 +126,15 @@
         - name: "Display RDMA ping result"
           ansible.builtin.debug: var=rping_server_result
 
-        - name: "Check the result of RDMA pinging server VM from client VM PVRDMA device"
+        - name: "Check the result of RDMA pinging server VM from client VM"
           ansible.builtin.assert:
             that:
               - rping_server_result is defined
               - rping_server_result.rc is defined
               - rping_server_result.rc == 0
             fail_msg: >-
-              Failed to RDMA ping server VM from client VM PVRDMA device.
-              Received error '{{ rping_server_result.stderr | default() }}'
+              RDMA pinging server VM from client VM failed.
+              Hit error '{{ rping_server_result.stderr | default() }}'
 
         - name: "Power off the cloned VM"
           include_tasks: ../../common/vm_set_power_state.yml
