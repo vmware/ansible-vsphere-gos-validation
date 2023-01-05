@@ -1,4 +1,4 @@
-# Copyright 2022 VMware, Inc.
+# Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Get EFLOW VM power state info in Windows guest OS
@@ -14,11 +14,13 @@
 
 - name: "Get EFLOW virtual machine power state"
   block:
-    - name: "Set fact of EFLOW virtual machine power state"
+    - name: "Get EFLOW virtual machine power state info line"
       ansible.builtin.set_fact:
-        win_eflow_vm_power_state: "{{ item.split(':')[1].strip() }}"
-      when: item.split(':')[0].strip() == 'VmPowerState'
-      with_items: "{{ win_powershell_cmd_output.stdout_lines | select }}"
+        win_eflow_vm_power_state_info: "{{ win_powershell_cmd_output.stdout_lines | select('match', 'VmPowerState\\s*:') }}"
+    - name: "Get EFLOW virtual machine power state"
+      ansible.builtin.set_fact:
+        win_eflow_vm_power_state: "{{ win_eflow_vm_power_state_info[0].split(':')[-1].strip() }}"
+      when: win_eflow_vm_power_state_info | length == 1
   when:
     - win_powershell_cmd_output.stdout_lines is defined
     - win_powershell_cmd_output.stdout_lines | length != 0

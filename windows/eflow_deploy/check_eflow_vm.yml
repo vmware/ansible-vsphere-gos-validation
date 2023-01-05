@@ -1,4 +1,4 @@
-# Copyright 2022 VMware, Inc.
+# Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Check EFLOW VM info
@@ -8,7 +8,7 @@
   ansible.builtin.assert:
     that:
       - win_eflow_vm_power_state == 'Running'
-    fail_msg: "Get EFLOW virtual machine power state is not 'Running': {{ win_eflow_vm_power_state }}"
+    fail_msg: "Get EFLOW virtual machine power state in guest OS: {{ win_eflow_vm_power_state }}, not expected 'Running'."
 
 # Check EFLOW VM OS info
 - name: "Get EFLOW virtual machine OS info"
@@ -19,8 +19,8 @@
   ansible.builtin.assert:
     that:
       - win_powershell_cmd_output.stdout is defined
-      - win_powershell_cmd_output.stdout
       - "'Common Base Linux Mariner' in win_powershell_cmd_output.stdout"
+    fail_msg: "Not get 'Common Base Linux Mariner' keyword in file '/etc/os-release' in EFLOW virtual machine."
 
 # Check EFLOW VM network info
 - name: "Get EFLOW virtual machine network info"
@@ -46,16 +46,15 @@
     that:
       - get_eflow_vm_ip is defined
       - get_eflow_vm_ip | ansible.utils.ipv4
-    fail_msg: "Not get valid EFLOW VM IPv4 address: {{ get_eflow_vm_ip | default('') }}"
+    fail_msg: "Failed to get valid EFLOW VM IPv4 address: {{ get_eflow_vm_ip | default('') }}"
 
 - name: "Check EFLOW virtual machine network info"
   ansible.builtin.assert:
     that:
       - get_eflow_vm_network_info
-      # - "'{{ get_eflow_vm_ip }}' in get_eflow_vm_network_info"
       - "'currentState:OK' in get_eflow_vm_network_info"
       - "'SubNet={{ win_vswitch_name }}' in get_eflow_vm_network_info"
-    fail_msg: "'{{ get_eflow_vm_ip }}', 'currentState:OK' or 'SubNet={{ win_vswitch_name }}' info is not displayed in EFLOW virutal machine endpoint info result: {{ get_eflow_vm_network_info }}"
+    fail_msg: "'currentState:OK' or 'SubNet={{ win_vswitch_name }}' info is not displayed in EFLOW virutal machine endpoint info result: {{ get_eflow_vm_network_info }}"
 
 - name: "Check EFLOW VM static IP address for Windows Server"
   ansible.builtin.assert:
