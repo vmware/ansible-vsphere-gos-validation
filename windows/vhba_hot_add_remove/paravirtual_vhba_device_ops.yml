@@ -4,7 +4,8 @@
 # Description:
 #   This test case is used for check hotadd, hot remove disk on existing PVSCSI
 # controller, and hotadd, hot remove new PVSCSI controller and disk. Test case
-# will be 'No Run' if VMware tools is not installed or not running.
+# will be 'Blocked' if there is no PVSCSI driver, which means either VMware tools
+# is not installed or not running, or guest OS does not have inbox PVSCSI driver.
 #
 - name: paravirtual_vhba_device_ops
   hosts: localhost
@@ -13,18 +14,16 @@
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
     - block:
-        - name: "Set fact of skip test to True when no VMware tools installed"
-          ansible.builtin.set_fact:
-            skip_pvscsi_no_vmtools: true
-        - name: "Set fact of skip test to False when there is pvscsi inbox driver"
-          ansible.builtin.set_fact:
-            skip_pvscsi_no_vmtools: false
-          when:
-            - guest_os_with_inbox_drivers
-
         - include_tasks: ../setup/test_setup.yml
+
+        # Skip test case if no pvscsi driver in guest OS, no matter it's from inbox or VMware tools
+        - include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_test_no_vmtools: "{{ skip_pvscsi_no_vmtools }}"
+            skip_msg: "Test case '{{ current_testcase_name }}' is blocked because guest OS has no inbox PVSCSI driver or VMware tools is not installed"
+            skip_reason: "Blocked"
+          when:
+            - not (vmtools_is_running is defined and vmtools_is_running | bool)
+            - not guest_os_with_inbox_drivers
 
         - include_tasks: vhba_test.yml
           vars:
