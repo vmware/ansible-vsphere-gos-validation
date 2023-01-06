@@ -11,6 +11,19 @@
 #   cdrom_unit_num: the unit number of CDROM device.
 #   cdrom_state: 'present' or 'absent'.
 #
+
+- name: "Set question auto answer to force to disconnect CD/DVD drive"
+  include_tasks: vm_set_extra_config.yml
+  vars:
+    vm_advanced_settings:
+      - key: "cdrom.showIsoLockWarning"
+        value: "FALSE"
+      - key: "msg.autoanswer"
+        value: "TRUE"
+  when:
+    - cdrom_state == "present"
+    - cdrom_type == "client"
+
 - name: "Configure VM CDROM {{ cdrom_controller_type | default('sata') }}{{ cdrom_controller_num }}:{{ cdrom_unit_num }} to '{{ cdrom_type }}'"
   community.vmware.vmware_guest:
     hostname: "{{ vsphere_host_name }}"
@@ -29,6 +42,6 @@
         state: "{{ cdrom_state | default(omit) }}"
   register: vm_config_cdrom_result
 
-- name: Display the result of reconfiguring VM CDROM
+- name: "Display the result of reconfiguring VM CDROM"
   ansible.builtin.debug: var=vm_config_cdrom_result
-  when: enable_debug is defined and enable_debug
+  when: enable_debug

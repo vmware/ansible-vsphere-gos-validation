@@ -1,6 +1,34 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+# Workaround for getting distribution info about RHEL variant OS like ProLinux
+# which doesn't have correct information in /etc/redhat-release
+- include_tasks: get_file_stat_info.yml
+  vars:
+    guest_file_path: "/etc/redhat-release"
+
+- name: "Set fact of /etc/redhat-release file info"
+  ansible.builtin.set_fact:
+    guest_redhat_release_exists: "{{ guest_file_exists }}"
+    guest_redhat_release_stat: "{{ guest_file_stat }}"
+
+- name: "Check and correct OS release in /etc/redhat-release"
+  block:
+    - include_tasks: get_file_stat_info.yml
+      vars:
+        guest_file_path: "/etc/system-release"
+
+    - name: "Overwrithe /etc/redhat-release with /etc/system-release"
+      ansible.builtin.shell: "cat /etc/system-release > /etc/redhat-release"
+      delegate_to: "{{ vm_guest_ip }}"
+      when:
+        - guest_file_exists
+        - guest_file_stat.islnk | default(false)
+        - guest_file_stat.lnk_source | default('') != "/etc/redhat-release"
+  when:
+    - guest_redhat_release_exists | bool
+    - not (guest_redhat_release_stat.islink | default(false))
+
 - include_tasks: ../../common/get_guest_system_info.yml
 
 # Get Debian OS version from /etc/debian_version
