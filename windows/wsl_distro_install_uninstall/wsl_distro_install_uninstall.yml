@@ -1,0 +1,48 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is to install WSL in guest OS.
+# The Windows Subsystem for Linux (WSL) is available for installation on:
+# 1. Windows Server 2019 (version 1709) and later
+#    https://docs.microsoft.com/en-us/windows/wsl/install-on-server
+# 2. Windows 10 version 2004 and higher (Build 19041 and higher) or Windows 11
+#    https://docs.microsoft.com/en-us/windows/wsl/install
+#
+
+- name: wsl_distro_install_uninstall
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - name: "Installation and uninstallation test for WSL and distribution"
+      block:
+        - include_tasks: ../setup/test_setup.yml
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "WSL is not supported by {{ guest_os_ansible_distribution }} with build number {{ guest_os_build_num }} "
+            skip_reason: "Not Supported"
+          when: >
+            (guest_os_ansible_distribution_major_ver | int < 10) or
+            (guest_os_product_type | lower == 'server' and guest_os_build_num | int < 16299) or
+            (guest_os_product_type | lower == 'client' and guest_os_build_num | int < 19041)
+
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Test case '{{ ansible_play_name }}' is skipped for Windows Server and it'll be added to the project later"
+            skip_reason: "Skipped"
+          when: (guest_os_product_type | lower == 'server')
+
+        - include_tasks: wsl_test_prepare.yml
+
+        # Install WSL and distribution
+        - include_tasks: install_wsl.yml
+
+        # Run the distribution
+        - include_tasks: run_wsl_distro.yml
+
+        # Uninstall the distribution
+        - include_tasks: unregister_wsl_distro.yml
+      rescue:
+        - include_tasks: ../../common/test_rescue.yml
