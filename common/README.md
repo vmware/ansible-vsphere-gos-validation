@@ -37,7 +37,7 @@
 * vm_add_remove_vtpm.yml: Add or remove vTPM device from VM
 * vm_add_vtpm_device.yml: Add key provider on vCenter then add new vTPM device to VM
 * vm_answer_question.yml: Answer question at VM power on
-  
+
 ### Tasks for VM CPU or Memory settings
 * vm_enable_cpu_hotadd.yml: Enable VM CPU hotadd
 * vm_set_cpu_number.yml: Set VM CPU number, cores per socket is 1 by default
@@ -122,8 +122,8 @@
 * esxi_get_guest_config_options.yml: Get VM config options for a guest id on a hardware version
 * esxi_get_pmem_info.yml: Get ESXi host total and available persistent memroy size in MB
 * esxi_configure_advanced_settings.yml: Configure advanced system settings on ESXi host
-* esxi_get_vmkernels.yml: Get ESXi host VMkernel network adapters
-* esxi_manage_vmkernel.yml: Add or remove a VMkernel network adapter on ESXi host 
+* esxi_get_vmkernel_adapters.yml: Get ESXi host VMkernel network adapters
+* esxi_manage_vmkernel_adapter.yml: Add or remove a VMkernel network adapter on ESXi host
 * esxi_set_firewall_rule.yml: Enable or disable a firewall rule on ESXi host
 
 
@@ -152,7 +152,7 @@
 * esxi_remove_vswitch.yml: Remove a vSphere Standard Switch
 * esxi_get_vswitch_facts.yml: Get virtual switch facts
 
-### Tasks for vSphere Distributed Switch (VDS) and Port Group 
+### Tasks for vSphere Distributed Switch (VDS) and Port Group
 * vcenter_manage_vds.yml: Create or remove a vSphere Distributed Switch
 * vcenter_manage_vds_portgroup.yml: Create or remove a distributed port group on vCenter Server
 * vcenter_manage_vds_host.yml: Add or remove an ESXi host for a distributed port group on vCenter Server
@@ -186,4 +186,4 @@
 ## Common tasks for Linux and Windows test cases
 * compose_vm_cdroms.yml: Generate VM CDROM device info list for creating new VM
 * download_iso_and_transfer.yml: Download ISO file and transfer to ESXi datastore
-* get_iso_file_list.yml: Generate and validate OS installation ISO file list 
+* get_iso_file_list.yml: Generate and validate OS installation ISO file list

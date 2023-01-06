@@ -5,9 +5,10 @@
 # Parameters:
 #   rule_name: The firewall rule name on ESXi host.
 #   rule_enabled: Whether to enable the firewall rule on ESXi host.
-#   rule_allowed_all: Whether to allow all hosts.
 #   rule_allowed_ip(optional): A list of allowed IP addresses.
 #   rule_allowed_networks(optional): A list of allowed IP networks.
+#   rule_allowed_all(optional): Whether to allow all hosts. If rule_allowed_ip and rule_allowed_networks
+#     is not set, it will be set to true by default.
 
 - name: "Check parameters for ESXi host firewall rule"
   ansible.builtin.assert:
@@ -17,12 +18,43 @@
       - rule_enabled | type_debug == 'bool'
     fail_msg: "At least one of parameters 'rule_name' or 'rule_enabled' is incorrect"
 
-- name: "Check parameter for enabling ESXi host firewall rule '{{ rule_name }}'"
-  ansible.builtin.assert:
-    that:
-      - rule_allowed_all is defined
-      - rule_allowed_all | type_debug == 'bool'
-    fail_msg: "'rule_allowed_all' must be set as a bool"
+- name: "Set fact of allowing all hosts or not"
+  block:
+    - name: "Set fact of allowing all hosts to 'true'"
+      ansible.builtin.set_fact:
+        rule_allowed_all: true
+      when:
+        - rule_allowed_ip is undefined or not rule_allowed_ip
+        - rule_allowed_networks is undefined or not rule_allowed_networks
+
+    - name: "Check rule allowed IP addresses and networks"
+      block:
+        - name: "Check rule allowed IP addresses"
+          ansible.builtin.assert:
+            that:
+              - rule_allowed_ip | type_debug == "list"
+              - rule_allowed_ip | ansible.builtin.ipaddr('address') | length == rule_allowed_ip | length
+            fail_msg: "'rule_allowed_ip' must be set with a list of valid IP addresses"
+          when:
+            - rule_allowed_ip is defined
+            - rule_allowed_ip
+
+        - name: "Check rule allowed networks"
+          ansible.builtin.assert:
+            that:
+              - rule_allowed_networks | type_debug == "list"
+              - rule_allowed_networks | ansible.builtin.ipaddr('net') | length == rule_allowed_networks | length
+            fail_msg: "'rule_allowed_networks' must be set with a list of valid networks"
+          when:
+            - rule_allowed_networks is defined
+            - rule_allowed_networks
+
+        - name: "Set fact of allowing all hosts to 'false'"
+          ansible.builtin.set_fact:
+            rule_allowed_all: false
+      when:
+        (rule_allowed_ip is defined and rule_allowed_ip) or
+        (rule_allowed_networks is defined and rule_allowed_networks)
   when: rule_enabled
 
 - name: "Set the config operation for ESXi host firewall rule '{{ rule_name }}'"

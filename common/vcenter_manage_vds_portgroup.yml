@@ -7,7 +7,7 @@
 #   vds_portgroup_name: The distributed port group name.
 #   vds_portgroup_state: The distributed port group state: present or absent.
 #   vds_port_number: The number of ports the distributed port group should contain.
-#     This is required when vds_portgroup_state is present.
+#     This is required when vds_portgroup_state is present. Default value is 4.
 #   vds_vlan_id: The VLAN ID used by the distributed port group. Default value is 0.
 #   vds_port_binding(optional): The port binding type. Choices are 'static' and 'ephemeral'.
 #     Default value is 'static'.
@@ -21,11 +21,9 @@
       - vds_portgroup_name is defined and vds_portgroup_name
       - vds_portgroup_state is defined
       - vds_portgroup_state in ['present', 'absent']
-      - vds_port_number is defined
-      - vds_port_number | int > 0
     fail_msg: >-
-      At least one of parameters 'vds_name', 'vds_portgroup_name', 'vds_portgroup_state' or
-      'vds_port_number' is incorrect.
+      At least one of parameters 'vds_name', 'vds_portgroup_name', 'vds_portgroup_state'
+      is incorrect.
 
 - name: "Set operation for managing distributed port group"
   ansible.builtin.set_fact:
@@ -42,7 +40,7 @@
     vlan_id: "{{ vds_vlan_id | default(0) }}"
     port_binding: "{{ vds_port_binding | default('static') }}"
     port_allocation: "{{ vds_port_allocation | default('fixed') }}"
-    num_ports: "{{ vds_port_number | default(omit) }}"
+    num_ports: "{{ vds_port_number | default(4) }}"
     state: "{{ vds_portgroup_state }}"
   register: manage_vds_portgroup_result
 
