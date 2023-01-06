@@ -58,6 +58,11 @@ def extract_error_msg(json_obj):
                             if "" in json_obj['stderr_lines']:
                                 json_obj['stdout_lines'].remove("")
                             message += '\n' + '\n'.join(json_obj['stdout_lines']).strip()
+                    if 'MODULE FAILURE' in value:
+                       if 'module_stderr' in json_obj and str(json_obj['module_stderr']) != '':
+                             message += '\n' + json_obj['module_stderr'].strip()
+                       elif 'module_stdout' in json_obj and str(json_obj['module_stdout']) != '':
+                             message += '\n' + json_obj['module_stdout'].strip()
 
                 elif isinstance(value, list):
                     message += '\n'.join(value)
