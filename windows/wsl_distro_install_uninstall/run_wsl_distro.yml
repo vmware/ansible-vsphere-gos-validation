@@ -6,7 +6,7 @@
 
 # List the installed distribution
 - name: "List installed WSL distribution"
-  ansible.windows.win_shell: "wsl --list | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_list_distro.txt"
+  ansible.windows.win_shell: "wsl --list | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_list_distro_after_install.txt"
   register: win_powershell_cmd_output
   ignore_errors: true
   delegate_to: "{{ vm_guest_ip }}"
@@ -15,13 +15,13 @@
     - win_powershell_cmd_output.rc is defined
     - win_powershell_cmd_output.rc == 0
   retries: 5
-  delay: 60
+  delay: 30
 
 - name: "Process the WSL output message"
   include_tasks: wsl_convert_binary_to_txt.yml
   vars:
-    source_path: "{{ wsl_file_path_win }}\\wsl_list_distro.txt"
-    file_name: "wsl_list_distro.txt"
+    source_path: "{{ wsl_file_path_win }}\\wsl_list_distro_after_install.txt"
+    file_name: "wsl_list_distro_after_install.txt"
 
 - name: "Validate the WSL list command execution result"
   ansible.builtin.assert:
@@ -37,14 +37,14 @@
 - name: "Process the WSL output message"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "wsl -d {{ wsl_distribution_name }} {{ distro_command}} | Out-File {{ wsl_file_path_win }}\\wsl_run_distro_cmd.txt"
+    win_powershell_cmd: "wsl -d {{ wsl_distribution_name }} {{ distro_command}} | Out-File {{ wsl_file_path_win }}\\wsl_run_distro_os_release.txt"
     win_execute_cmd_ignore_error: true
 
 - name: "Process the WSL output message"
   include_tasks: wsl_convert_binary_to_txt.yml
   vars:
-    source_path: "{{ wsl_file_path_win }}\\wsl_run_distro_cmd.txt"
-    file_name: "wsl_run_distro_cmd.txt"
+    source_path: "{{ wsl_file_path_win }}\\wsl_run_distro_os_release.txt"
+    file_name: "wsl_run_distro_os_release.txt"
 
 - name: "Check the execution result of WSL distribution command"
   ansible.builtin.assert:
