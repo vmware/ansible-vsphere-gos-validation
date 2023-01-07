@@ -26,44 +26,13 @@
   vars:
     vds_host_state: "present"
 
-- name: "Get all VMkernel network adapters on the ESXi host"
-  include_tasks: esxi_get_vmkernel_adapters.yml
-
-- name: "Get all existing VMkernel network adapter indices and number"
-  ansible.builtin.set_fact:
-    existing_vmk_indices: >-
-      {{
-        esxi_vmkernels_info |
-        map(attribute='device') |
-        map('replace', 'vmk', '') |
-        map('int') |
-        sort
-      }}
-    existing_vmk_num: "{{ esxi_vmkernels_info | length }}"
-
-- name: "Set fact of the new VMkernel network adapter device index"
-  ansible.builtin.set_fact:
-    vds_vmk_device_index: "{{ existing_vmk_num }}"
-  when: (existing_vmk_num | int == 0) or (existing_vmk_indices[-1] == (existing_vmk_num | int - 1))
-
-- name: "Set fact of the new VMkernel network adapter device index"
-  ansible.builtin.set_fact:
-    vds_vmk_device_index: "{{ range(0, existing_vmk_num | int) | difference(existing_vmk_indices) | min }}"
-  when:
-    - existing_vmk_num | int > 0
-    - existing_vmk_indices[-1] != existing_vmk_num | int - 1
+- name: "Get new VMkernel network adapter device"
+  include_tasks: esxi_get_new_vmkernel_adapter.yml
 
 - name: "Set fact of the new VMkernel network adapter device"
   ansible.builtin.set_fact:
-    vds_vmk_device: "vmk{{ vds_vmk_device_index }}"
-
-- name: "Check VMkernel network adapter device index"
-  ansible.builtin.assert:
-    that:
-      - vds_vmk_device_index is defined
-      - vds_vmk_device_index
-      - vds_vmk_device_index | int in range(0, 256)
-    fail_msg: "The valid VMkernel adapter device can only be in range of vmk0 ~ vmk255."
+    vds_vmk_device_index: "{{ new_vmk_device_index }}"
+    vds_vmk_device_name: "{{ new_vmk_device_name }}"
 
 - name: "Set fact of the new VMkernel network adapter's IP address"
   ansible.builtin.set_fact:
@@ -81,21 +50,26 @@
 - name: "Add a VMkernel network adapter assigned to the distributed port group for the ESXi host"
   include_tasks: esxi_manage_vmkernel_adapter.yml
   vars:
-    vmk_device: "{{ vds_vmk_device }}"
+    vmk_device: "{{ vds_vmk_device_name }}"
     vmk_state: "present"
     vmk_vds_name: "{{ vds_name }}"
     vmk_portgroup_name: "{{ vds_portgroup_name }}"
     vmk_network: "{{ vds_vmk_network }}"
     vmk_enable_mgmt: false
 
-- name: "Check the new VMkernel network adapter device name"
+- name: "Check the result of adding new VMkernel network adapter device"
   ansible.builtin.assert:
     that:
+      - manage_vmk_result.changed is defined
+      - manage_vmk_result.changed
       - manage_vmk_result.device is defined
-      - manage_vmk_result.device == vds_vmk_device
+      - manage_vmk_result.device == vds_vmk_device_name
     fail_msg: >-
-      The new added VMkernel network adapter is '{{ manage_vmk_result.device }}',
-      not expected '{{ vds_vmk_device }}'
+      Failed to add new VMkernel network adapter '{{ vds_vmk_device_name }}'.
+      The 'changed' value in task result is '{{ manage_vmk_result.changed | default(false) }}'.
+      The VMkernel network adapter device name in task result is
+      "{{ manage_vmk_result.device | default('') }}".
+    success_msg: "VMkernel network adapter '{{ vds_vmk_device_name }}' is added to ESXi host"
 
 - name: "Set fact that the vSphere Distributed Switch networking is setup"
   ansible.builtin.set_fact:

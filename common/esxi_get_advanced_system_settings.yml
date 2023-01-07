@@ -1,0 +1,25 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get ESXi server's advanced system settings
+
+- name: "Initialized fact of ESXi server's advanced system settings"
+  ansible.builtin.set_fact:
+    esxi_advanced_system_settings: {}
+
+- name: "Gather info about ESXi server's advanded system settings"
+  community.vmware.vmware_host_config_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+  register: get_advanced_settings_result
+
+- name: "Set fact of ESXi server's advanced system settings"
+  ansible.builtin.set_fact:
+    esxi_advanced_system_settings: "{{ get_advanced_settings_result.hosts_info[esxi_hostname] }}"
+  when:
+    - get_advanced_settings_result is defined
+    - get_advanced_settings_result.hosts_info is defined
+    - get_advanced_settings_result.hosts_info[esxi_hostname] is defined

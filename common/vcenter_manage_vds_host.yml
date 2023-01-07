@@ -41,10 +41,24 @@
     vmnics: "{{ vds_host_vmnics | default(omit) }}"
   register: manage_vds_host_result
 
-- name: "Check the result of managing ESXi host for vSphere Distributed Switch"
+- name: "Diplay the result of managing ESXi host for vSphere Distributed Switch"
+  ansible.builtin.debug: var=manage_vds_host_result
+  when: enable_debug
+
+- name: "Get info about the vSphere Distributed Switch"
+  include_tasks: vcenter_get_vds_info.yml
+
+- name: "Check ESXi host is {{ vds_host_state }} in the vSphere Distributed Switch"
   ansible.builtin.assert:
     that:
-      - manage_vds_host_result is defined
-      - manage_vds_host_result.failed is defined
-      - not manage_vds_host_result.failed
-    fail_msg: "Failed to {{ vds_host_op }} ESXi host '{{ esxi_hostname }}' for vSphere Distributed Switch"
+      - vds_info
+      - vds_info.configure is defined
+      - vds_info.configure.hosts is defined
+      - ((vds_host_state == 'present' and esxi_hostname in vds_info.configure.hosts) or
+         (vds_host_state == 'absent' and esxi_hostname not in vds_info.configure.hosts))
+    fail_msg: >-
+      Failed to {{ vds_host_op }} ESXi host '{{ esxi_hostname }}' for
+      vSphere Distributed Switch '{{ vds_name }}'"
+    success_msg: >-
+      ESXi host '{{ esxi_hostname }}' is {{ vds_host_state }} in
+      vSphere Distributed Switch '{{ vds_name }}'

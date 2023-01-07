@@ -32,17 +32,10 @@
         - name: "Pepare vSphere Distributed Switch and Port Group for PVRDMA testing"
           include_tasks: ../../common/vds_network_setup.yml
 
-        - name: "Tag VMkernel adapter '{{ vds_vmk_device }}' for PVRDMA"
-          include_tasks: ../../common/esxi_configure_advanced_settings.yml
+        - name: "Tag VMkernel adapter and enable firewall rule on ESXi host for PVRDMA communication"
+          include_tasks: ../../common/esxi_enable_pvrdma_configs.yml
           vars:
-            esxi_advanced_settings: {"Net.PVRDMAVmknic": "{{ vds_vmk_device }}"}
-
-        - name: "Enable ESXi host firewall rule for PVRDMA"
-          include_tasks: ../../common/esxi_set_firewall_rule.yml
-          vars:
-            rule_name: "pvrdma"
-            rule_enabled: true
-            rule_allowed_all: true
+            pvrdma_vmk_nic: "{{ vds_vmk_device_name }}"
 
         - name: "Set the port group name for new network adapter"
           ansible.builtin.set_fact:
@@ -154,22 +147,14 @@
           ansible.builtin.shell: "kill -9 {{ rping_server_process_pid }}"
           delegate_to: "{{ vm_guest_ip }}"
           ignore_errors: true
-          
+
         - name: "Hot remove the new {{ adapter_type }} network adapter from server VM"
           include_tasks: hot_remove_network_adapter.yml
           vars:
             new_network_adapter_mac_addr: "{{ new_nic_mac_addr }}"
 
-        - name: "Disable ESXi host firewall rule for PVRDMA"
-          include_tasks: ../../common/esxi_set_firewall_rule.yml
-          vars:
-            rule_name: "pvrdma"
-            rule_enabled: false
-
-        - name: "Remove PVRDMA tag for VMkernel adapter '{{ vds_vmk_device }}'"
-          include_tasks: ../../common/esxi_configure_advanced_settings.yml
-          vars:
-            esxi_advanced_settings: {"Net.PVRDMAVmknic": ""}
+        - name: "Remove VMkernel adapter tag and disable firewall rule for PVRDMA communication"
+          include_tasks: ../../common/esxi_disable_pvrdma_configs.yml
 
         - name: "Cleanup network"
           include_tasks: ../../common/vds_network_cleanup.yml

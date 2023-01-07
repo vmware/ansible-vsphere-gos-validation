@@ -1,0 +1,27 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Configure advanced system settings on an ESXi host
+# Parameters:
+#   esxi_host_config_options: A dictionary of advanced system setting options to config
+
+- name: "Check 'esxi_host_config_options' parameter value is valid"
+  ansible.builtin.assert:
+    that:
+      - esxi_host_config_options is defined
+      - esxi_host_config_options | ansible.builtin.type_debug == 'dict'
+    fail_msg: "'esxi_host_config_options' parameter must be set with a dictionary."
+
+- name: "Configure ESXi server with advanded system settings"
+  community.vmware.vmware_host_config_manager:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+    options: "{{ esxi_host_config_options }}"
+  register: set_advanced_settings_result
+
+- name: "Display the result of configuring ESXi advanced system settings"
+  ansible.builtin.debug: var=set_advanced_settings_result
+  when: enable_debug

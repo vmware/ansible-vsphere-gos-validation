@@ -1,0 +1,27 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Remove VMkernel adapter tag and firewall rule on ESXi host for PVRDMA communication.
+#
+
+- name: "Disable ESXi host firewall rule for PVRDMA"
+  include_tasks: ../../common/esxi_set_firewall_rule.yml
+  vars:
+    rule_name: "pvrdma"
+    rule_enabled: false
+
+- name: "Remove PVRDMA tag for VMkernel adapter"
+  include_tasks: ../../common/esxi_set_advanced_system_settings.yml
+  vars:
+    esxi_host_config_options: {"Net.PVRDMAVmknic": ""}
+
+- name: "Get ESXi server's advanced system settings to check config result"
+  include_tasks: esxi_get_advanced_system_settings.yml
+
+- name: "Check 'Net.PVRDMAVmknic' is set to '' in ESXi server's advanced system settings"
+  ansible.builtin.assert:
+    that:
+      - esxi_advanced_system_settings['Net.PVRDMAVmknic'] is defined
+      - esxi_advanced_system_settings['Net.PVRDMAVmknic'] == ''
+    fail_msg: "Failed to set 'Net.PVRDMAVmknic' to ''"
+    success_msg: "'Net.PVRDMAVmknic' is set to ''"

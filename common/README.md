@@ -121,11 +121,14 @@
 * esxi_get_guest_ids.yml: Get supported guest ids for a hardware version on ESXi host
 * esxi_get_guest_config_options.yml: Get VM config options for a guest id on a hardware version
 * esxi_get_pmem_info.yml: Get ESXi host total and available persistent memroy size in MB
-* esxi_configure_advanced_settings.yml: Configure advanced system settings on ESXi host
-* esxi_get_vmkernel_adapters.yml: Get ESXi host VMkernel network adapters
+* esxi_set_advanced_system_settings.yml: Configure ESXi host's advanced system settings
+* esxi_get_advanced_system_settings.yml: Get ESXi host's advanced system settings
+* esxi_get_vmkernel_adapters.yml: Get ESXi host's VMkernel network adapters
+* esxi_get_new_vmkernel_adapter.yml: Get index and name of a new VMkernel network adapter on ESXi host
 * esxi_manage_vmkernel_adapter.yml: Add or remove a VMkernel network adapter on ESXi host
 * esxi_set_firewall_rule.yml: Enable or disable a firewall rule on ESXi host
-
+* esxi_enable_pvrdma_configs.yml: Tag VMkernel network adapter and enable firewall rule on ESXi host for PVRDMA communication
+* esxi_disable_pvrdma_configs.yml: Remove VMkernel network adapter tag and disable firewall rule on ESXi host for PVRDMA communication
 
 ### Tasks for ESXi datastores
 * esxi_add_datastore.yml: Add NFS or VMFS datastore to ESXi host
@@ -154,6 +157,7 @@
 
 ### Tasks for vSphere Distributed Switch (VDS) and Port Group
 * vcenter_manage_vds.yml: Create or remove a vSphere Distributed Switch
+* vcenter_get_vds_info.yml: Gather information about a vSphere Distributed Switch
 * vcenter_manage_vds_portgroup.yml: Create or remove a distributed port group on vCenter Server
 * vcenter_manage_vds_host.yml: Add or remove an ESXi host for a distributed port group on vCenter Server
 
