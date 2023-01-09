@@ -11,22 +11,14 @@
     ('Flatcar' in guest_os_ansible_distribution or
      guest_os_ansible_distribution in ['Fedora', 'VMware Photon OS'])
 
-#- name: "Skip test case for unsupported Linux kernel"
-#  include_tasks: ../../common/skip_test_case.yml
-#  vars:
-#    skip_msg: >-
-#      {{ guest_os_ansible_distribution }} with Linux kernel {{ guest_os_ansible_kernel }}
-#      doesn't support PVRDMA. PVRDMA is supported in Linux kernel 4.6 or later.
-#    skip_reason: "Not Supported"
-#  when: guest_os_ansible_kernel is version('4.6', '<')
-
 - name: "Get guest config options"
   include_tasks: ../../common/esxi_get_guest_config_options.yml
   vars:
     guest_id: "{{ vm_guest_id }}"
     esxi_hardware_version: "{{ vm_hardware_version_num }}"
 
-- include_tasks: ../../common/skip_test_case.yml
+- name: "Skip test case for guest_id and hardware version which doesn't support PVRDMA adapter"
+  include_tasks: ../../common/skip_test_case.yml
   vars:
     skip_msg: >-
       This guest ID '{{ vm_guest_id }}' with hardware version '{{ vm_hardware_version_num }}'
@@ -54,5 +46,4 @@
     skip_reason: "Not Supported"
   when: >
     (guest_pvrdma_module_info.filename is undefined) or
-    (('vmw_pvrdma' not in guest_pvrdma_module_info.filename) and
-    ('builtin' not in guest_pvrdma_module_info.filename))
+    ('vmw_pvrdma' not in guest_pvrdma_module_info.filename)

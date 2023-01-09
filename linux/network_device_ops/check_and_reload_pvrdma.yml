@@ -4,7 +4,7 @@
 # Reload vmw_pvrdma module when ESXi version is 7.0.1 or earlier
 # or new RDMA device status is not active
 #
-- name: "Reload vmw_pvrdma module"
+- name: "Reload 'vmw_pvrdma' module"
   include_tasks: ../utils/reload_module.yml
   vars:
     module_name: "vmw_pvrdma"
@@ -12,7 +12,8 @@
 
 - name: "Check RDMA device port state"
   block:
-    - include_tasks: ../utils/get_rdma_device_info.yml
+    - name: "Get RDMA devices in guest OS after hot-add"
+      include_tasks: ../utils/get_rdma_device_info.yml
     
     - name: "Set fact of RDMA device after hot-add"
       ansible.builtin.set_fact:
@@ -29,7 +30,7 @@
       ansible.builtin.set_fact:
         new_rdma_device: "{{ (rdma_devices_after_hotadd | difference(rdma_devices_before_hotadd))[0] }}"
     
-    - name: "Reload vmw_pvrdma module"
+    - name: "Reload 'vmw_pvrdma' module"
       include_tasks: ../utils/reload_module.yml
       vars:
         module_name: "vmw_pvrdma"
