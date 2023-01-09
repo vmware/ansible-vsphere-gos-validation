@@ -69,7 +69,7 @@
             new_nic_net_prefix: "{{ pvrdma_server_vm_net_prefix }}"
             new_nic_gateway: "{{ pvrdma_server_vm_gateway }}"
 
-        - name: "Hot add a new network adapter on server VM and apply network config"
+        - name: "Hot add a new {{ adapter_type }} network adapter on server VM and apply network config"
           include_tasks: hot_add_network_adapter.yml
 
         - name: "Set fact of the PVRDMA network adapter mac address for server VM"
@@ -98,7 +98,7 @@
             vm_name: "{{ pvrdma_client_vm_name }}"
             update_inventory_timeout: 300
 
-        - name: "Hot add a new network adapter on client VM and apply network config"
+        - name: "Hot add a new {{ adapter_type }} network adapter on client VM and apply network config"
           include_tasks: hot_add_network_adapter.yml
           vars:
             vm_name: "{{ pvrdma_client_vm_name }}"
@@ -133,13 +133,13 @@
               RDMA pinging server VM from client VM failed.
               Hit error '{{ rping_server_result.stderr | default() }}'
 
-        - name: "Power off the cloned VM"
+        - name: "Power off the client VM"
           include_tasks: ../../common/vm_set_power_state.yml
           vars:
             vm_power_state_set: 'powered-off'
             vm_name: "{{ pvrdma_client_vm_name }}"
 
-        - name: "Remove the cloned VM"
+        - name: "Remove the client VM"
           include_tasks: ../../common/vm_remove.yml
           vars:
             vm_name: "{{ pvrdma_client_vm_name }}"

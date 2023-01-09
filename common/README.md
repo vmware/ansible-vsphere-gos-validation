@@ -159,7 +159,7 @@
 * vcenter_manage_vds.yml: Create or remove a vSphere Distributed Switch
 * vcenter_get_vds_info.yml: Gather information about a vSphere Distributed Switch
 * vcenter_manage_vds_portgroup.yml: Create or remove a distributed port group on vCenter Server
-* vcenter_manage_vds_host.yml: Add or remove an ESXi host for a distributed port group on vCenter Server
+* vcenter_manage_vds_host.yml: Add or remove an ESXi host for a vSphere Distributed Switch on vCenter Server
 
 ## Localhost tasks
 ### Tasks for NFS mount and unmount
