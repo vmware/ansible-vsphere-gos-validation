@@ -1,9 +1,11 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Workaround for getting distribution info about RHEL variant OS like ProLinux
-# which doesn't have correct information in /etc/redhat-release
-- include_tasks: get_file_stat_info.yml
+# Overwrite /etc/redhat-release with correct OS release information
+# for RHEL variant OS like ProLinux so that ansible can retrieve
+# correct distribution
+- name: "Get info about guest OS file /etc/redhat-release"
+  include_tasks: get_file_stat_info.yml
   vars:
     guest_file_path: "/etc/redhat-release"
 
@@ -14,7 +16,8 @@
 
 - name: "Check and correct OS release in /etc/redhat-release"
   block:
-    - include_tasks: get_file_stat_info.yml
+    - name: "Get info about guest OS file /etc/system-release"
+      include_tasks: get_file_stat_info.yml
       vars:
         guest_file_path: "/etc/system-release"
 
@@ -29,10 +32,11 @@
     - guest_redhat_release_exists | bool
     - not (guest_redhat_release_stat.islink | default(false))
 
-- include_tasks: ../../common/get_guest_system_info.yml
+- name: "Get guest OS distribution info"
+  include_tasks: ../../common/get_guest_system_info.yml
 
-# Get Debian OS version from /etc/debian_version
-- block:
+- name: "Get Debian OS version from /etc/debian_version"
+  block:
     - name: "Get Debian version"
       ansible.builtin.command: cat /etc/debian_version
       register: debian_version_result
@@ -57,7 +61,8 @@
   ansible.builtin.set_fact:
     guest_os_bit: "{% if guest_os_ansible_architecture in ['x86_64', 'amd64', 'aarch64'] %}64-bit{% else %}32-bit{% endif %}"
 
-- include_tasks: check_guest_os_gui.yml
+- name: "Check whether guest OS has GUI"
+  include_tasks: check_guest_os_gui.yml
 
 - name: "Print Linux guest OS information"
   ansible.builtin.debug:

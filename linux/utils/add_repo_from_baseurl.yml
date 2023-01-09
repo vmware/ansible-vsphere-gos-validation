@@ -41,7 +41,7 @@
   ansible.builtin.set_fact:
     repo_baseurl_prefix: ""
 
-- name: "Add yum repository"
+- name: "Add yum repository for {{ guest_os_ansible_distribution }}"
   block:
     - name: "Set the prefix for local yum repository"
       ansible.builtin.set_fact:
@@ -66,7 +66,8 @@
     - name: "Display the result of adding yum repository"
       ansible.builtin.debug: var=add_yum_repo_result
 
-    - block:
+    - name: "Update yum repository file"
+      block:
         - name: "Get new repository file path"
           ansible.builtin.set_fact:
             new_yum_repo_path: "{{ add_yum_repo_result.diff.after_header }}"
@@ -80,7 +81,7 @@
         - add_yum_repo_result.diff.after_header is defined
   when: guest_os_family in ["RedHat", "VMware Photon OS"]
 
-- name: Add repository for SLES/SLED
+- name: "Add zypper repository for {{ guest_os_ansible_distribution }}"
   block:
     - name: "Set the prefix for local zypper repository"
       ansible.builtin.set_fact:

@@ -44,17 +44,16 @@
             loop_var: service_name
 
         - name: "Enable cloud-init GOSC in {{ guest_cloud_cfg_path }}"
-          ansible.builtin.lineinfile:
-            path: "{{ guest_cloud_cfg_path }}"
-            regexp: '^[#\s]*{{ item.split(":")[0] }}'
-            line: '{{ item }}'
-            state: present
+          include_tasks: replace_or_add_line_in_file.yml
+          vars:
+             file: "{{ guest_cloud_cfg_path }}"
+             reg_exp: '^[#\s]*{{ item.split(":")[0] }}'
+             line_content: '{{ item }}'
           with_items:
             - 'manage_etc_hosts: true'
             - 'preserve_hostname: false'
             - 'disable_vmware_customization: false'
             - 'ssh_pwauth: 1'
-          delegate_to: "{{ vm_guest_ip }}"
 
         - name: Check cloud-init GOSC is enabled
           ansible.builtin.command: "grep '^disable_vmware_customization' {{ guest_cloud_cfg_path }}"
@@ -66,19 +65,15 @@
           ansible.builtin.set_fact:
             cloudinit_gosc_enabled: "{{ result.stdout.split(': ')[1] | lower == 'false' }}"
 
-        # Enable network config in /etc/cloud/cloud.cfg.d/*.cfg
-        - block:
-            - name: "Enable cloud-init network config"
-              ansible.builtin.lineinfile:
-                path: "{{ file_path }}"
-                regexp: '^[#\s]*{{ network_config_keyword }}'
-                line: '#network: {config: disabled}'
-                state: present
-              when:
-              delegate_to: "{{ vm_guest_ip }}"
-              with_items: "{{ network_config_result.stdout_lines }}"
-              loop_control:
-                loop_var: file_path
+        - name: "Enable cloud-init network config"
+	  include_tasks: replace_or_add_line_in_file.yml
+	  vars:
+	     file: "{{ file_path }}"
+	     reg_exp: '^[#\s]*{{ network_config_keyword }}'
+	     line_content: '#network: {config: disabled}'
+          with_items: "{{ network_config_result.stdout_lines }}"
+          loop_control:
+            loop_var: file_path
           when:
             - network_config_result.stdout_lines is defined
             - network_config_result.stdout_lines | length >= 1
@@ -136,15 +131,14 @@
           ansible.builtin.set_fact:
             cloudinit_gosc_disabled: "{{ result.rc != 0 }}"
 
-        # Disable network config
-        - block:
+        - name: "Disable cloud-init network config"
+          block:
             - name: "Disable cloud-init network config"
-              ansible.builtin.lineinfile:
-                path: "{{ file_path }}"
-                regexp: '^[#\s]*{{ network_config_keyword }}'
-                line: 'network: {config: disabled}'
-                state: present
-              delegate_to: "{{ vm_guest_ip }}"
+              include_tasks: replace_or_add_line_in_file.yml
+              vars:
+                 file: "{{ file_path }}"
+                 reg_exp: '^[#\s]*{{ network_config_keyword }}'
+                 line_content: 'network: {config: disabled}'
               with_items: "{{ network_config_result.stdout_lines }}"
               loop_control:
                 loop_var: file_path
@@ -153,11 +147,10 @@
                 - network_config_result.stdout_lines | length >= 1
 
             - name: "Disable cloud-init network config"
-              ansible.builtin.lineinfile:
-                path: "{{ guest_cloud_cfg_path }}"
-                line: "network: {config: disabled}"
-                state: present
-              delegate_to: "{{ vm_guest_ip }}"
+              include_tasks: replace_or_add_line_in_file.yml
+              vars:
+                file: "{{ guest_cloud_cfg_path }}"
+                line_content: "network: {config: disabled}"
               when: >
                 network_config_result.stdout_lines is undefined or
                 network_config_result.stdout_lines | length == 0
