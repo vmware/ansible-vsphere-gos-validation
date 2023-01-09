@@ -1,4 +1,4 @@
-# Copyright 2022 VMware, Inc.
+# Copyright 2022-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
@@ -32,15 +32,14 @@
 
 - block:
     - name: "Check {{ mount_point_path }} exists"
-      ansible.builtin.stat:
-        path: "{{ mount_point_path }}"
-      delegate_to: "{{ vm_guest_ip }}"
-      register: stat_mount_point_path
+      include_tasks: get_file_stat_info.yml
+      vars:
+        guest_file_path: "{{ mount_point_path }}"
 
     - name: "Mount point doesn't exists"
       ansible.builtin.fail:
         msg: "The mount point path {{ mount_point_path }} doesn't exist, which can't be unmounted"
-      when: not (stat_mount_point_path.stat.exists | default(false))
+      when: not (guest_file_exists | bool)
   when: mount_state in ['absent', 'unmounted']
 
 - name: "Set mount point {{ mount_point_path }} to {{ mount_state }}"

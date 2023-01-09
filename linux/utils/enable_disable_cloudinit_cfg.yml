@@ -1,25 +1,34 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Check /etc/cloud/cloud.cfg existence"
-  ansible.builtin.stat:
-    path: /etc/cloud/cloud.cfg
-  register: cloud_init_cfg
-  delegate_to: "{{ vm_guest_ip }}"
+- name: "Set cloud-init config file path"
+  ansible.builtin.set_fact:
+    guest_cloud_cfg_path: "/etc/cloud/cloud.cfg"
+    guest_cloud_cfg_d_path: "/etc/cloud/cloud.cfg.d"
 
-- block:
+- name: "Check {{ guest_cloud_cfg_path }} existence"
+  include_tasks: get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ guest_cloud_cfg_path }}"
+
+- name: "Set fact of {{ guest_cloud_cfg_path }} exists or not"
+  ansible.builtin.set_fact:
+    guest_cloud_cfg_exists: "{{ guest_file_exists }}"
+
+- name: "Update cloud-init configs"
+  block:
     - name: "Set keyword for searching network config in cloud-init config files"
       ansible.builtin.set_fact:
         network_config_keyword: "network: *{config: *disabled}"
 
     - name: "Search for network config"
-      ansible.builtin.shell: grep -rl "{{ network_config_keyword }}" /etc/cloud/cloud.cfg /etc/cloud/cloud.cfg.d/*.cfg
+      ansible.builtin.shell: "grep -rl '{{ network_config_keyword }}' {{ guest_cloud_cfg_path }} {{ guest_cloud_cfg_d_path }}/*.cfg"
       register: network_config_result
       failed_when: false
       changed_when: false
       delegate_to: "{{ vm_guest_ip }}"
 
-    - name: Enable Cloud-Init GOSC for cloud-init work flow
+    - name: "Enable Cloud-Init GOSC for cloud-init workflow"
       block:
         # Enable cloud-init services
         - include_tasks: service_operation.yml
@@ -34,9 +43,9 @@
           loop_control:
             loop_var: service_name
 
-        - name: "Enable cloud-init GOSC in /etc/cloud/cloud.cfg"
+        - name: "Enable cloud-init GOSC in {{ guest_cloud_cfg_path }}"
           ansible.builtin.lineinfile:
-            path: /etc/cloud/cloud.cfg
+            path: "{{ guest_cloud_cfg_path }}"
             regexp: '^[#\s]*{{ item.split(":")[0] }}'
             line: '{{ item }}'
             state: present
@@ -48,7 +57,7 @@
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: Check cloud-init GOSC is enabled
-          ansible.builtin.command: grep '^disable_vmware_customization' /etc/cloud/cloud.cfg
+          ansible.builtin.command: "grep '^disable_vmware_customization' {{ guest_cloud_cfg_path }}"
           register: result
           changed_when: false
           delegate_to: "{{ vm_guest_ip }}"
@@ -70,27 +79,31 @@
               with_items: "{{ network_config_result.stdout_lines }}"
               loop_control:
                 loop_var: file_path
-          when: network_config_result.stdout_lines is defined and network_config_result.stdout_lines | length >= 1
+          when:
+            - network_config_result.stdout_lines is defined
+            - network_config_result.stdout_lines | length >= 1
 
         # For ubuntu, we should remove files to let gosc with cloud-init work well
-        - name: remove files if exists
+        - name: "Remove files if exists"
           ansible.builtin.file:
             path: "{{ config_file_for_netplan }}"
             state: absent
             force: true
           with_items:
-            - /etc/cloud/cloud-init.disabled
-            - /var/lib/cloud/seed/nocloud-net
-            - /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg
-            - /etc/cloud/cloud.cfg.d/subiquity-disable-cloudinit-networking.cfg
-            - /etc/cloud/cloud.cfg.d/99-installer.cfg
-          when: guest_os_ansible_distribution is defined and guest_os_ansible_distribution == "Ubuntu"
+            - "/etc/cloud/cloud-init.disabled"
+            - "/var/lib/cloud/seed/nocloud-net"
+            - "{{ guest_cloud_cfg_d_path }}/50-curtin-networking.cfg"
+            - "{{ guest_cloud_cfg_d_path }}/subiquity-disable-cloudinit-networking.cfg"
+            - "{{ guest_cloud_cfg_d_path }}/99-installer.cfg"
+          when:
+            - guest_os_ansible_distribution is defined
+            - guest_os_ansible_distribution == "Ubuntu"
           loop_control:
             loop_var: config_file_for_netplan
           delegate_to: "{{ vm_guest_ip }}"
           ignore_errors: true
 
-        - name: Assert disable_vmware_customization is false
+        - name: "Assert disable_vmware_customization is false"
           ansible.builtin.assert:
             that:
               - cloudinit_gosc_enabled
@@ -102,18 +115,18 @@
           ignore_errors: true
       when: enable_cloudinit_gosc | bool
 
-    - name: Disable Cloud-Init GOSC for perl work flow
+    - name: "Disable Cloud-Init GOSC for perl workflow"
       block:
-        - name: Disable cloud-init GOSC in /etc/cloud/cloud.cfg
+        - name: "Disable cloud-init GOSC in {{ guest_cloud_cfg_path }}"
           ansible.builtin.lineinfile:
-            path: /etc/cloud/cloud.cfg
+            path: "{{ guest_cloud_cfg_path }}"
             regexp: '^\s*disable_vmware_customization:'
             backup: true
             state: absent
           delegate_to: "{{ vm_guest_ip }}"
 
-        - name: Check cloud-init GOSC is disabled
-          ansible.builtin.command: grep '^disable_vmware_customization' /etc/cloud/cloud.cfg
+        - name: "Check cloud-init GOSC is disabled"
+          ansible.builtin.command: "grep '^disable_vmware_customization' {{ guest_cloud_cfg_path }}"
           register: result
           changed_when: false
           ignore_errors: true
@@ -135,15 +148,19 @@
               with_items: "{{ network_config_result.stdout_lines }}"
               loop_control:
                 loop_var: file_path
-              when: network_config_result.stdout_lines is defined and network_config_result.stdout_lines | length >= 1
+              when:
+                - network_config_result.stdout_lines is defined
+                - network_config_result.stdout_lines | length >= 1
 
             - name: "Disable cloud-init network config"
               ansible.builtin.lineinfile:
-                path: /etc/cloud/cloud.cfg
+                path: "{{ guest_cloud_cfg_path }}"
                 line: "network: {config: disabled}"
                 state: present
               delegate_to: "{{ vm_guest_ip }}"
-              when: network_config_result.stdout_lines is undefined or network_config_result.stdout_lines | length == 0
+              when: >
+                network_config_result.stdout_lines is undefined or
+                network_config_result.stdout_lines | length == 0
 
         # For ubuntu, create file /etc/cloud/cloud-init.disabled to disable cloud-init
         - name: "Create file /etc/cloud/cloud-init.disabled to disable gosc with cloud-init for Ubuntu"
@@ -154,13 +171,10 @@
           when: guest_os_ansible_distribution == "Ubuntu"
           delegate_to: "{{ vm_guest_ip }}"
 
-        - name: Assert cloud-init GOSC is disabled
+        - name: "Assert cloud-init GOSC is disabled"
           ansible.builtin.assert:
             that:
               - cloudinit_gosc_disabled
             fail_msg: "Failed to disable cloud-init GOSC"
       when: not enable_cloudinit_gosc | bool
-  when:
-    - cloud_init_cfg.stat is defined
-    - cloud_init_cfg.stat.exists is defined
-    - cloud_init_cfg.stat.exists
+  when: guest_cloud_cfg_exists | bool

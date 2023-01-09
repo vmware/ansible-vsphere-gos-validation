@@ -1,4 +1,4 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: "Initialize sshd service info and config file"
@@ -6,11 +6,14 @@
     sshd_service_info: ""
     sshd_config_file: "/etc/ssh/sshd_config"
 
-- name: "Check sshd configure file status"
-  ansible.builtin.stat:
-    path: "{{ sshd_config_file }}"
-  register: sshd_config_stat_result
-  delegate_to: "{{ vm_guest_ip }}"
+- name: "Check sshd config file status"
+  include_tasks: get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ sshd_config_file }}"
+
+- name: "Set fact of sshd config file exists or not"
+  ansible.builtin.set_fact:
+    sshd_config_file_exists: "{{ guest_file_exists }}"
 
 # Modify sshd config to keep connection alive
 - name: "Modify sshd config to keep connection alive"
@@ -64,7 +67,4 @@
 
     - name: "Print {{ sshd_service_info.name }} restart result"
       ansible.builtin.debug: var=restart_sshd_result
-  when:
-    - sshd_config_stat_result is defined
-    - sshd_config_stat_result.stat is defined
-    - sshd_config_stat_result.stat.exists | default(false)
+  when: sshd_config_file_exists | bool

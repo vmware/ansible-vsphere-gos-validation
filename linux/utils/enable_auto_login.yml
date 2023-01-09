@@ -1,4 +1,4 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Enable auto login for user
@@ -7,7 +7,6 @@
 
 - name: "Initialize facts for enabling auto login"
   ansible.builtin.set_fact:
-    enable_autologin: false
     dm_conf_file: ""
     dm_conf_section: ""
     dm_autologin_options: {}
@@ -85,50 +84,35 @@
     msg: "Can not enable auto login because display manager config file is not set for {{ guest_os_display_manager }} display manager."
   when: not dm_conf_path
 
-- name: "Enable autologin in display manager config file path"
+- name: "Check display manager config file status"
+  include_tasks: get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ dm_conf_path }}"
+
+- name: "Can not enable auto login when display manager config file doesn't exist"
+  ansible.builtin.fail:
+    msg: "Can not enable auto login because display manager config file {{ dm_conf_path }} doesn't exist"
+  when: not (guest_file_exists | bool)
+
+# Enable auto login
+- name: "Enable auto login for user {{ autologin_user }} in {{ guest_os_ansible_distribution }}"
   block:
-    - name: "Check display manager config file status"
-      ansible.builtin.stat:
-        path: "{{ dm_conf_path }}"
-      register: dm_stat_result
-      delegate_to: "{{ vm_guest_ip }}"
+    - include_tasks: ../../common/update_ini_style_file.yml
+      vars:
+        file_path: "{{ dm_conf_path }}"
+        section_name: "{{ dm_conf_section }}"
+        option_name: "{{ item.key }}"
+        option_value: "{{ item.value }}"
+      with_list: "{{ dm_autologin_options | dict2items }}"
+  when: guest_os_display_manager in ["gdm", "lightdm", "fly-dm", "lxdm", "sddm"]
 
-    - name: "{{ dm_conf_path }} exists. Auto login can be enabled"
-      ansible.builtin.set_fact:
-        enable_autologin: true
-      when:
-        - dm_stat_result is defined
-        - dm_stat_result.stat is defined
-        - dm_stat_result.stat.exists is defined
-        - dm_stat_result.stat.exists
-
-    - name: "Can not enable auto login when display manager config file doesn't exist"
-      ansible.builtin.fail:
-        msg: "Can not enable auto login because display manager config file {{ dm_conf_path }} doesn't exist"
-      when: not enable_autologin
-
-    - name: "Enable auto login for user {{ autologin_user }}"
-      block:
-        - name: "Enable auto login for user {{ autologin_user }} in {{ guest_os_ansible_distribution }}"
-          block:
-            - include_tasks: ../../common/update_ini_style_file.yml
-              vars:
-                file_path: "{{ dm_conf_path }}"
-                section_name: "{{ dm_conf_section }}"
-                option_name: "{{ item.key }}"
-                option_value: "{{ item.value }}"
-              with_list: "{{ dm_autologin_options | dict2items }}"
-          when: guest_os_display_manager in ["gdm", "lightdm", "fly-dm", "lxdm", "sddm"]
-
-        # Enable auto login for SLES/SLED
-        - name: "Enable auto login for user {{ autologin_user }} in {{ guest_os_ansible_distribution }}"
-          include_tasks: replace_or_add_line_in_file.yml
-          vars:
-            file: "{{ dm_conf_path }}"
-            reg_exp: "DISPLAYMANAGER_AUTOLOGIN=.*"
-            line_content: "DISPLAYMANAGER_AUTOLOGIN={{ autologin_user }}"
-          when:
-            - guest_os_display_manager == "xdm"
-            - guest_os_family == "Suse"
-      when: enable_autologin
-  when: dm_conf_path
+# Enable auto login for SLES/SLED
+- name: "Enable auto login for user {{ autologin_user }} in {{ guest_os_ansible_distribution }}"
+  include_tasks: replace_or_add_line_in_file.yml
+  vars:
+    file: "{{ dm_conf_path }}"
+    reg_exp: "DISPLAYMANAGER_AUTOLOGIN=.*"
+    line_content: "DISPLAYMANAGER_AUTOLOGIN={{ autologin_user }}"
+  when:
+    - guest_os_display_manager == "xdm"
+    - guest_os_family == "Suse"

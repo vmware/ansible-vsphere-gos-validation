@@ -1,4 +1,4 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Flatcar doesn't have python installed, so we need to install ActivePython3 at first
@@ -11,10 +11,9 @@
   ansible.builtin.debug: var=ap3_install_result
 
 - name: "Check /etc/ssh/sshd_config status"
-  ansible.builtin.stat:
-    path: "/etc/ssh/sshd_config"
-  register: sshd_config_stat
-  delegate_to: "{{ vm_guest_ip }}"
+  include_tasks: ../../utils/get_file_stat_info.yml
+  vars:
+    guest_file_path: "/etc/ssh/sshd_config"
 
 # If /etc/ssh/sshd_config is a symbolic link
 # it means the file has not been changed
@@ -29,7 +28,7 @@
         file: "/etc/ssh/sshd_config"
         reg_exp: "^#?PermitRootLogin"
         line_content: "PermitRootLogin yes"
-  when: sshd_config_stat.stat.islnk
+  when: guest_file_stat.islnk | default(false)
 
 # Change user password
 - name: "Get user names for password changing"

@@ -1,4 +1,4 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # For Ubuntu server, /etc/apt/apt.conf.d/20auto-upgrades file not exist,
@@ -26,10 +26,9 @@
   loop: "{{ apt_tasks }}"
 
 - name: Get apt configuration file status
-  ansible.builtin.stat:
-    path: "{{ apt_etc_files[1] }}"
-  register: result_file_exists
-  delegate_to: "{{ vm_guest_ip }}"
+  include_tasks: get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ apt_etc_files[1] }}"
 
 - include_tasks: replace_or_add_line_in_file.yml
   vars:
@@ -37,10 +36,7 @@
     reg_exp: "APT::Periodic::{{ item }}.*"
     line_content: 'APT::Periodic::{{ item }} "0";'
   loop: "{{ apt_tasks }}"
-  when:
-    - "'stat' in result_file_exists"
-    - "'exists' in result_file_exists.stat"
-    - result_file_exists.stat.exists
+  when: guest_file_exists | bool
 
 - include_tasks: replace_or_add_line_in_file.yml
   vars:

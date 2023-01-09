@@ -2,109 +2,72 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Add official online package repository
-- block:
-    - block:
-        - name: "List deprecated repositories"
-          ansible.builtin.shell: "grep -rGl 'mirror\\(list\\)\\?.centos.org' /etc/yum.repos.d/"
-          delegate_to: "{{ vm_guest_ip }}"
-          ignore_errors: true
-          register: list_centos_repos
+- name: "Set online repositories for CentOS"
+  block:
+    - name: "List deprecated repositories"
+      ansible.builtin.shell: "grep -rGl 'mirror\\(list\\)\\?.centos.org' /etc/yum.repos.d/"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: list_centos_repos
 
-        - name: "Display repositories which use CentOS mirrors"
-          ansible.builtin.debug: var=list_centos_repos
+    - name: "Display repositories which use CentOS mirrors"
+      ansible.builtin.debug: var=list_centos_repos
 
-        - name: "Remove deprecated repositories"
-          ansible.builtin.file:
-            path: "{{ centos_repo_path }}"
-            state: absent
-          delegate_to: "{{ vm_guest_ip }}"
-          with_items: "{{ list_centos_repos.stdout_lines }}"
-          loop_control:
-            loop_var: centos_repo_path
-          when:
-            - list_centos_repos is defined
-            - list_centos_repos.stdout_lines is defined
-            - list_centos_repos.stdout_lines | length > 0
-
-        - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
-          ansible.builtin.set_fact:
-            online_repos:
-              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}"
-                baseurl: "http://vault.centos.org/$contentdir/$releasever/os/$basearch"
-                gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7"
-          when: guest_os_ansible_distribution_major_ver | int < 8
-
-        - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
-          ansible.builtin.set_fact:
-            online_repos:
-              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
-                baseurl: "http://vault.centos.org/$contentdir/$releasever/BaseOS/$basearch/os/"
-                gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
-              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
-                baseurl: "http://vault.centos.org/$contentdir/$releasever/AppStream/$basearch/os/"
-                gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
-              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
-                baseurl: "http://vault.centos.org/$contentdir/$releasever/PowerTools/$basearch/os/"
-                gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
-          when: guest_os_ansible_distribution_major_ver | int == 8
-
-        - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
-          ansible.builtin.set_fact:
-            online_repos:
-              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
-                baseurl: "http://mirror.stream.centos.org/9-stream/BaseOS/$basearch/os/"
-                gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
-              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
-                baseurl: "http://mirror.stream.centos.org/9-stream/AppStream/$basearch/os/"
-                gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
-              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
-                baseurl: "http://mirror.stream.centos.org/9-stream/CRB/$basearch/os/"
-                gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
-          when: guest_os_ansible_distribution_major_ver | int >= 9
-      when: guest_os_ansible_distribution == "CentOS"
-
-    - name: "Set online repositories for Rocky Linux"
-      block:
-        - name: "Set GPG key path for Rocky Linux {{ guest_os_ansible_distribution_ver }}"
-          ansible.builtin.set_fact:
-            rocky_gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial"
-          when: guest_os_ansible_distribution_major_ver | int == 8
-
-        - name: "Set GPG key path for Rocky Linux {{ guest_os_ansible_distribution_ver }}"
-          ansible.builtin.set_fact:
-            rocky_gpg_key_path: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-{{ guest_os_ansible_distribution_major_ver }}"
-          when: guest_os_ansible_distribution_major_ver | int >= 9
-
-        - name: "Set online repositories for Rocky Linux {{ guest_os_ansible_distribution_ver }}"
-          ansible.builtin.set_fact:
-            online_repos:
-              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
-                baseurl: "http://mirror.rockylinux.org/$contentdir/$releasever/BaseOS/$basearch/os/"
-                mirrorlist: "https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=BaseOS-$releasever"
-                gpg_key_path: "{{ rocky_gpg_key_path }}"
-              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
-                baseurl: "http://mirror.rockylinux.org/$contentdir/$releasever/AppStream/$basearch/os/"
-                mirrorlist: "https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=AppStream-$releasever"
-                gpg_key_path: "{{ rocky_gpg_key_path }}"
-              - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
-                baseurl: "http://mirror.rockylinux.org/$contentdir/$releasever/PowerTools/$basearch/os/"
-                mirrorlist: "https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=PowerTools-$releasever"
-                gpg_key_path: "{{ rocky_gpg_key_path }}"
-      when: guest_os_ansible_distribution == "Rocky"
-
-    - include_tasks: add_repo_from_baseurl.yml
-      vars:
-        repo_name: "{{ online_repo.name }}"
-        repo_baseurl: "{{ online_repo.baseurl }}"
-        repo_mirrorlist: "{{ online_repo.mirrorlist | default(omit) }}"
-        gpg_check: true
-        gpg_key_path: "{{ online_repo.gpg_key_path }}"
-      with_list: "{{ online_repos }}"
+    - name: "Remove deprecated repositories"
+      ansible.builtin.file:
+        path: "{{ centos_repo_path }}"
+        state: absent
+      delegate_to: "{{ vm_guest_ip }}"
+      with_items: "{{ list_centos_repos.stdout_lines }}"
       loop_control:
-        loop_var: "online_repo"
-  when: guest_os_ansible_distribution in ["CentOS", "Rocky"]
+        loop_var: centos_repo_path
+      when:
+        - list_centos_repos is defined
+        - list_centos_repos.stdout_lines is defined
+        - list_centos_repos.stdout_lines | length > 0
 
-- block:
+    - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
+      ansible.builtin.set_fact:
+        online_repos:
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}"
+            baseurl: "http://vault.centos.org/$contentdir/$releasever/os/$basearch"
+      when: guest_os_ansible_distribution_major_ver | int < 8
+
+    - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
+      ansible.builtin.set_fact:
+        online_repos:
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
+            baseurl: "http://vault.centos.org/$contentdir/$releasever/BaseOS/$basearch/os/"
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
+            baseurl: "http://vault.centos.org/$contentdir/$releasever/AppStream/$basearch/os/"
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
+            baseurl: "http://vault.centos.org/$contentdir/$releasever/PowerTools/$basearch/os/"
+      when: guest_os_ansible_distribution_major_ver | int == 8
+
+    - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
+      ansible.builtin.set_fact:
+        online_repos:
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
+            baseurl: "http://mirror.stream.centos.org/9-stream/BaseOS/$basearch/os/"
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
+            baseurl: "http://mirror.stream.centos.org/9-stream/AppStream/$basearch/os/"
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
+            baseurl: "http://mirror.stream.centos.org/9-stream/CRB/$basearch/os/"
+      when: guest_os_ansible_distribution_major_ver | int >= 9
+  when: guest_os_ansible_distribution == "CentOS"
+
+- name: "Set online repositories for Rocky Linux {{ guest_os_ansible_distribution_ver }}"
+  ansible.builtin.set_fact:
+    online_repos:
+      - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
+        baseurl: "http://mirror.rockylinux.org/$contentdir/$releasever/BaseOS/$basearch/os/"
+      - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
+        baseurl: "http://mirror.rockylinux.org/$contentdir/$releasever/AppStream/$basearch/os/"
+      - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
+        baseurl: "http://mirror.rockylinux.org/$contentdir/$releasever/PowerTools/$basearch/os/"
+  when: guest_os_ansible_distribution == "Rocky"
+
+- name: "Set online repositories for Oracle Linux"
+  block:
     - name: "Set Oracle Linux online repository website"
       ansible.builtin.set_fact:
         oraclelinux_repo_url: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL{{ guest_os_ansible_distribution_major_ver }}"
@@ -142,23 +105,45 @@
               - name: "ol{{ guest_os_ansible_distribution_major_ver }}_{{ oraclelinux_uek_release }}"
                 baseurl: "{{ oraclelinux_repo_url }}/{{ oraclelinux_uek_release }}/$basearch/"
       when: guest_os_ansible_distribution_major_ver | int >= 8
-
-    - include_tasks: add_repo_from_baseurl.yml
-      vars:
-        repo_name: "{{ online_repo.name }}"
-        repo_baseurl: "{{ online_repo.baseurl }}"
-        gpg_check: true
-      with_list: "{{ online_repos }}"
-      loop_control:
-        loop_var: "online_repo"
   when: guest_os_ansible_distribution == "OracleLinux"
 
-- block:
-    - name: "Set fact of APT source list file"
+- name: "Set online repositories for ProLinux"
+  block:
+    - name: "Set online repositories for ProLinux {{ guest_os_ansible_distribution_ver }}"
+      ansible.builtin.set_fact:
+        online_repos:
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}"
+            baseurl: "http://prolinux-repo.tmaxos.com/prolinux/7/os/$basearch/"
+      when: guest_os_ansible_distribution_major_ver | int == 7
+
+    - name: "Set online repositories for ProLinux {{ guest_os_ansible_distribution_ver }}"
+      ansible.builtin.set_fact:
+        online_repos:
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
+            baseurl: "http://prolinux-repo.tmaxos.com/prolinux/$releasever/os/$basearch/BaseOS"
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
+            baseurl: "http://prolinux-repo.tmaxos.com/prolinux/$releasever/os/$basearch/AppStream"
+      when: guest_os_ansible_distribution_major_ver | int >= 8
+  when: guest_os_ansible_distribution == "ProLinux"
+
+- name: "Add online repositories for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+  include_tasks: add_repo_from_baseurl.yml
+  vars:
+    repo_name: "{{ online_repo.name }}"
+    repo_baseurl: "{{ online_repo.baseurl }}"
+    gpg_check: true
+  with_list: "{{ online_repos }}"
+  loop_control:
+    loop_var: "online_repo"
+  when: guest_os_ansible_distribution in ["CentOS", "Rocky", "OracleLinux", "ProLinux"]
+
+- name: "Set APT sources list for {{ guest_os_ansible_distribution }}"
+  block:
+    - name: "Set fact of APT sources list file"
       ansible.builtin.set_fact:
         apt_source_list: "/etc/apt/sources.list"
 
-    - name: "Set the APT source for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_release }}"
+    - name: "Set the APT sources for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       ansible.builtin.set_fact:
         apt_sources:
           - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }} main restricted"
@@ -166,14 +151,15 @@
           - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }} universe"
       when: guest_os_ansible_distribution == "Ubuntu"
 
-    - name: "Set the APT source for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_release }}"
+    - name: "Set the APT sources for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       ansible.builtin.set_fact:
         apt_sources:
           - "deb http://deb.debian.org/debian/ {{ guest_os_ansible_distribution_release }} main"
           - "deb http://deb.debian.org/debian/ {{ guest_os_ansible_distribution_release }} main contrib"
       when: guest_os_ansible_distribution == "Debian"
 
-    - include_tasks: replace_or_add_line_in_file.yml
+    - name: "Add apt sources list for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+      include_tasks: replace_or_add_line_in_file.yml
       vars:
         file: "{{ apt_source_list }}"
         reg_exp: "{{ apt_source }}"
@@ -182,8 +168,8 @@
       loop_control:
         loop_var: "apt_source"
 
-    # Remove repos from universe and multiverse
-    - name: "Remove repos from multiverse"
+    # Remove repositories from universe and multiverse
+    - name: "Remove repositories from universe and multiverse"
       ansible.builtin.replace:
         path: "{{ apt_source_list }}"
         regexp: "^(deb .*multiverse.*)"
@@ -192,19 +178,20 @@
       when: guest_os_ansible_distribution == "Ubuntu"
   when: guest_os_ansible_distribution in ["Ubuntu", "Debian"]
 
-# Enable photon.repo, photon-release.repo and photon-updates.repo
-- block:
-    - name: "Set the fact of Photon OS {{ guest_os_ansible_distribution_major_ver }} online repos"
+- name: "Enable Photon OS online repositories"
+  block:
+    - name: "Set the fact of Photon OS {{ guest_os_ansible_distribution_major_ver }} online repositories"
       ansible.builtin.set_fact:
         photon_online_repos: ["photon", "photon-updates", "photon-extras"]
       when: guest_os_ansible_distribution_major_ver | int < 4
 
-    - name: "Set the fact of Photon OS {{ guest_os_ansible_distribution_major_ver }} online repos"
+    - name: "Set the fact of Photon OS {{ guest_os_ansible_distribution_major_ver }} online repositories"
       ansible.builtin.set_fact:
         photon_online_repos: ["photon", "photon-release", "photon-updates", "photon-extras"]
       when: guest_os_ansible_distribution_major_ver | int >= 4
 
-    - include_tasks: ../../common/update_ini_style_file.yml
+    - name: "Enable Photon OS online repositories"
+      include_tasks: ../../common/update_ini_style_file.yml
       vars:
         file_path: "/etc/yum.repos.d/{{ item }}.repo"
         section_name: "{{ item }}"
@@ -212,8 +199,8 @@
         option_value: 1
       with_items: "{{ photon_online_repos }}"
 
-    # Update baseurl to repos on https://packages.vmware.com/photon
-    - block:
+    - name: "Update baseurl to repositories on https://packages.vmware.com/photon"
+      block:
         - name: "Update repo's baseurl"
           ansible.builtin.command: "sed -i 's#dl.bintray.com/vmware/#packages.vmware.com/photon/$releasever/#' /etc/yum.repos.d/{{ item }}.repo"
           delegate_to: "{{ vm_guest_ip }}"

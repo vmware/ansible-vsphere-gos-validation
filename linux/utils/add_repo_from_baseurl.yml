@@ -1,4 +1,4 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Add a package repository with given baseurl
@@ -17,15 +17,19 @@
       - (repo_baseurl is defined and repo_baseurl) or (repo_mirrorlist is defined and repo_mirrorlist)
     fail_msg: "Invalid parameters: repo_name={{ repo_name | default('undefined') }}, repo_baseurl={{ repo_baseurl | default('undefined') }}, repo_mirrorlist = {{ repo_mirrorlist | default('undefined') }}"
 
-- name: "Set default GPG key"
-  ansible.builtin.set_fact:
-    gpg_key_path: |-
-      {%- if guest_os_ansible_distribution == "RedHat" -%}file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
-      {%- elif guest_os_ansible_distribution == "CentOS" -%}file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
-      {%- elif guest_os_ansible_distribution == "Rocky" -%}file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
-      {%- elif guest_os_ansible_distribution == "OracleLinux"  -%}file:///etc/pki/rpm-gpg/RPM-GPG-KEY-oracle
-      {%- elif guest_os_ansible_distribution == "VMware Photon OS"  -%}file:///etc/pki/rpm-gpg/VMWARE-RPM-GPG-KEY
-      {%- else -%}{%- endif -%}
+- name: "Set default RPM GPG key"
+  block:
+    - include_tasks: get_rpm_gpg_key_file.yml
+
+    - name: "Set default RPM GPG key"
+      ansible.builtin.set_fact:
+        gpg_key_path: "file://{{ guest_rpm_gpg_key_path }}"
+      when: guest_rpm_gpg_key_path
+
+    - name: "Skip GPG check as there is no RPM GPG key found"
+      ansible.builtin.set_fact:
+        gpg_check: false
+      when: not guest_rpm_gpg_key_path
   when:
     - gpg_check is defined
     - gpg_check

@@ -1,4 +1,4 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
@@ -73,37 +73,26 @@
         # /etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw
         # /usr/sbin/post-thaw-script thaw
         - name: "Check {{ vss_log_path }} existence"
-          ansible.builtin.stat:
-            path: "{{ vss_log_path }}"
-          register: vss_stat
-          delegate_to: "{{ vm_guest_ip }}"
+          include_tasks: ../utils/get_file_stat_info.yml
+          vars:
+            guest_file_path: "{{ vss_log_path }}"
 
-        - name: "{{ ansible_play_name }} failed"
+        - name: "Failed to find {{ vss_log_path }} after quiesce snapshot"
           ansible.builtin.fail:
             msg: "{{ vss_log_path }} doesn't exist after quiesce snapshot"
-          when: >
-            (vss_stat is undefined) or
-            (vss_stat.stat is undefined) or
-            (vss_stat.stat.exists is undefined) or
-            (vss_stat.stat.exists is defined and
-             not vss_stat.stat.exists)
+          when: not (guest_file_exists | bool)
 
-        - block:
-            # Retrieve /vss.log
-            - include_tasks: ../../common/vm_guest_file_operation.yml
-              vars:
-                operation: "fetch_file"
-                src_path: "{{ vss_log_path }}"
-                dest_path: "{{ current_test_log_folder }}{{ vss_log_path }}"
+        # Retrieve /vss.log
+        - include_tasks: ../../common/vm_guest_file_operation.yml
+          vars:
+            operation: "fetch_file"
+            src_path: "{{ vss_log_path }}"
+            dest_path: "{{ current_test_log_folder }}{{ vss_log_path }}"
 
-            - name: Get file content in /vss.log
-              ansible.builtin.shell: "cat {{ current_test_log_folder }}{{ vss_log_path }}"
-              register: vss_content
-          when:
-            - vss_stat is defined
-            - vss_stat.stat is defined
-            - vss_stat.stat.exists is defined
-            - vss_stat.stat.exists
+        - name: "Get file content in /vss.log"
+          ansible.builtin.shell: "cat {{ current_test_log_folder }}{{ vss_log_path }}"
+          changed_when: false
+          register: vss_content
 
         # Test failed for non-Flatcar guest
         - name: "{{ ansible_play_name }} failed"
