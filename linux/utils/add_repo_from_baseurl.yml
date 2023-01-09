@@ -4,13 +4,13 @@
 # Add a package repository with given baseurl
 # Parameter
 #   repo_name: (Required)The repository name
-#   repo_baseurl: (Required)The base url of the repository or the local repo dir
+#   repo_baseurl: (Required)The base url of the repository or the local repository dir
 #   repo_mirrorlist: (Optional)The URL to a mirror list of the repository, which is used for RHEL-like OS.
 #   repo_description: (Optional)The description of the repository
 #   gpg_check: (Optinoal)True to check GPG key
 #   gpg_key_path: (Optional)The GPG key path
 
-- name: "Check repo name and baseurl parameters are valid"
+- name: "Check repository name and baseurl parameters are valid"
   ansible.builtin.assert:
     that:
       - repo_name is defined and repo_name
@@ -19,7 +19,9 @@
 
 - name: "Set default RPM GPG key"
   block:
-    - include_tasks: get_rpm_gpg_key_file.yml
+    - name: "Get default RPM GPG key file"
+      include_tasks: get_rpm_gpg_key_file.yml
+      when: guest_rpm_gpg_key_path is undefined or not guest_rpm_gpg_key_path
 
     - name: "Set default RPM GPG key"
       ansible.builtin.set_fact:
@@ -39,7 +41,8 @@
   ansible.builtin.set_fact:
     repo_baseurl_prefix: ""
 
-- block:
+- name: "Add yum repository"
+  block:
     - name: "Set the prefix for local yum repository"
       ansible.builtin.set_fact:
         repo_baseurl_prefix: "file://"
@@ -60,14 +63,15 @@
       delegate_to: "{{ vm_guest_ip }}"
       register: add_yum_repo_result
 
-    - ansible.builtin.debug: var=add_yum_repo_result
+    - name: "Display the result of adding yum repository"
+      ansible.builtin.debug: var=add_yum_repo_result
 
     - block:
-        - name: "Get new repo file path"
+        - name: "Get new repository file path"
           ansible.builtin.set_fact:
             new_yum_repo_path: "{{ add_yum_repo_result.diff.after_header }}"
 
-        - name: "Remove spaces in repo file"
+        - name: "Remove spaces in repository file"
           ansible.builtin.shell: "sed -i 's/ *= */=/' {{ new_yum_repo_path }}"
           delegate_to: "{{ vm_guest_ip }}"
       when:
@@ -76,8 +80,8 @@
         - add_yum_repo_result.diff.after_header is defined
   when: guest_os_family in ["RedHat", "VMware Photon OS"]
 
-# Add repo for SLES/SLED
-- block:
+- name: Add repository for SLES/SLED
+  block:
     - name: "Set the prefix for local zypper repository"
       ansible.builtin.set_fact:
         repo_baseurl_prefix: "dir:"
