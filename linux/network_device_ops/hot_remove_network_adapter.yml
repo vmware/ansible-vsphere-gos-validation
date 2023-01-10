@@ -1,0 +1,28 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Hot remove the new network adapter
+#
+- name: "Hot remove the new network adapter from VM"
+  include_tasks: ../../common/vm_remove_network_adapter.yml
+  vars:
+    netadapter_mac_addr: "{{ new_network_adapter_mac_addr }}"
+
+- name: "Check VM connection is not broken after hot-remove"
+  include_tasks: ../../common/vm_wait_connection.yml
+  vars:
+    vm_wait_connection_timeout: 60
+
+- name: "Get network adapter status after hot-remove"
+  include_tasks: ../utils/get_network_adapters_status.yml
+
+- name: "Set fact of network adapter info after hot-remove"
+  ansible.builtin.set_fact:
+    network_adapters_after_hotremove: "{{ guest_network_adapters }}"
+
+- name: "Assert new {{ adapter_type }} adapter interface is removed"
+  ansible.builtin.assert:
+    that:
+      - network_adapters_after_hotremove | difference(network_adapters_before_hotadd) | length == 0
+    fail_msg: "After hot removing the new network adapter, guest OS still can detect it"
+    success_msg: "The new {{ adapter_type }} adapter interface is removed from guest OS"

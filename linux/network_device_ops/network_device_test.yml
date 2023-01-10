@@ -1,43 +1,32 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: "Test case block"
   block:
     - include_tasks: ../setup/test_setup.yml
 
-    # Install required packages and kernel modules
-    - include_tasks: ../utils/install_uninstall_package.yml
-      vars:
-        package_name: "distrib-compat"
-        package_state: "present"
-      when:
-        - guest_os_ansible_distribution == "VMware Photon OS"
-        - guest_os_ansible_distribution_major_ver | int < 4
+    - name: "Prepare for {{ adapter_type }} network adapter testing"
+      include_tasks: prepare_network_device_test.yml
 
-    - include_tasks: ../utils/kernel_module_install.yml
-      vars:
-        kernel_module_name: "8021q"
-      when:
-        - guest_os_ansible_distribution in ["SLES", "SLED"]
-        - guest_os_ansible_distribution_major_ver | int == 12
-
-    - name: "Get existing network interface before hotadd testing"
-      include_tasks: ../utils/get_network_adapters_status.yml
-    - name: "Set fact of network adapter info before hotadd"
-      ansible.builtin.set_fact:
-        network_adapters_before_hotadd: "{{ guest_network_adapters }}"
-
-    # Get eth0 device name in guest. Sometimes it is not 'eth0', e.g., 'ens192', 'ens33', etc.
-    - name: "Set fact of the first network adapter interface name in guest OS"
-      ansible.builtin.set_fact:
-        eth0_name: "{{ network_adapters_before_hotadd[0] }}"
-
-    # Prepare router VM, vSwitch and portgroup
-    - include_tasks: ../../common/network_testbed_setup.yml
+    - name: "Prepare router VM, vSwitch and portgroup"
+      include_tasks: ../../common/network_testbed_setup.yml
       when: router_vm_deployed is undefined or not router_vm_deployed | bool
 
-    - include_tasks: network_status_validate.yml
-      vars:
-        adapter_type: "{{ nic_type }}"
+    - name: "Set the port group name for new network adapter"
+      ansible.builtin.set_fact:
+        vm_portgroup_name: "{{ portgroup_name }}"
+
+    - name: "Set fact of the new network adapter gateway"
+      ansible.builtin.set_fact:
+        new_nic_gateway: "{{ vlan_gateway }}"
+
+    - name: "Hot add a new {{ adapter_type }} network adapter on VM and apply network config"
+      include_tasks: hot_add_network_adapter.yml
+
+    - name: "Validate network adapter status changes"
+      include_tasks: network_status_validate.yml
+
+    - name: "Hot remove the new {{ adapter_type }} network adapter"
+      include_tasks: hot_remove_network_adapter.yml
   rescue:
     - include_tasks: ../../common/test_rescue.yml

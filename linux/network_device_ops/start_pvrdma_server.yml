@@ -1,0 +1,28 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Start a listening service for PVRDMA on server VM
+#
+- name: "Set command for starting PVRDMA listening on server VM"
+  ansible.builtin.set_fact:
+    pvrdma_server_start_cmd: "rping -s -a {{ pvrdma_server_vm_ipv4 }} -P"
+
+- name: "Start PVRDMA listening on server VM '{{ pvrdma_server_vm_name }}'"
+  ansible.builtin.shell: "{{ pvrdma_server_start_cmd }}"
+  vars:
+    ansible_async_dir: /tmp/.ansible_async/
+  async: 86400
+  poll: 0
+  delegate_to: "{{ vm_guest_ip }}"
+  changed_when: false
+  register: pvrdma_server_job
+
+- name: "Check PVRDMA listening process is started on server VM"
+  include_tasks: ../utils/check_process_status.yml
+  vars:
+    expected_process_state: "present"
+    process_name: "{{ pvrdma_server_start_cmd }}"
+
+- name: "Set fact of PVRDMA listening process pid"
+  ansible.builtin.set_fact:
+    rping_server_process_pid: "{{ running_process_info[0].pid }}"

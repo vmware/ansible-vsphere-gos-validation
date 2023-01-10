@@ -1,4 +1,4 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Add official online package repository
@@ -7,6 +7,7 @@
         - name: "List deprecated repositories"
           ansible.builtin.shell: "grep -rGl 'mirror\\(list\\)\\?.centos.org' /etc/yum.repos.d/"
           delegate_to: "{{ vm_guest_ip }}"
+          ignore_errors: true
           register: list_centos_repos
 
         - name: "Display repositories which use CentOS mirrors"
@@ -162,6 +163,7 @@
         apt_sources:
           - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }} main restricted"
           - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }}-updates main restricted"
+          - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }} universe"
       when: guest_os_ansible_distribution == "Ubuntu"
 
     - name: "Set the APT source for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_release }}"
@@ -181,17 +183,12 @@
         loop_var: "apt_source"
 
     # Remove repos from universe and multiverse
-    - name: "Remove repos from universe and multiverse"
+    - name: "Remove repos from multiverse"
       ansible.builtin.replace:
         path: "{{ apt_source_list }}"
-        regexp: "^(deb .*{{ apt_source }}.*)"
+        regexp: "^(deb .*multiverse.*)"
         replace: "#\\1"
       delegate_to: "{{ vm_guest_ip }}"
-      with_list:
-        - 'universe'
-        - 'multiverse'
-      loop_control:
-        loop_var: "apt_source"
       when: guest_os_ansible_distribution == "Ubuntu"
   when: guest_os_ansible_distribution in ["Ubuntu", "Debian"]
 

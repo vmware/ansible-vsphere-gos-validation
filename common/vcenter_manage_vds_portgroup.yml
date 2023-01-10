@@ -1,0 +1,85 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Create or remove a vSphere Distributed Port Group
+# Parameters:
+#   vds_name: The vSphere Distributed Switch name where the port group is.
+#   vds_portgroup_name: The distributed port group name.
+#   vds_portgroup_state: The distributed port group state: present or absent.
+#   vds_port_number: The number of ports the distributed port group should contain.
+#     This is required when vds_portgroup_state is present. Default value is 4.
+#   vds_vlan_id: The VLAN ID used by the distributed port group. Default value is 0.
+#   vds_port_binding(optional): The port binding type. Choices are 'static' and 'ephemeral'.
+#     Default value is 'static'.
+#   vds_port_allocation(optional): The port allocation type. Choices are 'elastic' and 'fixed'.
+#     Default value is 'fixed'.
+#
+- name: "Check paramters for managing a distributed port group"
+  ansible.builtin.assert:
+    that:
+      - vds_name is defined and vds_name
+      - vds_portgroup_name is defined and vds_portgroup_name
+      - vds_portgroup_state is defined
+      - vds_portgroup_state in ['present', 'absent']
+    fail_msg: >-
+      At least one of parameters 'vds_name', 'vds_portgroup_name', 'vds_portgroup_state'
+      is incorrect.
+
+- name: "Set operation for managing distributed port group"
+  ansible.builtin.set_fact:
+    vds_portgroup_op: "{% if vds_portgroup_state == 'present' %}create{% else %}remove{% endif %}"
+
+- name: "{{ vds_portgroup_op | capitalize }} distributed port group '{{ vds_portgroup_name }}'"
+  community.vmware.vmware_dvs_portgroup:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    switch_name: "{{ vds_name }}"
+    portgroup_name: "{{ vds_portgroup_name }}"
+    vlan_id: "{{ vds_vlan_id | default(0) }}"
+    port_binding: "{{ vds_port_binding | default('static') }}"
+    port_allocation: "{{ vds_port_allocation | default('fixed') }}"
+    num_ports: "{{ vds_port_number | default(4) }}"
+    state: "{{ vds_portgroup_state }}"
+  register: manage_vds_portgroup_result
+
+- name: "Display the result of managing distributed port group"
+  ansible.builtin.debug: var=manage_vds_portgroup_result
+  when: enable_debug
+
+- name: "Check the result of managing distributed port group"
+  ansible.builtin.assert:
+    that:
+      - manage_vds_portgroup_result is defined
+      - manage_vds_portgroup_result.changed is defined
+      - manage_vds_portgroup_result.changed
+    fail_msg: "Failed to {{ vds_portgroup_op }} distributed port group '{{ vds_portgroup_name }}'"
+
+- name: "Wait for creating distributed port group is completed"
+  block:
+    - name: "Wait for creating distributed port group is completed"
+      community.vmware.vmware_dvs_portgroup_info:
+        hostname: "{{ vsphere_host_name }}"
+        username: "{{ vsphere_host_user }}"
+        password: "{{ vsphere_host_user_password }}"
+        validate_certs: "{{ validate_certs | default(false) }}"
+        datacenter: "{{ vsphere_host_datacenter }}"
+      ignore_errors: true
+      register: wait_vds_pg_result
+      delay: 5
+      retries: 30
+      until:
+        - wait_vds_pg_result is defined
+        - wait_vds_pg_result.dvs_portgroup_info is defined
+        - wait_vds_pg_result.dvs_portgroup_info[vds_name] is defined
+        - wait_vds_pg_result.dvs_portgroup_info[vds_name] | selectattr('portgroup_name', 'equalto', vds_portgroup_name) | length > 0
+
+    - name: "Check waiting for distributed port group result"
+      ansible.builtin.assert:
+        that:
+          - wait_vds_pg_result is defined
+          - wait_vds_pg_result.failed is defined
+          - not wait_vds_pg_result.failed
+        fail_msg: "Timed out waiting for portgroup '{{ vds_portgroup_name }}' to be created in 150 seconds."
+  when: vds_portgroup_state == 'present'

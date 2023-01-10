@@ -21,6 +21,7 @@
 * ovf_deploy.yml: Deploy OVF template to VM
 * ovf_export.yml: Export VM to OVF template
 * vm_remove.yml: Delete VM from ESXi host
+* vm_instant_clone.yml: Create an instant clone of VM
 
 ### Tasks for VM basic settings
 * vm_set_guest_id.yml: Set VM's guest id
@@ -36,7 +37,7 @@
 * vm_add_remove_vtpm.yml: Add or remove vTPM device from VM
 * vm_add_vtpm_device.yml: Add key provider on vCenter then add new vTPM device to VM
 * vm_answer_question.yml: Answer question at VM power on
-  
+
 ### Tasks for VM CPU or Memory settings
 * vm_enable_cpu_hotadd.yml: Enable VM CPU hotadd
 * vm_set_cpu_number.yml: Set VM CPU number, cores per socket is 1 by default
@@ -120,6 +121,14 @@
 * esxi_get_guest_ids.yml: Get supported guest ids for a hardware version on ESXi host
 * esxi_get_guest_config_options.yml: Get VM config options for a guest id on a hardware version
 * esxi_get_pmem_info.yml: Get ESXi host total and available persistent memroy size in MB
+* esxi_set_advanced_system_settings.yml: Configure ESXi host's advanced system settings
+* esxi_get_advanced_system_settings.yml: Get ESXi host's advanced system settings
+* esxi_get_vmkernel_adapters.yml: Get ESXi host's VMkernel network adapters
+* esxi_get_new_vmkernel_adapter.yml: Get index and name of a new VMkernel network adapter on ESXi host
+* esxi_manage_vmkernel_adapter.yml: Add or remove a VMkernel network adapter on ESXi host
+* esxi_set_firewall_rule.yml: Enable or disable a firewall rule on ESXi host
+* esxi_enable_pvrdma_configs.yml: Tag VMkernel network adapter and enable firewall rule on ESXi host for PVRDMA communication
+* esxi_disable_pvrdma_configs.yml: Remove VMkernel network adapter tag and disable firewall rule on ESXi host for PVRDMA communication
 
 ### Tasks for ESXi datastores
 * esxi_add_datastore.yml: Add NFS or VMFS datastore to ESXi host
@@ -137,14 +146,20 @@
 * vcenter_get_version_build.yml: Get vCenter server version info
 * esxi_get_model.yml: Get ESXi server model and CPU model info
 
-### Tasks for ESXi virtual switch and portgroup
+### Tasks for vSphere Standard Switch (VSS) and Port Group
 * esxi_add_portgroup.yml: Add a new virtual switch port group
 * esxi_remove_portgroup.yml: Remove a virtual switch port group
 * esxi_get_portgroup_facts.yml: Get virtual switch port group facts
 * esxi_wait_portgroup.yml: Wait for specified port group info retrieved
-* esxi_add_vswitch.yml: Add a new standard virtual switch
-* esxi_remove_vswitch.yml: Remove a standard virtual switch
+* esxi_add_vswitch.yml: Add a new vSphere Standard Switch
+* esxi_remove_vswitch.yml: Remove a vSphere Standard Switch
 * esxi_get_vswitch_facts.yml: Get virtual switch facts
+
+### Tasks for vSphere Distributed Switch (VDS) and Port Group
+* vcenter_manage_vds.yml: Create or remove a vSphere Distributed Switch
+* vcenter_get_vds_info.yml: Gather information about a vSphere Distributed Switch
+* vcenter_manage_vds_portgroup.yml: Create or remove a distributed port group on vCenter Server
+* vcenter_manage_vds_host.yml: Add or remove an ESXi host for a vSphere Distributed Switch on vCenter Server
 
 ## Localhost tasks
 ### Tasks for NFS mount and unmount
@@ -167,10 +182,12 @@
 * router_vm_deploy.yml: Deploy a router VM for network testing or GOSC testing
 * network_testbed_setup.yml: Setup network adapter testing testbed
 * network_testbed_cleanup.yml: Cleanup network adapter testing testbed
+* vds_network_setup.yml: Setup vSphere Distributed Switch networking
+* vds_network_cleanup.yml: Cleanup vSphere Distributed Switch networking
 * test_rescue: Tasks executed when test case failure
 * skip_test_case.yml: Tasks for skipping testcase and ending play
 
 ## Common tasks for Linux and Windows test cases
 * compose_vm_cdroms.yml: Generate VM CDROM device info list for creating new VM
 * download_iso_and_transfer.yml: Download ISO file and transfer to ESXi datastore
-* get_iso_file_list.yml: Generate and validate OS installation ISO file list 
+* get_iso_file_list.yml: Generate and validate OS installation ISO file list

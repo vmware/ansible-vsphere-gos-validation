@@ -1,0 +1,166 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for test PVRDMA network adapter hot-add/remove, connect and disconnect.
+#
+- name: pvrdma_network_device_ops
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  vars:
+    timestamp: "{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}"
+    adapter_type: "pvrdma"
+  tasks:
+    - name: "Test case block"
+      block:
+        - include_tasks: ../setup/test_setup.yml
+
+        - name: "Check whether guest OS supports PVRDMA testing"
+          include_tasks: check_pvrdma_support_status.yml
+
+        - name: "Prepare for PVRDMA network adapter testing"
+          include_tasks: prepare_network_device_test.yml
+
+        - name: "Get RDMA devices in guest OS before hot-add"
+          include_tasks: ../utils/get_rdma_device_info.yml
+
+        - name: "Set fact of RDMA device before hot-add"
+          ansible.builtin.set_fact:
+            rdma_devices_before_hotadd: "{{ guest_rdma_device_info }}"
+
+        - name: "Disable firewall in guest OS"
+          include_tasks: ../utils/disable_firewall.yml
+
+        - name: "Pepare vSphere Distributed Switch and Port Group for PVRDMA testing"
+          include_tasks: ../../common/vds_network_setup.yml
+
+        - name: "Tag VMkernel adapter and enable firewall rule on ESXi host for PVRDMA communication"
+          include_tasks: ../../common/esxi_enable_pvrdma_configs.yml
+          vars:
+            pvrdma_vmk_nic: "{{ vds_vmk_device_name }}"
+
+        - name: "Set the port group name for new network adapter"
+          ansible.builtin.set_fact:
+            vm_portgroup_name: "{{ vds_portgroup_name }}"
+
+        - name: "Set facts for PVRDMA server VM and client VM"
+          ansible.builtin.set_fact:
+            pvrdma_server_vm_name: "{{ vm_name }}"
+            pvrdma_server_vm_ipv4: "{{ vds_vmk_ip_addr | ansible.utils.ipmath(1) }}"
+            pvrdma_server_vm_net_prefix: "{{ vds_vmk_net_prefix }}"
+            pvrdma_server_vm_gateway: "{{ vds_vmk_ip_addr }}"
+            pvrdma_client_vm_name: "{{ vm_name }}_{{ timestamp }}"
+            pvrdma_client_vm_ipv4: "{{ vds_vmk_ip_addr | ansible.utils.ipmath(2) }}"
+
+        # Clone a new VM as client VM from current VM, and current VM as server
+        - name: "Clone a new VM as PVRDMA client VM from current VM"
+          include_tasks: ../../common/vm_instant_clone.yml
+          vars:
+            parent_vm_name: "{{ pvrdma_server_vm_name }}"
+            cloned_vm_name: "{{ pvrdma_client_vm_name }}"
+
+        # On server VM
+        - name: "Initialize the static IP address for the server VM"
+          ansible.builtin.set_fact:
+            new_nic_network: "{{ (pvrdma_server_vm_ipv4 ~ '/' ~ pvrdma_server_vm_net_prefix) | ansible.utils.ipaddr('network') }}"
+            new_nic_ipv4: "{{ pvrdma_server_vm_ipv4 }}"
+            new_nic_net_prefix: "{{ pvrdma_server_vm_net_prefix }}"
+            new_nic_gateway: "{{ pvrdma_server_vm_gateway }}"
+
+        - name: "Hot add a new {{ adapter_type }} network adapter on server VM and apply network config"
+          include_tasks: hot_add_network_adapter.yml
+
+        - name: "Set fact of the PVRDMA network adapter mac address for server VM"
+          ansible.builtin.set_fact:
+            new_nic_mac_addr: "{{ new_network_adapter_mac_addr }}"
+
+        - name: "Validate network adapter status changes on server VM"
+          include_tasks: network_status_validate.yml
+
+        - name: "Check PVRDMA device status and reload it if necessary on server VM"
+          include_tasks: check_and_reload_pvrdma.yml
+
+        - name: "Start a listening service for RDMA connection on server VM"
+          include_tasks: start_pvrdma_server.yml
+
+        # Switch to client VM
+        - name: "Reset the client VM '{{ pvrdma_client_vm_name }}' for updating IP address"
+          include_tasks: ../../common/vm_set_power_state.yml
+          vars:
+            vm_name: "{{ pvrdma_client_vm_name }}"
+            vm_power_state_set: 'restarted'
+
+        - name: "Add client VM guest IP to inventory"
+          include_tasks: ../../common/update_inventory.yml
+          vars:
+            vm_name: "{{ pvrdma_client_vm_name }}"
+            update_inventory_timeout: 300
+
+        - name: "Hot add a new {{ adapter_type }} network adapter on client VM and apply network config"
+          include_tasks: hot_add_network_adapter.yml
+          vars:
+            vm_name: "{{ pvrdma_client_vm_name }}"
+            new_nic_ipv4: "{{ pvrdma_client_vm_ipv4 }}"
+
+        - name: "Check the result of pinging gateway from client VM"
+          ansible.builtin.assert:
+            that:
+              - ping_success_after_hotadd | bool
+            fail_msg: "Failed to ping gateway from client VM PVRDMA device"
+
+        - name: "Check PVRDMA device status and reload it if necessary on client VM"
+          include_tasks: check_and_reload_pvrdma.yml
+
+        # rping server VM from client VM
+        - name: "RDMA ping server VM '{{ pvrdma_server_vm_name }}' from client VM '{{ pvrdma_client_vm_name }}'"
+          ansible.builtin.shell: "rping -c -I {{ pvrdma_client_vm_ipv4 }} -a {{ pvrdma_server_vm_ipv4 }} -C 5 -vV"
+          delegate_to: "{{ vm_guest_ip }}"
+          ignore_errors: true
+          register: rping_server_result
+
+        - name: "Display RDMA ping result"
+          ansible.builtin.debug: var=rping_server_result
+
+        - name: "Check the result of RDMA pinging server VM from client VM"
+          ansible.builtin.assert:
+            that:
+              - rping_server_result is defined
+              - rping_server_result.rc is defined
+              - rping_server_result.rc == 0
+            fail_msg: >-
+              RDMA pinging server VM from client VM failed.
+              Hit error '{{ rping_server_result.stderr | default() }}'
+
+        - name: "Power off the client VM"
+          include_tasks: ../../common/vm_set_power_state.yml
+          vars:
+            vm_power_state_set: 'powered-off'
+            vm_name: "{{ pvrdma_client_vm_name }}"
+
+        - name: "Remove the client VM"
+          include_tasks: ../../common/vm_remove.yml
+          vars:
+            vm_name: "{{ pvrdma_client_vm_name }}"
+
+        # Switch to server VM
+        - include_tasks: ../../common/update_inventory.yml
+
+        - name: "Stop PVRDMA listening on server VM"
+          ansible.builtin.shell: "kill -9 {{ rping_server_process_pid }}"
+          delegate_to: "{{ vm_guest_ip }}"
+          ignore_errors: true
+
+        - name: "Hot remove the new {{ adapter_type }} network adapter from server VM"
+          include_tasks: hot_remove_network_adapter.yml
+          vars:
+            new_network_adapter_mac_addr: "{{ new_nic_mac_addr }}"
+
+        - name: "Remove VMkernel adapter tag and disable firewall rule for PVRDMA communication"
+          include_tasks: ../../common/esxi_disable_pvrdma_configs.yml
+
+        - name: "Cleanup network"
+          include_tasks: ../../common/vds_network_cleanup.yml
+      rescue:
+        - include_tasks: ../../common/test_rescue.yml

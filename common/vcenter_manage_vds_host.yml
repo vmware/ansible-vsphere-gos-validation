@@ -1,0 +1,64 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Add or remove ESXi host for a vSphere Distributed Switch
+# Parameters:
+#   vds_name: The vSphere Distributed Switch name.
+#   vds_host_state: The ESXi host state on the vSphere Distributed Switch: present or absent.
+#   vds_host_vmnics: A list of ESXi vmnics to use with the vSphere Distributed Switch.
+#     Default value is [].
+#
+- name: "Check paramters for managing ESXi host on vSphere Distributed Switch"
+  ansible.builtin.assert:
+    that:
+      - vds_name is defined and vds_name
+      - vds_host_state is defined
+      - vds_host_state in ['present', 'absent']
+      - vds_host_vmnics is undefined or vds_host_vmnics | type_debug == 'list'
+    fail_msg: >-
+      At least one of parameters 'vds_name', 'vds_host_state', or 'vds_host_vmnics' is incorrect.
+
+- name: "Set default ESXi vmnics to use with the vSphere Distributed Switch"
+  ansible.builtin.set_fact:
+    vds_host_vmnics: []
+  when:
+    - vds_host_state == 'present'
+    - vds_host_vmnics is undefined
+
+- name: "Set operation for managing ESXi host on vSphere Distributed Switch"
+  ansible.builtin.set_fact:
+    vds_host_op: "{% if vds_host_state == 'present' %}add{% else %}remove{% endif %}"
+
+- name: "{{ vds_host_op | capitalize }} ESXi host '{{ esxi_hostname }}' for vSphere Distributed Switch"
+  community.vmware.vmware_dvs_host:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    esxi_hostname: '{{ esxi_hostname }}'
+    switch_name: "{{ vds_name }}"
+    state: "{{ vds_host_state }}"
+    vmnics: "{{ vds_host_vmnics | default(omit) }}"
+  register: manage_vds_host_result
+
+- name: "Diplay the result of managing ESXi host for vSphere Distributed Switch"
+  ansible.builtin.debug: var=manage_vds_host_result
+  when: enable_debug
+
+- name: "Get info about the vSphere Distributed Switch"
+  include_tasks: vcenter_get_vds_info.yml
+
+- name: "Check ESXi host is {{ vds_host_state }} in the vSphere Distributed Switch"
+  ansible.builtin.assert:
+    that:
+      - vds_info
+      - vds_info.configure is defined
+      - vds_info.configure.hosts is defined
+      - ((vds_host_state == 'present' and esxi_hostname in vds_info.configure.hosts) or
+         (vds_host_state == 'absent' and esxi_hostname not in vds_info.configure.hosts))
+    fail_msg: >-
+      Failed to {{ vds_host_op }} ESXi host '{{ esxi_hostname }}' for
+      vSphere Distributed Switch '{{ vds_name }}'"
+    success_msg: >-
+      ESXi host '{{ esxi_hostname }}' is {{ vds_host_state }} in
+      vSphere Distributed Switch '{{ vds_name }}'

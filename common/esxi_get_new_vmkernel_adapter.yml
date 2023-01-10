@@ -1,0 +1,54 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get index and name of a new VMkernel network adapter on ESXi host 
+#
+- name: "Initialize the index and name of a new VMkernel network adapter"
+  ansible.builtin.set_fact:
+    new_vmk_device_index: ""
+    new_vmk_device_name: ""
+
+- name: "Get all VMkernel network adapters on the ESXi host"
+  include_tasks: esxi_get_vmkernel_adapters.yml
+
+- name: "Get all existing VMkernel network adapter indices and number"
+  ansible.builtin.set_fact:
+    existing_vmk_indices: >-
+      {{
+        esxi_vmkernels_info |
+        map(attribute='device') |
+        map('replace', 'vmk', '') |
+        map('int') |
+        sort
+      }}
+    existing_vmk_num: "{{ esxi_vmkernels_info | length }}"
+
+- name: "Set fact of the new VMkernel network adapter device index"
+  ansible.builtin.set_fact:
+    new_vmk_device_index: "{{ existing_vmk_num }}"
+  when: (existing_vmk_num | int == 0) or (existing_vmk_indices[-1] == (existing_vmk_num | int - 1))
+
+- name: "Set fact of the new VMkernel network adapter device index"
+  ansible.builtin.set_fact:
+    new_vmk_device_index: "{{ range(0, existing_vmk_num | int) | difference(existing_vmk_indices) | min }}"
+  when:
+    - existing_vmk_num | int > 0
+    - existing_vmk_indices[-1] != existing_vmk_num | int - 1
+
+- name: "Check VMkernel network adapter device index"
+  ansible.builtin.assert:
+    that:
+      - new_vmk_device_index is defined
+      - new_vmk_device_index
+      - new_vmk_device_index | int in range(0, 256)
+    fail_msg: "The valid VMkernel adapter device can only be in range of vmk0 ~ vmk255."
+
+- name: "Set fact of the new VMkernel network adapter device"
+  ansible.builtin.set_fact:
+    new_vmk_device_name: "vmk{{ new_vmk_device_index }}"
+
+- name: "Display the index and name of new VMkernel network adapter device"
+  ansible.builtin.debug:
+    msg:
+      - "The new VMkernel network adapter device index is '{{ new_vmk_device_index }}'"
+      - "The new VMkernel network adapter device name is '{{ new_vmk_device_name }}'"

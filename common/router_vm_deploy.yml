@@ -1,25 +1,32 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Deploy a Router VM in the same datastore of the under test VM,
-# using the Openwrt ova template in this path by default:
-# tools/openwrt_19.07.2_x86.ova
+# Deploy a router VM in the same datastore of the test VM from
+# the OpenWrt OVA template tools/openwrt_19.07.2_x86.ova
 #
-- name: Check if Openwrt ova template file exists
+- name: "Set facts for deploying router VM"
+  ansible.builtin.set_fact:
+    router_vm_name: "Ansible_Router_VM_{{ testrun_timestamp }}"
+    router_vm_ova_path: "{{ main_playbook_path }}/tools/openwrt_19.07.2_x86.ova"
+    vlan_gateway: "192.168.192.1"
+
+- name: "Check if the OVA template file for router VM exists"
   ansible.builtin.stat:
-    path: "{{ router_vm_ovf_path }}"
-  register: router_ovf_stat
-- name: Display the result of file existence
-  ansible.builtin.debug: var=router_ovf_stat
+    path: "{{ router_vm_ova_path }}"
+  register: router_ova_stat
+
+- name: "Display the result of file existence"
+  ansible.builtin.debug: var=router_ova_stat
   when: enable_debug
 
-- name: Check file existence result
+- name: "Check file existence result"
   ansible.builtin.fail:
-    msg: "Openwrt ova template file not exist in: {{ router_vm_ovf_path }}"
-  when: not router_ovf_stat.stat.exists
+    msg: "The OVA template file for router VM '{{ router_vm_ova_path }}' doesn't exist"
+  when: not router_ova_stat.stat.exists
 
-- include_tasks: ovf_deploy.yml
+- name: "Deploy router VM from OVA template"
+  include_tasks: ovf_deploy.yml
   vars:
-    ovf_path: "{{ router_vm_ovf_path }}"
+    ovf_path: "{{ router_vm_ova_path }}"
     ovf_vm_name: "{{ router_vm_name }}"
     deploy_datastore: "{{ datastore }}"

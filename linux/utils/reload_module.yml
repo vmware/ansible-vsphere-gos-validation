@@ -1,0 +1,40 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Load or reload kernel module in guest OS
+# Parameters:
+#   module_name: The kernel module name to load
+#
+- name: "Check module_name is defined and not empty"
+  ansible.builtin.assert:
+    that:
+      - module_name is defined and module_name
+    fail_msg: "module_name variable must be defined and set to a valid value."
+
+- name: "Check module '{{ module_name }}' is loaded or not"
+  ansible.builtin.shell: "lsmod | grep '^{{ module_name }}'"
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: true
+  changed_when: false
+  register: lsmod_result
+
+- name: "Unload module '{{ module_name }}'"
+  community.general.modprobe:
+    name: "{{ module_name }}"
+    state: "absent"
+  delegate_to: "{{ vm_guest_ip }}"
+  when:
+    - lsmod_result is defined
+    - lsmod_result.stdout is defined
+    - module_name in lsmod_result.stdout
+ 
+- name: "Load module '{{ module_name }}'"
+  community.general.modprobe:
+    name: "{{ module_name }}"
+    state: "present"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: modprobe_result
+
+- name: "Print result of loading module '{{ module_name }}'"
+  ansible.builtin.debug: var=modprobe_result
+  when: enable_debug

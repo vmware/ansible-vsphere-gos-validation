@@ -1,0 +1,50 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check whether target VM supports PVRDMA testing
+#
+- name: "Skip test case for unsupported guest OS"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: "{{ guest_os_ansible_distribution }} doesn't support PVRDMA"
+    skip_reason: "Not Supported"
+  when: >
+    ('Flatcar' in guest_os_ansible_distribution or
+     guest_os_ansible_distribution in ['Fedora', 'VMware Photon OS'])
+
+- name: "Get guest config options"
+  include_tasks: ../../common/esxi_get_guest_config_options.yml
+  vars:
+    guest_id: "{{ vm_guest_id }}"
+    esxi_hardware_version: "{{ vm_hardware_version_num }}"
+
+- name: "Skip test case for guest_id and hardware version which doesn't support PVRDMA adapter"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      This guest ID '{{ vm_guest_id }}' with hardware version '{{ vm_hardware_version_num }}'
+      does not support PVRDMA network adapter.
+    skip_reason: "Not Supported"
+  when: >
+    (guest_config_options.support_ethernet_card is undefined) or
+    ('pvrdma' not in guest_config_options.support_ethernet_card)
+
+- name: "Get module info about vmw_pvrdma"
+  include_tasks: ../utils/get_module_info.yml
+  vars:
+    module_name: "vmw_pvrdma"
+
+- name: "Set the fact of vmw_pvrdma module info"
+  ansible.builtin.set_fact:
+    guest_pvrdma_module_info: "{{ guest_module_info }}"
+
+- name: "Skip test case due to no vmw_pvrdma module"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      Test case '{{ ansible_play_name }}' is not supported because {{ guest_os_ansible_distribution }}
+      {{ guest_os_ansible_distribution_ver }} doesn't have vmw_pvrdma module.
+    skip_reason: "Not Supported"
+  when: >
+    (guest_pvrdma_module_info.filename is undefined) or
+    ('vmw_pvrdma' not in guest_pvrdma_module_info.filename)

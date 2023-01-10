@@ -1,0 +1,29 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Configure the VMkernel adapter and firewall rule on ESXi host for PVRDMA communication.
+# Parameters:
+#   pvrdma_vmk_nic: The VMkernel network adapter to tag for PVRDMA communication
+#
+- name: "Tag VMkernel adapter '{{ pvrdma_vmk_nic }}' for PVRDMA"
+  include_tasks: ../../common/esxi_set_advanced_system_settings.yml
+  vars:
+    esxi_host_config_options: {"Net.PVRDMAVmknic": "{{ pvrdma_vmk_nic }}"}
+
+- name: "Get ESXi server's advanced system settings to check config result"
+  include_tasks: esxi_get_advanced_system_settings.yml
+
+- name: "Check 'Net.PVRDMAVmknic' is set to '{{ pvrdma_vmk_nic }}' in ESXi server's advanced system settings"
+  ansible.builtin.assert:
+    that:
+      - esxi_advanced_system_settings['Net.PVRDMAVmknic'] is defined
+      - esxi_advanced_system_settings['Net.PVRDMAVmknic'] == pvrdma_vmk_nic
+    fail_msg: "Failed to set 'Net.PVRDMAVmknic' to '{{ pvrdma_vmk_nic }}'"
+    success_msg: "'Net.PVRDMAVmknic' is set to '{{ pvrdma_vmk_nic }}'"
+
+- name: "Enable ESXi host firewall rule for PVRDMA"
+  include_tasks: ../../common/esxi_set_firewall_rule.yml
+  vars:
+    rule_name: "pvrdma"
+    rule_enabled: true
+    rule_allowed_all: true
