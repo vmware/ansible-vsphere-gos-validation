@@ -37,9 +37,9 @@
 
     # Get network adapter interface status
     - name: "Get network interface '{{ network_adapter_name }}' status"
-      ansible.builtin.shell: "nmcli device status | grep '^{{ network_adapter_name }}\\s\\+' | awk '{print $3'}"
+      ansible.builtin.shell: "nmcli device status | grep '^{{ network_adapter_name }}\\s\\+' | awk '{print $3}'"
       register: nmcli_device_status
-      retries: 12
+      retries: 30
       delay: 5
       until:
         - nmcli_device_status is defined
@@ -57,7 +57,7 @@
           - expected_nmcli_device_status in nmcli_device_status.stdout
         fail_msg: >-
           It's timed out to wait for {{ network_adapter_name }} status
-          becoming '{{ expected_nmcli_device_status }}' in 60 seconds.
+          becoming '{{ expected_nmcli_device_status }}' in 150 seconds.
           Current status is '{{ nmcli_device_status.stdout | default('') }}'
   when: guest_os_network_manager == "NetworkManager"
 
