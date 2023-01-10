@@ -10,7 +10,7 @@
 - name: "Generate Ignition config file"
   include_tasks: generate_ignition_config.yml
 
-- name: "Defining the Ignition config in Guestinfo"
+- name: "Defining the Ignition configs in Guestinfo"
   include_tasks: ../../../common/vm_set_extra_config.yml
   vars:
     vm_advanced_settings:
@@ -18,6 +18,23 @@
         value: "{{ ignition_config_data }}"
       - key: "guestinfo.coreos.config.data.encoding"
         value: "base64"
+
+- name: "Power on VM"
+  include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-on'
+
+- name: "Get VM's extra config"
+  include_tasks: ../../common/vm_get_extra_config.yml
+
+- name: "Check Ignition configs is present in VM's extra config after VM power-on"
+  ansible.builtin.assert:
+    that:
+      - vm_extra_config['guestinfo.coreos.config.data'] is defined
+      - vm_extra_config['guestinfo.coreos.config.data'] == ignition_config_data
+      - vm_extra_config['guestinfo.coreos.config.data.encoding'] is defined
+      - vm_extra_config['guestinfo.coreos.config.data.encoding'] == 'base64'
+    fail_msg: "The Ignition configs are not correct in VM's extra config after VM power-on"
 
 # Skip checking guest full name here because we will check it in TD1 case
 - include_tasks: ../../../common/vm_wait_guest_fullname.yml

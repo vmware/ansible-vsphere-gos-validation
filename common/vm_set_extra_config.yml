@@ -1,4 +1,4 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Add or update custom configure item for VM
@@ -17,17 +17,15 @@
     advanced_settings: "{{ vm_advanced_settings }}"
   register: vm_extra_config_set_result
 
-# Check VM extra config after VM power on
-- include_tasks: vm_set_power_state.yml
-  vars:
-    vm_power_state_set: 'powered-on'
+- name: "Set fact of VM's extra config settings"
+  ansible.builtin.set_fact:
+    vm_extra_config: "{{ vm_extra_config_set_result.instance.advanced_settings | default({}) }}"
 
-- include_tasks: vm_get_extra_config.yml
-- name: "Check VM custom configure values are set successfully"
+- name: "Check VM extra configure values are set successfully"
   ansible.builtin.assert:
     that:
-      - vm_extra_item.key in vm_extra_config
-      - vm_extra_config[vm_extra_item.key] == vm_extra_item.value
+      - vm_extra_config[vm_extra_item.key] | default("") == vm_extra_item.value
+    fail_msg: "Failed to set '{{ vm_extra_item.key }}' to '{{ vm_extra_item.value }}' in VM's extra config"
   with_items: "{{ vm_advanced_settings }}"
   loop_control:
     loop_var: vm_extra_item
