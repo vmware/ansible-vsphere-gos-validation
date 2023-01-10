@@ -7,7 +7,14 @@
 #   vmtools_is_running: true or false. VMware Tools is running or not.
 #   vmtools_is_ovt: true or false. VMware Tools is open-vm-tools or not.
 #
-- name: Get VMware Tools installed information first
+- name: "Initialize the facts of VMware Tools status"
+  ansible.builtin.set_fact:
+    vmtools_is_installed: false
+    vmtools_is_running: false
+    vmtools_not_ready: true
+    vmtools_is_ovt: false
+
+- name: "Get VMware Tools installed information"
   community.vmware.vmware_guest_tools_info:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -18,11 +25,11 @@
     name: "{{ vm_name }}"
   register: get_vmtools_info
   ignore_errors: true
-- name: Display the result of getting VMware tools info
+- name: "Display the result of getting VMware Tools info"
   ansible.builtin.debug: var=get_vmtools_info
-  when: enable_debug is defined and enable_debug
+  when: enable_debug
 
-- name: Set fact of VMware Tools installed status
+- name: "Set fact of VMware Tools status"
   ansible.builtin.set_fact:
     vmtools_is_installed: "{{ get_vmtools_info.vmtools_info.vm_tools_install_status != 'toolsNotInstalled' }}"
     vmtools_is_running: "{{ get_vmtools_info.vmtools_info.vm_tools_running_status == 'guestToolsRunning' }}"
@@ -33,8 +40,9 @@
     - not get_vmtools_info.failed
     - "'vmtools_info' in get_vmtools_info"
 
-- block:
-    - name: Wait for VMware Tools running when it's executing scripts or not running
+- name: "VMware Tools is installed but not ready"
+  block:
+    - name: "Wait for VMware Tools running when it's executing scripts or not running"
       community.vmware.vmware_guest_tools_info:
         hostname: "{{ vsphere_host_name }}"
         username: "{{ vsphere_host_user }}"
@@ -52,7 +60,7 @@
         - get_vmtools_info_retry.vmtools_info.vm_tools_running_status == 'guestToolsRunning'
       retries: "{{ get_vmtools_status_retries | default(100) }}"
       delay: 3
-    - name: Set fact of VMware Tools running status
+    - name: "Set fact of VMware Tools running status"
       ansible.builtin.set_fact:
         vmtools_is_running: "{{ get_vmtools_info_retry.vmtools_info.vm_tools_running_status == 'guestToolsRunning' }}"
       when:
@@ -60,11 +68,11 @@
         - get_vmtools_info_retry.vmtools_info is defined
         - get_vmtools_info_retry.vmtools_info.vm_tools_running_status is defined
   when:
-    - vmtools_is_installed | default(false)
-    - vmtools_not_ready | default(true)
+    - vmtools_is_installed
+    - vmtools_not_ready
 
 - ansible.builtin.debug:
     msg:
-      - "VMware tools is installed in guest: {{ vmtools_is_installed | default(false) }}"
-      - "VMware tools is running in guest: {{ vmtools_is_running | default(false) }}"
-      - "VMware tools is installed as open-vm-tools: {{ vmtools_is_ovt | default(false) }}"
+      - "VMware tools is installed in guest: {{ vmtools_is_installed }}"
+      - "VMware tools is running in guest: {{ vmtools_is_running }}"
+      - "VMware tools is installed as open-vm-tools: {{ vmtools_is_ovt }}"

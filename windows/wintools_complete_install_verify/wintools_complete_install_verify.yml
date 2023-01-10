@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is used for test VMware tools installation in Windows
-# guest OS. The VMware tools installation ISO file can be an existing file
-# in ESXi datastore, ESXi host bundled VMware tools, or the URL, ISO file
+#   This test case is used for test VMware Tools installation in Windows
+# guest OS. The VMware Tools installation ISO file can be an existing file
+# in ESXi datastore, ESXi host bundled VMware Tools, or the URL, ISO file
 # will be downloaded before testing.
 #
 - name: wintools_complete_install_verify
@@ -17,44 +17,60 @@
         - include_tasks: ../setup/test_setup.yml
           vars:
             create_current_test_folder: true
-        - name: "Set update VMware tools by default"
+
+        - name: "Set update VMware Tools by default"
           ansible.builtin.set_fact:
             update_vmtools: true
           when: update_vmtools is undefined
-        - name: "Set not install from ESXi bundled VMware tools by default"
+        - name: "Set not install from ESXi bundled VMware Tools by default"
           ansible.builtin.set_fact:
             vmtools_esxi_bundled: false
           when: vmtools_esxi_bundled is undefined
 
-        # If VBS is enabled, will not install under development tools due to secureboot is enabled
+        # If VBS is enabled, will not install under development VMware Tools due to secureboot is enabled
         - block:
             - include_tasks: ../../common/vm_get_vbs_status.yml
             - include_tasks: ../../common/skip_test_case.yml
               vars:
-                skip_msg: "Skip test case due to under development VMware tools can not test on VM with VBS enabled."
+                skip_msg: "Skip test case due to under development VMware Tools can not test on VM with VBS enabled."
                 skip_reason: "Not Applicable"
               when:
                 - vm_vbs_enabled is defined and vm_vbs_enabled | bool
                 - is_development_tools is defined and is_development_tools | bool
           when: guest_os_ansible_architecture == "64-bit"
 
-        - include_tasks: ../../common/skip_test_case.yml
-          vars:
-            skip_msg: "Test case '{{ ansible_play_name }}' is skipped because update_vmtools is set to: {{ update_vmtools }}"
-            skip_reason: "Skipped"
-          when: not update_vmtools | bool
+        - name: "Handle update_vmtools is set to false situation"
+          block:
+            - include_tasks: ../../common/skip_test_case.yml
+              vars:
+                skip_msg: "Test case '{{ ansible_play_name }}' is skipped because VMware Tools is already installed and running, while 'update_vmtools' is set to: {{ update_vmtools }}"
+                skip_reason: "Skipped"
+              when: vmtools_is_running
+            - name: "Testing failed"
+              ansible.builtin.fail:
+                msg: "VMware Tools is not running when it's installed and 'update_vmtools' is set to false."
+              when: not vmtools_is_running
+          when:
+            - not update_vmtools | bool
+            - vmtools_is_installed
 
-        # Get ESXi host bundled VMware tools ISO path
+        - name: "Uninstall VMware Tools firstly when it's installed"
+          include_tasks: ../wintools_uninstall_verify/uninstall_vmtools.yml
+          when:
+            - update_vmtools | bool
+            - vmtools_is_installed
+
+        # Get ESXi host bundled VMware Tools ISO path
         - block:
             - include_tasks: ../../common/esxi_get_bundled_tools_path.yml
               vars:
                 server_get_bundled_tools_path_os: 'windows'
-            - name: Set fact of the bundled VMware tools path
+            - name: "Set fact of the bundled VMware Tools path"
               ansible.builtin.set_fact:
                 vmtools_iso_path: "[] {{ server_get_bundled_tools_path }}"
           when: vmtools_esxi_bundled
 
-        # Or download VMware tools ISO from URL
+        # Or download VMware Tools ISO from URL
         - include_tasks: download_vmtools_and_transfer.yml
           when:
             - not vmtools_esxi_bundled
@@ -64,12 +80,12 @@
         - include_tasks: enable_test_signing.yml
           when: is_development_tools is defined and is_development_tools | bool
 
-        # Mount VMware tools ISO file to VM CDROM
+        # Mount VMware Tools ISO file to VM CDROM
         - include_tasks: ../../common/vm_connect_cdrom_to_iso.yml
           vars:
-            vm_cdrom_iso_file: "{{ vmtools_iso_path }}"
-
-        # Execute VMware tools installation
+            vm_cdrom_iso_file: "{{ vmtools_iso_path }}" 
+        
+        # Execute VMware Tools installation
         - include_tasks: install_vmtools.yml
         - include_tasks: verify_vmtools.yml
         - include_tasks: detach_vmtools_and_remove.yml
