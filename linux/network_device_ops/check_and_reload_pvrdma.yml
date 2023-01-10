@@ -14,22 +14,22 @@
   block:
     - name: "Get RDMA devices in guest OS after hot-add"
       include_tasks: ../utils/get_rdma_device_info.yml
-    
+
     - name: "Set fact of RDMA device after hot-add"
       ansible.builtin.set_fact:
         rdma_devices_after_hotadd: "{{ guest_rdma_device_info }}"
-    
+
     - name: "Check new RDMA device exists"
       ansible.builtin.assert:
         that:
           - rdma_devices_after_hotadd | length > 0
           - rdma_devices_after_hotadd | difference(rdma_devices_before_hotadd) | length == 1
         fail_msg: "No new RDMA device is detected"
-    
+
     - name: "Set fact of new RDMA device"
       ansible.builtin.set_fact:
         new_rdma_device: "{{ (rdma_devices_after_hotadd | difference(rdma_devices_before_hotadd))[0] }}"
-    
+
     - name: "Reload 'vmw_pvrdma' module"
       include_tasks: ../utils/reload_module.yml
       vars:

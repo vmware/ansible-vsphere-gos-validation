@@ -131,7 +131,7 @@
       ansible.builtin.set_fact:
         guest_config_options: >-
           {{
-            vm_config_name.values() | zip_longest([]) 
+            vm_config_name.values() | zip_longest([])
             | items2dict(key_name=0, value_name=1)
           }}
 
@@ -159,14 +159,14 @@
       register: guest_os_descriptor
       ignore_errors: true
       loop: "{{ vm_config_name.keys() }}"
-      
+
     - name: "Set fact for VM default config with guest id {{ guest_id }}"
       ansible.builtin.set_fact:
         guest_config_options: >-
-          {{ 
-            guest_config_options 
-            | combine({vm_config_name[item.key]: 
-                       vm_device_types[item.value] if item.value in vm_device_types else item.value}) 
+          {{
+            guest_config_options
+            | combine({vm_config_name[item.key]:
+                       vm_device_types[item.value] if item.value in vm_device_types else item.value})
           }}
       with_items: "{{ guest_os_descriptor.results | map(attribute='matches') | select('defined') | flatten | map('dict2items') }}"
 
@@ -197,12 +197,12 @@
     - name: "Set supported disk controllers for guest id {{ guest_id }}"
       ansible.builtin.set_fact:
         guest_config_options: >-
-          {{ 
+          {{
             guest_config_options
             | combine({
-                 'support_disk_controller': 
-                 guest_supported_disk_ctrls.matches | map(attribute='e') | map('extract', vm_device_types) | list 
-              })
+                 'support_disk_controller':
+                   guest_supported_disk_ctrls.matches | map(attribute='e') | map('extract', vm_device_types) | list
+                    })
            }}
       when:
         - guest_supported_disk_ctrls is defined
@@ -220,12 +220,12 @@
     - name: "Set supported network adapters for guest id {{ guest_id }}"
       ansible.builtin.set_fact:
         guest_config_options: >-
-          {{ 
+          {{
             guest_config_options
             | combine({
-                 'support_ethernet_card': 
-                 guest_supported_ethernet_card.matches | map(attribute='e') | map('extract', vm_device_types) | list 
-              })
+                 'support_ethernet_card':
+                   guest_supported_ethernet_card.matches | map(attribute='e') | map('extract', vm_device_types) | list
+                      })
            }}
       when:
         - guest_supported_ethernet_card is defined
@@ -243,12 +243,12 @@
     - name: "Set supported USB controllers for guest id {{ guest_id }}"
       ansible.builtin.set_fact:
         guest_config_options: >-
-          {{ 
+          {{
             guest_config_options
             | combine({
-                 'support_usb_controller': 
-                 guest_supported_usb_ctrls.matches | map(attribute='e') | map('extract', vm_device_types) | list 
-              })
+                 'support_usb_controller':
+                   guest_supported_usb_ctrls.matches | map(attribute='e') | map('extract', vm_device_types) | list
+                      })
            }}
       when:
         - guest_supported_usb_ctrls is defined
@@ -258,7 +258,7 @@
     - name: "Combine guest_id and hardware version into guest_config_options"
       ansible.builtin.set_fact:
         guest_config_options: >-
-          {{ 
+          {{
             guest_config_options
             | combine({
                  'guest_id': guest_id,
