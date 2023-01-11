@@ -22,13 +22,30 @@
           ansible.builtin.set_fact:
             update_vmtools: true
           when: update_vmtools is undefined
-        - name: "Set not install from ESXi bundled VMware Tools by default"
+
+        - name: "Check VMware Tools source parameters"
+          ansible.builtin.assert:
+            that:
+              - (vmtools_url_path is defined and vmtools_url_path) or (vmtools_iso_path is defined and vmtools_iso_path)
+            fail_msg: "One of parameters 'vmtools_url_path', 'vmtools_iso_path' must be set when 'vmtools_esxi_bundled' is set to '{{ vmtools_esxi_bundled }}'."
+          when:
+            - vmtools_esxi_bundled is defined
+            - not vmtools_esxi_bundled | bool
+        - name: "Set install ESXi bundled VMware Tools by default"
+          ansible.builtin.set_fact:
+            vmtools_esxi_bundled: true
+          when:
+            - vmtools_esxi_bundled is undefined
+            - vmtools_url_path is undefined or not vmtools_url_path
+            - vmtools_iso_path is undefined or not vmtools_iso_path
+        - name: "Set install VMware Tools from URL or datastore ISO file"
           ansible.builtin.set_fact:
             vmtools_esxi_bundled: false
           when: vmtools_esxi_bundled is undefined
 
         # If VBS is enabled, will not install under development VMware Tools due to secureboot is enabled
-        - block:
+        - name: "Check if VBS is enabled"
+          block:
             - include_tasks: ../../common/vm_get_vbs_status.yml
             - include_tasks: ../../common/skip_test_case.yml
               vars:
@@ -41,14 +58,15 @@
 
         - name: "Handle update_vmtools is set to false situation"
           block:
-            - include_tasks: ../../common/skip_test_case.yml
+            - name: "VMware Tools is running"
+              include_tasks: ../../common/skip_test_case.yml
               vars:
                 skip_msg: "Test case '{{ ansible_play_name }}' is skipped because VMware Tools is already installed and running, while 'update_vmtools' is set to: {{ update_vmtools }}"
                 skip_reason: "Skipped"
               when: vmtools_is_running
-            - name: "Testing failed"
+            - name: "VMware Tools is not running"
               ansible.builtin.fail:
-                msg: "VMware Tools is not running when it's installed and 'update_vmtools' is set to false."
+                msg: "Expected VMware Tools status is running when it's already installed while 'update_vmtools' is set to: {{ update_vmtools }}"
               when: not vmtools_is_running
           when:
             - not update_vmtools | bool
@@ -60,8 +78,8 @@
             - update_vmtools | bool
             - vmtools_is_installed
 
-        # Get ESXi host bundled VMware Tools ISO path
-        - block:
+        - name: "Get ESXi host bundled VMware Tools ISO path"
+          block:
             - include_tasks: ../../common/esxi_get_bundled_tools_path.yml
               vars:
                 server_get_bundled_tools_path_os: 'windows'
@@ -83,8 +101,8 @@
         # Mount VMware Tools ISO file to VM CDROM
         - include_tasks: ../../common/vm_connect_cdrom_to_iso.yml
           vars:
-            vm_cdrom_iso_file: "{{ vmtools_iso_path }}" 
-        
+            vm_cdrom_iso_file: "{{ vmtools_iso_path }}"
+
         # Execute VMware Tools installation
         - include_tasks: install_vmtools.yml
         - include_tasks: verify_vmtools.yml
