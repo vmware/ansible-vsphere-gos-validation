@@ -1,4 +1,4 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Install open-vm-tools with OS commands
@@ -34,12 +34,11 @@
 # Install open-vm-tools packages
 - name: "Install packages {{ ovt_packages }}"
   ansible.builtin.command: "{{ package_install_cmd }} {{' '.join(ovt_packages) }}"
-  args:
-    warn: false
   register: ovt_install_result
+  ignore_errors: true
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: Display the packages install output
+- name: "Display the packages install output"
   ansible.builtin.debug: var=ovt_install_result
   when: enable_debug | bool
 
@@ -51,7 +50,7 @@
       - ovt_install_result.stdout
       - ovt_install_result.rc is defined
       - ovt_install_result.rc | int == 0
-    fail_msg: "Failed to execute command: {{ ' '.join(ovt_install_result.cmd) }}"
+    fail_msg: "Failed to install open-vm-tools by executing command: {{ ' '.join(ovt_install_result.cmd) }}."
 
 # Eject CDROM /dev/sr0 from guest
 - include_tasks: ../utils/eject_cdrom_in_guest.yml

@@ -1,4 +1,4 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Uninstall open-vm-tools
@@ -11,12 +11,11 @@
 # Uninstall open-vm-tools packages
 - name: "Uninstall packages {{ ovt_packages }}"
   ansible.builtin.command: "{{ package_uninstall_cmd }} {{' '.join(ovt_packages) }}"
-  args:
-    warn: false
   register: ovt_uninstall_result
+  ignore_errors: true
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: Display the packages uninstall output
+- name: "Display the packages uninstall output"
   ansible.builtin.debug: var=ovt_uninstall_result
   when: enable_debug | bool
 
@@ -28,7 +27,7 @@
       - ovt_uninstall_result.stdout
       - ovt_uninstall_result.rc is defined
       - ovt_uninstall_result.rc | int == 0
-    fail_msg: "Failed to execute command: {{ ' '.join(ovt_uninstall_result.cmd) }}"
+    fail_msg: "Failed to uninstall open-vm-tools by executing command: {{ ' '.join(ovt_uninstall_result.cmd) }}"
 
 # Reboot VM to make changes take effect
 - include_tasks: ../utils/reboot.yml

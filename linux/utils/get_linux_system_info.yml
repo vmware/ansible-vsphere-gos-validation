@@ -1,39 +1,59 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Overwrite /etc/redhat-release with correct OS release information
-# for RHEL variant OS like ProLinux so that ansible can retrieve
-# correct distribution
-- name: "Get info about guest OS file /etc/redhat-release"
-  include_tasks: get_file_stat_info.yml
-  vars:
-    guest_file_path: "/etc/redhat-release"
-
-- name: "Set fact of /etc/redhat-release file info"
-  ansible.builtin.set_fact:
-    guest_redhat_release_exists: "{{ guest_file_exists }}"
-    guest_redhat_release_stat: "{{ guest_file_stat }}"
-
-- name: "Check and correct OS release in /etc/redhat-release"
-  block:
-    - name: "Get info about guest OS file /etc/system-release"
-      include_tasks: get_file_stat_info.yml
-      vars:
-        guest_file_path: "/etc/system-release"
-
-    - name: "Overwrithe /etc/redhat-release with /etc/system-release"
-      ansible.builtin.shell: "cat /etc/system-release > /etc/redhat-release"
-      delegate_to: "{{ vm_guest_ip }}"
-      when:
-        - guest_file_exists | bool
-        - guest_file_stat.islnk | default(false)
-        - guest_file_stat.lnk_source | default('') != "/etc/redhat-release"
-  when:
-    - guest_redhat_release_exists | bool
-    - not (guest_redhat_release_stat.islink | default(false))
-
+# Get Linux OS system information
+#
 - name: "Get guest OS distribution info"
   include_tasks: ../../common/get_guest_system_info.yml
+
+- name: "Get OS release info"
+  include_tasks: get_os_release.yml
+
+- name: "Correct OS distribution info"
+  block:
+    # Overwrite /etc/redhat-release with correct OS release information
+    # for RHEL variant OS like ProLinux so that ansible can retrieve
+    # correct distribution
+    - name: "Get content of guest OS file /etc/redhat-release"
+      ansible.builtin.command: "cat /etc/redhat-release"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      register: guest_os_redhat_release
+
+    - name: "Set fact of /etc/redhat-release file info"
+      ansible.builtin.set_fact:
+        guest_os_redhat_release: "{{ guest_os_redhat_release.stdout | default('') }}"
+
+    - name: "Display content of guest OS file /etc/redhat-release"
+      ansible.builtin.debug: var=guest_os_redhat_release
+
+    - name: "Correct guest OS distribution info"
+      block:
+        - name: "Get content of guest OS file /etc/system-release"
+          ansible.builtin.command: "cat /etc/system-release"
+          delegate_to: "{{ vm_guest_ip }}"
+          ignore_errors: true
+          register: guest_os_system_release
+
+        - name: "Update /etc/redhat-release and refresh OS distribution info"
+          block:
+            - name: "Display content of guest OS file /etc/system-release"
+              ansible.builtin.debug: var=guest_os_system_release
+
+            - name: "Overwrithe /etc/redhat-release with /etc/system-release"
+              ansible.builtin.shell: "echo '{{ guest_os_system_release.stdout }}' > /etc/redhat-release"
+              delegate_to: "{{ vm_guest_ip }}"
+
+            - name: "Update guest OS distribution info"
+              include_tasks: ../../common/get_guest_system_info.yml
+          when:
+            - guest_os_system_release.stdout is defined
+            - guest_os_system_release.stdout
+      when: guest_os_redhat_release | regex_search("Red *Hat", ignorecase=True)
+  when:
+    - guest_os_ansible_distribution == "RedHat"
+    - guest_os_release.NAME is defined
+    - guest_os_release.NAME != "Red Hat Enterprise Linux"
 
 - name: "Get Debian OS version from /etc/debian_version"
   block:

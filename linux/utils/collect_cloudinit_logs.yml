@@ -33,11 +33,10 @@
       delegate_to: "{{ vm_guest_ip }}"
 
     - name: "Fetch cloud-init logs from guest OS"
-      ansible.builtin.fetch:
-        src: "{{ cloudinit_logs_src_path }}"
-        dest: "{{ cloudinit_logs_local_path }}"
-        flat: true
-      delegate_to: "{{ vm_guest_ip }}"
+      include_tasks: fetch_file.yml
+      vars:
+        fetch_file_src_path: "{{ cloudinit_logs_src_path }}"
+        fetch_file_dst_path: "{{ cloudinit_logs_local_path }}"
   when:
     - vmtools_is_running is undefined or not (vmtools_is_running | bool)
     - vm_guest_ip is defined
