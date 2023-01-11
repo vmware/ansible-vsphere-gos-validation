@@ -11,15 +11,30 @@
 #   cdrom_unit_num: the unit number of CDROM device.
 #   cdrom_state: 'present' or 'absent'.
 #
+- name: "Initialize the fact about auto answer enablement"
+  ansible.builtin.set_fact:
+    cdrom_config_auto_answer: false
 
-- name: "Set question auto answer to force to disconnect CD/DVD drive"
-  include_tasks: vm_set_extra_config.yml
-  vars:
-    vm_advanced_settings:
-      - key: "cdrom.showIsoLockWarning"
-        value: "FALSE"
-      - key: "msg.autoanswer"
-        value: "TRUE"
+- name: "Prepare for changing CD/DVD drive to client device"
+  block:
+    - name: "Get VM power state"
+      include_tasks: common/vm_set_power_state.yml
+
+    - name: "Set question auto answer for powered-on VM"
+      block:
+        - name: "Set question auto answer to force to disconnect CD/DVD drive"
+          include_tasks: vm_set_extra_config.yml
+          vars:
+            vm_advanced_settings:
+              - key: "cdrom.showIsoLockWarning"
+                value: "FALSE"
+              - key: "msg.autoanswer"
+                value: "TRUE"
+
+        - name: "Set fact that auto answer is enabled for disconnecting CD/DVD drive"
+          ansible.builtin.set_fact:
+            cdrom_config_auto_answer: true
+      when: vm_power_state_get != "poweredOff"
   when:
     - cdrom_state == "present"
     - cdrom_type == "client"
@@ -54,6 +69,4 @@
         value: ""
       - key: "msg.autoanswer"
         value: ""
-  when:
-    - cdrom_state == "present"
-    - cdrom_type == "client"
+  when: cdrom_config_auto_answer
