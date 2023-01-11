@@ -1,12 +1,14 @@
-# Copyright 2022 VMware, Inc.
+# Copyright 2022-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Wait for message appear in VM's log file
+# Wait for specified message appears in VM's log file with spcified times.
 # Parameters:
-#   vm_wait_log_name: the log file name in VM folder. e.g. vmware.log
-#   vm_wait_log_msg: the regular expression of message to wait for appearing
-#   vm_wait_log_retries: how many times to re-check log about waiting message
-#   vm_wait_log_delay: seconds to delay for a retry
+#   vm_wait_log_name: the log file name in VM folder. e.g. vmware.log.
+#   vm_wait_log_msg: the regular expression of message to wait for appearing.
+#   vm_wait_log_msg_times: the at least times the specified message appearing in log file.
+#     Default is 1.
+#   vm_wait_log_retries: the times to re-check log file to wait for message.
+#   vm_wait_log_delay: seconds to delay for a retry.
 #   vm_wait_log_ignore_errors: true to ignore task failure. Default is false.
 #   vm_wait_log_hide_output: true to hide the output, if set to false will print
 #   the output of log content. Default is true.
@@ -19,22 +21,25 @@
   ansible.builtin.set_fact:
     vm_log_file_path: "{{ vm_dir_name }}/{{ vm_wait_log_name }}"
 
-# Check if log file exists
-- include_tasks: esxi_check_delete_datastore_file.yml
+- name: "Check if log file exists"
+  include_tasks: esxi_check_delete_datastore_file.yml
   vars:
     file_in_datastore_ops: file
     file_in_datastore: "{{ datastore }}"
     file_in_datastore_path: "{{ vm_log_file_path }}"
     file_in_datastore_failed_ignore: "{{ vm_wait_log_ignore_errors | default(false) }}"
 
-# Log file exists
-- block:
-    - name: "Set fact of the url of datastore file"
-      ansible.builtin.set_fact:
-        vm_wait_log_url: "{{ ds_file_result.url }}"
+- name: "VM log file exists"
+  block:
+    - name: "Check URL of datastore file"
+      ansible.builtin.assert:
+        that:
+          - ds_file_result.url is defined
+          - ds_file_result.url
+        fail_msg: "Failed to get VM log file URL: {{ ds_file_result.url | default('') }}"
     - name: "Wait for message '{{ vm_wait_log_msg }}' appear in VM log {{ vm_wait_log_name }}"
       ansible.builtin.uri:
-        url: "{{ vm_wait_log_url }}"
+        url: "{{ ds_file_result.url }}"
         method: GET
         return_content: true
         user: "{{ vsphere_host_user }}"
@@ -45,7 +50,7 @@
       until:
         - get_vm_log_content is defined
         - get_vm_log_content.content is defined
-        - get_vm_log_content.content | regex_findall(vm_wait_log_msg) | length != 0
+        - (get_vm_log_content.content | regex_findall(vm_wait_log_msg) | length) >= (vm_wait_log_msg_times | default(1)) 
       delay: "{{ vm_wait_log_delay | default(5) }}"
       retries:  "{{ vm_wait_log_retries | default(60) }}"
       ignore_errors: "{{ vm_wait_log_ignore_errors | default(false) }}"
@@ -62,14 +67,17 @@
     - name: "Set fact of log message wait result"
       ansible.builtin.set_fact:
         vm_wait_log_msg_success: true
-      when: vm_wait_log_msg_list | length != 0
-    - ansible.builtin.debug:
+      when: vm_wait_log_msg_list | length >= (vm_wait_log_msg_times | default(1))
+
+    - name: "Display log message wait result"
+      ansible.builtin.debug:
         msg:
-          - "Found '{{ vm_wait_log_msg }}' message in VM log {{ vm_wait_log_name }}: {{ 'Success' if vm_wait_log_msg_success | bool else 'Failure' }}"
+          - "Found '{{ vm_wait_log_msg }}' message in VM log file '{{ vm_wait_log_name }}': {{ 'Success' if vm_wait_log_msg_success | bool else 'Failure' }}"
           - "Found logs list: {{ vm_wait_log_msg_list }}"
+
     - name: "VM log info check failure"
       ansible.builtin.fail:
-        msg: "Failed to find '{{ vm_wait_log_msg }}' in VM log {{ vm_wait_log_name }}"
+        msg: "Found '{{ vm_wait_log_msg }}' message in VM log file '{{ vm_wait_log_name }}' appearing '{{ vm_wait_log_msg_list | length }}' times, while expect '{{ vm_wait_log_msg_times | default(1) }} times.'"
       when:
         - vm_wait_log_ignore_errors is undefined or not (vm_wait_log_ignore_errors | bool)
         - not (vm_wait_log_msg_success | bool)
@@ -77,7 +85,7 @@
     - file_in_datastore_result is defined
     - file_in_datastore_result == 'Success'
 
-- name: "VM log info check failure"
+- name: "VM log file info check failure"
   ansible.builtin.fail:
     msg: "Failed to find VM log file '{{ vm_wait_log_name }}'"
   when:
