@@ -10,35 +10,37 @@
     unmapped_os_fullname: "Linux {{ guest_os_ansible_kernel }} {{ guest_os_ansible_distribution }}"
 
 # Linux 5.x
-- block:
-    # Map Linux 5.x when ESXi <= 7.0.0
-    - block:
-        - name: "Set guest_fullname variable for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} on ESXi <= 7.0.0"
+- name: "Guest OS has Linux 5.x kernel"
+  block:
+    - name: "Map Linux 5.x when ESXi <= 7.0.0"
+      block:
+        - name: "Set fact of guest_fullname for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} on ESXi <= 7.0.0"
           ansible.builtin.set_fact:
             guest_fullname: ["Other 3.x or later Linux ({{ guest_os_bit }})", "Other 3.x Linux ({{ guest_os_bit }})"]
           when: "'other3xLinux' in vm_guest_id"
 
-        - name: "Set guest_fullname variable for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} on ESXi <= 7.0.0"
+        - name: "Set fact of guest_fullname for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} on ESXi <= 7.0.0"
           ansible.builtin.set_fact:
             guest_fullname: ["Other 4.x or later Linux ({{ guest_os_bit }})", "Other 4.x Linux ({{ guest_os_bit }})"]
           when: "'other4xLinux' in vm_guest_id"
       when: esxi_version is version('7.0.0', '<=')
 
     # Map Linux 5.x when ESXi > 7.0.0 as Other 5.x or later Linux is supported on ESXi 7.0.1 and later
-    - name: "Set guest_fullname variable for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} on ESXi > 7.0.0"
+    - name: "Set fact of guest_fullname for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} on ESXi > 7.0.0"
       ansible.builtin.set_fact:
         guest_fullname: ["Other 5.x or later Linux ({{ guest_os_bit }})", "Other 5.x Linux ({{ guest_os_bit }})"]
       when: esxi_version is version('7.0.0', '>')
   when: guest_os_ansible_kernel is version('5.0', '>=')
 
 # Linux 4.x
-- block:
-    - name: "Set guest_fullname variable for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} on ESXi <= 7.0.0"
+- name: "Guest OS has Linux 4.x kernel"
+  block:
+    - name: "Set fact of guest_fullname for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} on ESXi <= 7.0.0"
       ansible.builtin.set_fact:
         guest_fullname: ["Other 3.x or later Linux ({{ guest_os_bit }})", "Other 3.x Linux ({{ guest_os_bit }})"]
       when: esxi_version is version('6.7.0', '<')
 
-    - name: "Set guest_fullname variable for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+    - name: "Set fact of guest_fullname for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       ansible.builtin.set_fact:
         guest_fullname: ["Other 4.x or later Linux ({{ guest_os_bit }})", "Other 4.x Linux ({{ guest_os_bit }})"]
       when: esxi_version is version('6.7.0', '>=')
@@ -47,7 +49,7 @@
     - guest_os_ansible_kernel is version('4.0', '>=')
 
 # Linux 3.x
-- name: "Set guest_fullname variable for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+- name: "Set fact of guest_fullname for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
   ansible.builtin.set_fact:
     guest_fullname: ["Other 3.x or later Linux ({{ guest_os_bit }})", "Other 3.x Linux ({{ guest_os_bit }})"]
   when:
