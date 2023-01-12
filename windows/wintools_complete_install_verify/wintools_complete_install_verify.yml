@@ -2,10 +2,14 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is used for test VMware Tools installation in Windows
-# guest OS. The VMware Tools installation ISO file can be an existing file
-# in ESXi datastore, ESXi host bundled VMware Tools, or the URL, ISO file
-# will be downloaded before testing.
+#   This test case is used for test VMware Tools installation in Windows guest OS.
+# If no VMware Tools installed in guest OS, this test case will install VMware Tools.
+# If there is VMware Tools already installed in guest OS:
+# (1) by default 'update_vmtools' will be set to true, this test case will uninstall
+# existing VMware Tools firstly, then install VMware Tools when VMware Tools ISO source
+# parameters are configured correctly,
+# (2) if 'update_vmtools' is set to false, this test case will be skipped when VMware Tools
+# service is running, or test case will fail when VMware Tools service is not running.
 #
 - name: wintools_complete_install_verify
   hosts: localhost
@@ -51,10 +55,10 @@
               vars:
                 skip_msg: "Skip test case due to under development VMware Tools can not test on VM with VBS enabled."
                 skip_reason: "Not Applicable"
-              when:
-                - vm_vbs_enabled is defined and vm_vbs_enabled | bool
-                - is_development_tools is defined and is_development_tools | bool
-          when: guest_os_ansible_architecture == "64-bit"
+              when: vm_vbs_enabled is defined and vm_vbs_enabled | bool
+          when:
+            - guest_os_ansible_architecture == "64-bit"
+            - is_development_tools is defined and is_development_tools | bool
 
         - name: "Handle update_vmtools is set to false situation"
           block:
