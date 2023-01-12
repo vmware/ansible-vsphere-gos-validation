@@ -1,6 +1,8 @@
 # Copyright 2021-2022 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+# Reconfigure guest OS on existing VM to prepare for GOS validation testing
+#
 # For Ubuntu or Debian , modify sshd config to keep connection alive
 - include_tasks: ../utils/ssh_keep_alive.yml
   when: guest_os_family == "Debian"
@@ -9,7 +11,8 @@
 - include_tasks: ../utils/disable_auto_update.yml
   when: guest_os_ansible_distribution in ["Ubuntu"]
 
-- block:
+- name: "Reconfigure VMware Photon OS"
+  block:
     - include_tasks: ../../common/vm_get_vmtools_status.yml
       when: vmtools_is_running is undefined or not vmtools_is_running
 
@@ -18,34 +21,32 @@
         - (new_vm is undefined) or (not new_vm | bool)
         - vmtools_is_running
 
-    # Photon OS needs to disable DNSSEC and DNSOverTLS while connecting online repo
-    - include_tasks: ../utils/set_dns.yml
+    # VMware Photon OS needs to disable DNSSEC and DNSOverTLS while connecting online repo
+    - name: "Disable DNSSEC and DNSOverTLS settings for VMware Photon OS"
+      include_tasks: ../utils/set_dns.yml
 
-    # Update photon repo cache
-    - include_tasks: ../utils/repo_update.yml
+    - name: "Update VMware Photon OS repo cache"
+      include_tasks: ../utils/repo_update.yml
       vars:
         check_update_cmd: "tdnf makecache"
 
-    - include_tasks: ../utils/get_installed_package_info.yml
+    - name: "Install 'gawk' on VMware Photon OS"
+      include_tasks: ../utils/install_uninstall_package.yml
       vars:
-        package_name: "gawk"
-
-    - include_tasks: ../utils/install_uninstall_package.yml
-      vars:
-        package_name: "gawk"
+        package_list: ["gawk"]
         package_state: "present"
-      when:
-        - package_info is defined
-        - package_info | length == 0
   when: guest_os_ansible_distribution == "VMware Photon OS"
 
-- block:
-    - include_tasks: ../utils/get_service_info.yml
+- name: "Reconfigure SLED"
+  block:
+    - name: "Check 'PackageKit' service state"
+      include_tasks: ../utils/get_service_info.yml
       vars:
         service_name: "packagekit.service"
 
-    - block:
-        - name: "Disable and stop PackageKit Service"
+    - name: "Stop and disable 'PackageKit' service"
+      block:
+        - name: "Stop and disable 'PackageKit' service"
           ansible.builtin.service:
             name: 'packagekit.service'
             state: 'stopped'
@@ -59,16 +60,9 @@
         - service_info.state is defined
         - service_info.state in ['active', 'running']
 
-    # Remove PackageKit
-    - include_tasks: ../utils/get_installed_package_info.yml
+    - name: "Remove 'PackageKit' package from SLED"
+      include_tasks: ../utils/install_uninstall_package.yml
       vars:
-        package_name: "PackageKit"
-
-    - include_tasks: ../utils/install_uninstall_package.yml
-      vars:
-        package_name: "PackageKit"
+        package_list: ["PackageKit"]
         package_state: "absent"
-      when:
-        - package_info is defined
-        - package_info | length > 0
   when: guest_os_ansible_distribution == "SLED"

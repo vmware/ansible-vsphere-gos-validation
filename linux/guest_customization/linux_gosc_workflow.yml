@@ -7,7 +7,8 @@
 # 3. For cloud-init GOSC, cloud-init is installed or can be installed in guest OS with version higher than 18.5,
 # 4. Guest OS is not in the not support GOSC list.
 #
-- block:
+- name: "Test case block"
+  block:
     - name: "Set cloud-init workflow flag"
       ansible.builtin.set_fact:
         enable_cloudinit_gosc: "{% if gosc_workflow  == 'cloud-init' %}True{% else %}False{% endif %}"
@@ -16,35 +17,28 @@
       vars:
         skip_test_no_vmtools: true
 
-    - include_tasks: check_gosc_support_status.yml
+    - name: "Check GOSC testing is supported or not"
+      include_tasks: check_gosc_support_status.yml
 
-    - name: "Test case block"
+    - name: "Prepare for GOSC testing on VMware Photon OS"
       block:
-        # Traditional GOSC in Photon OS is implemented with cloud-init,
-        # so will upgrade cloud-init to the latest version in Photon OS
-        - include_tasks: ../utils/install_uninstall_package.yml
+        # Traditional GOSC in VMware Photon OS is implemented with cloud-init,
+        # so will upgrade cloud-init to the latest version in VMware Photon OS
+        # And 'tar' is required for collecting cloud-init logs
+        - name: "Install latest 'cloud-init' and 'tar' packages"
+          include_tasks: ../utils/install_uninstall_package.yml
           vars:
-            package_name: "cloud-init"
+            package_list: ["cloud-init", "tar"]
             package_state: "latest"
 
-        # Install tar for collecting cloud-init logs
-        - include_tasks: ../utils/get_installed_package_info.yml
-          vars:
-            package_name: "tar"
-
-        - include_tasks: ../utils/install_uninstall_package.yml
-          vars:
-            package_name: "tar"
-            package_state: "present"
-          when:
-            - package_info is defined
-            - package_info | length == 0
+        - include_tasks: ../utils/get_cloudinit_version.yml
 
         # In Photon OS 4.0, open-vm-tools-gosc is provided with GOSC scripts
         # from open-vm-tools 11.3.5
-        - include_tasks: ../utils/install_uninstall_package.yml
+        - name: "Install 'open-vm-tools-gosc-{{ vmtools_version }}' for GOSC"
+          include_tasks: ../utils/install_uninstall_package.yml
           vars:
-            package_name: "open-vm-tools-gosc-{{ vmtools_version }}"
+            package_list: ["open-vm-tools-gosc-{{ vmtools_version }}"]
             package_state: "present"
           when:
             - not enable_cloudinit_gosc | bool
@@ -54,65 +48,79 @@
       when: guest_os_ansible_distribution == "VMware Photon OS"
 
     # Install perl if guest OS doesn't have it
-    - block:
+    - name: "Prepare for perl GOSC testing on {{ guest_os_ansible_distribution }}"
+      block:
         - name: "Check perl existence"
           ansible.builtin.command: "which perl"
           failed_when: false
           register: which_perl_result
           delegate_to: "{{ vm_guest_ip }}"
 
-        - include_tasks: ../utils/install_uninstall_package.yml
-          vars:
-            package_name: "perl"
-            package_state: "latest"
-          when:
-            - which_perl_result.rc is undefined or which_perl_result.rc != 0
-            - guest_os_ansible_kernel is version('4.0', '<')
+        - name: "Install perl"
+          block:
+            - name: "Set perl package name on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+              ansible.builtin.set_fact:
+                guest_perl_package_name: |-
+                  {%- if guest_os_ansible_kernel is version('4.0', '<') -%}perl
+                  {%- else -%}perl-interpreter{%- endif -%}
 
-        - include_tasks: ../utils/install_uninstall_package.yml
-          vars:
-            package_name: "perl-interpreter"
-            package_state: "latest"
-          when:
-            - which_perl_result.rc is undefined or which_perl_result.rc != 0
-            - guest_os_ansible_kernel is version('4.0', '>=')
+            - name: "Install '{{ guest_perl_package_name }}' for perl GOSC"
+              include_tasks: ../utils/install_uninstall_package.yml
+              vars:
+                package_list: ["{{ guest_perl_package_name }}"]
+                package_state: "latest"
+          when: which_perl_result.rc is undefined or which_perl_result.rc != 0
       when:
         - not enable_cloudinit_gosc | bool
         - guest_os_family == "RedHat"
 
-    # Check cloud-init version for cloud-init gosc workflow
-    - include_tasks: ../utils/cloudinit_pkg_check.yml
+    - name: "Prepare for cloud-init GOSC"
+      block:
+        - name: "Install 'cloud-init' for cloud-init GOSC on {{ guest_os_ansible_distribution }}"
+          include_tasks: ../utils/install_uninstall_package.yml
+          vars:
+            package_list: ["cloud-init"]
+            package_state: "present"
+          when: guest_os_ansible_distribution != "VMware Photon OS"
 
-    # Skip cloud-init GOSC if cloud-init version is lower than required version.
-    - block:
-        # Debian 10 and 11 cloud-init GOSC depends on cloud-init 22.1 or later
+        # Check whether cloud-init version meets cloud-init GOSC requirements
+        # Debian 10 and 11 cloud-init GOSC requires cloud-init 22.1 or later installed.
         # See https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1008039
-        # For other OS, cloud-init GOSC requires cloud-init 18.5 or later installed.
+        # For other Linux, cloud-init GOSC requires cloud-init 18.5 or later installed.
+        # See https://kb.vmware.com/s/article/90331
         - name: "Set fact of cloud-init version for supporting GOSC"
           ansible.builtin.set_fact:
-            operator: >-
-              {% if guest_os_ansible_distribution != 'Debian' %}>{% else %}>={% endif %}
             gosc_required_cloudinit_version: >-
               {% if guest_os_ansible_distribution != 'Debian' %}18.5{% else %}22.1{% endif %}
+
+        - include_tasks: ../utils/get_cloudinit_version.yml
 
         - include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_reason: "Not Supported"
-            skip_msg: >
-              "The guest OS doesn't have required cloud-init ({{ operator }} {{ gosc_required_cloudinit_version }}) installed. Skip to run this test case."
-          when: (not cloudinit_version) or not (cloudinit_version is version(gosc_required_cloudinit_version, operator))
+            skip_msg: >-
+               The guest OS doesn't have required cloud-init (>= {{ gosc_required_cloudinit_version }})
+               installed. Skip to run this test case.
+          when: >
+            (not cloudinit_version) or
+            not (cloudinit_version is version(gosc_required_cloudinit_version, '>='))
       when: enable_cloudinit_gosc
 
-    # Get DNS server info before GOSC
-    - include_tasks: ../utils/get_system_dns.yml
+    - name: "Get DNS server info before GOSC"
+      include_tasks: ../utils/get_system_dns.yml
+
     - name: "Set fact of the DNS servers in /etc/resolv.conf before GOSC"
       ansible.builtin.set_fact:
         dns_servers_before_gosc: "{{ dns_servers }}"
-    - ansible.builtin.debug:
+
+    - name: "Display DNS servers before GOSC"
+      ansible.builtin.debug:
         msg: "DNS servers before GOSC: {{ dns_servers_before_gosc }}"
 
     # Modify cloud-init GOSC config in guest OS
-    - include_tasks: ../utils/enable_disable_cloudinit_cfg.yml
+    - name: "Update cloud-init config for {{ gosc_workflow }} GOSC"
+      include_tasks: ../utils/enable_disable_cloudinit_cfg.yml
+
     # Prepare router VM, vSwitch and portgroup
     - include_tasks: ../../common/network_testbed_setup.yml
       when:
