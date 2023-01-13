@@ -1,0 +1,34 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+# Check the WSL Version
+# Return:
+#   wsl_default_version: the default version of WSL
+#
+- name: "Initialize the variables"
+  ansible.builtin.set_fact:
+    wsl_version_info: ""
+    wsl_default_version: ""
+
+- name: "Check WSL status"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "wsl --status | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_status.txt"
+    win_execute_cmd_ignore_error: true
+
+- name: "Process the WSL output message"
+  include_tasks: wsl_convert_binary_to_txt.yml
+  vars:
+    source_path: "{{ wsl_file_path_win }}\\wsl_status.txt"
+    file_name: "wsl_status.txt"
+
+- name: "Set fact of WSL version info"
+  ansible.builtin.set_fact:
+    wsl_version_info: "{{ lookup('ansible.builtin.file', wsl_new_file).split('\n') | select('match', '^Default Version:') }}"
+
+- name: "Set fact of WSL default version"
+  ansible.builtin.set_fact:
+    wsl_default_version: "{{ wsl_version_info[0].split(':')[-1].strip() | int }}"
+  when:
+    - wsl_version_info | length > 0
