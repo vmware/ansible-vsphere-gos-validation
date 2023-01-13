@@ -96,10 +96,15 @@
         - name: "Set facts of packages and command for VMware Photon OS"
           ansible.builtin.set_fact:
             package_manage_list_str: "{{ ' '.join(package_manage_list) }}"
+
+        - name: "Set the command to {{ package_manage_op | lower }} packages on VMware Photon OS"
+          ansible.builtin.set_fact:
             package_manage_cmd: |-
-              {%- if package_state in [ 'installed', 'present', 'latest' ] -%}tdnf install -y
-              {%- else -%}tdnf remove -y
-              {%- endif -%}{{ package_manage_list_str }}
+              {%- if package_state in [ 'installed', 'present', 'latest' ] -%}
+              tdnf install -y {{ package_manage_list_str }}
+              {%- else -%}
+              tdnf remove -y {{ package_manage_list_str }}
+              {%- endif -%}
 
         - name: "{{ package_manage_op }} packages on VMware Photon OS"
           ansible.builtin.command: "{{ package_manage_cmd }}"
