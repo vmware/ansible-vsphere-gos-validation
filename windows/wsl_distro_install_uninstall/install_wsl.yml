@@ -8,23 +8,26 @@
 # "Launching WSL from session zero does not currently work (for example from an ssh connection)",
 # and the support of inbox version is removed from Windows build 25267, the test case will install inbox version for
 # build lower than 25267 until the known issue is resolved.
-- name: "Install inbox version of WSL and distribution"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "wsl --install --inbox -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_install.txt"
-    win_execute_cmd_ignore_error: true
+#
+- name: "Set installation command for inbox version of WSL"
+  ansible.builtin.set_fact:
+    wsl_install_cmd: "wsl --install --inbox -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_install.txt"
   when:
     - guest_os_build_num | int < 25267
     - guest_os_build_num | int > 22000
 
-- name: "Install store version of WSL and distribution"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "wsl --install -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_install.txt"
-    win_execute_cmd_ignore_error: true
+- name: "Set installation command for store version of WSL"
+  ansible.builtin.set_fact:
+    wsl_install_cmd: "wsl --install -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_install.txt"
   when: > 
     (guest_os_build_num | int >= 25267) or
     (guest_os_build_num | int < 22000)
+
+- name: "Install WSL and distribution"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ wsl_install_cmd }}"
+    win_execute_cmd_ignore_error: true
 
 - name: "Process the WSL output message"
   include_tasks: wsl_convert_binary_to_txt.yml
@@ -58,17 +61,11 @@
     - name: "Check WSL version after setting"
       include_tasks: check_wsl_version.yml
   when:
-    - wsl_default_version is defined
     - wsl_default_version | int != 2
 
 - name: "Validate the WSL version"
   ansible.builtin.assert:
     that:
-      - wsl_default_version is defined
-    fail_msg: "Getting WSL default version failed."
-
-- name: "Validate the WSL version"
-  ansible.builtin.assert:
-    that:
+      - wsl_default_version
       - wsl_default_version | int == 2
     fail_msg: "WSL default version is: {{ wsl_default_version }}, not the expected version: 2"
