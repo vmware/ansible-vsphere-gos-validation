@@ -347,7 +347,7 @@ class CallbackModule(CallbackBase):
                            loop_item=None,
                            ignore_errors=False):
         task = result._task
-        task_tags = task._attributes['tags']
+        task_tags = task.tags
         prefix = self._task_type_cache.get(task._uuid, 'TASK')
 
         # Use cached task name
@@ -410,7 +410,7 @@ class CallbackModule(CallbackBase):
 
         if result._task.loop:
             task_details += " => (item={})".format(loop_item)
-            if result._task._attributes['ignore_errors']:
+            if result._task.ignore_errors:
                 ignore_errors = True
 
         task_details += " => {}".format(self._dump_results(result._result, indent=4))
@@ -729,13 +729,13 @@ class CallbackModule(CallbackBase):
 
     def v2_runner_on_ok(self, result):
         task = result._task
-        task_result = result._result
-        task_args = task._attributes['args']
-        task_file = os.path.basename(task.get_path()).split(':')[0].strip()
-        delegated_vars = task_result.get('_ansible_delegated_vars', None)
-
         if isinstance(task, TaskInclude):
             return
+
+        task_result = result._result
+        task_args = task.args
+        task_file = os.path.basename(task.get_path()).split(':')[0].strip()
+        delegated_vars = task_result.get('_ansible_delegated_vars', None)
 
         if result._task.loop and 'results' in result._result:
             self._process_items(result)

@@ -1,4 +1,4 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Reset deploy_casename in case user doesn't provide correct guest_id
@@ -6,7 +6,7 @@
   ansible.builtin.set_fact:
     deploy_casename: "deploy_vmwarephoton_ova"
 
-# Photon OS OVA for HWv11 is using other3xlinux64 as guest id
+# VMware Photon OS OVA for HWv11 is using other3xlinux64 as guest id
 - include_tasks: ../../../common/vm_set_guest_id.yml
   vars:
     guest_id: "vmwarePhoton64Guest"
@@ -26,13 +26,14 @@
     src_file_path: "{{ seed_iso_path }}"
     dest_file_path: "{{ vm_dir_name }}/{{ seed_iso_path | basename }}"
 
-# Attach seed ISO to Photon OS VM
+# Attach seed ISO to VMware Photon OS VM
 - include_tasks: ../../../common/vm_configure_cdrom.yml
   vars:
     cdrom_type: iso
     cdrom_iso_file: "{{ vm_files_path_ds }}/{{ seed_iso_path | basename }}"
     cdrom_controller_num: 0
     cdrom_unit_num: 0
+    cdrom_state: present
 
 # Power on VM to update login information
 - include_tasks: ../../common/vm_set_power_state.yml
@@ -46,18 +47,19 @@
     update_inventory_timeout: 300
 
 # Eject seed ISO from guest
-- name: "Eject seed ISO from Photon OS"
+- name: "Eject seed ISO from VMware Photon OS"
   include_tasks: ../../utils/eject_cdrom_in_guest.yml
   vars:
     guest_cdrom_device_num: 0
 
-# Disconnect seed ISO from Photon OS VM
+# Disconnect seed ISO from VMware Photon OS VM
 - name: "Change VM's CD/DVD Drive 1 to client device"
   include_tasks: ../../../common/vm_configure_cdrom.yml
   vars:
     cdrom_type: client
     cdrom_controller_num: 0
     cdrom_unit_num: 0
+    cdrom_state: present
 
 # Remove temporary folders
 - name: "Remove temporary directory {{ tmp_seed_dir }}"

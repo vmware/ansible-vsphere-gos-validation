@@ -1,0 +1,36 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get OS release info from Linux /etc/os-release file
+#
+- name: "Initialize facts about guest OS release"
+  ansible.builtin.set_fact:
+    guest_os_release_path: "/etc/os-release"
+    guest_os_release_local_path: ""
+    guest_os_release: {}
+
+- name: "Fetch {{ guest_os_release_path }} to localhost"
+  include_tasks: fetch_file.yml
+  vars:
+    fetch_file_src_path: "{{ guest_os_release_path }}"
+    fetch_file_dst_path: "{{ current_test_log_folder }}/"
+    fetch_file_ignore_errors: true
+
+- name: "Get guest OS release info from /etc/os-release"
+  block:
+    - name: "Set fact of the local path for {{ guest_os_release_path }} fetched from guest OS"
+      ansible.builtin.set_fact:
+        guest_os_release_local_path: "{{ fetch_file_local_path }}"
+
+    - name: "Get content of guest /etc/os-release"
+      ansible.builtin.shell: "cat {{ guest_os_release_local_path }} | sed 's/=/: /'"
+      changed_when: false
+      register: get_os_release_content
+
+    - name: "Set fact of guest OS release info"
+      ansible.builtin.set_fact:
+        guest_os_release: "{{ get_os_release_content.stdout | from_yaml }}"
+      when:
+        - get_os_release_content.stdout is defined
+        - get_os_release_content.stdout
+  when: fetch_file_local_path

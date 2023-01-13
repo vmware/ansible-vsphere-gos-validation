@@ -68,12 +68,12 @@ This project supports below scenarios for end-to-end guest operating system vali
 | :---------------------------------------------- | :------------------------------: | :----------------------: | :--------------------------------: |
 | Red Hat Enterprise Linux 7.x, 8.x, 9.x          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | CentOS 7.x, 8.x                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Oracle Linux 7.x, 8.x, 9.0                      | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Rocky Linux 8.x, 9.0                            | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| AlmaLinux 8.x, 9.0                              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Oracle Linux 7.x, 8.x, 9.x                      | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Rocky Linux 8.x, 9.x                            | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| AlmaLinux 8.x, 9.x                              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise 15 SP3 and later          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise 12 SP5, 15 SP0/SP1/SP2    |                                  |                          | :heavy_check_mark:                 |
-| Photon OS 3.x, 4.x                              | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
+| VMware Photon OS 3.x, 4.x                       | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Ubuntu 18.04 and later live-server              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Ubuntu 20.04 and later cloud image              |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Ubuntu 18.04 desktop                            |                                  |                          | :heavy_check_mark:                 |
@@ -85,6 +85,7 @@ This project supports below scenarios for end-to-end guest operating system vali
 | Windows Server 2019, 2022                       | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | UnionTech OS Server 20 1050a                    | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Fedora Server 36 and later                      | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| ProLinux Server 7.9, 8.5                        | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 
 Note: This compatible guest operating systems list is used for this project only. For guest operating system support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
 

@@ -1,4 +1,4 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: "Test case block"
@@ -11,8 +11,9 @@
         skip_reason: "Not Supported"
       when:
         - new_disk_ctrl_type in ["lsilogic", "lsilogicsas"]
-        - guest_os_ansible_distribution in ["RedHat", "Rocky", "AlmaLinux", "CentOS"]
+        - guest_os_family == "RedHat"
         - guest_os_ansible_distribution_major_ver | int >= 8
+        - "'uek' not in guest_os_ansible_kernel"
 
     - include_tasks: ../../common/skip_test_case.yml
       vars:
@@ -23,23 +24,16 @@
         - ((guest_os_ansible_distribution != "VMware Photon OS" and vm_hardware_version_num | int < 13) or
            (guest_os_ansible_distribution == "VMware Photon OS" and vm_hardware_version_num | int < 19))
 
-    # Install SCSI command tools for rescan LSI Logic controller
-    - block:
+    - name: "Install SCSI command tools for rescan LSI Logic controller"
+      block:
         - name: "Set SCSI command tools package name"
           ansible.builtin.set_fact:
             sg3_utils_pkg: "{{ 'sg3-utils' if guest_os_family in ['Debian', 'Astra Linux (Orel)'] else 'sg3_utils' }}"
 
-        - include_tasks: ../utils/get_installed_package_info.yml
-          vars:
-            package_name: "{{ sg3_utils_pkg }}"
-
         - include_tasks: ../utils/install_uninstall_package.yml
           vars:
-            package_name: "{{ sg3_utils_pkg }}"
+            package_list: ["{{ sg3_utils_pkg }}"]
             package_state: "present"
-          when:
-            - package_info is defined
-            - package_info | length == 0
       when:
         - new_disk_ctrl_type == 'lsilogic'
         - "'Flatcar' not in guest_os_ansible_distribution"

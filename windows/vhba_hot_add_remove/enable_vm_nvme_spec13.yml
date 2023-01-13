@@ -13,7 +13,25 @@
     set_win_power_state: "shutdown"
 
 # Add extra config for VM
-- include_tasks: ../../common/vm_set_extra_config.yml
+- name: "Set 'nvme.specVersion' with '103' in VM's extra config"
+  include_tasks: ../../common/vm_set_extra_config.yml
+
+- name: "Power on VM"
+  include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-on'
 
 # After VM power on in above common task, get VM IP address again in case IP changed
 - include_tasks: ../utils/win_update_inventory.yml
+
+- name: "Get VM's extra config"
+  include_tasks: ../../common/vm_get_extra_config.yml
+
+- name: "Check 'nvme.specVersion' is '103' in VM's extra config after VM power-on"
+  ansible.builtin.assert:
+    that:
+      - vm_extra_config['nvme.specVersion'] is defined
+      - vm_extra_config['nvme.specVersion'] == '103'
+    fail_msg: >-
+      The 'nvme.specVersion' is not '103' in VM's extra config after VM power-on. In VM's extra config,
+      nvme.specVersion = {{ vm_extra_config['nvme.specVersion'] | default('') }}.

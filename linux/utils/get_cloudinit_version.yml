@@ -1,0 +1,24 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the version of cloud-init in guest OS
+#
+- name: "Initialize the fact of cloud-init version"
+  ansible.builtin.set_fact:
+    cloudinit_version: ""
+
+- name: "Get cloud-init version from package info"
+  include_tasks: get_installed_package_info.yml
+  vars:
+    package_name: "cloud-init"
+
+- name: "Set fact of cloud-init version"
+  ansible.builtin.set_fact:
+    cloudinit_version: "{{ package_info.Version }}"
+  when:
+    - package_info | length > 0
+    - package_info.Version is defined
+    - package_info.Version
+
+- name: "Print the cloud-init version"
+  ansible.builtin.debug: var=cloudinit_version

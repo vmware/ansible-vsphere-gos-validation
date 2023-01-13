@@ -1,4 +1,4 @@
-# Copyright 2022 VMware, Inc.
+# Copyright 2022-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
@@ -30,17 +30,17 @@
     fail_msg: "Either mount_point_src or mount_fstype is not set for mounting"
   when: mount_state in ['mounted', 'present', 'remounted']
 
-- block:
+- name: "Check mount point {{ mount_point_path }} exists"
+  block:
     - name: "Check {{ mount_point_path }} exists"
-      ansible.builtin.stat:
-        path: "{{ mount_point_path }}"
-      delegate_to: "{{ vm_guest_ip }}"
-      register: stat_mount_point_path
+      include_tasks: get_file_stat_info.yml
+      vars:
+        guest_file_path: "{{ mount_point_path }}"
 
     - name: "Mount point doesn't exists"
       ansible.builtin.fail:
         msg: "The mount point path {{ mount_point_path }} doesn't exist, which can't be unmounted"
-      when: not (stat_mount_point_path.stat.exists | default(false))
+      when: not (guest_file_exists | bool)
   when: mount_state in ['absent', 'unmounted']
 
 - name: "Set mount point {{ mount_point_path }} to {{ mount_state }}"
@@ -55,4 +55,4 @@
 
 - name: "Print the result of setting mount point {{ mount_point_path }} to {{ mount_state }}"
   ansible.builtin.debug: var=set_mount_point_result
-  when: enable_debug | default(false)
+  when: enable_debug

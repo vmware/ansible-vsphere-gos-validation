@@ -1,0 +1,28 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get file stat information
+# Parameters:
+#   guest_file_path: The file path in guest OS
+# Returns:
+#   guest_file_exists: The file path exists or not
+#   guest_file_stat: The stat information about the guest file
+
+- name: "Check guest file path is provided"
+  ansible.builtin.assert:
+    that:
+      - guest_file_path is defined
+      - guest_file_path
+    fail_msg: "'guest_file_path' must be set with a file path in guest OS"
+
+- name: "Get file stat information"
+  ansible.builtin.stat:
+    path: "{{ guest_file_path }}"
+  register: guest_file_stat_result
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Set facts of guest file stat information"
+  ansible.builtin.set_fact:
+    guest_file_exists: "{{ guest_file_stat_result.stat.exists | default(false) }}"
+    guest_file_stat: "{{ guest_file_stat_result.stat | default({}) }}"

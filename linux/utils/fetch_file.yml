@@ -1,0 +1,50 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get file from Linux guest OS and save it at localhost
+# Parameters:
+#   fetch_file_src_path: The source file path in guest OS
+#   fetch_file_dst_path: The destination directory or file path at localhost
+#   fetch_file_ignore_errors: Whether to ignore errors if source file doesn't exist or fetching file failed.
+#     Default value is false.
+# Return:
+#   fetch_file_local_path: The local file path for the fetched guest OS file
+#
+- name: "Initialize the local file path for the fetched guest OS file"
+  ansible.builtin.set_fact:
+    fetch_file_local_path: ""
+
+- name: "Get stat info about file {{ fetch_file_src_path }}"
+  include_tasks: get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ fetch_file_src_path }}"
+
+- name: "Source file doesn't exist in guest OS"
+  ansible.builtin.fail:
+    msg: "{{ fetch_file_src_path }} doesn't exist in guest OS"
+  when:
+    - not (guest_file_exists | bool)
+    - not (fetch_file_ignore_errors | default(false))
+
+- name: "Fetch guest OS file"
+  block:
+    - name: "Fetch file from guest OS and save it at localhost"
+      ansible.builtin.fetch:
+        src: "{{ fetch_file_src_path }}"
+        dest: "{{ fetch_file_dst_path }}"
+        flat: "{{ fetch_file_dst_path.endswith('/') }}"
+      register: fetch_guest_file
+      ignore_errors: "{{ fetch_file_ignore_errors | default(false) }}"
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Display the result of fetching guest file"
+      ansible.builtin.debug: var=fetch_guest_file
+      when: enable_debug
+
+    - name: "Set fact of the local file path for the fetched guest OS file"
+      ansible.builtin.set_fact:
+        fetch_file_local_path: "{{ fetch_guest_file.dest }}"
+      when:
+        - fetch_guest_file.dest is defined
+        - fetch_guest_file.dest
+  when: guest_file_exists | bool

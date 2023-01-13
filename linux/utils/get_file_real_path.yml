@@ -1,4 +1,4 @@
-# Copyright 2021-2022 VMware, Inc.
+# Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Get the real path of file
@@ -12,20 +12,16 @@
     file_real_path: "{{ src_file }}"
 
 - name: "Get stats of {{ src_file }}"
-  ansible.builtin.stat:
-    path: "{{ src_file }}"
-  register: stat_file_result
-  delegate_to: "{{ vm_guest_ip }}"
+  include_tasks: get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ src_file }}"
 
 - name: "Get the source file path of symlink {{ src_file }}"
   ansible.builtin.set_fact:
     file_real_path: "{{ stat_file_result.stat.lnk_source }}"
   when:
-    - stat_file_result is defined
-    - stat_file_result.stat is defined
-    - stat_file_result.stat.islnk is defined
-    - stat_file_result.stat.islnk
-    - stat_file_result.stat.lnk_source is defined
+    - guest_file_stat.islnk | default(false)
+    - guest_file_stat.stat.lnk_source is defined
 
 - name: "Print the real path of {{ src_file }}"
   ansible.builtin.debug: var=file_real_path
