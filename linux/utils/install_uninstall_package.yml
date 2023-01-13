@@ -26,8 +26,8 @@
       - package_state in ['absent', 'installed', 'latest', 'present', 'removed']
     fail_msg: >-
       At least one of parameters 'package_list' and 'package_state' is incorrect.
-      The value of 'package_list' is '{{ package_list | default("undefined") }}'.
-      The value of 'package_state' is '{{ package_state | default("undefined") }}'.
+      The value of 'package_list' is '{{ package_list | default("") }}'.
+      The value of 'package_state' is '{{ package_state | default("") }}'.
 
 - name: "Initialize variables for installing or uninstalling package"
   ansible.builtin.set_fact:
@@ -76,12 +76,11 @@
 
 - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }}"
   block:
-    - name: "Set proxy for installing package"
-      include_tasks: set_proxy.yml
-      when: package_state == "present"
-
-    - name: "Add repository for installing or upgrading package"
+    - name: "Set proxy and add repositories for installing or upgrading package"
       block:
+        - name: "Set proxy for installing package"
+          include_tasks: set_proxy.yml
+
         # Add a local repo from ISO image for RHEL/SLES/SLED
         - include_tasks: ../utils/add_local_dvd_repo.yml
           when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat']
