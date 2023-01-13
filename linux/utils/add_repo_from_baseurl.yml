@@ -21,16 +21,15 @@
   block:
     - name: "Get default RPM GPG key file"
       include_tasks: get_rpm_gpg_key_file.yml
-      when: guest_rpm_gpg_key_path is undefined or not guest_rpm_gpg_key_path
 
     - name: "Set default RPM GPG key"
       ansible.builtin.set_fact:
         gpg_key_path: "file://{{ guest_rpm_gpg_key_path }}"
       when: guest_rpm_gpg_key_path
 
-    - name: "Skip GPG check as there is no RPM GPG key found"
-      ansible.builtin.set_fact:
-        gpg_check: false
+    - name: "Fail the test due to no RPM GPG key found"
+      ansible.builtin.fail:
+        msg: "Can't not add repository when GPG check is enabled but no RPM GPG key is found."
       when: not guest_rpm_gpg_key_path
   when:
     - gpg_check is defined

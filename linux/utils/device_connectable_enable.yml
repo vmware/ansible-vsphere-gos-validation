@@ -38,6 +38,9 @@
       vars:
         vm_power_state_set: 'powered-on'
 
+    - name: "Update VM's IP in inventory"
+      include_tasks: ../../common/update_inventory.yml
+
     - name: "Get VM's extra config"
       include_tasks: ../../common/vm_get_extra_config.yml
 
@@ -50,7 +53,10 @@
           - vm_extra_config['isolation.device.edit.disable'] == 'FALSE'
         fail_msg: >-
           The isolation.device settings are not correct in VM's extra config after VM power-on.
+          In VM's extra config,
+          isolation.device.connectable.disable = {{ vm_extra_config['isolation.device.connectable.disable'] |
+                                                   default('') }},
+          isolation.device.edit.disable = {{ vm_extra_config['isolation.device.edit.disable'] |
+                                                   default('') }}.
 
-    - name: "Update VM's IP in inventory"
-      include_tasks: ../../common/update_inventory.yml
   when: not vm_advanced_settings_exist

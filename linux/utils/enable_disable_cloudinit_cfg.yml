@@ -15,6 +15,15 @@
   ansible.builtin.set_fact:
     guest_cloud_cfg_exists: "{{ guest_file_exists }}"
 
+- name: "Fail to enable cloud-init GOSC due to no cloud-init config file"
+  ansible.builtin.fail:
+    msg: >-
+      Can't enable clout-init GOSC because {{ guest_cloud_cfg_path }} doesn't exist.
+      Please check whether cloud-init is installed.
+  when:
+     - enable_cloudinit_gosc | bool
+     - not guest_cloud_cfg_exists | bool
+
 - name: "Update cloud-init configs"
   block:
     - name: "Set keyword for searching network config in cloud-init config files"

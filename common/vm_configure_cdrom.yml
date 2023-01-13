@@ -3,14 +3,45 @@
 ---
 # Reconfigure VM CDROM
 # Parameters:
+#   cdrom_state: 'present' or 'absent'.
 #   cdrom_type: 'iso', 'client' or 'none'.
 #   cdrom_iso_file: must be set to the ISO file path in datastore when
 #     'cdrom_type' set to 'iso.' in this format '[datastore] file_path/file.iso'
 #   cdrom_controller_type: the CDROM controller type 'ide' or 'sata'.
 #   cdrom_controller_num: the bus number of the controller CDROM attachs.
 #   cdrom_unit_num: the unit number of CDROM device.
-#   cdrom_state: 'present' or 'absent'.
 #
+- name: "Check parameters for configuring CD/DVD drive device"
+  ansible.builtin.assert:
+    that:
+      - cdrom_state is defined
+      - cdrom_state in ['present', 'absent']
+      - cdrom_type is undefined or cdrom_type in ['iso', 'client', 'none']
+      - cdrom_controller_num is defined
+      - cdrom_controller_num | int >= 0
+      - cdrom_unit_num is defined
+      - cdrom_unit_num | int >= 0
+    fail_msg: >-
+      At least one of parameters 'cdrom_state', 'cdrom_type', 'cdrom_controller_num', or 'cdrom_unit_num'
+      is incorrect. The values of parameters are cdrom_state={{ cdrom_state | default('') }},
+      cdrom_type={{ cdrom_type | default('') }}, cdrom_controller_num={{ cdrom_controller_num | default('') }},
+      cdrom_unit_num={{ cdrom_unit_num | default('') }}.
+
+- name: "Set default CDROM type to 'client'"
+  ansible.builtin.set_fact:
+    cdrom_type: 'client'
+  when: cdrom_state == 'present'
+
+- name: "Check ISO file is set"
+  ansible.builtin.assert:
+    that:
+      - cdrom_iso_file is defined
+      - cdrom_iso_file
+    fail_msg: "'cdrom_iso_file' must be set to connect CD/DVD drive to an ISO file"
+  when:
+    - cdrom_state == 'present'
+    - cdrom_type == 'iso'
+
 - name: "Initialize the fact about auto answer enablement"
   ansible.builtin.set_fact:
     cdrom_config_auto_answer: false

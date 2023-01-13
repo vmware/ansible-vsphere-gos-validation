@@ -21,6 +21,9 @@
   vars:
     vm_power_state_set: 'powered-on'
 
+# After VM power on in above common task, get VM IP address again in case IP changed
+- include_tasks: ../utils/win_update_inventory.yml
+
 - name: "Get VM's extra config"
   include_tasks: ../../common/vm_get_extra_config.yml
 
@@ -29,7 +32,6 @@
     that:
       - vm_extra_config['nvme.specVersion'] is defined
       - vm_extra_config['nvme.specVersion'] == '103'
-    fail_msg: "The 'nvme.specVersion' is not correct in VM's extra config after VM power-on"
-
-# After VM power on in above common task, get VM IP address again in case IP changed
-- include_tasks: ../utils/win_update_inventory.yml
+    fail_msg: >-
+      The 'nvme.specVersion' is not '103' in VM's extra config after VM power-on. In VM's extra config,
+      nvme.specVersion = {{ vm_extra_config['nvme.specVersion'] | default('') }}.
