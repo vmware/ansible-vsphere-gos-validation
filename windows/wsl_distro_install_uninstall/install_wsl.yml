@@ -9,25 +9,46 @@
 # and the support of inbox version is removed from Windows build 25267, the test case will install inbox version for
 # build lower than 25267 until the known issue is resolved.
 #
-- name: "Set installation command for inbox version of WSL"
-  ansible.builtin.set_fact:
-    wsl_install_cmd: "wsl --install --inbox -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_install.txt"
-  when:
-    - guest_os_build_num | int < 25267
-    - guest_os_build_num | int > 22000
+- name: "Install WSL for Windows Client"
+  block:
+    - name: "Set installation command for inbox version of WSL"
+      ansible.builtin.set_fact:
+        wsl_install_cmd: "wsl --install --inbox -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_install.txt"
+      when:
+        - guest_os_build_num | int < 25267
+        - guest_os_build_num | int > 22000
 
-- name: "Set installation command for store version of WSL"
-  ansible.builtin.set_fact:
-    wsl_install_cmd: "wsl --install -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_install.txt"
-  when: > 
-    (guest_os_build_num | int >= 25267) or
-    (guest_os_build_num | int < 22000)
+    - name: "Set installation command for store version of WSL"
+      ansible.builtin.set_fact:
+        wsl_install_cmd: "wsl --install -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_install.txt"
+      when: > 
+        (guest_os_build_num | int >= 25267) or
+        (guest_os_build_num | int < 22000)
 
-- name: "Install WSL and distribution"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "{{ wsl_install_cmd }}"
-    win_execute_cmd_ignore_error: true
+    - name: "Install WSL and distribution"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "{{ wsl_install_cmd }}"
+        win_execute_cmd_ignore_error: true
+  when: (guest_os_product_type | lower == 'client')
+
+- name: "Install WSL for Windows Server"
+  block:
+    # Due to issue https://github.com/microsoft/WSL/issues/9258, install "Debian" for Server.
+    - name: "Set the distribution name"
+      ansible.builtin.set_fact:
+        wsl_distribution_name: "Debian"
+
+    - name: "Install WSL and distribution"
+      ansible.windows.win_shell: "wsl --install -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_install.txt"
+      register: win_powershell_cmd_output
+      ignore_errors: true
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_unreachable: true
+      become: true
+      become_method: runas
+      become_user: Administrator
+  when: (guest_os_product_type | lower == 'server')
 
 - name: "Process the WSL output message"
   include_tasks: wsl_convert_binary_to_txt.yml
@@ -56,7 +77,21 @@
     - name: "Set WSL default version to 2"
       include_tasks: ../utils/win_execute_cmd.yml
       vars:
-        win_powershell_cmd: "wsl --set-default-version 2"
+        win_powershell_cmd: "wsl --set-default-version 2 | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_set_default_version_to_2.txt"
+        win_execute_cmd_ignore_error: true
+
+    - name: "Process the WSL output message"
+      include_tasks: wsl_convert_binary_to_txt.yml
+      vars:
+        source_path: "{{ wsl_file_path_win }}\\wsl_set_default_version_to_2.txt"
+        file_name: "wsl_set_default_version_to_2.txt"
+
+    - name: "Check WSL version setting result"
+      ansible.builtin.fail:
+        msg: "Setting WSL default version to 2 failed. Please check log file wsl_set_default_version_to_2.txt."
+      when:
+        - win_powershell_cmd_output.rc is defined
+        - win_powershell_cmd_output.rc != 0
 
     - name: "Check WSL version after setting"
       include_tasks: check_wsl_version.yml
