@@ -9,7 +9,7 @@ WORKDIR /root/ansible-vsphere-gos-validation
 # Install the required packages
 RUN tdnf makecache && \
     tdnf install -y python3 zip vim wget python3-pip \
-    sshpass gawk nfs-utils iana-etc xorriso && \
+    sshpass gawk nfs-utils iana-etc xorriso python3-lxml && \
     pip3 install setuptools wheel jmespath && \
     pip3 install pycdlib netaddr pywinrm pyvmomi pypsrp
 
@@ -17,7 +17,10 @@ RUN tdnf makecache && \
 RUN pip3 install ansible-core
 
 # Install Ansible collections
-# You can set https proxy if collections are failed to install from Galaxy server
+# You can set https proxy if collections are failed to install from Galaxy server, e.g.,
+# ENV HTTPS_PROXY="https://proxy.xxxx.com:xxxx"
+# Ansible 2.14.0 requires the locale encoding to be UTF-8
+ENV LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
 RUN ansible-galaxy collection install ansible.netcommon ansible.posix community.general community.vmware community.windows community.crypto
 
 # Download latest 'ansible-vsphere-gos-validation' release to working dir
