@@ -48,6 +48,14 @@
       become: true
       become_method: runas
       become_user: Administrator
+
+    # For Windows Server 2022
+    # 1. The default WSL version is 1.
+    # 2. The RC is 1 for above installation task, though WSL and distribution are actually installed.
+    - name: "Set the fact of skipping setting WSL version"
+      ansible.builtin.set_fact:
+        skip_set_wsl_ver: true
+      when: guest_os_build_num | int <= 23048
   when: (guest_os_product_type | lower == 'server')
 
 - name: "Process the WSL output message"
@@ -62,6 +70,7 @@
   when:
     - win_powershell_cmd_output.rc is defined
     - win_powershell_cmd_output.rc != 0
+    - not skip_set_wsl_ver
 
 - name: "Restart the guest OS"
   include_tasks: ../utils/win_shutdown_restart.yml
@@ -97,6 +106,7 @@
       include_tasks: check_wsl_version.yml
   when:
     - wsl_default_version | int != 2
+    - not skip_set_wsl_ver
 
 - name: "Validate the WSL version"
   ansible.builtin.assert:
@@ -104,3 +114,12 @@
       - wsl_default_version
       - wsl_default_version | int == 2
     fail_msg: "WSL default version is: {{ wsl_default_version }}, not the expected version: 2"
+  when: not skip_set_wsl_ver
+
+- name: "Validate the WSL version"
+  ansible.builtin.assert:
+    that:
+      - wsl_default_version
+      - wsl_default_version | int == 1
+    fail_msg: "WSL default version is: {{ wsl_default_version }}"
+  when: skip_set_wsl_ver
