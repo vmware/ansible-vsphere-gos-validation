@@ -145,14 +145,14 @@
         tmp_config_option_file: "{{ tmp_path }}"
 
     - name: "Fetch config option file from ESXi server"
-      fetch:
+      ansible.builtin.fetch:
         src: "{{ vm_config_option_esx_hw }}"
         dest: "{{ tmp_config_option_file }}"
         flat: true
       delegate_to: "{{ esxi_hostname }}"
 
     - name: "Get default config option from guest OS descriptor for guest id {{ guest_id }}"
-      xml:
+      community.general.xml:
         path: "{{ tmp_config_option_file }}"
         xpath: "{{ guest_config_options_xpath }}/{{ item }}"
         content: text
@@ -171,7 +171,7 @@
       with_items: "{{ guest_os_descriptor.results | map(attribute='matches') | select('defined') | flatten | map('dict2items') }}"
 
     - name: "Get default video RAM size in KB for guest id {{ guest_id }}"
-      xml:
+      community.general.xml:
         path: "{{ tmp_config_option_file }}"
         xpath: "{{ guest_config_options_xpath }}/vRAMSizeInKB/defaultValue"
         content: text
@@ -187,7 +187,7 @@
         - guest_vram_size.matches | length > 0
 
     - name: "Get supported disk controllers for guest id {{ guest_id }}"
-      xml:
+      community.general.xml:
         path: "{{ tmp_config_option_file }}"
         xpath: "{{ guest_config_options_xpath }}/supportedDiskControllerList/e"
         content: text
@@ -210,7 +210,7 @@
         - guest_supported_disk_ctrls.matches | length > 0
 
     - name: "Get supported disk controllers for guest id {{ guest_id }}"
-      xml:
+      community.general.xml:
         path: "{{ tmp_config_option_file }}"
         xpath: "{{ guest_config_options_xpath }}/supportedEthernetCard/e"
         content: text
@@ -233,7 +233,7 @@
         - guest_supported_ethernet_card.matches | length > 0
 
     - name: "Get supported USB controllers for guest id {{ guest_id }}"
-      xml:
+      community.general.xml:
         path: "{{ tmp_config_option_file }}"
         xpath: "{{ guest_config_options_xpath }}/supportedUSBControllerList/e"
         content: text
