@@ -90,10 +90,10 @@ This project supports below scenarios for end-to-end guest operating system vali
 Note: This compatible guest operating systems list is used for this project only. For guest operating system support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
 
 ### Docker images
-* Latest (Release v2.1):
+* Latest (Release v2.2):
   * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
-* Release v2.1:
-  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v2.1
+* Release v2.2:
+  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v2.2
 
 Launch testing using Docker image
 1. Execute below commands in your machine
