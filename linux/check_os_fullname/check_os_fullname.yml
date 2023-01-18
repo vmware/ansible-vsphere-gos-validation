@@ -30,45 +30,57 @@
 
         - name: "Display guest OS distribution"
           ansible.builtin.debug:
-            msg: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+            msg: "{{ vm_guest_os_distribution }}"
 
-        - name: "Initialize facts for checking guest full name"
+        - name: "Initialize facts for checking guest id and guest full name"
           ansible.builtin.set_fact:
+            expected_guest_id: ""
+            expected_guest_id_suffix: "{% if guest_os_bit == '64-bit' %}64{% endif %}Guest"
             expected_guest_fullname: ""
+            expected_guest_family: "linuxGuest"
             guest_is_otherlinux: false
 
-        # Map Ubuntu guest full name
-        - name: "Set expected_guest_fullname for Ubuntu"
+        - name: "Set fact of expected guest id suffix"
           ansible.builtin.set_fact:
-            expected_guest_fullname: "Ubuntu Linux ({{ guest_os_bit }})"
-          when: guest_os_ansible_distribution == "Ubuntu"
+            expected_guest_id_suffix: "{{ expected_guest_id_suffix | replace('64', '_64') }}"
+          when: >
+            guest_os_ansible_distribution in ["RedHat", "SLES", "SLED",
+            "CentOS", "OracleLinux", "AlmaLinux", "Rocky", "Debian"]
 
-        - name: "Map RHEL guest full name"
+        - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
           include_tasks: rhel_fullname_map.yml
           when: guest_os_ansible_distribution == "RedHat"
 
-        - name: "Map {{ guest_os_ansible_distribution }} guest full name"
+        - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
           include_tasks: sles_fullname_map.yml
           when: guest_os_ansible_distribution in ["SLES", "SLED"]
 
-        - name: "Map VMware Photon OS guest full name"
-          include_tasks: photon_fullname_map.yml
-          when: guest_os_ansible_distribution == "VMware Photon OS"
-
-        # Map guest full name for AmazonLinux, CentOS, Oracle Linux, AlmaLinux, Rocky Linux and Debian
-        - name: "Map {{ guest_os_ansible_distribution }} guest full name"
+        - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
           include_tasks: "{{ guest_os_ansible_distribution | lower }}_fullname_map.yml"
           when: guest_os_ansible_distribution in ["Amazon", "CentOS", "OracleLinux", "AlmaLinux", "Rocky", "Debian"]
 
-        # Map FreeBSD guest full name
-        - name: "Set expected_guest_fullname for FreeBSD"
+        - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
+            expected_guest_id: "ubuntu{{ expected_guest_id_suffix }}"
+            expected_guest_fullname: "Ubuntu Linux ({{ guest_os_bit }})"
+          when: guest_os_ansible_distribution == "Ubuntu"
+
+        - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+          ansible.builtin.set_fact:
+            expected_guest_id: "vmwarePhoton64Guest"
+            expected_guest_fullname: "VMware Photon OS (64-bit)"
+          when: guest_os_ansible_distribution == "VMware Photon OS"
+
+        - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+          ansible.builtin.set_fact:
+            expected_guest_id: "freebsd{{ guest_os_ansible_distribution_major_ver }}{{ expected_guest_id_suffix | replace('64', '_64') }}"
             expected_guest_fullname: "FreeBSD {{ guest_os_ansible_distribution_major_ver }} ({{ guest_os_bit }})"
+            expected_guest_family: "otherGuestFamily"
           when: guest_os_ansible_distribution == "FreeBSD"
 
-        # Map Fedora guest full name
-        - name: "Set expected_guest_fullname for Fedora"
+        - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
+            expected_guest_id: "fedora{{ expected_guest_id_suffix }}"
             expected_guest_fullname: "Red Hat Fedora ({{ guest_os_bit }})"
           when: guest_os_ansible_distribution == "Fedora"
 
@@ -77,7 +89,7 @@
             guest_is_otherlinux: true
           when: expected_guest_fullname == ""
 
-        - name: "Map Other Linux guest full name"
+        - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
           include_tasks: otherlinux_fullname_map.yml
           when: guest_is_otherlinux
 

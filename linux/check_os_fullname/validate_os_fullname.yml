@@ -8,41 +8,51 @@
 # If the guest os full name is unmapped and displays OS detailed data, test passed
 - name: "Guest OS full name is unmapped but shows OS detailed data"
   block:
-    - name: "guest OS detailed information is shown in guest OS full name, test passed"
+    - name: "guest OS detailed information is shown in guest OS full name on ESXi {{ esxi_version }}, test passed"
       ansible.builtin.meta: end_host
   when:
     - (esxi_version is version('6.7.0', '==') and (esxi_update_version | int < 2)) or (esxi_version is version('7.0.0', '=='))
     - unmapped_os_fullname is defined and unmapped_os_fullname
     - unmapped_os_fullname in guestinfo_guest_full_name
 
-- name: "Check guest ID in guest info is not empty"
+- name: "Check VM's guest id in guest info"
   ansible.builtin.assert:
     that:
-      - guestinfo_guest_id
-    fail_msg: "Guest ID in guest info is '{{ guestinfo_guest_id }}', which should be a valid value firstly."
+      - guestinfo_guest_id == expected_guest_id
+    fail_msg: "VM's guest id in guest info is '{{ guestinfo_guest_id }}', not expected '{{ expected_guest_id }}'."
+    success_msg: "VM's guest id in guest info is '{{ guestinfo_guest_id }}', which is as expected '{{ expected_guest_id }}'."
 
-- name: "Display VM's guest OS full name and expected guest OS full name"
-  ansible.builtin.debug:
-    msg:
-      - "VM's guest OS full name is '{{ guestinfo_guest_full_name }}'."
-      - "Expected guest OS full name is '{{ expected_guest_fullname }}'."
-
-- name: "Validate Guest OS full name is {{ expected_guest_fullname[0] }} or {{ expected_guest_fullname[1] }}"
-  ansible.builtin.assert:
-    that:
-      - guestinfo_guest_full_name in expected_guest_fullname
-    fail_msg: >
-      VM's guest OS full name is: '{{ guestinfo_guest_full_name }}',
-      not expected '{{ expected_guest_fullname[0] }}' or '{{ expected_guest_fullname[1] }}'
-  when:
-    - expected_guest_fullname is sequence
-    - expected_guest_fullname | length == 2
-
-- name: "Validate Guest OS full name is {{ expected_guest_fullname }}"
+- name: "Check VM's guest full name in guest info"
   ansible.builtin.assert:
     that:
       - guestinfo_guest_full_name == expected_guest_fullname
-    fail_msg: >
-      VM's guest OS full name is: '{{ guestinfo_guest_full_name }}',
-      not expected '{{ expected_guest_fullname }}'
-  when: expected_guest_fullname is string
+    fail_msg: "VM's guest full name is '{{ guestinfo_guest_full_name }}', not expected '{{ expected_guest_fullname }}'."
+    success_msg: "VM's guest full name is '{{ guestinfo_guest_full_name }}', which is as expected '{{ expected_guest_fullname }}'."
+  when: not (guestinfo_guest_full_name is match('Other \\d+.x Linux.*'))
+
+- name: "Check VM's guest full name in guest info"
+  block:
+    - name: "Set alternative for the expected guest full name"
+      ansible.builtin.set_fact:
+        expected_guest_fullname_alternative: "{{ expected_guest_fullname ｜ replace('Linux', 'or later Linux') }}"
+
+    - name: "Check VM's guest full name in guest info"
+      ansible.builtin.assert:
+        that:
+          - guestinfo_guest_full_name in [expected_guest_fullname, expected_guest_fullname_alternative]
+        fail_msg: >-
+          VM's guest full name is '{{ guestinfo_guest_full_name }}', not expected '{{ expected_guest_fullname }}' or
+          '{{ expected_guest_fullname_alternative }}'.
+        success_msg: >-
+          VM's guest full name is '{{ guestinfo_guest_full_name }}', which is as expected '{{ expected_guest_fullname }}'
+          or '{{ expected_guest_fullname_alternative }}'.
+  when: guestinfo_guest_full_name is match('Other \\d+.x Linux.*')
+
+- name: "Check VM's guest family in guest info"
+  ansible.builtin.assert:
+    that:
+      - guestinfo_guest_family == expected_guest_family
+    fail_msg: >-
+      VM's guest family in guest info is '{{ guestinfo_guest_family }}', not expected '{{ expected_guest_family }}'.
+    success_msg: >-
+      VM's guest family in guest info is '{{ guestinfo_guest_family }}', which is as expected '{{ expected_guest_family }}'.

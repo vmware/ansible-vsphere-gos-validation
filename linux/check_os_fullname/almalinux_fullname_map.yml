@@ -3,17 +3,19 @@
 ---
 # Guest full name of AlmaLinux is mapped to "AlmaLinux (64-bit)" when
 # VMware Tools version is 12.0.0 or later, ESXi version is 8.0.0 or later.
-- name: "Set expected_guest_fullname for AlmaLinux with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
+- name: "Set expected guest id and full name for AlmaLinux with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
   ansible.builtin.set_fact:
-    expected_guest_fullname: "AlmaLinux ({{ guest_os_bit }})"
+    expected_guest_id: "almalinux_64Guest"
+    expected_guest_fullname: "AlmaLinux (64-bit)"
   when:
     - vmtools_version is version('12.0.0', '>=')
     - esxi_version is version('8.0.0', '>=')
 
 # Guest full name of AlmaLinux is mapped to VM's guest OS version when:
 # VMware Tools version is 12.0.0 or later, ESXi version is 7.0.3 or earlier.
-- name: "Set expected_guest_fullname from VM's guest OS version"
+- name: "Set expected guest id and full name for AlmaLinux with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
   ansible.builtin.set_fact:
+    expected_guest_id: "{{ vm_guest_id }}"
     expected_guest_fullname: "{{ vm_guest_os_version }}"
   when:
     - vmtools_version is version('12.0.0', '>=')
@@ -21,6 +23,6 @@
 
 # Guest full name of AlmaLinux is mapped to "Other N.x Linux (64-bit)" when
 # VMware Tools version is 11.3.5 or earlier
-- name: "Set expected_guest_fullname for AlmaLinux with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
+- name: "Set expected guest id and full name for AlmaLinux with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
   include_tasks: otherlinux_fullname_map.yml
   when: vmtools_version is version('12.0.0', '<')
