@@ -2,10 +2,12 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Wait VMware tools to report Guest OS fullname
-- include_tasks: ../../common/vm_get_guest_info.yml
+- name: "Get VM's guest info"
+  include_tasks: ../../common/vm_get_guest_info.yml
 
 # If the guest os full name is unmapped and displays OS detailed data, test passed
-- block:
+- name: "Guest OS full name is unmapped but shows OS detailed data"
+  block:
     - name: "guest OS detailed information is shown in guest OS full name, test passed"
       ansible.builtin.meta: end_host
   when:
@@ -19,45 +21,28 @@
       - guestinfo_guest_id
     fail_msg: "Guest ID in guest info is '{{ guestinfo_guest_id }}', which should be a valid value firstly."
 
-- name: "Known issue about Rocky Linux guest fullname"
-  block:
-    - include_tasks: ../utils/get_installed_package_info.yml
-      vars:
-        package_name: "open-vm-tools"
+- name: "Display VM's guest OS full name and expected guest OS full name"
+  ansible.builtin.debug:
+    msg:
+      - "VM's guest OS full name is '{{ guestinfo_guest_full_name }}'."
+      - "Expected guest OS full name is '{{ expected_guest_fullname }}'."
 
-    - name: "Known issue - ignore incorrect guest fullname with Rocky Linux built-in OVT 11.3.5"
-      ansible.builtin.debug:
-        msg:
-          - "The guest fullname of Rocky Linux with built-in open-vm-tools 11.3.5-{{ package_info.Release }} is always same as VM's guest OS version."
-          - "The expected guest fullname should be {{ ', or '.join(guest_fullname) }}. Ignore this known issue."
-          - "Please refer to https://bugs.rockylinux.org/view.php?id=200"
-      tags:
-        - known_issue
-      when:
-        - package_info is defined
-        - package_info.Release is defined
-        - package_info.Release == "1.el8" or package_info.Release == "1.el9"
-        - package_info.Vendor is defined and 'Rocky' in package_info.Vendor
+- name: "Validate Guest OS full name is {{ expected_guest_fullname[0] }} or {{ expected_guest_fullname[1] }}"
+  ansible.builtin.assert:
+    that:
+      - guestinfo_guest_full_name in expected_guest_fullname
+    fail_msg: >
+      VM's guest OS full name is: '{{ guestinfo_guest_full_name }}',
+      not expected '{{ expected_guest_fullname[0] }}' or '{{ expected_guest_fullname[1] }}'
   when:
-    - guest_os_ansible_distribution == 'Rocky'
-    - vmtools_version is version('11.3.5', '=')
+    - expected_guest_fullname is sequence
+    - expected_guest_fullname | length == 2
 
-- block:
-    - name: "Assert Guest OS fullname is either {{ guest_fullname[0] }} or {{ guest_fullname[1] }}"
-      ansible.builtin.assert:
-        that:
-          - guestinfo_guest_full_name in guest_fullname
-        fail_msg: >
-                "VM '{{ vm_name }}' guest OS fullname is: '{{ guestinfo_guest_full_name }}',
-                not expected '{{ guest_fullname[0] }}' or '{{ guest_fullname[1] }}'"
-  when:
-    - guest_fullname is sequence
-    - guest_fullname | length == 2
-
-- block:
-    - name: "Assert Guest OS fullname is {{ guest_fullname }}"
-      ansible.builtin.assert:
-        that:
-          - guestinfo_guest_full_name == guest_fullname
-        fail_msg: "VM '{{ vm_name }}' guest OS fullname is: '{{ guestinfo_guest_full_name }}', not expected '{{ guest_fullname }}'"
-  when: guest_fullname is string
+- name: "Validate Guest OS full name is {{ expected_guest_fullname }}"
+  ansible.builtin.assert:
+    that:
+      - guestinfo_guest_full_name == expected_guest_fullname
+    fail_msg: >
+      VM's guest OS full name is: '{{ guestinfo_guest_full_name }}',
+      not expected '{{ expected_guest_fullname }}'
+  when: expected_guest_fullname is string
