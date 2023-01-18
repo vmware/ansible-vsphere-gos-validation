@@ -778,8 +778,9 @@ class CallbackModule(CallbackBase):
                        self.vm_info.GuestInfo_Detailed_Data = set_fact_result.get("guestinfo_detailed_data", '')
                        self.vm_info.VMTools_Version = set_fact_result.get("guestinfo_vmtools_info", '')
                 if "check_guest_os_gui.yml" == task_file:
-                   if self.vm_info:
-                       self.vm_info.GUI_Installed = str(set_fact_result.get("guest_os_with_gui", ''))
+                   guest_os_with_gui = str(set_fact_result.get("guest_os_with_gui", ''))
+                   if self.vm_info and guest_os_with_gui != '':
+                       self.vm_info.GUI_Installed = guest_os_with_gui
 
         elif str(task.action) == "ansible.builtin.debug":
             if "skip_test_case.yml" == task_file and "Skip testcase:" in task.name:
@@ -837,7 +838,7 @@ class CallbackModule(CallbackBase):
                         self.vcenter_info['version'] = debug_var_value
                     if not self.vcenter_info['build'] and debug_var_name == "vcenter_build":
                         self.vcenter_info['build'] = debug_var_value
-                if "cloudinit_pkg_check.yml" == task_file and debug_var_name == "cloudinit_version":
+                if "get_cloudinit_version.yml" == task_file and debug_var_name == "cloudinit_version":
                     if self.vm_info and not self.vm_info.CloudInit_Version:
                         self.vm_info.CloudInit_Version = debug_var_value
                     if not self.os_cloudinit_version:
