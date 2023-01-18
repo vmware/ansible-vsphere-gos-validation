@@ -27,31 +27,22 @@
     - linux_kernel_major_ver | int >= 5
     - esxi_version is version('7.0.0', '<=')
 
-- name: "Set expected_guest_id and expected_guest_fullname for {{ vm_guest_os_distribution }} on ESXi {{ esxi_version }}"
+- name: "Set fact of expected guest OS major version on ESXi {{ esxi_version }}"
   ansible.builtin.set_fact:
-    expected_guest_id: "other{{ [linux_kernel_major_ver | int, 6] | min }}xLinux{{ expected_guest_id_suffix }}"
-    expected_guest_fullname: "Other {{ linux_kernel_major_ver }}.x Linux ({{ guest_os_bit }})"
-  when:
-    - esxi_version is version('8.0.0', '>=')
+    expected_guest_major_ver: |-
+      {%- if esxi_version is version('6.7.0', '<') -%}
+      {{ [linux_kernel_major_ver | int, 3] | min }}
+      {%- elif esxi_version is version('6.7.0', '>=') and esxi_version is version('7.0.1', '<') -%}
+      {{ [linux_kernel_major_ver | int, 4 ] | min }}
+      {%- elif esxi_version is version('7.0.1', '>=') and esxi_version is version('8.0.0', '<') -%}
+      {{ [linux_kernel_major_ver | int, 5 ] | min }}
+      {%- elif esxi_version is version('8.0.0', '>=') -%}
+      {{ [linux_kernel_major_ver | int, 6 ] | min }}
+      {%- endif %}
+
 
 - name: "Set expected_guest_id and expected_guest_fullname for {{ vm_guest_os_distribution }} on ESXi {{ esxi_version }}"
   ansible.builtin.set_fact:
-    expected_guest_id: "other{{ [linux_kernel_major_ver | int, 5] | min }}xLinux{{ expected_guest_id_suffix }}"
-    expected_guest_fullname: "Other {{ linux_kernel_major_ver }}.x Linux ({{ guest_os_bit }})"
-  when:
-    - esxi_version is version('7.0.0', '>')
-    - esxi_version is version('8.0.0', '<')
+    expected_guest_id: "other{{ expected_guest_major_ver }}xLinux{{ expected_guest_id_suffix }}"
+    expected_guest_fullname: "Other {{ expected_guest_major_ver }}.x or later Linux ({{ guest_os_bit }})"
 
-- name: "Set expected_guest_id and expected_guest_fullname for {{ vm_guest_os_distribution }} on ESXi {{ esxi_version }}"
-  ansible.builtin.set_fact:
-    expected_guest_id: "other{{ [linux_kernel_major_ver | int, 4] | min }}xLinux{{ expected_guest_id_suffix }}"
-    expected_guest_fullname: "Other {{ linux_kernel_major_ver }}.x Linux ({{ guest_os_bit }})"
-  when:
-    - esxi_version is version('6.7.0', '>=')
-    - esxi_version is version('7.0.0', '<=')
-
-- name: "Set expected_guest_id and expected_guest_fullname for {{ vm_guest_os_distribution }} on ESXi {{ esxi_version }}"
-  ansible.builtin.set_fact:
-    expected_guest_id: "other{{ [linux_kernel_major_ver | int, 3] | min }}xLinux{{ expected_guest_id_suffix }}"
-    expected_guest_fullname: "Other {{ linux_kernel_major_ver }}.x Linux ({{ guest_os_bit }})"
-  when: esxi_version is version('6.7.0', '<')

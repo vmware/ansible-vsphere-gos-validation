@@ -14,10 +14,10 @@
 - name: "Set facts of VMware Tools config file and log files"
   ansible.builtin.set_fact:
     vmtools_config_file: "/etc/vmware-tools/tools.conf"
-    vmtools_vmtoolsd_log_file: "{{ vmtools_log_dir }}/vmtoolsd.${USER}.log"
+    vmtools_vmtoolsd_log_file: "{{ vmtools_log_dir }}/vmtoolsd.log"
     vmtools_vmsvc_log_file: "{{ vmtools_log_dir }}/vmsvc.log"
 
-- name: "Set fact of configs for enabling VMware Tools debug logging"
+- name: "Set facts of VMware Tools config section and options for enabling debug logging"
   ansible.builtin.set_fact:
     vmtools_logging_section: logging
     vmtools_logging_options: |-
@@ -29,12 +29,18 @@
       vmsvc.handler=file
       vmsvc.data={{ vmtools_vmsvc_log_file }}
 
-- name: "Clean up {{ vmtools_log_dir }} for new logs"
-  ansible.builtin.shell: "[ -e {{ vmtools_log_dir }} ] && rm -rf {{ vmtools_log_dir }}"
+- name: "Prepare log directory {{ vmtools_log_dir }} for new logs"
+  ansible.builtin.shell: |
+    if [ -e {{ vmtools_log_dir }} ] ; then
+        rm -rf {{ vmtools_log_dir }};
+    fi
+    mkdir -p {{ vmtools_log_dir }}
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Get VMware Tools config file stat info"
   include_tasks: get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ vmtools_config_file }}"
 
 - name: "Create VMware Tools config file with logging options"
   ansible.builtin.copy:
@@ -42,6 +48,7 @@
     content: |
       [{{ vmtools_logging_section }}]
       {{ vmtools_logging_options }}
+  delegate_to: "{{ vm_guest_ip }}"
   when: not guest_file_exists
 
 - name: "Update VMware Tools config file with logging options"
@@ -64,3 +71,13 @@
 - name: "Display content of {{ vmtools_config_file }}"
   ansible.builtin.debug: var=vmtools_config
   when: enable_debug
+
+- name: "Get the service name of VMware Tools"
+  include_tasks: set_ovt_facts.yml
+
+- name: "Restart vmtoolsd service to make config take effect"
+  include_tasks: service_operation.yml
+  vars:
+    service_name: "{{ ovt_service }}"
+    service_enabled: true
+    service_state: "restarted"
