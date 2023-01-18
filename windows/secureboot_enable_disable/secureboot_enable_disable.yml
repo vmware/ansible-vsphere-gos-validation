@@ -31,6 +31,15 @@
             skip_reason: "Not Applicable"
           when: vm_firmware is undefined or vm_firmware | lower != 'efi'
 
+        - name: "Get VBS status of VM"
+          include_tasks: ../../common/vm_get_vbs_status.yml
+        - name: "Skip {{ current_testcase_name }} with VBS enabled"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case due to secure boot cannot be disabled for VM with VBS enabled."
+            skip_reason: "Not Applicable"
+          when: vm_vbs_enabled is defined and vm_vbs_enabled | bool
+
         # Enable, disable secure boot test if VM uses EFI firmware
         - include_tasks: change_secureboot_config.yml
           vars:
