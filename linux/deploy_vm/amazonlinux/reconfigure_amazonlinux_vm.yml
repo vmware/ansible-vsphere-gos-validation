@@ -10,27 +10,11 @@
 - include_tasks: ../../../common/esxi_get_version_build.yml
   when: esxi_version is undefined or esxi_version == 'N/A'
 
-# Amazon Linux 2 OVA is using other3xlinux64 as guest id
-- include_tasks: ../../../common/vm_set_guest_id.yml
-  vars:
-    guest_id: 'amazonlinux2_64Guest'
-  when:
-    - vm_guest_id != 'amazonlinux2_64Guest'
-    - ((esxi_version is version('6.7.0', '>')) or (esxi_version is version('6.7.0', '==') and esxi_update_version | int > 0))
-    - vm_hardware_version_num | int >= 14
-
-# We can look at this back when there is any news about Amazon Linux 3
-# - include_tasks: ../../../common/vm_set_guest_id.yml
-#   when:
-#     - guest_id == 'amazonlinux3_64Guest'
-#     - vm_guest_id != guest_id
-#     - vm_hardware_version_num | int >= 18
-
 # Create the seed ISO to modify login information
 - include_tasks: ../../utils/create_seed_iso.yml
   vars:
     user_data_template: "amazon-user-data.j2"
-    local_hostname: "amazon-{{ hostname_timestamp }}"
+    local_hostname: "amazonlinux-{{ hostname_timestamp }}"
 
 # Upload seed ISO to VM path on ESXi server
 - include_tasks: ../../../common/esxi_upload_datastore_file.yml
@@ -57,9 +41,6 @@
 - include_tasks: ../../../common/update_inventory.yml
   vars:
     update_inventory_timeout: 300
-
-# Post configuration for ssh, cloud-init and vmtools
-- include_tasks: amazon_post_config.yml
 
 # Eject seed ISO from guest
 - name: "Eject seed ISO from Amazon Linux"

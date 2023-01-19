@@ -33,15 +33,13 @@
       register: vm_ova_stat
       failed_when: not vm_ova_stat.stat.exists
 
-    # Deploy a new VM from OVA
-    - include_tasks: ../../common/ovf_deploy.yml
+    - name: "Deploy a new VM from OVA"
+      include_tasks: ../../common/ovf_deploy.yml
       vars:
         ovf_path: "{{ vm_ova_path }}"
         ovf_vm_name: "{{ vm_name }}"
         deploy_datastore: "{{ datastore }}"
 
-    # Get OVA deployed VM info
-    - include_tasks: ../../common/vm_get_vm_info.yml
     - name: "Set fact of vm_exists to True"
       ansible.builtin.set_fact:
         vm_exists: true
@@ -51,88 +49,84 @@
     - name: "Set fact of the base snapshot name"
       ansible.builtin.set_fact:
         base_snapshot_for_reconfig: "FreshDeployedFromOVA"
-    - include_tasks: ../../common/vm_take_snapshot.yml
+
+    - name: "Take snapshot after OVA deployment"
+      include_tasks: ../../common/vm_take_snapshot.yml
       vars:
         snapshot_name: "{{ base_snapshot_for_reconfig }}"
 
-    - name: "Set fact of guest OS type for VM '{{ vm_name }}'"
-      ansible.builtin.set_fact:
-        ova_guest_os_type: |-
-          {%- if 'ubuntu' in vm_guest_id -%}ubuntu
-          {%- elif 'amazonlinux' in vm_guest_id -%}amazonlinux
-          {%- elif 'vmwarePhoton' in vm_guest_id -%}photon
-          {%- else -%}unknown{%- endif -%}
+    - name: "Power on VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-on'
+
+    - name: "Collect OVA configs"
+      include_tasks: "../../common/collect_ovf_vm_config.yml"
+      vars:
+        ovf_vm_hardware_config_path: "{{ current_test_log_folder }}"
+
+    - name: "Try to get OS type from guest info"
+      include_tasks: get_ova_guest_os_type.yml
+
+    # Revert to snapshot "FreshDeployedFromOVA" to
+    # proceed the following tasks so that VM's reconfiguration can be
+    # performed at the first time boot.
+    - name: "Revert to snapshot '{{ base_snapshot_for_reconfig }}' for VM reconfig"
+      include_tasks: ../../common/vm_revert_snapshot.yml
+      vars:
+        snapshot_name: "{{ base_snapshot_for_reconfig }}"
 
     # Upgrade VM hardware version
     # Note:
     # Known issue on Ubuntu cloud image OVA deployed VM, after upgrade hardware version,
     # VM will hang during booting, tracked in this issue:
     # https://bugs.launchpad.net/cloud-images/+bug/1898871
-    - include_tasks: upgrade_ova_vm_hwv.yml
+    - name: "Upgrade VM's hardware version to {{ hardware_version }}"
+      include_tasks: upgrade_ova_vm_hwv.yml
       when:
-        - hardware_version is defined and hardware_version
-        - hardware_version == "latest" or (vm_hardware_version_num | int < hardware_version | int)
+        - hardware_version is defined
+        - (hardware_version == "latest" or
+           (vm_hardware_version_num | int < hardware_version | int))
 
-    # Power on VM and try to get OS type from guest info or vmx detailed data
-    - block:
-        - include_tasks: ../../common/vm_set_power_state.yml
-          vars:
-            vm_power_state_set: 'powered-on'
-        - name: "Set current power state"
-          ansible.builtin.set_fact:
-            current_power_state: "{{ vm_power_state_get }}"
-        - include_tasks: ../../common/vm_get_guest_info.yml
-
-        # Try to get OS type from guest info
-        - include_tasks: get_os_type_from_guestinfo.yml
-      when: ova_guest_os_type == 'unknown'
-
-    # Revert to snapshot "FreshDeployedFromOVA" or "AfterUpgradeHwv" to
-    # proceed the following tasks so that VM's reconfiguration can be
-    # performed at the first time boot.
-    - include_tasks: ../../common/vm_revert_snapshot.yml
-      vars:
-        snapshot_name: "{{ base_snapshot_for_reconfig }}"
-      when:
-        - current_power_state is defined
-        - current_power_state == "poweredOn"
-
-    # Configure username/password, ssh public key, sshd, etc in guest
-    # Reconfig Amazon Linux VM
-    - include_tasks: amazonlinux/reconfigure_amazonlinux_vm.yml
+    - name: "Reconfigure Amazon Linux VM"
+      include_tasks: amazonlinux/reconfigure_amazonlinux_vm.yml
       when: ova_guest_os_type == 'amazonlinux'
 
-    # Reconfig VMware Photon OS VM
-    - include_tasks: photon/reconfigure_photon_vm.yml
+    - name: "Reconfig VMware Photon OS VM"
+      include_tasks: photon/reconfigure_photon_vm.yml
       when: ova_guest_os_type == 'photon'
 
-    # Reconfig Flatcar VM
-    - include_tasks: flatcar/reconfigure_flatcar_vm.yml
+    - name: "Reconfig Flatcar VM"
+      include_tasks: flatcar/reconfigure_flatcar_vm.yml
       when: ova_guest_os_type == 'flatcar'
 
-    # Reconfig Ubuntu VM
-    - include_tasks: ubuntu/reconfigure_ubuntu_ova_vm.yml
+    - name: "Reconfig Ubuntu VM"
+      include_tasks: ubuntu/reconfigure_ubuntu_ova_vm.yml
       when: ova_guest_os_type == 'ubuntu'
 
-    # Warning about other OS OVAs which are not supported
-    - ansible.builtin.debug:
-        msg: "WARN: OVA guest OS type is not supported in this project. The following tests might fail."
+    - name: "Warning about unknown guest OS type"
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: The guest OS type of the OVA is not supported in this project.
+          The following tests might fail.
       when: ova_guest_os_type == 'unknown'
   rescue:
-    - include_tasks: ../../common/test_rescue.yml
+    - name: "Test rescue"
+      include_tasks: ../../common/test_rescue.yml
       vars:
         exit_testing_when_fail: true
   always:
-    - block:
-        # Umount NFS share points
-        - include_tasks: ../../common/local_unmount.yml
+    - name: "Unmount NFS share folder and remove mount folder"
+      block:
+        - name: "Umount NFS share points"
+          include_tasks: ../../common/local_unmount.yml
           vars:
             mount_path: "{{ nfs_mount_dir }}"
             local_unmount_ignore_errors: true
           when: nfs_mounted is defined and nfs_mounted | bool
 
-        # Remove temporary folders
-        - include_tasks: ../../common/delete_local_file.yml
+        - name: "Remove the mount folder"
+          include_tasks: ../../common/delete_local_file.yml
           vars:
             local_path: "{{ nfs_mount_dir }}"
             del_local_file_ignore_errors: true

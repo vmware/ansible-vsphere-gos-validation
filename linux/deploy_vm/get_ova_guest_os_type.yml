@@ -1,6 +1,15 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+# Try to get the OS type from VM's guest id
+- name: "Get guest OS type for VM '{{ vm_name }}' from guest id in VM's config"
+  ansible.builtin.set_fact:
+    ova_guest_os_type: |-
+      {%- if 'ubuntu' in vm_guest_id -%}ubuntu
+      {%- elif 'amazonlinux' in vm_guest_id -%}amazonlinux
+      {%- elif 'vmwarePhoton' in vm_guest_id -%}photon
+      {%- else -%}unknown{%- endif -%}
+
 # Try to get the OS type from guest id
 - name: "Get guest OS type for VM '{{ vm_name }}' from guest id in guest info"
   ansible.builtin.set_fact:
@@ -28,7 +37,7 @@
     - guestinfo_guest_full_name is defined
     - guestinfo_guest_full_name
 
-- name: "Get guest OS type for VM '{{ vm_name }}' based on guest OS detailed data"
+- name: "Get guest OS type for VM '{{ vm_name }}' from guest OS detailed data in guest info"
   ansible.builtin.set_fact:
     ova_guest_os_type: |-
       {%- if 'Ubuntu' in guestinfo_detailed_data -%}ubuntu
