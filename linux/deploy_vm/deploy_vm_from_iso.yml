@@ -298,19 +298,14 @@
     - include_tasks: ../../common/vm_get_power_state.yml
     - name: "Collect cloud-innit logs"
       block:
-        - include_tasks: ../../common/vm_get_vmtools_status.yml
-          vars:
-            get_vmtools_status_retries: 10
+        - include_tasks: ../../common/vm_get_guest_info.yml
         - include_tasks: ../utils/collect_cloudinit_logs.yml
           when:
-            - vmtools_is_installed is defined
-            - vmtools_is_installed
-            - vmtools_is_running is defined
-            - vmtools_is_running
+            - guestinfo_guest_id is defined
+            - guestinfo_guest_id is match('ubuntu.*')
       when:
         - vm_power_state_get is defined
         - vm_power_state_get == "poweredOn"
-        - unattend_install_conf is match('Ubuntu')
 
     - include_tasks: ../../common/test_rescue.yml
       vars:

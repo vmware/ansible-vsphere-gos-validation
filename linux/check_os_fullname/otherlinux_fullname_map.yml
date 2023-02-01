@@ -1,16 +1,6 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Map Flatcar, RockyLinux, or other Linux distribution which doesn't have a unique guest id
-
-# If there is no best match of the guest full name on ESXi server, it will show the guest OS detailed information
-# in the guest full name, which include the kernel version and os distribution
-- name: "Set unmapped guest fullname for {{ vm_guest_os_distribution }} on on ESXi {{ esxi_version }}"
-  ansible.builtin.set_fact:
-    unmapped_os_fullname: >-
-      Linux {{ guest_os_ansible_kernel }} {{ guest_os_release.PRETTY_NAME }}
-      {{ guest_os_release.NAME }} {{ guest_os_release.VERSION_ID }}
-
 - name: "Set fact of Linux kernel major version"
   ansible.builtin.set_fact:
     linux_kernel_major_ver: "{{ guest_os_ansible_kernel | regex_search('^\\d+') }}"
@@ -19,6 +9,30 @@
   ansible.builtin.fail:
     msg: "Failed to extract major version from Linux kernel version {{ guest_os_ansible_kernel }}"
   when: not linux_kernel_major_ver
+
+# If there is no best match of the guest full name on ESXi server, it might show the guest OS detailed information
+# in the guest full name, which includes the kernel version and os distribution
+- name: "Set unmapped guest full name for {{ vm_guest_os_distribution }} on ESXi {{ esxi_version }}"
+  block:
+    - name: "Compose unmapped guest full name"
+      ansible.builtin.set_fact:
+        unmapped_guest_fullname: >-
+          Linux {{ guest_os_ansible_kernel }} {{ guest_os_release.PRETTY_NAME }}
+          {{ guest_os_release.NAME }} {{ guest_os_release.VERSION_ID }}
+
+    - name: "Append OS release build number to unmapped guest full name"
+      ansible.builtin.set_fact:
+        unmapped_guest_fullname: "{{ unmapped_guest_fullname ~ ' ' ~ guest_os_release.BUILD_ID }}"
+      when:
+        - guest_os_release.BUILD_ID is defined
+        - guest_os_release.BUILD_ID
+  when:
+    - guest_os_release.PRETTY_NAME is defined
+    - guest_os_release.PRETTY_NAME
+    - guest_os_release.NAME is defined
+    - guest_os_release.NAME
+    - guest_os_release.VERSION_ID is defined
+    - guest_os_release.VERSION_ID
 
 # Linux kernel >= 5.x
 - name: "Set expected_guest_id and expected_guest_fullname with VM's guest OS version on ESXi {{ esxi_version }}"
@@ -29,6 +43,10 @@
     - linux_kernel_major_ver | int >= 5
     - esxi_version is version('7.0.0', '<=')
 
+# Guest id "other3xlinux64Guest" and full name "Other 3.x (or later) Linux (64-bit)" is available on ESXi 5.5 or later
+# Guest id "other4xlinux64Guest" and full name "Other 4.x (or later) Linux (64-bit)" is available on ESXi 6.7 or later
+# Guest id "other5xlinux45Guest" and full name "Other 5.x (or later) Linux (64-bit)" is available on ESXi 7.0.1 or later
+# Guest id "other6xlinux46Guest" and full name "Other 6.x (or later) Linux (64-bit)" is available on ESXi 8.0.0 or later
 - name: "Set fact of expected guest OS major version on ESXi {{ esxi_version }}"
   ansible.builtin.set_fact:
     expected_guest_major_ver: |-
@@ -47,4 +65,4 @@
   ansible.builtin.set_fact:
     expected_guest_id: "other{{ expected_guest_major_ver }}xLinux{{ expected_guest_id_suffix }}"
     expected_guest_fullname: "Other {{ expected_guest_major_ver }}.x or later Linux ({{ guest_os_bit }})"
-
+  when: expected_guest_major_ver

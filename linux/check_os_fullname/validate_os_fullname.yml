@@ -16,17 +16,17 @@
     - name: "Guest OS full name is unmapped"
       ansible.builtin.debug:
         msg: >-
-          Guest OS full name shows guest OS detailed information on ESXi {{ esxi_version }},
-          which is as expected on ESXi {{ esxi_version }}. Test Passed.
-
-    - name: "Test completed"
+          Guest OS full name is '{{ guestinfo_guest_full_name }}' on ESXi {{ esxi_version }},
+          which shows guest OS detailed information and is as expected on ESXi {{ esxi_version }}.
+          Test Passed.
+    - name: "Test passed on ESXi {{ esxi_version }}"
       ansible.builtin.meta: end_host
   when:
     - ((esxi_version is version('6.7.0', '==') and
         (esxi_update_version | int < 2)) or
        esxi_version is version('7.0.0', '=='))
-    - unmapped_os_fullname is defined and unmapped_os_fullname
-    - unmapped_os_fullname in guestinfo_guest_full_name
+    - unmapped_guest_fullname is defined and unmapped_guest_fullname
+    - guestinfo_guest_full_name == unmapped_guest_fullname
 
 - name: "Check guest id in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
   ansible.builtin.assert:
