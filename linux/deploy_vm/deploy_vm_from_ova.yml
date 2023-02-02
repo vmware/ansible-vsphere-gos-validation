@@ -138,21 +138,5 @@
             del_local_file_ignore_errors: true
       when: nfs_mount_dir is defined and nfs_mount_dir
 
-    # Collect cloud-init logs for deploying Ubuntu and Photon OVA
-    - include_tasks: ../../common/vm_get_power_state.yml
-    - name: "Collect cloud-init logs"
-      block:
-        - include_tasks: ../../common/vm_get_vmtools_status.yml
-          vars:
-            get_vmtools_status_retries: 10
-        - include_tasks: ../utils/collect_cloudinit_logs.yml
-          when:
-            - vmtools_is_installed is defined
-            - vmtools_is_installed
-            - vmtools_is_running is defined
-            - vmtools_is_running
-      when:
-        - vm_power_state_get is defined
-        - vm_power_state_get == "poweredOn"
-        - ova_guest_os_type is defined
-        - ova_guest_os_type in ['photon', 'ubuntu']
+    - name: "Collect VM deployment logs"
+      include_tasks: collect_vm_logs.yml
