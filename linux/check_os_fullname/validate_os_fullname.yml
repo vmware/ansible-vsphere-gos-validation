@@ -10,14 +10,26 @@
       - "ESXi version: {{ esxi_version }}"
       - "VM's hardware version: {{ vm_hardware_version }}"
 
+- name: "Check guest family in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
+  ansible.builtin.assert:
+    that:
+      - guestinfo_guest_family == expected_guest_family
+    fail_msg: >-
+      VM's guest family in guest info is '{{ guestinfo_guest_family }}',
+       not expected '{{ expected_guest_family }}'.
+    success_msg: >-
+      VM's guest family in guest info is '{{ guestinfo_guest_family }}',
+      which is as expected '{{ expected_guest_family }}'.
+
 # If the guest os full name is unmapped and displays OS detailed data, test passed
 - name: "Guest OS full name is unmapped but shows OS detailed data"
   block:
     - name: "Guest OS full name is unmapped"
       ansible.builtin.debug:
         msg: >-
-          Guest OS full name is '{{ guestinfo_guest_full_name }}' on ESXi {{ esxi_version }},
-          which shows guest OS detailed information and is as expected on ESXi {{ esxi_version }}.
+          Guest id is '{{ guestinfo_guest_id }}' on ESXi {{ esxi_version }}, and 
+          guest OS full name is '{{ guestinfo_guest_full_name }}',  which shows
+          guest OS detailed information and is as expected on ESXi {{ esxi_version }}.
           Test Passed.
     - name: "Test passed on ESXi {{ esxi_version }}"
       ansible.builtin.meta: end_host
@@ -70,15 +82,3 @@
           which is as expected '{{ expected_guest_fullname }}'
           or '{{ expected_guest_fullname_alternative }}'.
   when: expected_guest_fullname is match('Other \\d+.x .*Linux.*')
-
-- name: "Check guest family in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
-  ansible.builtin.assert:
-    that:
-      - guestinfo_guest_family == expected_guest_family
-    fail_msg: >-
-      VM's guest family in guest info is '{{ guestinfo_guest_family }}',
-       not expected '{{ expected_guest_family }}'.
-    success_msg: >-
-      VM's guest family in guest info is '{{ guestinfo_guest_family }}',
-      which is as expected '{{ expected_guest_family }}'.
-
