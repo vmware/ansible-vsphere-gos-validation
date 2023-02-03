@@ -6,7 +6,7 @@
 
 - name: "Display ESXi version and VM's hardware version"
   ansible.builtin.debug:
-    msg: 
+    msg:
       - "ESXi version: {{ esxi_version }}"
       - "VM's hardware version: {{ vm_hardware_version }}"
 
@@ -21,24 +21,46 @@
       VM's guest family in guest info is '{{ guestinfo_guest_family }}',
       which is as expected '{{ expected_guest_family }}'.
 
-# If the guest os full name is unmapped and displays OS detailed data, test passed
-- name: "Guest OS full name is unmapped but shows OS detailed data"
+# If the guest os full name is unmapped and displays OS detailed data on ESXi 6.7 GA and Update 1,
+# or on ESXi 7.0.0, that's expected. Test passed.
+- name: "Check unmapped guest OS full name"
   block:
-    - name: "Guest OS full name is unmapped"
-      ansible.builtin.debug:
-        msg: >-
-          Guest id is '{{ guestinfo_guest_id }}' on ESXi {{ esxi_version }}, and 
-          guest OS full name is '{{ guestinfo_guest_full_name }}',  which shows
-          guest OS detailed information and is as expected on ESXi {{ esxi_version }}.
-          Test Passed.
-    - name: "Test passed on ESXi {{ esxi_version }}"
-      ansible.builtin.meta: end_host
-  when:
-    - ((esxi_version is version('6.7.0', '==') and
-        (esxi_update_version | int < 2)) or
-       esxi_version is version('7.0.0', '=='))
-    - unmapped_guest_fullname is defined and unmapped_guest_fullname
-    - guestinfo_guest_full_name == unmapped_guest_fullname
+    # The unmapped guest full name includes Linux kernel version,
+    # OS pretty name, name, version id and build id
+    - name: "Set unmapped guest full name for {{ vm_guest_os_distribution }} on ESXi {{ esxi_version }}"
+      block:
+        - name: "Compose unmapped guest full name"
+          ansible.builtin.set_fact:
+            unmapped_guest_fullname: >-
+              Linux {{ guest_os_ansible_kernel }} {{ guest_os_release.PRETTY_NAME }}
+              {{ guest_os_release.NAME }} {{ guest_os_release.VERSION_ID }}
+
+        - name: "Append OS release build number to unmapped guest full name"
+          ansible.builtin.set_fact:
+            unmapped_guest_fullname: "{{ unmapped_guest_fullname ~ ' ' ~ guest_os_release.BUILD_ID }}"
+          when: guest_os_release.BUILD_ID | default('')
+      when:
+        - guest_os_release.PRETTY_NAME | default('')
+        - guest_os_release.NAME | default('')
+        - guest_os_release.VERSION_ID | default('')
+
+    - name: "Test passed"
+      block:
+        - name: "Guest OS full name is unmapped"
+          ansible.builtin.debug:
+            msg: >-
+              Guest id is '{{ guestinfo_guest_id }}' on ESXi {{ esxi_version }}, and
+              guest OS full name is '{{ guestinfo_guest_full_name }}',  which shows
+              guest OS detailed information and is as expected on ESXi {{ esxi_version }}.
+              Test Passed.
+        - name: "Test passed on ESXi {{ esxi_version }}"
+          ansible.builtin.meta: end_host
+      when:
+        - unmapped_guest_fullname is defined and unmapped_guest_fullname
+        - guestinfo_guest_full_name == unmapped_guest_fullname
+  when: >
+    (esxi_version is version('6.7.0', '==') and esxi_update_version | int < 2) or
+     esxi_version is version('7.0.0', '==')
 
 - name: "Check guest id in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
   ansible.builtin.assert:
