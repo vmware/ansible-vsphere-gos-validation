@@ -41,7 +41,15 @@
             expected_guest_major_ver: ""
             expected_guest_fullname: ""
             expected_guest_family: "linuxGuest"
+            guest_is_otherlinux: true
+
+        - name: "Set fact of guest OS is not other Linux"
+          ansible.builtin.set_fact:
             guest_is_otherlinux: false
+          when: >-
+            guest_os_ansible_distribution in ["RedHat", "CentOS", "OracleLinux", "AlmaLinux", "Rocky",
+                                              "SLES", "SLED", "VMware Photon OS", "Amazon", "Fedora",
+                                              "Ubuntu", "Debian"]
 
         - name: "Set fact of expected guest id suffix"
           ansible.builtin.set_fact:
@@ -79,11 +87,6 @@
             expected_guest_id: "fedora{{ expected_guest_id_suffix }}"
             expected_guest_fullname: "Red Hat Fedora ({{ guest_os_bit }})"
           when: guest_os_ansible_distribution == "Fedora"
-
-        - name: "Set fact of the guest is other linux"
-          ansible.builtin.set_fact:
-            guest_is_otherlinux: true
-          when: not expected_guest_fullname
 
         - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
           include_tasks: otherlinux_fullname_map.yml
