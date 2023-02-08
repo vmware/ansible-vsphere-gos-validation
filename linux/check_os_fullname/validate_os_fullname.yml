@@ -1,63 +1,108 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Wait VMware tools to report Guest OS fullname
-- include_tasks: ../../common/vm_get_guest_info.yml
-
-# If the guest os full name is unmapped and displays OS detailed data, test passed
-- block:
-    - name: "guest OS detailed information is shown in guest OS full name, test passed"
-      ansible.builtin.meta: end_host
-  when:
-    - (esxi_version is version('6.7.0', '==') and (esxi_update_version | int < 2)) or (esxi_version is version('7.0.0', '=='))
-    - unmapped_os_fullname is defined and unmapped_os_fullname
-    - unmapped_os_fullname in guestinfo_guest_full_name
-
-- name: "Check guest ID in guest info is not empty"
+- name: "Check expected guest id and full name is set for {{ vm_guest_os_distribution }}"
   ansible.builtin.assert:
     that:
-      - guestinfo_guest_id
-    fail_msg: "Guest ID in guest info is '{{ guestinfo_guest_id }}', which should be a valid value firstly."
+      - expected_guest_id
+      - expected_guest_fullname
+    fail_msg: >-
+      Failed to set expected guest id or guest full name for {{ vm_guest_os_distribution }}
+      with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }} server.
 
-- name: "Known issue about Rocky Linux guest fullname"
+- name: "Get VM's guest info"
+  include_tasks: ../../common/vm_get_guest_info.yml
+
+- name: "Display ESXi version and VM's hardware version"
+  ansible.builtin.debug:
+    msg:
+      - "ESXi version: {{ esxi_version }}"
+      - "VM's hardware version: {{ vm_hardware_version }}"
+
+# If the guest os full name is unmapped and displays OS detailed data on ESXi 6.7 GA and Update 1,
+# or on ESXi 7.0.0, that's expected. Test passed.
+- name: "Check unmapped guest OS full name on ESXi {{ esxi_version }} when guest id is empty"
   block:
-    - include_tasks: ../utils/get_installed_package_info.yml
-      vars:
-        package_name: "open-vm-tools"
+    # The unmapped guest full name which at least includes Linux kernel version, OS pretty name
+    # For VM with newer VMware Tools, the unmapped guest full name also includes OS name, version id and build id
+    # Here we only check linux kernel version and OS pretty name
+    - name: "Set unmapped guest full name for {{ vm_guest_os_distribution }} on ESXi {{ esxi_version }}"
+      ansible.builtin.set_fact:
+        unmapped_guest_fullname: "Linux {{ guest_os_ansible_kernel }} {{ guest_os_release.PRETTY_NAME }}"
+      when: guest_os_release.PRETTY_NAME | default('')
 
-    - name: "Known issue - ignore incorrect guest fullname with Rocky Linux built-in OVT 11.3.5"
-      ansible.builtin.debug:
-        msg:
-          - "The guest fullname of Rocky Linux with built-in open-vm-tools 11.3.5-{{ package_info.Release }} is always same as VM's guest OS version."
-          - "The expected guest fullname should be {{ ', or '.join(guest_fullname) }}. Ignore this known issue."
-          - "Please refer to https://bugs.rockylinux.org/view.php?id=200"
-      tags:
-        - known_issue
+    - name: "Test passed"
+      block:
+        - name: "Guest OS full name is unmapped"
+          ansible.builtin.debug:
+            msg: >-
+              Guest id is '{{ guestinfo_guest_id }}' on ESXi {{ esxi_version }}, and
+              guest OS full name is '{{ guestinfo_guest_full_name }}',  which shows
+              guest OS detailed information and is as expected on ESXi {{ esxi_version }}.
+              Test Passed.
+          tags:
+            - known_issue
+        - name: "Test passed on ESXi {{ esxi_version }}"
+          ansible.builtin.meta: end_host
       when:
-        - package_info is defined
-        - package_info.Release is defined
-        - package_info.Release == "1.el8" or package_info.Release == "1.el9"
-        - package_info.Vendor is defined and 'Rocky' in package_info.Vendor
+        - unmapped_guest_fullname is defined and unmapped_guest_fullname
+        - unmapped_guest_fullname in guestinfo_guest_full_name
   when:
-    - guest_os_ansible_distribution == 'Rocky'
-    - vmtools_version is version('11.3.5', '=')
+    - not guestinfo_guest_id
+    - ((esxi_version is version('6.7.0', '==') and
+        esxi_update_version | int < 2) or
+       esxi_version is version('7.0.0', '=='))
 
-- block:
-    - name: "Assert Guest OS fullname is either {{ guest_fullname[0] }} or {{ guest_fullname[1] }}"
+- name: "Check guest id in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
+  ansible.builtin.assert:
+    that:
+      - guestinfo_guest_id == expected_guest_id
+    fail_msg: >-
+      VM's guest id in guest info is '{{ guestinfo_guest_id }}',
+      not expected '{{ expected_guest_id }}'.
+    success_msg: >-
+      VM's guest id in guest info is '{{ guestinfo_guest_id }}',
+      which is as expected '{{ expected_guest_id }}'.
+
+- name: "Check guest full name in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
+  ansible.builtin.assert:
+    that:
+      - guestinfo_guest_full_name == expected_guest_fullname
+    fail_msg: >-
+      VM's guest full name is '{{ guestinfo_guest_full_name }}',
+      not expected '{{ expected_guest_fullname }}'.
+    success_msg: >-
+      VM's guest full name is '{{ guestinfo_guest_full_name }}',
+      which is as expected '{{ expected_guest_fullname }}'.
+  when: not (expected_guest_fullname is match('Other \\d+.x .*Linux.*'))
+
+- name: "Check guest full name in VM's guest info"
+  block:
+    - name: "Set alternative for the expected guest full name"
+      ansible.builtin.set_fact:
+        expected_guest_fullname_alternative: "{{ expected_guest_fullname | replace('or later ', '') }}"
+
+    - name: "Check guest full name in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
       ansible.builtin.assert:
         that:
-          - guestinfo_guest_full_name in guest_fullname
-        fail_msg: >
-                "VM '{{ vm_name }}' guest OS fullname is: '{{ guestinfo_guest_full_name }}',
-                not expected '{{ guest_fullname[0] }}' or '{{ guest_fullname[1] }}'"
-  when:
-    - guest_fullname is sequence
-    - guest_fullname | length == 2
+          - guestinfo_guest_full_name in [expected_guest_fullname, expected_guest_fullname_alternative]
+        fail_msg: >-
+          VM's guest full name is '{{ guestinfo_guest_full_name }}',
+          not expected '{{ expected_guest_fullname }}'
+          or '{{ expected_guest_fullname_alternative }}'.
+        success_msg: >-
+          VM's guest full name is '{{ guestinfo_guest_full_name }}',
+          which is as expected '{{ expected_guest_fullname }}'
+          or '{{ expected_guest_fullname_alternative }}'.
+  when: expected_guest_fullname is match('Other \\d+.x .*Linux.*')
 
-- block:
-    - name: "Assert Guest OS fullname is {{ guest_fullname }}"
-      ansible.builtin.assert:
-        that:
-          - guestinfo_guest_full_name == guest_fullname
-        fail_msg: "VM '{{ vm_name }}' guest OS fullname is: '{{ guestinfo_guest_full_name }}', not expected '{{ guest_fullname }}'"
-  when: guest_fullname is string
+- name: "Check guest family in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
+  ansible.builtin.assert:
+    that:
+      - guestinfo_guest_family == expected_guest_family
+    fail_msg: >-
+      VM's guest family in guest info is '{{ guestinfo_guest_family }}',
+       not expected '{{ expected_guest_family }}'.
+    success_msg: >-
+      VM's guest family in guest info is '{{ guestinfo_guest_family }}',
+      which is as expected '{{ expected_guest_family }}'.

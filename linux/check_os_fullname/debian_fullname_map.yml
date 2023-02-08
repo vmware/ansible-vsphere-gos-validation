@@ -1,24 +1,22 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Map Debian when ESXi >= 6.5.0
-- name: "Set guest_fullname variable for Debian on ESXi >= 6.5.0"
+# Guest id "debian10_64Guest" and full name "Debian GNU/Linux 10 (64-bit)" is available on ESXi 6.5 or later
+# Guest id "debian11_64Guest" and full name "Debian GNU/Linux 11 (64-bit)" is available on ESXi 7.0.0 or later
+# Guest id "debian12_64Guest" and full name "Debian GNU/Linux 12 (64-bit)" is available on ESXi 8.0.0 or later
+- name: "Set fact of expected guest OS major version on ESXi {{ esxi_version }}"
   ansible.builtin.set_fact:
-    guest_fullname: "Debian GNU/Linux {{ guest_os_ansible_distribution_major_ver }} ({{ guest_os_bit }})"
-  when: esxi_version is version('6.5.0', '>=')
+    expected_guest_major_ver: |-
+      {%- if esxi_version is version('6.5.0', '>=') and esxi_version is version('7.0.0', '<') -%}
+      {{ [guest_os_ansible_distribution_major_ver | int, 10] | min }}
+      {%- elif esxi_version is version('7.0.0', '>=') and esxi_version is version('8.0.0', '<') -%}
+      {{ [guest_os_ansible_distribution_major_ver | int, 11 ] | min }}
+      {%- elif esxi_version is version('8.0.0', '>=') -%}
+      {{ [guest_os_ansible_distribution_major_ver | int, 12 ] | min }}
+      {%- endif %}
 
-# Map Debian-9 and later when ESXi < 6.5.0
-- name: "Set guest_fullname variable for Debian on ESXi < 6.5.0"
+- name: "Set expected guest id and full name for Debian on ESXi {{ esxi_version }}"
   ansible.builtin.set_fact:
-    guest_fullname: "Debian GNU/Linux 8 ({{ guest_os_bit }})"
-  when:
-    - guest_os_ansible_distribution_major_ver | int >= 9
-    - esxi_version is version('6.5.0', '<')
-
-# Map Debian-8 and earlier when ESXi < 6.5.0
-- name: "Set guest_fullname variable for Debian on ESXi < 6.5.0"
-  ansible.builtin.set_fact:
-    guest_fullname: "Debian GNU/Linux {{ guest_os_ansible_distribution_major_ver }} ({{ guest_os_bit }})"
-  when:
-    - guest_os_ansible_distribution_major_ver | int < 9
-    - esxi_version is version('6.5.0', '<')
+    expected_guest_id: "debian{{ expected_guest_major_ver }}{{ expected_guest_id_suffix }}"
+    expected_guest_fullname: "Debian GNU/Linux {{ expected_guest_major_ver }} ({{ guest_os_bit }})"
+  when: expected_guest_major_ver

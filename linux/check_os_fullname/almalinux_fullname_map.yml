@@ -1,17 +1,29 @@
 # Copyright 2022-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Map AlmaLinux when ESXi version > 7.0.3 and VMware Tools version > 11.3.5
-- name: "Set guest_fullname variable for AlmaLinux on ESXi 7.0.3 later and VMTools 11.3.5 later"
+# Guest id "almalinux_64Guest and full name "AlmaLinux (64-bit)" is available on ESXi 8.0.0 or later
+# Guest full name of AlmaLinux is mapped to "AlmaLinux (64-bit)" when
+# VMware Tools version is 12.0.0 or later, ESXi version is 8.0.0 or later.
+- name: "Set expected guest id and full name for AlmaLinux with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
   ansible.builtin.set_fact:
-    guest_fullname: "AlmaLinux ({{ guest_os_bit }})"
+    expected_guest_id: "almalinux_64Guest"
+    expected_guest_fullname: "AlmaLinux (64-bit)"
   when:
-    - esxi_version is version('7.0.3', '>')
-    - vmtools_version is version('11.3.5', '>')
+    - vmtools_version is version('12.0.0', '>=')
+    - esxi_version is version('8.0.0', '>=')
 
-# Map AlmaLinux when ESXi version <= 7.0.3 or VMware Tools version <= 11.3.5
-- name: "Set guest_fullname variable for AlmaLinux on ESXi 7.0.3 and earlier, or VMTools 11.3.5 and earlier"
+# Guest full name of AlmaLinux is mapped to VM's guest OS version when:
+# VMware Tools version is 12.0.0 or later, ESXi version is 7.0.3 or earlier.
+- name: "Set expected guest id and full name for AlmaLinux with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
+  ansible.builtin.set_fact:
+    expected_guest_id: "{{ vm_guest_id }}"
+    expected_guest_fullname: "{{ vm_guest_os_version }}"
+  when:
+    - vmtools_version is version('12.0.0', '>=')
+    - esxi_version is version('8.0.0', '<')
+
+# Guest full name of AlmaLinux is mapped to "Other N.x Linux (64-bit)" when
+# VMware Tools version is 11.3.5 or earlier
+- name: "Set expected guest id and full name for AlmaLinux with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
   include_tasks: otherlinux_fullname_map.yml
-  when: >
-    esxi_version is version('7.0.3', '<=') or
-    vmtools_version is version('11.3.5', '<=')
+  when: vmtools_version is version('12.0.0', '<')

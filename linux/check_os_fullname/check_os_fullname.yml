@@ -4,7 +4,7 @@
 # Description:
 #   This test case is used for check VM guest OS fullname is reported correctly
 # in guest info through VMware tools. When VMware tools is not installed or not
-# running in VM, this test case result is 'No Run'.
+# running in VM, this test case result is 'Blocked'.
 #
 - name: check_os_fullname
   hosts: localhost
@@ -14,66 +14,113 @@
   tasks:
     - name: "Test case block"
       block:
-        - include_tasks: ../setup/test_setup.yml
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: true
 
-        # Run this test when VMware tools is running
-        - include_tasks: ../../common/esxi_get_version_build.yml
+        - name: "Set VMware Tools debug logging directory"
+          ansible.builtin.set_fact:
+            vmtools_log_dir: "/tmp/vmware-tools-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}"
+
+        - name: "Enable debug logging for VMware Tools"
+          include_tasks: ../utils/enable_vmtools_logging.yml
+
+        - name: "Get ESXi version and build"
+          include_tasks: ../../common/esxi_get_version_build.yml
           when: esxi_version is undefined or esxi_update_version is undefined
 
-        - name: "Get OS fullname in guest OS"
+        - name: "Display guest OS distribution"
           ansible.builtin.debug:
-            msg: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+            msg: "{{ vm_guest_os_distribution }}"
 
-        - name: "Initalize facts for checking guest full name"
+        - name: "Initialize facts for checking guest id and guest full name"
           ansible.builtin.set_fact:
-            guest_fullname: "guest fullname not defined in test case"
+            expected_guest_id: ""
+            expected_guest_id_suffix: "{% if guest_os_bit == '64-bit' %}64{% endif %}Guest"
+            expected_guest_major_ver: ""
+            expected_guest_fullname: ""
+            expected_guest_family: "linuxGuest"
+            guest_is_otherlinux: true
+
+        - name: "Set fact of guest OS is not other Linux"
+          ansible.builtin.set_fact:
             guest_is_otherlinux: false
+          when: >-
+            guest_os_ansible_distribution in ["RedHat", "CentOS", "OracleLinux", "AlmaLinux", "Rocky",
+                                              "SLES", "SLED", "VMware Photon OS", "Amazon", "Fedora",
+                                              "Ubuntu", "Debian"]
 
-        # Map Ubuntu
-        - name: "Set guest_fullname variable for Ubuntu"
+        - name: "Set fact of expected guest id suffix"
           ansible.builtin.set_fact:
-            guest_fullname: "Ubuntu Linux ({{ guest_os_bit }})"
-          when: guest_os_ansible_distribution == "Ubuntu"
+            expected_guest_id_suffix: "{{ expected_guest_id_suffix | replace('64', '_64') }}"
+          when: >-
+            guest_os_ansible_distribution in ["RedHat", "SLES", "SLED",
+                                             "CentOS", "OracleLinux", "Debian"]
 
-        # Map RHEL full name
-        - include_tasks: rhel_fullname_map.yml
+        - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+          include_tasks: rhel_fullname_map.yml
           when: guest_os_ansible_distribution == "RedHat"
 
-        # Map SLES full name
-        - include_tasks: sles_fullname_map.yml
+        - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+          include_tasks: sles_fullname_map.yml
           when: guest_os_ansible_distribution in ["SLES", "SLED"]
 
-        # Map VMware Photon OS guest full name
-        - include_tasks: photon_fullname_map.yml
-          when: guest_os_ansible_distribution == "VMware Photon OS"
-
-        - include_tasks: "{{ guest_os_ansible_distribution | lower }}_fullname_map.yml"
+        - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+          include_tasks: "{{ guest_os_ansible_distribution | lower }}_fullname_map.yml"
           when: guest_os_ansible_distribution in ["Amazon", "CentOS", "OracleLinux", "AlmaLinux", "Rocky", "Debian"]
 
-        # Map FreeBSD guest full name
-        - name: "Set guest_fullname variable for FreeBSD"
+        - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
-            guest_fullname: "FreeBSD {{ guest_os_ansible_distribution_major_ver }} ({{ guest_os_bit }})"
-          when: guest_os_ansible_distribution == "FreeBSD"
+            expected_guest_id: "ubuntu{{ expected_guest_id_suffix }}"
+            expected_guest_fullname: "Ubuntu Linux ({{ guest_os_bit }})"
+          when: guest_os_ansible_distribution == "Ubuntu"
 
-        # Map Fedora
-        - name: "Set guest_fullname variable for Fedora"
+        - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
-            guest_fullname: "Red Hat Fedora ({{ guest_os_bit }})"
+            expected_guest_id: "vmwarePhoton64Guest"
+            expected_guest_fullname: "VMware Photon OS (64-bit)"
+          when: guest_os_ansible_distribution == "VMware Photon OS"
+
+        - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+          ansible.builtin.set_fact:
+            expected_guest_id: "fedora{{ expected_guest_id_suffix }}"
+            expected_guest_fullname: "Red Hat Fedora ({{ guest_os_bit }})"
           when: guest_os_ansible_distribution == "Fedora"
 
-        # Map Other Linux
-        - name: "Set fact of the guest is other linux"
-          ansible.builtin.set_fact:
-            guest_is_otherlinux: true
-          when: guest_fullname == "guest fullname not defined in test case"
-
-        - include_tasks: otherlinux_fullname_map.yml
+        - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+          include_tasks: otherlinux_fullname_map.yml
           when: guest_is_otherlinux
 
-        # Validate guest OS fullname in guestinfo
-        - include_tasks: validate_os_fullname.yml
+        - name: "Validate guest OS full name in guestinfo"
+          include_tasks: validate_os_fullname.yml
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test rescue"
+          include_tasks: ../../common/test_rescue.yml
+      always:
+        - name: "Get VMware Tools log directory stat info"
+          include_tasks: ../utils/get_file_stat_info.yml
+          vars:
+            guest_file_path: "{{ vmtools_log_dir }}"
+
+        - name: "Collect VMware Tools logs"
+          block:
+            - name: "Archive VMware Tools debug logs"
+              ansible.builtin.archive:
+                path: "{{ vmtools_log_dir }}"
+                dest: "{{ vmtools_log_dir }}.tgz"
+                mode: "0644"
+              delegate_to: "{{ vm_guest_ip }}"
+              register: archive_vmtools_logs
+
+            - name: "Fetch VMware Tools debug logs"
+              include_tasks: ../utils/fetch_file.yml
+              vars:
+                fetch_file_src_path: "{{ vmtools_log_dir }}.tgz"
+                fetch_file_dst_path: "{{ current_test_log_folder }}/"
+                fetch_file_ignore_errors: true
+              when:
+                - archive_vmtools_logs is defined
+                - archive_vmtools_logs.changed is defined
+                - archive_vmtools_logs.changed
+          when: guest_file_exists

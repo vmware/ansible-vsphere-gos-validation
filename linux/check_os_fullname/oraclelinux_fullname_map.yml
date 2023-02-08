@@ -1,42 +1,22 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Map Oracle Linux on ESXi < 6.5.0
-- name: "Set guest_fullname variable for Oracle Linux {{ guest_os_ansible_distribution_major_ver }} on ESXi {{ esxi_version }}"
+# Guest id "oraclelinux7_64Guest" and full name "Oracle Linux 7 (64-bit)" is available on ESXi 6.5 or later
+# Guest id "oraclelinux8_64Guest" and full name "Oracle Linux 8 (64-bit)" is available on ESXi 6.7 or later
+# Guest id "oraclelinux9_64Guest" and full name "Oracle Linux 9 (64-bit)" is available on ESXi 7.0.1 or later
+- name: "Set fact of expected guest OS major version on ESXi {{ esxi_version }}"
   ansible.builtin.set_fact:
-    guest_fullname: "Oracle Linux 4/5 or later ({{ guest_os_bit }})"
-  when: esxi_version is version('6.5.0', '<')
+    expected_guest_major_ver: |-
+      {%- if esxi_version is version('6.5.0', '>=') and esxi_version is version('6.7.0', '<') -%}
+      {{ [guest_os_ansible_distribution_major_ver | int, 7 ] | min }}
+      {%- elif esxi_version is version('6.7.0', '>=') and esxi_version is version('7.0.1', '<') -%}
+      {{ [guest_os_ansible_distribution_major_ver | int, 8 ] | min }}
+      {%- elif esxi_version is version('7.0.1', '>=') -%}
+      {{ [guest_os_ansible_distribution_major_ver | int, 9 ] | min }}
+      {%- endif %}
 
-# Map Oracle Linux 5 and earlier on ESXi >= 6.5.0
-- name: "Set guest_fullname variable for Oracle Linux {{ guest_os_ansible_distribution_major_ver }} on ESXi {{ esxi_version }}"
+- name: "Set expected_guest_fullname for Oracle Linux {{ guest_os_ansible_distribution_major_ver }} on ESXi {{ esxi_version }}"
   ansible.builtin.set_fact:
-    guest_fullname: "Oracle Linux 4/5 ({{ guest_os_bit }})"
-  when:
-    - guest_os_ansible_distribution_major_ver | int <= 5
-    - esxi_version is version('6.5.0', '>=')
-
-# Map Oracle Linux 6 and later on ESXi 6.5
-- name: "Set guest_fullname variable for Oracle Linux {{ guest_os_ansible_distribution_major_ver }} on ESXi {{ esxi_version }}"
-  ansible.builtin.set_fact:
-    guest_fullname: "Oracle Linux {{ [guest_os_ansible_distribution_major_ver | int, 7 ] | min }} ({{ guest_os_bit }})"
-  when:
-    - guest_os_ansible_distribution_major_ver | int >= 6
-    - esxi_version is version('6.5.0', '>=')
-    - esxi_version is version('6.7.0', '<')
-
-# Map Oracle Linux 6 and later on ESXi 6.7 and 7.0.0
-- name: "Set guest_fullname variable for Oracle Linux {{ guest_os_ansible_distribution_major_ver }} on ESXi {{ esxi_version }}"
-  ansible.builtin.set_fact:
-    guest_fullname: "Oracle Linux {{ [guest_os_ansible_distribution_major_ver | int, 8 ] | min }} ({{ guest_os_bit }})"
-  when:
-    - guest_os_ansible_distribution_major_ver | int >= 6
-    - esxi_version is version('6.7.0', '>=')
-    - esxi_version is version('7.0.0', '<=')
-
-# Map Oracle linux 6 and later on ESXi 7.0.1 and later
-- name: "Set guest_fullname variable for Oracle Linux {{ guest_os_ansible_distribution_major_ver }} on ESXi {{ esxi_version }}"
-  ansible.builtin.set_fact:
-    guest_fullname: "Oracle Linux {{ [guest_os_ansible_distribution_major_ver | int, 9] | min }} ({{ guest_os_bit }})"
-  when:
-    - guest_os_ansible_distribution_major_ver | int >= 6
-    - esxi_version is version('7.0.1', '>=')
+    expected_guest_id: "oracleLinux{{ expected_guest_major_ver }}{{ expected_guest_id_suffix }}"
+    expected_guest_fullname: "Oracle Linux {{ expected_guest_major_ver }} ({{ guest_os_bit }})"
+  when: expected_guest_major_ver

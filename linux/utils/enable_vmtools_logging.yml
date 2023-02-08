@@ -1,0 +1,83 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Enable debug logging for VMware Tools within Linux guest OS
+# See https://kb.vmware.com/s/article/1007873 for details.
+# Parameters:
+#   vmtools_log_dir: The log directory in guest OS for VMware Tools debug logs
+#
+- name: "Set default VMware Tools debug log directory"
+  ansible.builtin.set_fact:
+    vmtools_log_dir: "/tmp/vmware-tools"
+  when: vmtools_log_dir is undefined or not vmtools_log_dir
+
+- name: "Set facts of VMware Tools config file and log files"
+  ansible.builtin.set_fact:
+    vmtools_config_file: "/etc/vmware-tools/tools.conf"
+    vmtools_vmtoolsd_log_file: "{{ vmtools_log_dir }}/vmtoolsd.log"
+    vmtools_vmsvc_log_file: "{{ vmtools_log_dir }}/vmsvc.log"
+
+- name: "Set facts of VMware Tools config section and options for enabling debug logging"
+  ansible.builtin.set_fact:
+    vmtools_logging_section: logging
+    vmtools_logging_options: |-
+      log=true
+      vmtoolsd.level=debug
+      vmtoolsd.handler=file
+      vmtoolsd.data={{ vmtools_vmtoolsd_log_file }}
+      vmsvc.level=debug
+      vmsvc.handler=file
+      vmsvc.data={{ vmtools_vmsvc_log_file }}
+
+- name: "Prepare log directory {{ vmtools_log_dir }} for new logs"
+  ansible.builtin.shell: |
+    if [ -e {{ vmtools_log_dir }} ] ; then
+        rm -rf {{ vmtools_log_dir }};
+    fi
+    mkdir -p {{ vmtools_log_dir }}
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Get VMware Tools config file stat info"
+  include_tasks: get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ vmtools_config_file }}"
+
+- name: "Create VMware Tools config file with logging options"
+  ansible.builtin.copy:
+    dest: "{{ vmtools_config_file }}"
+    content: |
+      [{{ vmtools_logging_section }}]
+      {{ vmtools_logging_options }}
+  delegate_to: "{{ vm_guest_ip }}"
+  when: not guest_file_exists
+
+- name: "Update VMware Tools config file with logging options"
+  include_tasks: ../../common/update_ini_style_file.yml
+  vars:
+    file_path: "{{ vmtools_config_file }}"
+    section_name: "{{ vmtools_logging_section }}"
+    option_name: "{{ item.key }}"
+    option_value: "{{ item.value }}"
+    ini_state: present
+  loop: "{{ vmtools_logging_options | replace('=',': ') | from_yaml | dict2items }}"
+  when: guest_file_exists
+
+- name: "Get content of {{ vmtools_config_file }}"
+  ansible.builtin.shell: "cat {{ vmtools_config_file }}"
+  changed_when: false
+  delegate_to: "{{ vm_guest_ip }}"
+  register: vmtools_config
+
+- name: "Display content of {{ vmtools_config_file }}"
+  ansible.builtin.debug: var=vmtools_config
+  when: enable_debug
+
+- name: "Get the service name of VMware Tools"
+  include_tasks: set_ovt_facts.yml
+
+- name: "Restart vmtoolsd service to make config take effect"
+  include_tasks: service_operation.yml
+  vars:
+    service_name: "{{ ovt_service }}"
+    service_enabled: true
+    service_state: "restarted"

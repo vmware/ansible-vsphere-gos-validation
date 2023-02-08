@@ -1,0 +1,31 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Collect cloud-init logs for deploying Ubuntu live-server,
+# cloud image or Photon OVA.
+#
+- name: "Collect VM logs"
+  block:
+    - name: "Get VM's power state"
+      include_tasks: ../../common/vm_get_power_state.yml
+
+    - name: "Collect cloud-init logs"
+      block:
+        - name: "Get VM's guest info"
+          include_tasks: ../../common/vm_get_guest_info.yml
+
+        - name: "Collect cloud-init logs"
+          include_tasks: ../utils/collect_cloudinit_logs.yml
+          when:
+            - guestinfo_guest_id is defined
+            - ((guestinfo_guest_id is match('ubuntu.*') and
+                unattend_install_conf is defined and
+                unattend_install_conf is match('Ubuntu/Server/')) or
+               (ova_guest_os_type is defined and
+                ova_guest_os_type in ['photon', 'ubuntu']))
+      when:
+        - vm_power_state_get is defined
+        - vm_power_state_get == "poweredOn"
+  when:
+    - vm_exists is defined
+    - vm_exists

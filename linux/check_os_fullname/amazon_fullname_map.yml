@@ -1,0 +1,20 @@
+# Copyright 2021-2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Guest id "amazonlinux2_64Guest" and full name "Amazon Linux 2 (64-bit)" is available on ESXi 6.7 U1 or later
+# Guest id "amazonlinux3_64Guest" and full name "Amazon Linux 3 (64-bit)" is available on ESXi 7.0.1 or later
+- name: "Set fact of expected guest OS major version on ESXi {{ esxi_version }}"
+  ansible.builtin.set_fact:
+    expected_guest_major_ver: |-
+      {%- if (esxi_version is version('6.7.0', '>') and esxi_version is version('7.0.1', '<')) or
+          (esxi_version is version('6.7.0', '==') and esxi_update_version | int > 0) -%}
+      {{ [guest_os_ansible_distribution_major_ver | int, 2] | min }}
+      {%- elif esxi_version is version('7.0.1', '>=') -%}
+      {{ [guest_os_ansible_distribution_major_ver | int, 3 ] | min }}
+      {%- endif %}
+
+- name: "Set expected guest id and full name for Amazon Linux on ESXi {{ esxi_version }}"
+  ansible.builtin.set_fact:
+    expected_guest_id: "amazonlinux{{ expected_guest_major_ver }}_64Guest"
+    expected_guest_fullname: "Amazon Linux {{ expected_guest_major_ver }} (64-bit)"
+  when: expected_guest_major_ver
