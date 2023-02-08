@@ -144,25 +144,19 @@
 
     - name: "Set fact of guest OS bitness and build or kernel version"
       ansible.builtin.set_fact:
+        ovf_vm_guest_os: "{{ guest_detailed_data_dict.prettyName | default('') }}"
         ovf_vm_guest_build: "{{ guest_detailed_data_dict.kernelVersion | default('') }}"
         ovf_vm_guest_bitness: "{{ guest_detailed_data_dict.bitness | default('')  }}"
 
     - name: "Set fact of Linux guest OS distribution"
       block:
-        - name: "Set fact of guest OS distribution"
+        - name: "Update the fact of guest OS distribution for VMware Photon OS"
           ansible.builtin.set_fact:
             ovf_vm_guest_os: "{{ guest_detailed_data_dict.distroName ~ ' ' ~
                                   guest_detailed_data_dict.distroVersion | default('') }}"
           when:
             - guest_detailed_data_dict.distroName is defined
             - guest_detailed_data_dict.distroName == 'VMware Photon OS'
-
-        - name: "Set fact of guest OS distribution"
-          ansible.builtin.set_fact:
-            ovf_vm_guest_os: "{{ guest_detailed_data_dict.prettyName | default('') }}"
-          when: >-
-            guest_detailed_data_dict.distroName is undefined or
-            guest_detailed_data_dict.distroName != 'VMware Photon OS'
 
         - name: "Collect Linux kernel version"
           ansible.builtin.set_fact:
@@ -174,13 +168,6 @@
       when:
         - guest_detailed_data_dict.familyName is defined
         - guest_detailed_data_dict.familyName =='Linux'
-
-    - name: "Set fact of guest OS distribution"
-      ansible.builtin.set_fact:
-        ovf_vm_guest_os: "{{ guest_detailed_data_dict.prettyName | default('') }}"
-      when: >
-        guest_detailed_data_dict.familyName is undefined or
-        guest_detailed_data_dict.familyName !='Linux'
   when: guestinfo_detailed_data
 
 - name: "Collect guest OS distribution and VMware tools info"
