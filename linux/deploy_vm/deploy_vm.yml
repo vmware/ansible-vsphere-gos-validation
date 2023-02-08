@@ -9,7 +9,8 @@
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
-    - include_tasks: ../../common/skip_test_case.yml
+    - name: "Skip test case"
+      include_tasks: ../../common/skip_test_case.yml
       vars:
         skip_msg: "Skip test case due to new_vm is set to '{{ new_vm | default(false) }}'"
         skip_reason: "Skipped"
@@ -27,21 +28,24 @@
       register: create_log_path
 
     # Change vm_username to root if it is not. And add a new user after VM deployment
-    - include_tasks: set_new_vm_user_account.yml
+    - name: "Set user account for new VM"
+      include_tasks: set_new_vm_user_account.yml
 
-    - name: Set fact of timestamp for VM hostname
+    - name: "Set fact of timestamp for VM hostname"
       ansible.builtin.set_fact:
         hostname_timestamp: "{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}"
 
-    # Get SSH public key from localhost
-    - include_tasks: ../utils/get_local_ssh_public_key.yml
+    - name: "Get SSH public key from localhost"
+      include_tasks: ../utils/get_local_ssh_public_key.yml
 
-    # Deploy VM by creating a new VM and install OS from ISO image on it
-    - include_tasks: deploy_vm_from_iso.yml
+    - name: "Deploy VM by creating a new VM and install OS from ISO image on it"
+      include_tasks: deploy_vm_from_iso.yml
       when: (vm_deploy_method is undefined) or (vm_deploy_method == "iso")
 
-    # Deploy VM from an OVA or OVF template, like AmazonLinux, Flatcar and VMware Photon OS
-    - include_tasks: deploy_vm_from_ova.yml
+    # OVA deployment is applicable for OS releases which have OVA deliverables, e.g.
+    # VMware Photon OS, Ubuntu cloud image, Flatcar, or Amazon Linux, etc
+    - name: "Deploy VM from an OVA template"
+      include_tasks: deploy_vm_from_ova.yml
       when: (vm_deploy_method is defined) and (vm_deploy_method == "ova")
 
     - name: "Print VM guest IP address"

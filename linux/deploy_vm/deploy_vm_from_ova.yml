@@ -88,21 +88,13 @@
         - (hardware_version == "latest" or
            (vm_hardware_version_num | int < hardware_version | int))
 
-    - name: "Reconfigure Amazon Linux VM"
-      include_tasks: amazonlinux/reconfigure_amazonlinux_vm.yml
-      when: ova_guest_os_type == 'amazonlinux'
+    - name: "Reconfigure VM with cloud-init"
+      include_tasks: reconfigure_vm_with_cloudinit.yml
+      when: ova_guest_os_type in ['photon', 'ubuntu', 'amazon']
 
-    - name: "Reconfig VMware Photon OS VM"
-      include_tasks: photon/reconfigure_photon_vm.yml
-      when: ova_guest_os_type == 'photon'
-
-    - name: "Reconfig Flatcar VM"
+    - name: "Reconfigure Flatcar VM with Ignition"
       include_tasks: flatcar/reconfigure_flatcar_vm.yml
       when: ova_guest_os_type == 'flatcar'
-
-    - name: "Reconfig Ubuntu VM"
-      include_tasks: ubuntu/reconfigure_ubuntu_ova_vm.yml
-      when: ova_guest_os_type == 'ubuntu'
 
     - name: "Warning about unknown guest OS type"
       ansible.builtin.debug:
@@ -111,7 +103,7 @@
           The following tests might fail.
       when: ova_guest_os_type == 'unknown'
   rescue:
-    - name: "Test rescue"
+    - name: "Test case failure"
       include_tasks: ../../common/test_rescue.yml
       vars:
         exit_testing_when_fail: true
