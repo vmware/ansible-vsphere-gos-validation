@@ -15,7 +15,8 @@
   when: ova_nfs_server_path is undefined or not ova_nfs_server_path
 
 # OVA file on NFS server
-- include_tasks: ../../common/mount_nfs_storage_local.yml
+- name: "Mount NFS storage"
+  include_tasks: ../../common/mount_nfs_storage_local.yml
   vars:
     nfs_server_path: "{{ ova_nfs_server_path }}"
   when: ova_nfs_server_path is defined and ova_nfs_server_path
@@ -30,8 +31,8 @@
   register: vm_ova_stat
   failed_when: not vm_ova_stat.stat.exists
 
-# Deploy a new VM from OVA
-- include_tasks: ../../common/ovf_deploy.yml
+- name: "Deploy a new VM from OVA"
+  include_tasks: ../../common/ovf_deploy.yml
   vars:
     ovf_path: "{{ vm_ova_path }}"
     ovf_vm_name: "{{ vm_name }}"
@@ -41,10 +42,16 @@
     vm_exists: true
 
 # Power on VM and wait for guest fullname reported by VMware tools
-- include_tasks: ../../common/vm_set_power_state.yml
+- name: "Power on VM"
+  include_tasks: ../../common/vm_set_power_state.yml
   vars:
     vm_power_state_set: "powered-on"
-- include_tasks: ../../common/vm_wait_guest_fullname.yml
+
+# Get OVA deployed VM info
+- name: "Collect hardware configs of the VM deployed from OVF"
+  include_tasks: ../../common/collect_ovf_vm_config.yml
+  vars:
+    ovf_vm_hardware_config_path: "{{ current_test_log_folder }}"
 
 # - include_tasks: ../../common/vm_get_ip_from_vmtools.yml
 
@@ -54,11 +61,6 @@
 #     src_path: "{{ config_remote_windows_local }}"
 #     dest_path: "C:\\ConfigureRemotingForAnsible.ps1"
 #     operation: 'copy_file'
-
-# Get OVA deployed VM info
-- include_tasks: ../../common/collect_ovf_vm_config.yml
-  vars:
-    ovf_vm_hardware_config_path: "{{ current_test_log_folder }}"
 
 # Reconfigure deployed VM
 # - include_tasks: reconfig_deployed_vm.yml
