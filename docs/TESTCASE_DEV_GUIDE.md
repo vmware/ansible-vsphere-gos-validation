@@ -89,9 +89,9 @@ Below is an example of test case playbook:
 2. In the "block" part, write the tasks of test case execution and verification.
 
 3. In the "block" part, use this task "common/skip_test_case.yml" to set test case result as below:
-* Blocked: Test case dependency is not meet, e.g. no VMware Tools installed, no vCenter server configured for GOS customization testing.
-* Not Supported: Tested function is not supported by VM on such ESXi versions or guest OS versions.
-* Not Applicable: Tested function is not applicable for VM configration. e.g. enable secureboot on BIOS VM.
+* Blocked: Test case dependency is not meet, e.g. no VMware Tools installed or running.
+* Not Supported: Tested function is not supported by VM hardware versions, ESXi versions or guest OS versions.
+* Not Applicable: Tested function is not applicable for VM configuration. e.g. enable secureboot on BIOS VM.
 * Skipped: Test case will not run due to configured parameters. e.g test case 'deploy_vm' will be 'Skipped' when 'new_vm' parameter is set to false.
 
 #### Test case "rescue"
