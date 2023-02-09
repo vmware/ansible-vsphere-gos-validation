@@ -22,7 +22,7 @@
 3. vars_files
 - Set the playbook 'vars_files' to the relative path to the configuration file "vars/test.yml", and/or other required variables file.
 4. tasks
-- This part contains "block" and "rescue" sections, write all the tasks of test case execution and validation in "block" part, "rescue" part includes a common task "setup/test_rescue.yml". It means any task fails in "block" part, the testing will jump to the "rescue" part to execute failure/error handling tasks.
+- This part contains "block" and "rescue" sections, write all the tasks of test case execution and validation in "block" part, "rescue" part includes a common task "common/test_rescue.yml". It means any task fails in "block" part, the testing will jump to the "rescue" part to execute failure/error handling tasks.
 
 Below is an example of test case playbook:
 ```
@@ -41,21 +41,21 @@ Below is an example of test case playbook:
           vars:
             skip_msg: "Skip test case '{{ ansible_play_name }}' due to VM config is not applicable for this test case."
             skip_reason: "Not Applicable"
-          when: vm_config == "config_1"
+          when: test_case_not_applicable | bool
 
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Skip test case '{{ ansible_play_name }}' due to guest OS not support this test case."
             skip_reason: "Not Supported"
-          when: guest_version == "version_1"
+          when: test_case_not_supported | bool
 
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Skip test case '{{ ansible_play_name }}' due to vCenter info is not provided."
+            skip_msg: "Skip test case '{{ ansible_play_name }}' due to required VM or guest OS condition is not meet."
             skip_reason: "Blocked"
-          when: vc_info == ""
+          when: not meet_test_case_dependency | bool
 
         - name: "Run testing"
           block:
@@ -69,7 +69,10 @@ Below is an example of test case playbook:
                 fail_msg: "{{ test_result }} is not the expected one: {{ expected_value }}"
                 success_msg: "{{ test_result }} is as expected: {{ expected_value }}"
 
-          when: vm_config == "config_2"
+          when:
+            - not test_case_not_applicable | bool
+            - not test_case_not_supported | bool
+            - meet_test_case_dependency | bool
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
@@ -86,10 +89,10 @@ Below is an example of test case playbook:
 2. In the "block" part, write the tasks of test case execution and verification.
 
 3. In the "block" part, use this task "common/skip_test_case.yml" to set test case result as below:
-* Blocked: Test case dependency is not meet, e.g. no VMtools or no VC for GOSC testing
-* Not Supported: Tested function is not supported by the OS.
-* Not Applicable: Tested function is not applicable. e.g. enable secureboot on BIOS VM
-* Skipped: Test case doesn't need to run. e.g deploy_vm when new_vm is false.
+* Blocked: Test case dependency is not meet, e.g. no VMware Tools installed, no vCenter server configured for GOS customization testing.
+* Not Supported: Tested function is not supported by VM on such ESXi versions or guest OS versions.
+* Not Applicable: Tested function is not applicable for VM configration. e.g. enable secureboot on BIOS VM.
+* Skipped: Test case will not run due to configured parameters. e.g test case 'deploy_vm' will be 'Skipped' when 'new_vm' parameter is set to false.
 
 #### Test case "rescue"
 - In the "rescure" part, the included task "common/test_rescue.yml" will fulfill below functions:
