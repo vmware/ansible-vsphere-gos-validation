@@ -16,6 +16,7 @@
     ovf_vm_cdrom_info: []
     ovf_vm_usb_info: []
     ovf_vm_video_card_info: []
+    ovf_vm_vmtools_info: {}
     ovf_vm_guest_os: ""
     ovf_vm_guest_build: ""
     ovf_vm_guest_bitness: ""
@@ -34,14 +35,16 @@
         ovf_vm_hardware_config |
         combine({'Guest OS ID': vm_guest_id | default(''),
                  'Guest OS Version': vm_config.config.guestFullName | default(''),
-                 'Hardware version': vm_hardware_version | default(''),
-                 'CPU number': vm_config.config.hardware.numCPU | default(''),
-                 'CPU cores per socket': vm_config.config.hardware.numCoresPerSocket | default(''),
-                 'Memory size in MB': vm_config.config.hardware.memoryMB | int | default(''),
+                 'Hardware Version': vm_hardware_version | default(''),
+                 'CPU Number': vm_config.config.hardware.numCPU | default(''),
+                 'CPU Cores per Socket': vm_config.config.hardware.numCoresPerSocket | default(''),
+                 'CPU Hot Add Enabled': vm_config.config.cpuHotAddEnabled | default(''),
+                 'Memory Size in MB': vm_config.config.hardware.memoryMB | int | default(''),
+                 'Memory Hot Add Enabled': vm_config.config.memoryHotAddEnabled | default(''),
                  'Firmware': vm_config.config.firmware | default(''),
-                 'Secure boot': vm_config.config.bootOptions.efiSecureBootEnabled | default(''),
-                 'VBS enabled': vm_config.config.flags.vbsEnabled | default(''),
-                 'Nested HV enabled': vm_config.config.nestedHVEnabled | default(''),
+                 'Secure Boot': vm_config.config.bootOptions.efiSecureBootEnabled | default(''),
+                 'VBS Enabled': vm_config.config.flags.vbsEnabled | default(''),
+                 'Nested HV Enabled': vm_config.config.nestedHVEnabled | default(''),
                  'vTPM': (vm_config.config.hardware.device |
                           selectattr('_vimtype', 'equalto', 'vim.vm.device.VirtualTPM') |
                           length > 0)
@@ -54,10 +57,10 @@
       {{
         ovf_vm_disk_info +
         [{'Label': item.deviceInfo.label | default(''),
-          'Disk size in GB': item.capacityInKB | int / 1024 / 1024 | default(''),
+          'Disk Size in GB': item.capacityInKB | int / 1024 / 1024 | default(''),
           'Controller': (vm_config.config.hardware.device |
                          selectattr('key', 'equalto', item.controllerKey))[0].deviceInfo.summary,
-          'Thin provisioned': item.backing.thinProvisioned | default('')}]
+          'Thin Provisioned': item.backing.thinProvisioned | default('')}]
        }}
   with_items: "{{ vm_config.config.hardware.device |
                   selectattr('_vimtype', 'equalto', 'vim.vm.device.VirtualDisk') }}"
@@ -102,8 +105,8 @@
         ovf_vm_hardware_config |
         combine({'Disks': ovf_vm_disk_info,
                  'CDROMs': ovf_vm_cdrom_info,
-                 'USB controllers': ovf_vm_usb_info,
-                 'Network adapters': ovf_vm_network_info
+                 'USB Controllers': ovf_vm_usb_info,
+                 'Network Adapters': ovf_vm_network_info
                  })
       }}
 
@@ -120,55 +123,80 @@
     ovf_vm_hardware_config: >-
       {{
         ovf_vm_hardware_config |
-        combine({'Video card': {
-                   'Auto-detect settings': ovf_vm_video_card_info[0].useAutoDetect | default(''),
-                   'Video RAM size in MB': (ovf_vm_video_card_info[0].videoRamSizeInKB | int) / 1024 | default(''),
-                   'Number of displays': ovf_vm_video_card_info[0].numDisplays | default(''),
+        combine({'Video Card': {
+                   'Auto-detect Settings': ovf_vm_video_card_info[0].useAutoDetect | default(''),
+                   'Video RAM Size in MB': (ovf_vm_video_card_info[0].videoRamSizeInKB | int) / 1024 | default(''),
+                   'Number of Displays': ovf_vm_video_card_info[0].numDisplays | default(''),
                    'Enable 3D Support': ovf_vm_video_card_info[0].enable3DSupport | default(''),
-                   '3D Memory size in MB': (ovf_vm_video_card_info[0].graphicsMemorySizeInKB | int) / 1024 | default(''),
-                   '3D renderer': ovf_vm_video_card_info[0].use3dRenderer | default('') }
+                   '3D Memory Size in MB': (ovf_vm_video_card_info[0].graphicsMemorySizeInKB | int) / 1024 | default(''),
+                   '3D Renderer': ovf_vm_video_card_info[0].use3dRenderer | default('') }
                 })
       }}
   when: ovf_vm_video_card_info | length > 0
 
-- name: "Get VM's guest info"
-  include_tasks: vm_get_guest_info.yml
+- name: "Get VMware Tools info"
+  ansible.builtin.set_fact:
+    ovf_vm_vmtools_info: >-
+      {{
+        ovf_vm_vmtools_info |
+        combine({'Version': vm_config.config.tools.version | default(''),
+                 'Install Type': vm_config.config.tools.toolsInstallType | default(''),
+                 'Upgrade Policy': vm_config.config.tools.toolsUpgradePolicy | default(''),
+                 'Sync Time with Host': vm_config.config.tools.syncTimeWithHost | default('')})
+      }}
 
-- name: "Get VM's guest OS distribution"
+- name: "Get VMware Tools status"
+  include_tasks: vm_get_vmtools_status.yml
+
+- name: "Get VM guest OS"
   block:
-    - name: "Convert guest OS detailed data to dictionary"
-      ansible.builtin.set_fact:
-        guest_detailed_data_dict: "{{ guestinfo_detailed_data |
-                                      regex_replace(' (\\w+=)', '\n\\1') |
-                                      replace('=', ': ') | from_yaml }}"
+    - name: "Get VM's guest info"
+      include_tasks: vm_get_guest_info.yml
 
-    - name: "Set fact of guest OS bitness and build or kernel version"
+    - name: "Update VMware Tools version"
       ansible.builtin.set_fact:
-        ovf_vm_guest_os: "{{ guest_detailed_data_dict.prettyName | default('') }}"
-        ovf_vm_guest_build: "{{ guest_detailed_data_dict.kernelVersion | default('') }}"
-        ovf_vm_guest_bitness: "{{ guest_detailed_data_dict.bitness | default('')  }}"
+        ovf_vm_vmtools_info: >-
+          {{
+            ovf_vm_vmtools_info |
+            combine({'Version': guestinfo_vmtools_info | default('')})
+          }}
 
-    - name: "Set fact of Linux guest OS distribution"
+    - name: "Get VM's guest OS distribution"
       block:
-        - name: "Update the fact of guest OS distribution for VMware Photon OS"
+        - name: "Convert guest OS detailed data to dictionary"
           ansible.builtin.set_fact:
-            ovf_vm_guest_os: "{{ guest_detailed_data_dict.distroName ~ ' ' ~
-                                  guest_detailed_data_dict.distroVersion | default('') }}"
-          when:
-            - guest_detailed_data_dict.distroName is defined
-            - guest_detailed_data_dict.distroName == 'VMware Photon OS'
+            guest_detailed_data_dict: "{{ guestinfo_detailed_data |
+                                          regex_replace(' (\\w+=)', '\n\\1') |
+                                          replace('=', ': ') | from_yaml }}"
 
-        - name: "Collect Linux kernel version"
+        - name: "Set fact of guest OS bitness and build or kernel version"
           ansible.builtin.set_fact:
-            ovf_vm_hardware_config: >-
-              {{
-                ovf_vm_hardware_config |
-                combine({'Kernel version': ovf_vm_guest_build})
-              }}
-      when:
-        - guest_detailed_data_dict.familyName is defined
-        - guest_detailed_data_dict.familyName =='Linux'
-  when: guestinfo_detailed_data
+            ovf_vm_guest_os: "{{ guest_detailed_data_dict.prettyName | default('') }}"
+            ovf_vm_guest_build: "{{ guest_detailed_data_dict.kernelVersion | default('') }}"
+            ovf_vm_guest_bitness: "{{ guest_detailed_data_dict.bitness | default('')  }}"
+
+        - name: "Set fact of Linux guest OS distribution"
+          block:
+            - name: "Update the fact of guest OS distribution for VMware Photon OS"
+              ansible.builtin.set_fact:
+                ovf_vm_guest_os: "{{ guest_detailed_data_dict.distroName ~ ' ' ~
+                                      guest_detailed_data_dict.distroVersion | default('') }}"
+              when:
+                - guest_detailed_data_dict.distroName is defined
+                - guest_detailed_data_dict.distroName == 'VMware Photon OS'
+
+            - name: "Collect Linux kernel version"
+              ansible.builtin.set_fact:
+                ovf_vm_hardware_config: >-
+                  {{
+                    ovf_vm_hardware_config |
+                    combine({'Kernel Version': ovf_vm_guest_build})
+                  }}
+          when:
+            - guest_detailed_data_dict.familyName is defined
+            - guest_detailed_data_dict.familyName =='Linux'
+      when: guestinfo_detailed_data
+  when: vmtools_is_running
 
 - name: "Collect guest OS distribution and VMware tools info"
   ansible.builtin.set_fact:
@@ -176,7 +204,7 @@
       {{
         ovf_vm_hardware_config |
         combine({'Guest OS Distribution': ovf_vm_guest_os,
-                 'VMware tools': guestinfo_vmtools_info | default('')})
+                 'VMware Tools': ovf_vm_vmtools_info})
       }}
 
 - name: "Display the VM hardware configuration deployed from OVF or OVA"

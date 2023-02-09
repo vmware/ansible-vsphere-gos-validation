@@ -9,7 +9,8 @@
   ansible.builtin.set_fact:
     cloudinit_final_msg: "VM deployed from OVA is ready for use"
 
-# Ubuntu OVA with hardware version 10 or earlier would hang at boot time
+# Add serial port for Ubuntu OVA when hardware_version > 10.
+# Otherwise, it would hang at boot time
 - name: "Add serial port for Ubuntu VM deployed from OVA"
   include_tasks: ../../common/vm_add_serial_port.yml
   when:
@@ -86,9 +87,12 @@
   vars:
     vm_power_state_set: 'powered-on'
 
+# VMware Photon OS and Amazon Linux OVA complete cloud-init config very quickly,
+# but Ubuntu takes much more time to complete it
 - name: "Wait 120 seconds for system booting"
   ansible.builtin.pause:
     seconds: 120
+  when: ova_guest_os_type == 'ubuntu'
 
 - name: "Wait for VM's guest full name is displayed in guest info"
   include_tasks: ../../common/vm_wait_guest_fullname.yml
