@@ -145,58 +145,59 @@
                  'Sync Time with Host': vm_config.config.tools.syncTimeWithHost | default('')})
       }}
 
-- name: "Get VMware Tools status"
-  include_tasks: vm_get_vmtools_status.yml
+- name: "Wait for VMware Tools running"
+  include_tasks: vm_wait_vmtools_status.yml
+  vars:
+    vm_wait_vmtools_running: true
+    vm_wait_vmtools_timeout: 600
 
-- name: "Get VM guest OS"
+- name: "Get VM's guest info"
+  include_tasks: vm_get_guest_info.yml
+
+- name: "Update VMware Tools version"
+  ansible.builtin.set_fact:
+    ovf_vm_vmtools_info: >-
+      {{
+        ovf_vm_vmtools_info |
+        combine({'Version': guestinfo_vmtools_info })
+      }}
+  when: guestinfo_vmtools_info
+
+- name: "Get VM's guest OS distribution"
   block:
-    - name: "Get VM's guest info"
-      include_tasks: vm_get_guest_info.yml
-
-    - name: "Update VMware Tools version"
+    - name: "Convert guest OS detailed data to dictionary"
       ansible.builtin.set_fact:
-        ovf_vm_vmtools_info: >-
-          {{
-            ovf_vm_vmtools_info |
-            combine({'Version': guestinfo_vmtools_info | default('')})
-          }}
+        guest_detailed_data_dict: "{{ guestinfo_detailed_data |
+                                      regex_replace(' (\\w+=)', '\n\\1') |
+                                      replace('=', ': ') | from_yaml }}"
 
-    - name: "Get VM's guest OS distribution"
+    - name: "Set fact of guest OS bitness and build or kernel version"
+      ansible.builtin.set_fact:
+        ovf_vm_guest_os: "{{ guest_detailed_data_dict.prettyName | default('') }}"
+        ovf_vm_guest_build: "{{ guest_detailed_data_dict.kernelVersion | default('') }}"
+        ovf_vm_guest_bitness: "{{ guest_detailed_data_dict.bitness | default('')  }}"
+
+    - name: "Set fact of Linux guest OS distribution"
       block:
-        - name: "Convert guest OS detailed data to dictionary"
+        - name: "Update the fact of guest OS distribution for VMware Photon OS"
           ansible.builtin.set_fact:
-            guest_detailed_data_dict: "{{ guestinfo_detailed_data |
-                                          regex_replace(' (\\w+=)', '\n\\1') |
-                                          replace('=', ': ') | from_yaml }}"
-
-        - name: "Set fact of guest OS bitness and build or kernel version"
-          ansible.builtin.set_fact:
-            ovf_vm_guest_os: "{{ guest_detailed_data_dict.prettyName | default('') }}"
-            ovf_vm_guest_build: "{{ guest_detailed_data_dict.kernelVersion | default('') }}"
-            ovf_vm_guest_bitness: "{{ guest_detailed_data_dict.bitness | default('')  }}"
-
-        - name: "Set fact of Linux guest OS distribution"
-          block:
-            - name: "Update the fact of guest OS distribution for VMware Photon OS"
-              ansible.builtin.set_fact:
-                ovf_vm_guest_os: "{{ guest_detailed_data_dict.distroName ~ ' ' ~
-                                      guest_detailed_data_dict.distroVersion | default('') }}"
-              when:
-                - guest_detailed_data_dict.distroName is defined
-                - guest_detailed_data_dict.distroName == 'VMware Photon OS'
-
-            - name: "Collect Linux kernel version"
-              ansible.builtin.set_fact:
-                ovf_vm_hardware_config: >-
-                  {{
-                    ovf_vm_hardware_config |
-                    combine({'Kernel Version': ovf_vm_guest_build})
-                  }}
+            ovf_vm_guest_os: "{{ guest_detailed_data_dict.distroName ~ ' ' ~
+                                  guest_detailed_data_dict.distroVersion | default('') }}"
           when:
-            - guest_detailed_data_dict.familyName is defined
-            - guest_detailed_data_dict.familyName =='Linux'
-      when: guestinfo_detailed_data
-  when: vmtools_is_running
+            - guest_detailed_data_dict.distroName is defined
+            - guest_detailed_data_dict.distroName == 'VMware Photon OS'
+
+        - name: "Collect Linux kernel version"
+          ansible.builtin.set_fact:
+            ovf_vm_hardware_config: >-
+              {{
+                ovf_vm_hardware_config |
+                combine({'Kernel Version': ovf_vm_guest_build})
+              }}
+      when:
+        - guest_detailed_data_dict.familyName is defined
+        - guest_detailed_data_dict.familyName =='Linux'
+  when: guestinfo_detailed_data
 
 - name: "Collect guest OS distribution and VMware tools info"
   ansible.builtin.set_fact:
