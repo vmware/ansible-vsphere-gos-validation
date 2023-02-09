@@ -1,46 +1,52 @@
 # Copyright 2022-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: Initialize inbox driver info variables
+- name: "Initialize inbox driver info variables"
   ansible.builtin.set_fact:
     inbox_drivers_info: []
     inbox_pvscsi_info: {}
     inbox_vmxnet3_info: {}
 
-- include_tasks: ../utils/win_get_image_driver.yml
+# Get pvscsi driver info
+- name: "Get PVSCSI driver info"
+  include_tasks: ../utils/win_get_image_driver.yml
   vars:
     win_driver_inf: "pvscsii.inf"
-- name: Set fact of pvscsi driver info
+- name: "Set fact of PVSCSI driver info"
   ansible.builtin.set_fact:
     inbox_pvscsi_info: "{{ inbox_pvscsi_info | combine({item.split(' : ')[0].strip(): item.split(' : ')[1].strip()}) }}"
   when: item
   loop: "{{ win_driver_info }}"
-- name: Add pvscsi driver info to list
+- name: "Add PVSCSI driver info to list"
   ansible.builtin.set_fact:
     inbox_drivers_info: "{{ [inbox_pvscsi_info] }}"
   when: inbox_pvscsi_info | length != 0
 
-- include_tasks: ../utils/win_get_image_driver.yml
+# Get vmxnet3 driver info
+- name: "Get VMXNET3 driver info"
+  include_tasks: ../utils/win_get_image_driver.yml
   vars:
     win_driver_inf: "vmxnet3.inf"
-- name: Set fact of vmxnet3 driver info
+- name: "Set fact of VMXNET3 driver info"
   ansible.builtin.set_fact:
     inbox_vmxnet3_info: "{{ inbox_vmxnet3_info | combine({item.split(' : ')[0].strip(): item.split(' : ')[1].strip()}) }}"
   when: item
   loop: "{{ win_driver_info }}"
-- name: Add vmxnet3 driver info to list
+- name: "Add VMXNET3 driver info to list"
   ansible.builtin.set_fact:
     inbox_drivers_info: "{{ inbox_drivers_info + [inbox_vmxnet3_info] }}"
   when: inbox_vmxnet3_info | length != 0
 
-- name: Print inbox drivers info
+- name: "Print inbox drivers info"
   ansible.builtin.debug: var=inbox_drivers_info
 
-- block:
-    - name: Set fact of the file path for recording inbox drivers info
+# Collect inbox drivers info in json file
+- name: "Save inbox drivers info"
+  block:
+    - name: "Set fact of the file path for recording inbox drivers info"
       ansible.builtin.set_fact:
         drivers_info_file_path: "{{ current_test_log_folder }}/{{ ('-').join(guest_os_ansible_distribution.split(' ')[1:-1]) }}-{{ guest_os_build_num }}-{{ guest_os_ansible_architecture.replace('-', '') }}.json"
-    - name: Dump inbox drivers info to json file
+    - name: "Dump inbox drivers info to json file"
       ansible.builtin.copy:
         dest: "{{ drivers_info_file_path }}"
         content: "{{ inbox_drivers_info | to_nice_json }}"

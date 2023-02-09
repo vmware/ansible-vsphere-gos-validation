@@ -12,25 +12,33 @@
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
           vars:
             create_current_test_folder: true
-        - include_tasks: ../../common/skip_test_case.yml
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Skip this test case due to guest OS version '{{ guest_os_ansible_distribution_ver }}' does not contain inboxed VMware drivers."
             skip_reason: "Not Supported"
           when:
             - not guest_os_with_inbox_drivers
 
-        - include_tasks: get_inbox_driver_info.yml
-        - name: "Check driver inbox status is True"
+        - name: "Get inbox driver info"
+          include_tasks: get_inbox_driver_info.yml
+
+        - name: "Check inbox driver info"
           ansible.builtin.assert:
             that:
-              - item.Inbox | bool
-            success_msg: "Driver '{{ item.Driver | default('') }}' inbox status is: {{ item.Inbox }}"
-            fail_msg: "Driver '{{ item.Driver | default('') }}' inbox status is: {{ item.Inbox }}, not True"
-          when: item.Inbox is defined
-          loop: "{{ inbox_drivers_info }}"
+              - inbox_drivers_info | length == 2
+              - inbox_drivers_info[0].Inbox | default(false) | bool
+              - inbox_drivers_info[1].Inbox | default(false) | bool
+              - inbox_drivers_info[0].Version | default('') == "1.3.15.0"
+              - inbox_drivers_info[1].Version | default('') == "1.8.17.0"
+            fail_msg: "Please check collected inbox drivers info: {{ inbox_drivers_info }}, driver's inbox status should be True and PVSCSI driver version should be 1.3.15.0, VMXNET3 driver version should be 1.8.17.0."
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
