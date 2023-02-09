@@ -39,16 +39,30 @@
                  'CPU Number': vm_config.config.hardware.numCPU | default(''),
                  'CPU Cores per Socket': vm_config.config.hardware.numCoresPerSocket | default(''),
                  'CPU Hot Add Enabled': vm_config.config.cpuHotAddEnabled | default(''),
+                 'CPU I/O MMU': vm_config.config.flags.vvtdEnabled | default(''),
                  'Memory Size in MB': vm_config.config.hardware.memoryMB | int | default(''),
                  'Memory Hot Add Enabled': vm_config.config.memoryHotAddEnabled | default(''),
                  'Firmware': vm_config.config.firmware | default(''),
                  'Secure Boot': vm_config.config.bootOptions.efiSecureBootEnabled | default(''),
                  'VBS Enabled': vm_config.config.flags.vbsEnabled | default(''),
-                 'Nested HV Enabled': vm_config.config.nestedHVEnabled | default(''),
-                 'vTPM': (vm_config.config.hardware.device |
+                 'CPU Nested HV Enabled': vm_config.config.nestedHVEnabled | default(''),
+                 'Virtual TPM': (vm_config.config.hardware.device |
                           selectattr('_vimtype', 'equalto', 'vim.vm.device.VirtualTPM') |
                           length > 0)
                  })
+      }}
+
+- name: "Get VM extra configs"
+  ansible.builtin.set_fact:
+    vm_extra_config: "{{ vm_config.config.extraConfig | items2dict }}"
+
+- name: "Collect VM extra configs"
+  ansible.builtin.set_fact:
+    ovf_vm_hardware_config: >-
+      {{
+        ovf_vm_hardware_config |
+        combine({'Virtual HPET': vm_extra_config['hpet0.present'] | bool | default(''),
+                 'Hardware Version Product Compatibility': vm_extra_config['virtualhw.productcompatibility'] | default('')})
       }}
 
 - name: "Set fact of disks info"
