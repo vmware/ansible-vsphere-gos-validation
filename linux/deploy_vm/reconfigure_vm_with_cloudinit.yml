@@ -1,0 +1,167 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of the deploy VM test case name"
+  ansible.builtin.set_fact:
+    deploy_casename: "deploy_{{ ova_guest_os_type }}_ova"
+
+- name: "Set fact of cloud-init final message"
+  ansible.builtin.set_fact:
+    cloudinit_final_msg: "The system is finally up, after $UPTIME seconds"
+
+# Add serial port for Ubuntu OVA when hardware_version > 10.
+# Otherwise, it would hang at boot time
+- name: "Add serial port for Ubuntu VM deployed from OVA"
+  include_tasks: ../../common/vm_add_serial_port.yml
+  when:
+    - ova_guest_os_type == 'ubuntu'
+    - vm_hardware_version_num is defined
+    - vm_hardware_version_num | int > 10
+
+- name: "Create cloud-init seed ISO to configure guest OS"
+  include_tasks: ../utils/create_seed_iso.yml
+  vars:
+    user_data_template: "{{ ova_guest_os_type }}-ova-user-data.j2"
+    local_hostname: "{{ ova_guest_os_type }}-ova-{{ hostname_timestamp }}"
+    mode: '0644'
+
+- name: "Upload cloud-init seed ISO to ESXi server datastore"
+  include_tasks: ../../common/esxi_upload_datastore_file.yml
+  vars:
+    src_file_path: "{{  seed_iso_path }}"
+    dest_file_path: "{{ vm_dir_name }}/{{ seed_iso_path | basename }}"
+
+- name: "Initialize CDROM device for attaching cloud-init seed ISO"
+  ansible.builtin.set_fact:
+    vm_cdrom_controller_type: "sata"
+    vm_cdrom_controller_num: 0
+    vm_cdrom_unit_num: 0
+
+- name: "Get VM's CDROM devices"
+  include_tasks: ../../common/vm_get_cdrom_devices.yml
+
+- name: "Set fact of VM's existing CDROM device"
+  ansible.builtin.set_fact:
+    vm_existing_cdrom_list: "{{ cdrom_device_list }}"
+
+# Amazon Linux and VMware Photon OS VM can use existing CDROM device
+- name: "Use existing CDROM device for attaching cloud-init seed ISO"
+  ansible.builtin.set_fact:
+    vm_cdrom_controller_type: "{{ vm_existing_cdrom_list[0].controller_label.split()[0] | lower }}"
+    vm_cdrom_controller_num: "{{ vm_existing_cdrom_list[0].bus_num }}"
+    vm_cdrom_unit_num: "{{ vm_existing_cdrom_list[0].unit_num }}"
+  when:
+    - ova_guest_os_type in ['photon', 'amazon']
+    - vm_existing_cdrom_list | length > 0
+
+# Ubuntu VM's existing CDROM device will attach its own seed ISO
+# So here needs a new CDROM for Ubuntu VM
+- name: "Use new SATA CDROM for attaching cloud-init seed ISO"
+  block:
+    - name: "Set facts of existing CDROM devices count and SATA CDROM device"
+      ansible.builtin.set_fact:
+        vm_sata_cdrom: "{{ vm_existing_cdrom_list | selectattr('controller_label', 'match', 'SATA.*') }}"
+
+    - name: "Set CDROM device for attaching seed.iso"
+      ansible.builtin.set_fact:
+        vm_cdrom_controller_num: "{{ (vm_sata_cdrom | length) // 2 }}"
+        vm_cdrom_unit_num: "{{ (vm_sata_cdrom | length) % 2 }}"
+      when: vm_sata_cdrom | length > 0
+  when:
+    - ova_guest_os_type == 'ubuntu'
+    - vm_existing_cdrom_list | length > 0
+
+- name: "Attach cloud-init seed ISO to VM"
+  include_tasks: ../../common/vm_configure_cdrom.yml
+  vars:
+    cdrom_type: iso
+    cdrom_iso_file: "{{ vm_files_path_ds }}/{{ seed_iso_path | basename }}"
+    cdrom_controller_type: "{{ vm_cdrom_controller_type }}"
+    cdrom_controller_num: "{{ vm_cdrom_controller_num }}"
+    cdrom_unit_num: "{{ vm_cdrom_unit_num }}"
+    cdrom_state: present
+
+- name: "Power on VM"
+  include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-on'
+
+# VMware Photon OS and Amazon Linux OVA complete cloud-init config very quickly,
+# but Ubuntu takes much more time to complete it
+- name: "Wait 120 seconds for system booting"
+  ansible.builtin.pause:
+    seconds: 120
+  when: ova_guest_os_type == 'ubuntu'
+
+- name: "Wait for VM's guest full name is displayed in guest info"
+  include_tasks: ../../common/vm_wait_guest_fullname.yml
+
+- name: "Get VM's guest IP"
+  include_tasks: ../../common/update_inventory.yml
+  vars:
+    update_inventory_timeout: 300
+
+- name: "Eject CDROM devices from guest OS"
+  include_tasks: ../utils/eject_cdrom_in_guest.yml
+
+- name: "Remove local temporary directory {{ tmp_seed_dir }}"
+  include_tasks: ../../common/delete_local_file.yml
+  vars:
+    local_path: "{{ tmp_seed_dir }}"
+
+- name: "Get all CDROM devices on VM"
+  include_tasks: ../../common/vm_get_cdrom_devices.yml
+
+- name: "Disconnect all ISOs from VM"
+  block:
+    - name: "Change VM's CDROM to client device"
+      include_tasks: ../../common/vm_configure_cdrom.yml
+      vars:
+        cdrom_type: client
+        cdrom_controller_type: "{{ vm_cdrom.controller_label.split()[0] | lower }}"
+        cdrom_controller_num: "{{ vm_cdrom.bus_num }}"
+        cdrom_unit_num: "{{ vm_cdrom.unit_num }}"
+        cdrom_state: present
+      with_items: "{{ cdrom_device_list }}"
+      loop_control:
+        loop_var: vm_cdrom
+
+    - name: "Remove the new added CDROM device"
+      include_tasks: ../../common/vm_configure_cdrom.yml
+      vars:
+        cdrom_type: client
+        cdrom_controller_type: "{{ vm_cdrom_controller_type }}"
+        cdrom_controller_num: "{{ vm_cdrom_controller_num }}"
+        cdrom_unit_num: "{{ vm_cdrom_unit_num }}"
+        cdrom_state: absent
+      when: cdrom_device_list | length > vm_existing_cdrom_list | length
+  when:
+    - cdrom_device_list is defined
+    - cdrom_device_list | length > 0
+
+- name: "Remove serial port from Ubuntu VM"
+  block:
+    - name: "Shutdown guest OS"
+      include_tasks: ../utils/shutdown.yml
+
+    - name: "Remove serial port from VM"
+      include_tasks: ../../common/vm_remove_serial_port.yml
+
+    - name: "Failed to remove serial port from VM"
+      ansible.builtin.fail:
+        msg: "Failed to remove serial port from VM"
+      when: >
+        remove_serial_port is undefined or
+        remove_serial_port.changed is undefined or
+        not remove_serial_port.changed
+
+    - name: "Power on VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-on'
+  when:
+    - ova_guest_os_type == 'ubuntu'
+    - vm_hardware_version_num is defined
+    - vm_hardware_version_num | int > 10
+    - vm_serial_port_file_path is defined
+    - vm_serial_port_file_path

@@ -1,7 +1,6 @@
 #cloud-config
 chpasswd:
   list: |
-    ec2-user:{{ vm_password_hash }}
     root:{{ vm_password_hash }}
   expire: false
 ssh_pwauth: true
@@ -19,9 +18,17 @@ users:
       - {{ ssh_public_key }}
 {% endif %}
 
+runcmd:
+  - [ sed, -i, "s/^#PermitRootLogin .*/PermitRootLogin yes/", "/etc/ssh/sshd_config"]
+  - [ sed, -i, "s/^disable_root:.*/disable_root: false/", "/etc/cloud/cloud.cfg"]
+  - [ sed, -i, "s/^ssh_pwauth:.*/ssh_pwauth: true/", "/etc/cloud/cloud.cfg"]
+  - [ sed, -i, "s/^repo_upgrade:.*/repo_upgrade: none/", "/etc/cloud/cloud.cfg"]
+
 write_files:
   - content: |
       network:
         config: disabled
     path: /etc/cloud/cloud.cfg.d/80_disable_network_after_firstboot.cfg
     permissions: '0644'
+
+final_message: "{{ cloudinit_final_msg }}"
