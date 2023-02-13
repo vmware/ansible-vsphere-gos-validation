@@ -9,9 +9,11 @@
 # 1. enable VBS
 # 2. enable VBS with Secure Boot and DMA (value 3)
 # 3. enable VBS with UEFI lock (value 1)
-# 4. enable VBS with Require UEFI Memory Attributes Table
 # 4. enable virtualization-based protection of Code Integrity policies
 # 5. enable virtualization-based protection of Code Integrity policies with UEFI lock (value 1)
+# 6. enable virtualization-based protection of Code Integrity policies with Require UEFI Memory Attributes Table
+# 7. enable CredentialGuard with UEFI lock (value 1)
+# 8. enable System Guard Secure Launch and SMM protection
 #
 - include_tasks: win_execute_cmd.yml
   vars:
@@ -19,9 +21,11 @@
       reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard" /v "EnableVirtualizationBasedSecurity" /t REG_DWORD /d 1 /f;
       reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard" /v "RequirePlatformSecurityFeatures" /t REG_DWORD /d 3 /f;
       reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard" /v "Locked" /t REG_DWORD /d 1 /f;
-      reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard" /v "RequireUEFIMemoryAttributesTable" /t REG_DWORD /d 1 /f;
       reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v "Enabled" /t REG_DWORD /d 1 /f;
-      reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v "Locked" /t REG_DWORD /d 1 /f
+      reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v "Locked" /t REG_DWORD /d 1 /f;
+      reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v "HVCIMATRequired" /t REG_DWORD /d 1 /f;
+      reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v "LsaCfgFlags" /t REG_DWORD /d 1 /f;
+      reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\SystemGuard" /v "Enabled" /t REG_DWORD /d 1 /f
 
 # Restart guest OS after configuration in guest
 - include_tasks: win_shutdown_restart.yml

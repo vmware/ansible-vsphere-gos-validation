@@ -36,26 +36,21 @@
         fail_msg: "VM VBS status is not enabled after enabling it."
   when: not vm_vbs_enabled_before
 
-- name: "VM VBS is enabled"
-  block:
-    # Get VBS status in guest OS
-    - include_tasks: ../utils/win_get_vbs_guest.yml
-    - name: "Set fact of HVCI and VBS running status in guest before enable"
-      ansible.builtin.set_fact:
-        guest_vbs_enabled_before: true
-      when:
-        - win_vbs_status_guest | int == 2
-        - "'2' in win_vbs_running_service"
-  when: vm_vbs_enabled_before
+- name: "Get Device Guard available security properties in guest OS"
+  include_tasks: ../utils/win_get_dg_security_properties.yml
 
-# Enable VBS in guest OS if HVCI is not running or VBS is not running
-- name: "Enable VBS in guest OS"
-  block:
-    - include_tasks: ../utils/win_enable_vbs_guest.yml
-    - include_tasks: ../utils/win_get_vbs_guest.yml
-  when: not guest_vbs_enabled_before
+- name: "Enable VBS and security services in guest OS"
+  include_tasks: ../utils/win_enable_vbs_guest.yml
 
-# SecurityServicesRunning: 2 means HVCI is running
+- name: "Get running security services"
+  include_tasks: ../utils/win_get_vbs_guest.yml
+
+# SecurityServicesRunning:
+# 0. 	No services running.
+# 1. 	If present, Windows Defender Credential Guard is running.
+# 2. 	If present, HVCI is running.
+# 3. 	If present, System Guard Secure Launch is running.
+# 4. 	If present, SMM Firmware Measurement is running.
 # VirtualizationBasedSecurityStatus: 2 means VBS is enabled and running
 - name: "Check VBS and running security service status"
   ansible.builtin.assert:

@@ -1,0 +1,36 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get available security properties for Windows Defender Device Guard.
+# Refer to this page: https://docs.microsoft.com/en-us/windows/security/
+# threat-protection/device-guard/enable-virtualization-based-protection-of-code-integrity
+# 1. 	If present, hypervisor support is available.
+# 2. 	If present, Secure Boot is available.
+# 3. 	If present, DMA protection is available.
+# 4. 	If present, Secure Memory Overwrite is available.
+# 5. 	If present, NX protections are available.
+# 6. 	If present, SMM mitigations are available.
+# 7. 	If present, MBEC/GMET is available.
+# 8. 	If present, APIC virtualization is available.
+#
+- name: "Initialize the fact of Device Guard available security properties"
+  ansible.builtin.set_fact:
+    win_dg_security_properties: ""
+
+- name: "Get Device Guard available security properties"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(CimInstance –ClassName Win32_DeviceGuard –Namespace root\\Microsoft\\Windows\\DeviceGuard).AvailableSecurityProperties"
+
+- name: "Set fact of Device Guard available security properties"
+  ansible.builtin.set_fact:
+    win_dg_security_properties: "{{ win_powershell_cmd_output.stdout_lines }}"
+  when:
+    - win_powershell_cmd_output is defined
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+
+- name: "Display the results"
+  ansible.builtin.debug:
+    msg:
+      - "AvailableSecurityProperties: {{ win_dg_security_properties }}"
