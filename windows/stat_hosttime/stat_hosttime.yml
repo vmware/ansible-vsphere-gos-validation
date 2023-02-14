@@ -1,9 +1,9 @@
-# Copyright 2021-2023 VMware, Inc.
+# Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
 #   This test case is used for check 'VMwareToolboxCmd.exe' command can display
-# the date and time on the host. If VMware Tools is not installed or not running,
+# the date and time in the guest OS. If VMware Tools is not installed or not running,
 # then this test case result will be "Blocked".
 # Note: The difference between host time got from 'VMwareToolboxCmd.exe' in VM and
 # the host time got from ESXi host may not in 15s due to network issue.
@@ -21,12 +21,17 @@
           vars:
             skip_test_no_vmtools: true
 
+        - name: "Initialize the facts of host time"
+          ansible.builtin.set_fact:
+            real_time: ""
+            stat_time: ""
+
         - name: "Set time zone of guet OS to UTC"
           include_tasks: ../utils/win_execute_cmd.yml
           vars:
             win_powershell_cmd: "Set-TimeZone -Id UTC"
 
-        - name: "Get host time by VMware tools in guet OS"
+        - name: "Get host time by VMware Tools in guest OS"
           ansible.windows.win_shell: "& 'C:\\Program Files\\VMware\\VMware Tools\\VMwareToolboxCmd.exe' stat hosttime"
           register: stat_time_output
           delegate_to: "{{ vm_guest_ip }}"
@@ -40,6 +45,9 @@
         - name: "Set the fact of host time got from {{ esxi_hostname }}"
           ansible.builtin.set_fact:
             real_time: "{{ ' '.join((host_facts.ansible_facts.host_date_time.date, host_facts.ansible_facts.host_date_time.time)) }}"
+          when:
+            - host_facts.ansible_facts.host_date_time is defined
+            - host_facts.ansible_facts.host_date_time
 
         - name: "Set the fact of host time got from guest OS"
           ansible.builtin.set_fact:
@@ -48,14 +56,21 @@
             - stat_time_output.stdout_lines is defined
             - stat_time_output.stdout_lines | length != 0
 
-        - name: "Display the host time got from guest OS by VMware tools and from ESXi host directly"
+        - name: "Check if host time is got or not"
+          ansible.builtin.assert:
+            that:
+              - real_time
+              - stat_time
+            fail_msg: "Did not get the host time either from ESXi host {{ real_time }} or from guest OS {{ stat_time }}."
+
+        - name: "Display the host time got from guest OS by VMware Tools and from ESXi host directly"
           ansible.builtin.debug:
             msg:
-              - "In guest OS, VMware tools stat host time is: {{ stat_time }}"
-              - "On ESXi host '{{ esxi_hostname }}', host time is: {{ real_time}}"
+              - "In guest OS, VMware Tools stat host time is: {{ stat_time }}"
+              - "On ESXi host '{{ esxi_hostname }}', host time is: {{ real_time }}"
 
         # Calculate how many seconds stat host time is behind comparing with real host time
-        - name: "Time difference between VMware tools stat host time and real host time"
+        - name: "Time difference between VMware Tools stat host time and real host time"
           ansible.builtin.set_fact:
             stat_behind_real: "{{ ((real_time | to_datetime) - (stat_time | to_datetime)).total_seconds() }}"
 
