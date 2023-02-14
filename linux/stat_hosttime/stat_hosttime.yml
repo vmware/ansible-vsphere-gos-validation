@@ -16,7 +16,7 @@
   tasks:
     - name: "Test case block"
       block:
-        - name: "Skip test case if no VMware tools"
+        - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: true
@@ -26,7 +26,7 @@
 
         - name: "Execute vmware-toolbox-cmd stat hosttime in guest OS"
           ansible.builtin.shell: "LC_ALL='en_US.UTF-8' TZ=UTC {{ vmware_toolbox_cmd_path }} stat hosttime"
-          register: stat_time
+          register: stat_time_output
           delegate_to: "{{ vm_guest_ip }}"
           poll: 0
 
@@ -38,16 +38,23 @@
           ansible.builtin.set_fact:
             real_time: "{{ ' '.join((host_facts.ansible_facts.host_date_time.date, host_facts.ansible_facts.host_date_time.time)) }}"
 
+        - name: "Set the fact of host time got from guest OS"
+          ansible.builtin.set_fact:
+            stat_time: "{{ stat_time_output.stdout_lines[0] | to_datetime('%d %b %Y %H:%M:%S') }}"
+          when:
+            - stat_time_output.stdout_lines is defined
+            - stat_time_output.stdout_lines | length != 0
+
         - name: "Display the host time got from guest OS by VMware tools and from ESXi host directly"
           ansible.builtin.debug:
             msg:
-              - "In guest OS, VMware tools stat host time is: {{ stat_time.stdout }}"
+              - "In guest OS, VMware tools stat host time is: {{ stat_time }}"
               - "On ESXi host '{{ esxi_hostname }}' host time is: {{ real_time }}"
 
         # Calculate how many seconds stat host time is behand real host time
         - name: "Time difference between VMware Tools stat host time and real host time"
           ansible.builtin.set_fact:
-            stat_behind_real: "{{ ((real_time | to_datetime) - (stat_time.stdout | to_datetime('%d %b %Y %H:%M:%S')) ).total_seconds() }}"
+            stat_behind_real: "{{ ((real_time | to_datetime) - (stat_time | to_datetime)).total_seconds() }}"
 
         - name: "Display the time difference"
           ansible.builtin.debug:
@@ -60,4 +67,5 @@
             fail_msg: "Difference between stat host time and real host time is larger than 15s: {{ stat_behind_real }}s"
             success_msg: "Difference between stat host time and real host time: {{ stat_behind_real }}s"
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml

@@ -16,7 +16,7 @@
   tasks:
     - name: "Test case block"
       block:
-        - name: "Skip test case if no VMware tools"
+        - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: true
@@ -43,7 +43,7 @@
 
         - name: "Set the fact of host time got from guest OS"
           ansible.builtin.set_fact:
-            stat_time: "{{ stat_time_output.stdout_lines[0] }}"
+            stat_time: "{{ stat_time_output.stdout_lines[0] | to_datetime('%d %b %Y %H:%M:%S') }}"
           when:
             - stat_time_output.stdout_lines is defined
             - stat_time_output.stdout_lines | length != 0
@@ -57,7 +57,7 @@
         # Calculate how many seconds stat host time is behind comparing with real host time
         - name: "Time difference between VMware tools stat host time and real host time"
           ansible.builtin.set_fact:
-            stat_behind_real: "{{ ((real_time | to_datetime) - (stat_time | to_datetime('%d %b %Y %H:%M:%S')) ).total_seconds() }}"
+            stat_behind_real: "{{ ((real_time | to_datetime) - (stat_time | to_datetime)).total_seconds() }}"
 
         - name: "Display the time difference"
           ansible.builtin.debug:
@@ -70,4 +70,5 @@
             fail_msg: "Difference between stat host time and real host time is larger than 15s: {{ stat_behind_real }}s"
             success_msg: "Difference between stat host time and real host time: {{ stat_behind_real }}s"
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
