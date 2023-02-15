@@ -45,6 +45,22 @@
 - name: "Get running security services"
   include_tasks: ../utils/win_get_vbs_guest.yml
 
+# AvailableSecurityProperties:
+# 0. 	If present, no relevant properties exist on the device.
+# 1. 	If present, hypervisor support is available.
+# 2. 	If present, Secure Boot is available.
+# 3. 	If present, DMA protection is available.
+# 4. 	If present, Secure Memory Overwrite is available.
+# 5. 	If present, NX protections are available.
+# 6. 	If present, SMM mitigations are available.
+# 7. 	If present, MBEC/GMET is available.
+# 8. 	If present, APIC virtualization is available.
+- name: "Check available security properties got in guest OS"
+  ansible.builtin.assert:
+    that:
+      - win_dg_security_properties | sort == ['1', '2', '3', '4', '5', '6', '7']
+    fail_msg: "Got available security properties in guest OS is: {{ win_dg_security_properties }}, which missing '{{ ['1', '2', '3', '4', '5', '6', '7'] | difference(win_dg_security_properties) }}' compared with the expected list."
+
 # SecurityServicesRunning:
 # 0. 	No services running.
 # 1. 	If present, Windows Defender Credential Guard is running.
