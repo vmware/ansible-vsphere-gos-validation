@@ -791,18 +791,13 @@ class CallbackModule(CallbackBase):
         json_file_path = os.path.join(self.log_dir, self.guest_info_json_file)
         new_guest_info = {}
         if guestinfo:
-            if 'guestinfo_vmtools_info' in guestinfo:
-                new_guest_info['VMware Tools'] = guestinfo['guestinfo_vmtools_info']
-            if 'guestinfo_guest_id' in guestinfo:
-                new_guest_info['GuestInfo Guest ID'] = guestinfo['guestinfo_guest_id']
-            if 'guestinfo_guest_full_name' in guestinfo:
-                new_guest_info['GuestInfo Guest Full Name'] = guestinfo['guestinfo_guest_full_name']
-            if 'guestinfo_guest_family' in guestinfo:
-                new_guest_info['GuestInfo Guest Family'] = guestinfo['guestinfo_guest_family']
-            if 'guestinfo_detailed_data' in guestinfo:
-                new_guest_info['GuestInfo_Detailed_Data'] = guestinfo['guestinfo_detailed_data']
+            new_guest_info['VMware Tools'] = guestinfo.get('guestinfo_vmtools_info', None)
+            new_guest_info['GuestInfo Guest ID'] = guestinfo.get('guestinfo_guest_id', '')
+            new_guest_info['GuestInfo Guest Full Name'] = guestinfo.get('guestinfo_guest_full_name','')
+            new_guest_info['GuestInfo Guest Family'] = guestinfo.get('guestinfo_guest_family', '')
+            new_guest_info['GuestInfo_Detailed_Data'] = guestinfo.get('guestinfo_detailed_data', '')
 
-            if len(new_guest_info.keys()) > 0:
+            if new_guest_info['VMware Tools']:
                 orig_guest_info = {}
                 if os.path.exists(json_file_path):
                     with open(json_file_path, 'r') as json_file:
@@ -1016,12 +1011,13 @@ class CallbackModule(CallbackBase):
         self._play_name = play.get_name()
         self._play_path = self._get_play_path(play)
 
+        if self._last_test_id is None:
+            test_index = 0
+        else:
+            test_index = int(self._last_test_id.split('_')[0]) + 1
+
         # Start new test case
         if self._play_name in self.testcase_list:
-            if self._last_test_id is None:
-                test_index = 0
-            else:
-                test_index = int(self._last_test_id.split('_')[0]) + 1
 
             # Start new test case
             self._last_test_id = "{}_{}".format(test_index, self._play_name)
