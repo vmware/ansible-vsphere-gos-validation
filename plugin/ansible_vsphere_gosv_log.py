@@ -1,7 +1,6 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 from __future__ import (absolute_import, division, print_function)
-
 __metaclass__ = type
 
 DOCUMENTATION = '''
@@ -40,8 +39,6 @@ else:
 """_summary_
 Extract error message from task result
 """
-
-
 def extract_error_msg(json_obj):
     message = ''
     try:
@@ -84,31 +81,187 @@ def extract_error_msg(json_obj):
     return message
 
 class vSphereInfo(object):
-    def __init__(self, hostname, version='', update_version='',
+    def __init__(self, product, hostname, version='', update_version='',
                  build='', model='', cpu_model=''):
+        self.product = product
         self.hostname = hostname
         self.version = version
         if update_version and update_version != 'N/A':
-            self.version += ' Update ' + update_version
+            self.version += ' U' + update_version
         self.build = build
         self.model = model
         self.cpu_model = cpu_model
- 
 
-class VmInfo(object):
-    def __init__(self, vm_name=''):
+    def __str__(self):
+        info = {'hostname': self.hostname,
+                'version': self.version,
+                'build': self.build}
+        if self.product.lower() == 'esxi':
+            info['model'] = self.model
+            info['cpu_model'] = self.cpu_model
+        return json.dumps(info, indent=4)
+
+class TestbedInfo(object):
+    def __init__(self, vcenter_hostname, esxi_hostname,
+                 ansible_gosv_facts):
+        """
+        Initialize vCenter and ESXi server info with ansible facts
+        :param vcenter_hostname:
+        :param esxi_hostname:
+        :param ansible_gosv_facts:
+        """
+        self.vcenter_info = None
+        self.set_vcenter_info(vcenter_hostname, ansible_gosv_facts)
+        self.esxi_info = None
+        self.set_esxi_info(esxi_hostname, ansible_gosv_facts)
+
+    def set_vcenter_info(self, vcenter_hostname, ansible_gosv_facts=None):
+        """
+        Update vCenter server info with ansible facts
+        :param ansible_gosv_facts:
+        :return:
+        """
+        if ansible_gosv_facts:
+            self.vcenter_info = vSphereInfo('vCenter', vcenter_hostname,
+                                            ansible_gosv_facts.get('vcenter_version', ''),
+                                            '',
+                                            ansible_gosv_facts.get('vcenter_build', ''))
+        else:
+            self.vcenter_info = vSphereInfo('vCenter', vcenter_hostname)
+
+    def set_esxi_info(self, esxi_hostname, ansible_gosv_facts=None):
+        """
+        Update ESXi server info with ansible facts
+        :param ansible_gosv_facts:
+        :return:
+        """
+        if ansible_gosv_facts:
+            self.esxi_info = vSphereInfo('ESXi', esxi_hostname,
+                                         ansible_gosv_facts.get('esxi_version', ''),
+                                         ansible_gosv_facts.get('esxi_update_version', ''),
+                                         ansible_gosv_facts.get('esxi_build', ''),
+                                         ansible_gosv_facts.get('esxi_model_info', ''),
+                                         ansible_gosv_facts.get('esxi_cpu_model_info', ''))
+        else:
+            self.esxi_info = vSphereInfo('ESXi', esxi_hostname)
+
+    def __str__(self):
+        """
+        Print testbed information as below:
+
+        Testbed information:
+        +-----------------------------------------------+--------------------------------------------+
+        | Product | Version | Build    | Hostname or IP | Server Model                               |
+        +-----------------------------------------------+--------------------------------------------+
+        | vCenter | 7.0.2   | 17694817 | 192.168.10.10  |                                            |
+        +-----------------------------------------------+--------------------------------------------+
+        | ESXi    | 7.0.2   | 17630552 | 192.168.10.11  | Dell Inc. PowerEdge R650                   |
+        |         |         |          |                | Intel(R) Xeon(R) Silver 4314 CPU @ 2.40GHz |
+        +-----------------------------------------------+--------------------------------------------+
+        """
+        msg = "Testbed information:\n"
+        if ((not self.vcenter_info or not self.vcenter_info.hostname) and
+             (not self.esxi_info or not self.esxi_info.hostname)):
+            msg += "Not found vCenter or ESXi server information\n"
+            return msg
+
+        # Get version column width
+        version_col_width = max([len('Version'), len(self.vcenter_info.version), len(self.esxi_info.version)])
+        # Get build column width
+        build_col_width = max([len('Build'), len(self.vcenter_info.build), len(self.esxi_info.build)])
+        # Get hostname or IP column width
+        hostname_col_width = max(
+            [len('Hostname or IP'), len(self.vcenter_info.hostname), len(self.esxi_info.hostname)])
+        # Get server model column width
+        server_model_col_width = max(
+            [len('Server Model'), len(self.esxi_info.model), len(self.esxi_info.cpu_model)])
+
+        # Table width
+        table_width = sum([9, version_col_width, build_col_width,
+                           hostname_col_width, server_model_col_width]) + 14
+
+        row_border = "+{}+\n".format("".ljust(table_width - 2, "-"))
+        row_format = "| {:<7} | {:<} | {:<} | {:<} | {:<} |\n"
+
+        # Table head
+        msg += row_border
+        msg += row_format.format("Product",
+                                 "Version".ljust(version_col_width),
+                                 "Build".ljust(build_col_width),
+                                 "Hostname or IP".ljust(hostname_col_width),
+                                 "Server Model".ljust(server_model_col_width))
+        msg += row_border
+
+        # vCenter row
+        if self.vcenter_info.hostname:
+            msg += row_format.format("vCenter",
+                                     self.vcenter_info.version.ljust(version_col_width),
+                                     self.vcenter_info.build.ljust(build_col_width),
+                                     self.vcenter_info.hostname.ljust(hostname_col_width),
+                                     ''.ljust(server_model_col_width))
+            msg += row_border
+
+        # Server row
+        if self.esxi_info.hostname:
+            msg += row_format.format("ESXi",
+                                     self.esxi_info.version.ljust(version_col_width),
+                                     self.esxi_info.build.ljust(build_col_width),
+                                     self.esxi_info.hostname.ljust(hostname_col_width),
+                                     self.esxi_info.model.ljust(server_model_col_width))
+            if self.esxi_info.cpu_model:
+                msg += row_format.format('',
+                                         ''.ljust(version_col_width),
+                                         ''.ljust(build_col_width),
+                                         ''.ljust(hostname_col_width),
+                                         self.esxi_info.cpu_model.ljust(server_model_col_width))
+            msg += row_border
+
+        msg += "\n"
+        return msg
+
+class VmGuestInfo(object):
+    def __init__(self, ansible_gosv_facts={}):
+        """
+        Initialize VM guest info with ansible facts
+        :param ansible_gosv_facts:
+        """
+        self.Guest_OS_Distribution = ansible_gosv_facts.get('vm_guest_os_distribution', '')
+        self.ESXi_Version = ansible_gosv_facts.get('esxi_version', '')
+        if (self.ESXi_Version and
+                ansible_gosv_facts.get('esxi_update_version', '') and
+                ansible_gosv_facts['esxi_update_version'] != 'N/A'):
+            self.ESXi_Version += ' U' + ansible_gosv_facts['esxi_update_version']
+        self.ESXi_Build = ansible_gosv_facts.get('esxi_build', '')
+        self.Hardware_Version = ansible_gosv_facts.get('vm_hardware_version','')
+        self.VMTools_Version = ansible_gosv_facts.get('guestinfo_vmtools_info', '')
+        self.Config_Guest_Id = ansible_gosv_facts.get('vm_guest_id', '')
+        self.GuestInfo_Guest_Id = ansible_gosv_facts.get('guestinfo_guest_id', '')
+        self.GuestInfo_Guest_Full_Name = ansible_gosv_facts.get('guestinfo_guest_full_name', '')
+        self.GuestInfo_Guest_Family = ansible_gosv_facts.get('guestinfo_guest_family', '')
+        self.GuestInfo_Detailed_Data = ansible_gosv_facts.get('guestinfo_detailed_data', '')
+
+    def __str__(self):
+        """
+        Convert guest info into a json formatted string
+        """
+        guestinfo_in_dict = OrderedDict()
+        for attr_name, attr_value in vars(self).items():
+            if not attr_name.startswith('__') and attr_value is not None:
+                guestinfo_in_dict[attr_name] = attr_value
+        return json.dumps(guestinfo_in_dict, indent=4)
+
+class VmDetailInfo(VmGuestInfo):
+    def __init__(self, vm_name, ansible_gosv_facts):
         self.Name = vm_name
-        self.IP = ''
-        self.Guest_OS_Distribution = ''
-        self.Hardware_Version = ''
-        self.VMTools_Version = ''
-        self.CloudInit_Version = ''
-        self.GUI_Installed = ''
-        self.Config_Guest_Id = ''
-        self.GuestInfo_Guest_Id = ''
-        self.GuestInfo_Guest_Full_Name = ''
-        self.GuestInfo_Guest_Family = ''
-        self.GuestInfo_Detailed_Data = ''
+        if vm_name:
+            if not ansible_gosv_facts or not isinstance(ansible_gosv_facts, dict):
+                ansible_gosv_facts = {}
+
+            self.Guest_OS_Distribution = ansible_gosv_facts.get('vm_guest_os_distribution', '')
+            self.IP = ansible_gosv_facts.get('vm_guest_ip', '')
+            self.GUI_Installed = ansible_gosv_facts.get('guest_os_with_gui', '')
+            self.CloudInit_Version = ansible_gosv_facts.get('cloudinit_version', '')
+            super().__init__(ansible_gosv_facts)
 
     def __str__(self):
         """
@@ -122,13 +275,13 @@ class VmInfo(object):
         +---------------------------------------------------------------+
         | Guest OS Distribution     | VMware Photon OS 4.0 x86_64       |
         +---------------------------------------------------------------+
-        | Hardware Version          | vmx-19                            |
-        +---------------------------------------------------------------+
-        | VMTools Version           | 11.2.5.26209 (build-17337674)     |
-        +---------------------------------------------------------------+
         | CloudInit Version         | 20.4.1                            |
         +---------------------------------------------------------------+
         | GUI Installed             | False                             |
+        +---------------------------------------------------------------+
+        | Hardware Version          | vmx-19                            |
+        +---------------------------------------------------------------+
+        | VMTools Version           | 11.2.5.26209 (build-17337674)     |
         +---------------------------------------------------------------+
         | Config Guest Id           | vmwarePhoton64Guest               |
         +---------------------------------------------------------------+
@@ -150,14 +303,17 @@ class VmInfo(object):
 
         # Get VM name from testing vars file and set log dir
         msg = 'VM information:\n'
-        wrap_width = 50
-        wrapped_vm_info = {}
+        if not self.Name:
+            msg += "Not found VM information\n"
+            return msg
 
+        wrap_width = 80
+        wrapped_vm_info = {}
         # Get column width
         head_col_width = 0
         info_col_width = 0
         for attr_name, attr_value in vars(self).items():
-            if not attr_name.startswith('__') and attr_value is not None:
+            if not attr_name.startswith('__') and not attr_name.startswith('ESXi') and attr_value is not None:
                 head_col_width = max([head_col_width, len(attr_name)])
                 if len(attr_value) > wrap_width:
                     if attr_name == 'GuestInfo_Detailed_Data':
@@ -206,42 +362,33 @@ class VmInfo(object):
 
         return msg
 
-    def update(self, ansible_facts):
-        """
-        Update VM info with ansible_facts
-        :param ansible_facts:
-        :return:
-        """
-        self.Hardware_Version = ansible_facts.get('vm_hardware_version','')
-        self.Guest_OS_Distribution = ansible_facts.get('vm_guest_os_distribution', '')
-        self.Config_Guest_Id = ansible_facts.get('vm_guest_id', '')
-        self.GuestInfo_Guest_Id = ansible_facts.get('guestinfo_guest_id', '')
-        self.GuestInfo_Guest_Full_Name = ansible_facts.get('guestinfo_guest_full_name', '')
-        self.GuestInfo_Guest_Family = ansible_facts.get('guestinfo_guest_family', '')
-        self.GuestInfo_Detailed_Data = ansible_facts.get('guestinfo_detailed_data', '')
-        self.VMTools_Version = ansible_facts.get('guestinfo_vmtools_info', '')
-        self.GUI_Installed = ansible_facts.get('guest_os_with_gui', '')
-        self.CloudInit_Version = ansible_facts.get('cloudinit_version', '')
-
-class TestResult(object):
+class TestRun(object):
     """
-    Data about an individual test case
+    Data about an individual test case run
     """
 
-    def __init__(self, name):
-        self.name = name
+    def __init__(self, test_id, test_name):
+        self.id = test_id
+        self.name = test_name
         self.status = "No Run"
-        self.started_at = None
+        self.start_time = None
         self.duration = 0
+    def __str__(self):
+        return str({"id": self.id,
+                    "name": self.name,
+                    "status": self.status,
+                    "start_time": self.start_time,
+                    "duration": self.duration})
 
     def start(self):
-        self.started_at = time.time()
+        self.start_time = time.time()
         self.status = "Running"
+        # print("Test {} is started.".format(self.id))
 
-    def finish(self, status):
-        self.duration = int(time.time() - self.started_at)
+    def complete(self, status):
+        self.duration = int(time.time() - self.start_time)
         self.status = status
-
+        # print("Test {} is completed, result is {}.".format(self.id, self.status))
 
 class CallbackModule(CallbackBase):
     CALLBACK_NAME = 'ansible_vsphere_gosv_log'
@@ -254,16 +401,13 @@ class CallbackModule(CallbackBase):
         self.hosts = []
         self.play = None
         self.log_msg = ''
-        self.test_results = OrderedDict()
+        self.test_runs = OrderedDict()
         self.testcase_list = []
-        self.test_suite = ''
 
-        self._ansible_facts = {}
+        self._ansible_gosv_facts = {}
 
-        self.os_ovt_version = None
-
-        self.started_at = None
-        self.finished_at = None
+        self.start_time = None
+        self.end_time = None
 
         self.plugin_dir = os.path.dirname(os.path.realpath(__file__))
         self.cwd = os.path.dirname(self.plugin_dir)
@@ -276,10 +420,11 @@ class CallbackModule(CallbackBase):
         self.test_results_log = "results.log"
         self.guest_info_json_file = "guest_info.json"
         self.junit_results_xml = "junit_results.xml"
+        self.collected_guest_info = {}
 
-        # Set default testing vars file and testcase list file
-        self.testing_vars_file = os.path.join(self.cwd, "vars/test.yml")
-        self.testing_testcase_file = os.path.join(self.cwd, "linux/gosv_testcase_list.yml")
+        # Testing vars file and testcase list file
+        self.testing_vars_file = None
+        self.testing_testcase_file = None
         self.testing_vars = {}
 
         # The play name and path of current playbook
@@ -458,6 +603,10 @@ class CallbackModule(CallbackBase):
 
         task_details += " => {}".format(self._dump_results(result._result, indent=4))
 
+        if 'include_vars' in str(task.action):
+            # update testing vars with include_vars
+            self.testing_vars.update(result._result.get('ansible_facts', {}))
+
         if ignore_errors:
             task_details += "\n...ignoring"
             log_failed_tasks = False
@@ -507,28 +656,40 @@ class CallbackModule(CallbackBase):
         if log_failed_tasks:
             self.remove_logger_file_handler(self.failed_tasks_log)
 
-    def _get_testing_vars(self):
-        if not self.testing_vars_file or not os.path.exists(self.testing_vars_file):
-            self.logger.error("Failed to get testing vars file")
-            return
+    def _load_testing_vars(self, play):
+        # Update testing vars with play vars
+        play_vars = play.get_vars()
+        if play_vars:
+            self.testing_vars.update(play_vars)
 
-        with open(self.testing_vars_file, 'r') as fd:
-            self.testing_vars = yaml.load(fd, Loader=yaml.Loader)
+        # Update testing vars with play vars files
+        play_vars_files = play.get_vars_files()
+        play_path = self._get_play_path(play)
+        if play_vars_files:
+            for vars_file in play_vars_files:
+                if 'testing_vars_file' in vars_file:
+                    # Update testing vars with testing_vars_file
+                    if self.testing_vars_file and os.path.exists(self.testing_vars_file):
+                        with open(self.testing_vars_file, 'r') as fd:
+                            self.testing_vars.update(yaml.load(fd, Loader=yaml.Loader))
+                else:
+                    vars_file_path = os.path.join(os.path.dirname(play_path), vars_file)
+                    if os.path.exists(vars_file_path):
+                        with open(vars_file_path, 'r') as fd:
+                            self.testing_vars.update(yaml.load(fd, Loader=yaml.Loader))
 
     # Get all of test cases at play start and set status to "No Run"
-    def _get_testcase_list(self):
-        if not self.testing_testcase_file or not os.path.exists(self.testing_testcase_file):
-            self.logger.error("Failed to get test cases file")
+    def _get_testcase_list(self, testcase_file_path):
+        if not testcase_file_path or not os.path.exists(testcase_file_path):
+            self.logger.error("Test cases file {} doesn't exist".format(testcase_file_path))
             return
 
-        self.test_suite = os.path.basename(os.path.dirname(self.testing_testcase_file))
-
-        with open(self.testing_testcase_file, 'r') as fd:
+        with open(testcase_file_path, 'r') as fd:
             playbooks = yaml.load(fd, Loader=yaml.Loader)
             for index, playbook in enumerate(playbooks):
                 test_name = os.path.basename(playbook['import_playbook']).replace('.yml', '')
-                test_id = "{}_{}".format(index, test_name)
-                self.test_results[test_id] = TestResult(test_name)
+                test_id = "{}_{}".format((index+1), test_name)
+                self.test_runs[test_id] = TestRun(test_id, test_name)
                 self.testcase_list.append(test_name)
 
     def _get_play_path(self, play):
@@ -544,126 +705,27 @@ class CallbackModule(CallbackBase):
             fd.write(msg)
             fd.close()
 
-    def _print_testbed_info(self):
-        """
-        Print testbed information as below:
-
-        Testbed information:
-        +-----------------------------------------------+--------------------------------------------+
-        | Product | Version | Build    | Hostname or IP | Server Model                               |
-        +-----------------------------------------------+--------------------------------------------+
-        | vCenter | 7.0.2   | 17694817 | 192.168.10.10  |                                            | 
-        +-----------------------------------------------+--------------------------------------------+
-        | ESXi    | 7.0.2   | 17630552 | 192.168.10.11  | Dell Inc. PowerEdge R650                   |
-        |         |         |          |                | Intel(R) Xeon(R) Silver 4314 CPU @ 2.40GHz |
-        +-----------------------------------------------+--------------------------------------------+
-        """
-
-        # Get vCenter and ESXi server info
-        vcenter_info = None
-        esxi_info = None
-        if self.testing_vars:
-            esxi_hostname = self.testing_vars.get('esxi_hostname', '')
-            vcenter_hostname = self.testing_vars.get('vcenter_hostname', '')
-            if self._ansible_facts:
-                esxi_info = vSphereInfo(esxi_hostname,
-                                        self._ansible_facts.get('esxi_version', ''),
-                                        self._ansible_facts.get('esxi_update_version', ''),
-                                        self._ansible_facts.get('esxi_build', ''),
-                                        self._ansible_facts.get('esxi_model_info', ''),
-                                        self._ansible_facts.get('esxi_cpu_model_info', ''))
-                vcenter_info = vSphereInfo(vcenter_hostname,
-                                           self._ansible_facts.get('vcenter_version', ''), 
-                                           '',
-                                           self._ansible_facts.get('vcenter_build', ''))
-            else:
-                esxi_info = vSphereInfo(esxi_hostname)
-                vcenter_info = vSphereInfo(vcenter_hostname)
-
-        msg = "Testbed information:\n"
-        if ((not vcenter_info or not vcenter_info.hostname) and
-            (not esxi_info or not esxi_info.hostname)):
-            msg += "Not found vCenter or ESXi server information\n"
-            self.logger.debug(msg)
-            self._display.display(msg, color=C.COLOR_VERBOSE)
-            return
-
-        # Get version column width
-        version_col_width = max([len('Version'), len(vcenter_info.version), len(esxi_info.version)])
-        # Get build column width
-        build_col_width = max([len('Build'), len(vcenter_info.build), len(esxi_info.build)])
-        # Get hostname or IP column width
-        hostname_col_width = max(
-            [len('Hostname or IP'), len(vcenter_info.hostname), len(esxi_info.hostname)])
-        # Get server model column width
-        server_model_col_width = max(
-            [len('Server Model'), len(esxi_info.model), len(esxi_info.cpu_model)])
-
-        # Table width
-        table_width = sum([9, version_col_width, build_col_width,
-                           hostname_col_width, server_model_col_width]) + 14
-
-        row_border = "+{}+\n".format("".ljust(table_width - 2, "-"))
-        row_format = "| {:<7} | {:<} | {:<} | {:<} | {:<} |\n"
-
-        # Table head
-        msg += row_border
-        msg += row_format.format("Product",
-                                 "Version".ljust(version_col_width),
-                                 "Build".ljust(build_col_width),
-                                 "Hostname or IP".ljust(hostname_col_width),
-                                 "Server Model".ljust(server_model_col_width))
-        msg += row_border
-
-        # vCenter row
-        if vcenter_hostname:
-            msg += row_format.format("vCenter",
-                                     vcenter_info.version.ljust(version_col_width),
-                                     vcenter_info.build.ljust(build_col_width),
-                                     vcenter_info.hostname.ljust(hostname_col_width),
-                                     ''.ljust(server_model_col_width))
-            msg += row_border
-
-        # Server row
-        if esxi_hostname:
-            msg += row_format.format("ESXi",
-                                     esxi_info.version.ljust(version_col_width),
-                                     esxi_info.build.ljust(build_col_width),
-                                     esxi_hostname.ljust(hostname_col_width),
-                                     esxi_info.model.ljust(server_model_col_width))
-            if esxi_info.cpu_model:
-                msg += row_format.format('',
-                                         ''.ljust(version_col_width),
-                                         ''.ljust(build_col_width),
-                                         ''.ljust(hostname_col_width),
-                                         esxi_info.cpu_model.ljust(server_model_col_width))
-            msg += row_border
-
-        msg += "\n"
-        self.logger.info(msg)
-        self._display.display(msg, color=C.COLOR_VERBOSE)
-
     def _print_test_results(self):
         """
         Print test results in a table as below
 
         Test Results (Total: 3, Failed: 1, No Run: 1, Elapsed Time: 00:18:42):
-        +---------------------------------------------+
-        | Name                 |   Status | Exec Time |
-        +---------------------------------------------+
-        | deploy_vm            | * No Run | 00:00:01  |
-        +---------------------------------------------+
-        | vgauth_check_service |   Passed | 00:03:02  |
-        +---------------------------------------------+
-        | gosc_cloudinit_dhcp  | * Failed | 00:12:58  |
-        +---------------------------------------------+
+        +--------------------------------------------------+
+        | ID | Name                 |   Status | Exec Time |
+        +--------------------------------------------------+
+        |  1 | deploy_vm            | * No Run | 00:00:01  |
+        +--------------------------------------------------+
+        |  2 | vgauth_check_service |   Passed | 00:03:02  |
+        +--------------------------------------------------+
+        |  3 | gosc_cloudinit_dhcp  | * Failed | 00:12:58  |
+        +--------------------------------------------------+
         """
 
         total_exec_time = ""
-        total_count = len(self.testcase_list)
+        total_count = len(self.test_runs)
 
-        if self.started_at and self.finished_at:
-            total_exec_time = int(self.finished_at - self.started_at)
+        if self.start_time and self.end_time:
+            total_exec_time = int(self.end_time - self.start_time)
 
         # No test run
         if total_count == 0:
@@ -675,11 +737,11 @@ class CallbackModule(CallbackBase):
 
         # Get the column width
         idx_col_width = max([len(str(total_count)), 2])
-        name_col_width = max([len(test_result.name) for test_result in self.test_results.values()])
+        name_col_width = max([len(test_result.name) for test_result in self.test_runs.values()])
         status_col_width = max([(len(test_result.status) + 2)
                                 if test_result.status != "Passed"
                                 else len(test_result.status)
-                                for test_result in self.test_results.values()])
+                                for test_result in self.test_runs.values()])
 
         status_mark = ""
         if status_col_width > len('passed'):
@@ -699,8 +761,8 @@ class CallbackModule(CallbackBase):
         # Table rows
         status_stats = OrderedDict([('Passed', 0), ('Failed', 0), ('Blocked', 0), ('Skipped', 0), ('No Run', 0)])
         test_idx = 0
-        for test_id in self.test_results:
-            test_result = self.test_results[test_id]
+        for test_id in self.test_runs:
+            test_result = self.test_runs[test_id]
             test_idx += 1
             test_exec_time = time.strftime('%H:%M:%S', time.gmtime(test_result.duration))
             if test_result.status == 'Passed':
@@ -738,7 +800,7 @@ class CallbackModule(CallbackBase):
         Print OS release information into a JSON file, which includes open-vm-tools version,
         cloud-init version, inbox drivers versions.
         """
-        os_release_info_file = self._ansible_facts.get('os_release_info_file_path', None)
+        os_release_info_file = self._ansible_gosv_facts.get('os_release_info_file_path', None)
         if (os_release_info_file and os.path.exists(os_release_info_file)):
             with open(os_release_info_file, 'r') as json_input:
                 os_release_info_detail = json.load(json_input,
@@ -746,14 +808,14 @@ class CallbackModule(CallbackBase):
                 # Update cloud-init version or open-vm-tools version in OS releas info
                 if os_release_info_detail and len(os_release_info_detail) == 1:
                     data_changed = False
-                    if (self._ansible_facts.get('cloudinit_version','') and
+                    if (self._ansible_gosv_facts.get('cloudinit_version','') and
                             'cloud-init' not in os_release_info_detail[0]):
-                        os_release_info_detail[0]['cloud-init'] = self._ansible_facts['cloudinit_version']
+                        os_release_info_detail[0]['cloud-init'] = self._ansible_gosv_facts['cloudinit_version']
                         os_release_info_detail[0].move_to_end('cloud-init', last=False)
                         data_changed = True
-                    if (self._ansible_facts.get('vmtools_info_from_vmtoolsd','') and
+                    if (self._ansible_gosv_facts.get('vmtools_info_from_vmtoolsd','') and
                             'open-vm-tools' not in os_release_info_detail[0]):
-                        os_release_info_detail[0]['open-vm-tools'] = self._ansible_facts['vmtools_info_from_vmtoolsd']
+                        os_release_info_detail[0]['open-vm-tools'] = self._ansible_gosv_facts['vmtools_info_from_vmtoolsd']
                         os_release_info_detail[0].move_to_end('open-vm-tools', last=False)
                         data_changed = True
 
@@ -774,12 +836,14 @@ class CallbackModule(CallbackBase):
         self._clean_results(result._result, result._task.action)
 
         if (not ignore_errors and self._last_test_id and
-                self._last_test_id in self.test_results and
-                self.test_results[self._last_test_id].status == "Running"):
+                self._last_test_id in self.test_runs and
+                self.test_runs[self._last_test_id].status == "Running"):
             if 'reason: Blocked' in result._task.name:
-                self.test_results[self._last_test_id].finish('Blocked')
+                self.test_runs[self._last_test_id].complete('Blocked')
             else:
-                self.test_results[self._last_test_id].finish('Failed')
+                self.test_runs[self._last_test_id].complete('Failed')
+            # Pop up the completed test case
+            self.testcase_list.pop(0)
 
         if result._task.loop and 'results' in result._result:
             self._process_items(result)
@@ -787,29 +851,21 @@ class CallbackModule(CallbackBase):
 
         self._print_task_details(result, 'failed', delegated_vars, ignore_errors=ignore_errors)
 
-    def _dump_guest_info(self, guestinfo):
+    def _dump_guest_info(self):
+        """
+        Dump collected guest info into a json file
+        :return:
+        """
         json_file_path = os.path.join(self.log_dir, self.guest_info_json_file)
-        new_guest_info = {}
-        if guestinfo:
-            new_guest_info['VMware Tools'] = guestinfo.get('guestinfo_vmtools_info', None)
-            new_guest_info['GuestInfo Guest ID'] = guestinfo.get('guestinfo_guest_id', '')
-            new_guest_info['GuestInfo Guest Full Name'] = guestinfo.get('guestinfo_guest_full_name','')
-            new_guest_info['GuestInfo Guest Family'] = guestinfo.get('guestinfo_guest_family', '')
-            new_guest_info['GuestInfo_Detailed_Data'] = guestinfo.get('guestinfo_detailed_data', '')
+        if len(self.collected_guest_info) > 0:
+            with open(json_file_path, 'w') as json_file:
+                self._display.display("Dump guest info into {}".format(json_file_path),
+                                      color=C.COLOR_VERBOSE)
+                json_objs = []
+                for guest_info in self.collected_guest_info.values():
+                    json_objs.append(json.loads(str(guest_info)))
 
-            if new_guest_info['VMware Tools']:
-                orig_guest_info = {}
-                if os.path.exists(json_file_path):
-                    with open(json_file_path, 'r') as json_file:
-                        orig_guest_info = json.load(json_file)
-
-                if ('VMware Tools' in new_guest_info and
-                    new_guest_info['VMware Tools'] not in orig_guest_info):
-                    orig_guest_info[new_guest_info['VMware Tools']] = new_guest_info
-                    with open(json_file_path, 'w') as json_file:
-                        self._display.display("Dump guest info into {}".format(json_file_path),
-                                              color=C.COLOR_VERBOSE)
-                        json.dump(orig_guest_info, json_file, indent=4)
+                json.dump(json_objs, json_file, indent=4)
 
     def _get_exception_traceback(self, result):
         if 'exception' in result:
@@ -823,12 +879,14 @@ class CallbackModule(CallbackBase):
         self._clean_results(result._result, result._task.action)
 
         if (not ignore_errors and self._last_test_id and
-                self._last_test_id in self.test_results and
-                self.test_results[self._last_test_id].status == "Running"):
+                self._last_test_id in self.test_runs and
+                self.test_runs[self._last_test_id].status == "Running"):
             if 'reason: Blocked' in result._task.name:
-                self.test_results[self._last_test_id].finish('Blocked')
+                self.test_runs[self._last_test_id].complete('Blocked')
             else:
-                self.test_results[self._last_test_id].finish('Failed')
+                self.test_runs[self._last_test_id].complete('Failed')
+            # Pop up the completed test case
+            self.testcase_list.pop(0)
 
         if result._task.loop and 'results' in result._result:
             self._process_items(result)
@@ -836,7 +894,7 @@ class CallbackModule(CallbackBase):
 
         self._print_task_details(result, 'failed', delegated_vars, ignore_errors=ignore_errors)
 
-    def _collect_ansible_facts(self, result):
+    def _collect_ansible_gosv_facts(self, result):
         task = result._task
         task_result = result._result
         task_args = task.args
@@ -861,31 +919,29 @@ class CallbackModule(CallbackBase):
             if ansible_facts:
                 non_empty_facts = dict(filter(lambda item: item[1],
                                               ansible_facts.items()))
-                self._ansible_facts.update(non_empty_facts)
+                self._ansible_gosv_facts.update(non_empty_facts)
                 if task_file == "vm_get_guest_info.yml":
-                    self._dump_guest_info(non_empty_facts)
+                    # Save guest info
+                    vm_guest_info = VmGuestInfo(self._ansible_gosv_facts)
+                    if vm_guest_info.VMTools_Version:
+                        guestinfo_hash = str(hash("{}{}{}".format(vm_guest_info.ESXi_Build,
+                                                                  vm_guest_info.VMTools_Version,
+                                                                  vm_guest_info.Hardware_Version)))
+
+                        if (guestinfo_hash not in self.collected_guest_info):
+                            self.collected_guest_info[guestinfo_hash] = vm_guest_info
 
         elif (task_file in ["deploy_vm.yml", "test_setup.yml"] and
               str(task.action) == "ansible.builtin.debug"):
             if 'var' in task_args and task_args['var'] == "vm_guest_ip":
                 if task_result["vm_guest_ip"]:
-                    self._ansible_facts["vm_guest_ip"] = task_result["vm_guest_ip"]
+                    self._ansible_gosv_facts["vm_guest_ip"] = task_result["vm_guest_ip"]
 
     def v2_runner_on_ok(self, result):
         task = result._task
         task_args = task.args
 
         if isinstance(task, TaskInclude):
-            if ('_raw_params' in task_args and
-                    task_args['_raw_params'] == "skip_test_case.yml"):
-                task_vars = task.get_vars()
-                # Finish skipped test case
-                if ("skip_reason" in task_vars and
-                        task_vars["skip_reason"] and
-                        self._last_test_id and
-                        self._last_test_id in self.test_results and
-                        self.test_results[self._last_test_id].status == "Running"):
-                    self.test_results[self._last_test_id].finish()
             return
 
         task_result = result._result
@@ -902,7 +958,7 @@ class CallbackModule(CallbackBase):
             self._print_task_details(result, "ok", delegated_vars)
 
         # Collect ansible_facts from set_fact or debug modules
-        self._collect_ansible_facts(result)
+        self._collect_ansible_gosv_facts(result)
 
         # Set skipped test case result
         task_file = os.path.basename(task.get_path()).split(':')[0].strip()
@@ -911,10 +967,11 @@ class CallbackModule(CallbackBase):
                 "Skip testcase:" in task.name):
             test_status = task.name.split(':')[-1].strip()
             if (self._last_test_id and
-                    self._last_test_id in self.test_results and
-                    self.test_results[self._last_test_id].status == "Running"):
-                self.test_results[self._last_test_id].finish(test_status)
-
+                    self._last_test_id in self.test_runs and
+                    self.test_runs[self._last_test_id].status == "Running"):
+                self.test_runs[self._last_test_id].complete(test_status)
+                # Pop up the completed test case
+                self.testcase_list.pop(0)
 
     def v2_runner_on_skipped(self, result):
         self._clean_results(result._result, result._task.action)
@@ -928,9 +985,11 @@ class CallbackModule(CallbackBase):
         self._print_task_details(result, "unreachable", delegated_vars)
 
         if (self._last_test_id and
-                self._last_test_id in self.test_results and
-                self.test_results[self._last_test_id].status == "Running"):
-            self.test_results[self._last_test_id].finish('Failed')
+                self._last_test_id in self.test_runs and
+                self.test_runs[self._last_test_id].status == "Running"):
+            self.test_runs[self._last_test_id].complete('Failed')
+            # Pop up the completed test case
+            self.testcase_list.pop(0)
 
     def v2_runner_retry(self, result):
         task_name = result.task_name or result._task
@@ -961,7 +1020,7 @@ class CallbackModule(CallbackBase):
 
     def v2_playbook_on_start(self, playbook):
         playbook_path = os.path.realpath(playbook._file_name)
-        self.started_at = time.time()
+        self.start_time = time.time()
 
         # Parse extra vars
         extra_vars = {}
@@ -973,21 +1032,22 @@ class CallbackModule(CallbackBase):
                     for extra_vars_item in extra_vars_list:
                         if extra_vars_item.find("=") != -1:
                             extra_vars[extra_vars_item.split("=")[0].strip()] = extra_vars_item.split("=")[1].strip()
-
         # Update testing vars file with extra variable
         if 'testing_vars_file' in extra_vars.keys():
             self.testing_vars_file = extra_vars['testing_vars_file']
+        else:
+            self.testing_vars_file = os.path.join(self.cwd, "vars/test.yml"))
 
-        # Get all testing vars
-        self._get_testing_vars()
 
         # Get testcase list
         if 'main.yml' in os.path.basename(playbook_path):
             # Update testcase list file with extra variable
             if 'testing_testcase_file' in extra_vars.keys():
                 self.testing_testcase_file = extra_vars['testing_testcase_file']
-
-            self._get_testcase_list()
+                self._get_testcase_list(extra_vars['testing_testcase_file'])
+            else:
+                self.testing_testcase_file = os.path.join(self.cwd, "linux/gosv_testcase_list.yml")
+            self._get_testcase_list(self.testing_testcase_file)
 
         self.add_logger_file_handler(self.full_debug_log)
         msg = self._banner("PLAYBOOK: {}".format(playbook_path))
@@ -1003,26 +1063,26 @@ class CallbackModule(CallbackBase):
     def v2_playbook_on_play_start(self, play):
         # Finish the last test case
         if (self._last_test_id and
-                self._last_test_id in self.test_results and
-                self.test_results[self._last_test_id].status == "Running"):
-            self.test_results[self._last_test_id].finish('Passed')
+                self._last_test_id in self.test_runs and
+                self.test_runs[self._last_test_id].status == "Running"):
+            self.test_runs[self._last_test_id].complete('Passed')
+            # Pop up the completed test case
+            self.testcase_list.pop(0)
 
         # Move to new started playbook
         self._play_name = play.get_name()
         self._play_path = self._get_play_path(play)
+        self._load_testing_vars(play)
 
-        if self._last_test_id is None:
-            test_index = 0
-        else:
-            test_index = int(self._last_test_id.split('_')[0]) + 1
-
+        test_index = len(self.test_runs) - len(self.testcase_list)
         # Start new test case
-        if self._play_name in self.testcase_list:
-
+        if (test_index < len(self.test_runs) and
+            self.testcase_list[0] == self._play_name):
             # Start new test case
-            self._last_test_id = "{}_{}".format(test_index, self._play_name)
-            if self._last_test_id in self.test_results:
-                self.test_results[self._last_test_id].start()
+            self._last_test_id = "{}_{}".format((test_index+1), self._play_name)
+            # print("New test id is " + self._last_test_id)
+            if self._last_test_id in self.test_runs:
+                self.test_runs[self._last_test_id].start()
 
         if self._play_name:
             msg = self._banner("PLAY [{}]".format(self._play_name))
@@ -1040,13 +1100,15 @@ class CallbackModule(CallbackBase):
         self._play_tasks_cache.clear()
 
     def v2_playbook_on_stats(self, stats):
-        self.finished_at = time.time()
+        self.end_time = time.time()
 
         # Update the last testcase status
         if (self._last_test_id and
-                self._last_test_id in self.test_results and
-                self.test_results[self._last_test_id].status == "Running"):
-            self.test_results[self._last_test_id].finish('Passed')
+                self._last_test_id in self.test_runs and
+                self.test_runs[self._last_test_id].status == "Running"):
+            self.test_runs[self._last_test_id].complete('Passed')
+            # Pop up the completed test case
+            self.testcase_list.pop(0)
 
         # Log play stats
         msg = self._banner("PLAY RECAP")
@@ -1064,27 +1126,30 @@ class CallbackModule(CallbackBase):
 
         self.logger.info(msg)
 
-        # Log testcases results
+        # Update open-vm-tools and cloud-init version in inbox driver info file
         self._print_os_release_info()
 
-        # Only print test summary when there is test case
-        if len(self.test_results) > 0:
+        # Dump guest info into a json file
+        self._dump_guest_info()
+
+        # Print test summary when there is test run
+        if len(self.test_runs) > 0:
             self._display.banner("TEST SUMMARY")
             self.logger.info(self._banner("TEST SUMMARY"))
             self.add_logger_file_handler(self.test_results_log)
+
             # Print testbed information
-            self._print_testbed_info()
+            vcenter_hostname = self.testing_vars.get('vcenter_hostname', '')
+            esxi_hostname = self.testing_vars.get('esxi_hostname', '')
+            testbed_info = TestbedInfo(vcenter_hostname, esxi_hostname, self._ansible_gosv_facts)
+            self.logger.info(str(testbed_info))
+            self._display.display(str(testbed_info), color=C.COLOR_VERBOSE)
 
             # Print VM information
             vm_name = self.testing_vars.get('vm_name', None)
-            if vm_name:
-                vm_info = VmInfo(vm_name)
-                vm_info.update(self._ansible_facts)
-                vm_info_str = str(vm_info)
-            else:
-                vm_info_str = "Not found VM information"
-            self.logger.info(vm_info_str)
-            self._display.display(vm_info_str, color=C.COLOR_VERBOSE)
+            vm_info = VmDetailInfo(vm_name, self._ansible_gosv_facts)
+            self.logger.info(str(vm_info))
+            self._display.display(str(vm_info), color=C.COLOR_VERBOSE)
 
             # Print test results
             self._print_test_results()
