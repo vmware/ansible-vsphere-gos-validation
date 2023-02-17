@@ -1,0 +1,110 @@
+
+debug=yes
+nonInteractive=yes
+
+# Variations in the root disk device name between VMware and Virtualbox
+if [ -e /dev/ada0 ]; then
+    DISKSLICE=ada0
+elif [ -e /dev/da0 ]; then
+    DISKSLICE=da0
+elif [ -e /dev/vtbd0 ]; then
+    DISKSLICE=vtbd0
+else
+    echo "Unknown disk for install.sh to work with!"
+    exit -1
+fi
+
+PARTITIONS="${DISKSLICE} gpt"
+# DISTRIBUTIONS="kernel.txz base.txz kernel-dbg.txz lib32.txz src.txz ports.txz"
+DISTRIBUTIONS="kernel.txz base.txz"
+
+
+#!/bin/sh
+echo 'Running installerconfig ...'
+#hostname
+sysrc hostname="FreeBSD"
+
+gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 da0
+# Set Time Zone to UTC
+echo "Setting Time Zone to UTC ..."
+/bin/cp /usr/share/zoneinfo/UTC /etc/localtime
+/usr/bin/touch /etc/wall_cmos_clock
+/sbin/adjkerntz -a
+
+echo "Set DHCP to NIC vmx0 ..."
+ifdev=$(ifconfig | grep '^[a-z]' | cut -d: -f1 | head -n 1)
+echo "Get ifname ${ifdev}"
+sysrc ifconfig_${ifdev}=DHCP
+sleep 5
+
+# Add new user. 
+{% if new_user is defined and new_user != 'root' %}
+echo "{{ vm_password }}" | pw -V /etc useradd {{ new_user }} -h 0 -s /bin/sh -G wheel -d /home/{{ new_user }} -c "{{ new_user }} User"
+mkdir -p /home/{{ new_user }}
+chown 1001:1001 /home/{{ new_user }}
+{% endif %}
+
+# Set password of root user
+echo "{{ vm_password }}" | pw -V /etc usermod root -h 0
+
+# Set latest repository to the new system
+echo "Set latest repository to the new system ..."
+env ASSUME_ALWAYS_YES=YES pkg bootstrap -f | cat
+bit=`uname -m`
+OSFamily=`uname -s`
+major_version=`freebsd-version -k | cut -d . -f 1`
+repo="${OSFamily}:${major_version}:${bit}"
+
+mkdir -p /usr/local/etc/pkg/repos
+cat << EOF > /usr/local/etc/pkg/repos/latest.conf
+FreeBSD: { enabled: no }
+
+latest: {                                                                     
+  url: "pkg+http://pkg.FreeBSD.org/${repo}/latest",
+  mirror_type: "srv",                                                           
+  signature_type: "fingerprints",                                               
+  fingerprints: "/usr/share/keys/pkg",                                         
+  enabled: yes                                                                 
+}
+EOF
+
+# Get DHCP for nic0
+echo "Get IP with dhclient ..."
+dhclient ${ifdev}
+sleep 15
+echo "Check network again ..."
+ifconfig
+sleep 5
+
+# Installing packages
+echo "Installing packages ..."
+env ASSUME_ALWAYS_YES=YES pkg bootstrap -y | cat
+env ASSUME_ALWAYS_YES=YES pkg update -f
+# env ASSUME_ALWAYS_YES=YES pkg install -y bash curl vim wget sudo
+env ASSUME_ALWAYS_YES=YES pkg install -y vim | cat
+
+# Enable root login via ssh
+echo "Enable root login via ssh ..."
+mkdir -p -m 700 /root/.ssh
+echo "{{ ssh_public_key }}" > /root/.ssh/authorized_keys
+chown -R root /root/.ssh
+chmod 0644 /root/.ssh/authorized_keys
+# We can't ssh to VM with empty password for root user
+sed -i .bak -e 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+sed -i '' -e 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+sed -i '' -e 's/#PermitEmpty.*/PermitEmptyPasswords yes/' /etc/ssh/sshd_config
+
+# Enable service
+echo "Enable service ..."
+sysrc sshd_enable="YES"
+sysrc ntpd_enable="YES"
+sysrc ntpd_sync_on_start="YES"
+
+# Removing boot menu delay
+echo "Removing boot menu delay ..."
+echo 'autoboot_delay="3"' >> /boot/loader.conf
+
+echo "End of installerconfig and shutdown ..."
+shutdown -p now
+
+
