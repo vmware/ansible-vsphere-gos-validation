@@ -20,7 +20,14 @@ DISTRIBUTIONS="kernel.txz base.txz"
 
 
 #!/bin/sh
+set -o xtrace
+
 echo 'Running installerconfig ...'
+# Enable serial and internal consoles
+echo "Enabling serial and internal consoles"
+echo "-Dhv" > /boot.config
+echo "cuau0   \"/usr/libexec/getty std.38400\"  xterm   on  secure" >> /etc/ttys
+
 #hostname
 sysrc hostname="FreeBSD"
 
@@ -104,7 +111,8 @@ sysrc ntpd_sync_on_start="YES"
 echo "Removing boot menu delay ..."
 echo 'autoboot_delay="3"' >> /boot/loader.conf
 
-echo "End of installerconfig and shutdown ..."
+echo "End of installerconfig"
+echo "{{ autoinstall_complete_msg }}" > /dev/ttyu0
 shutdown -p now
 
 
