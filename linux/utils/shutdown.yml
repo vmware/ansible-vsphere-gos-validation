@@ -9,6 +9,17 @@
   changed_when: false
   async: 1
   poll: 0
+  when: guest_os_family != "FreeBSD"
+
+# The 'shutdown -h now' will let FreeBSD to halt
+- name: Execute guest OS shutdown for FreeBSD
+  ansible.builtin.command: "poweroff"
+  delegate_to: "{{ vm_guest_ip }}"
+  become: true
+  changed_when: false
+  async: 1
+  poll: 0
+  when: guest_os_family == "FreeBSD"
 
 - name: "Wait for port 22 to become stopped"
   ansible.builtin.wait_for:

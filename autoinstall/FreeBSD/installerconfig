@@ -44,16 +44,6 @@ echo "Get ifname ${ifdev}"
 sysrc ifconfig_${ifdev}=DHCP
 sleep 5
 
-# Add new user. 
-{% if new_user is defined and new_user != 'root' %}
-echo "{{ vm_password }}" | pw -V /etc useradd {{ new_user }} -h 0 -s /bin/sh -G wheel -d /home/{{ new_user }} -c "{{ new_user }} User"
-mkdir -p /home/{{ new_user }}
-chown 1001:1001 /home/{{ new_user }}
-{% endif %}
-
-# Set password of root user
-echo "{{ vm_password }}" | pw -V /etc usermod root -h 0
-
 # Set latest repository to the new system
 echo "Set latest repository to the new system ..." > /dev/ttyu0
 env ASSUME_ALWAYS_YES=YES pkg bootstrap -f | cat
@@ -86,11 +76,33 @@ ifconfig > /dev/ttyu0
 echo "Installing packages ..." > /dev/ttyu0
 env ASSUME_ALWAYS_YES=YES pkg bootstrap -y
 env ASSUME_ALWAYS_YES=YES pkg update -f
+# Hit issue: reset by peer during install packages
 # The open-vm-tools is not installed by default
-env ASSUME_ALWAYS_YES=YES pkg install -y python3
-env ASSUME_ALWAYS_YES=YES pkg install -y open-vm-tools-nox11 | cat
+packages_to_install='python3 open-vm-tools-nox11 sudo'
+for package_to_install in $packages_to_install
+do
+    echo aaa | grep bbb
+    until [ $? -eq 0 ]
+    do
+        echo "will install package: $package_to_install" > /dev/ttyu0
+        check_results=`env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install`
+        echo $check_results > /dev/ttyu0
+        echo $check_results | grep "are already installed"
+    done
+    echo "The package($package_to_install) is already installed" > /dev/ttyu0
+done
 # env ASSUME_ALWAYS_YES=YES pkg install -y sudo lsblk bash curl wget sudo
-sleep 10
+
+# Add new user. 
+{% if new_user is defined and new_user != 'root' %}
+echo "{{ vm_password }}" | pw -V /etc useradd {{ new_user }} -h 0 -s /bin/sh -G wheel -d /home/{{ new_user }} -c "{{ new_user }} User"
+mkdir -p /home/{{ new_user }}
+chown 1001:1001 /home/{{ new_user }}
+echo '$new_user ALL=(ALL:ALL) ALL' >> /usr/local/etc/sudoers
+{% endif %}
+
+# Set password of root user
+echo "{{ vm_password }}" | pw -V /etc usermod root -h 0
 
 # Enable root login via ssh
 echo "Enable root login via ssh ..." > /dev/ttyu0
