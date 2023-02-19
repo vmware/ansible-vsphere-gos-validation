@@ -22,11 +22,10 @@ DISTRIBUTIONS="kernel.txz base.txz kernel-dbg.txz lib32.txz src.txz ports.txz"
 #!/bin/sh
 set -o xtrace
 
-echo 'Running installerconfig ...'
+echo 'Running installerconfig ...' > /dev/ttyu0
 # Enable serial and internal consoles
-echo "Enabling serial and internal consoles"
+echo "Enabling serial and internal consoles" 
 echo "-Dhv" > /boot.config
-#echo "cuau0   \"/usr/libexec/getty std.38400\"  xterm   on  secure" >> /etc/ttys
 echo "cuau0   \"/usr/libexec/getty std.9600\"  xterm   on  secure" >> /etc/ttys
 
 #hostname
@@ -39,7 +38,7 @@ echo "Setting Time Zone to UTC ..."
 /usr/bin/touch /etc/wall_cmos_clock
 /sbin/adjkerntz -a
 
-echo "Set DHCP to NIC vmx0 ..."
+echo "Set DHCP to NIC ${ifdev} ..." > /dev/ttyu0
 ifdev=$(ifconfig | grep '^[a-z]' | cut -d: -f1 | head -n 1)
 echo "Get ifname ${ifdev}"
 sysrc ifconfig_${ifdev}=DHCP
@@ -56,7 +55,7 @@ chown 1001:1001 /home/{{ new_user }}
 echo "{{ vm_password }}" | pw -V /etc usermod root -h 0
 
 # Set latest repository to the new system
-echo "Set latest repository to the new system ..."
+echo "Set latest repository to the new system ..." > /dev/ttyu0
 env ASSUME_ALWAYS_YES=YES pkg bootstrap -f | cat
 bit=`uname -m`
 OSFamily=`uname -s`
@@ -77,24 +76,23 @@ latest: {
 EOF
 
 # Get DHCP for nic0
-echo "Get IP with dhclient ..."
+echo "Get IP with dhclient ..." > /dev/ttyu0
 dhclient ${ifdev}
 sleep 15
-echo "Check network again ..."
-ifconfig
-sleep 5
+echo "Check network ..." > /dev/ttyu0
+ifconfig > /dev/ttyu0
 
 # Installing packages
-echo "Installing packages ..."
+echo "Installing packages ..." > /dev/ttyu0
 env ASSUME_ALWAYS_YES=YES pkg bootstrap -y
 env ASSUME_ALWAYS_YES=YES pkg update -f
 # The open-vm-tools is not installed by default
 env ASSUME_ALWAYS_YES=YES pkg install -y open-vm-tools-nox11 | cat
-env ASSUME_ALWAYS_YES=YES pkg install -y sudo | cat
-# env ASSUME_ALWAYS_YES=YES pkg install -y lsblk bash curl wget sudo
+# env ASSUME_ALWAYS_YES=YES pkg install -y sudo lsblk bash curl wget sudo
+sleep 10
 
 # Enable root login via ssh
-echo "Enable root login via ssh ..."
+echo "Enable root login via ssh ..." > /dev/ttyu0
 mkdir -p -m 700 /root/.ssh
 echo "{{ ssh_public_key }}" > /root/.ssh/authorized_keys
 chown -R root /root/.ssh
@@ -105,16 +103,16 @@ sed -i '' -e 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
 sed -i '' -e 's/#PermitEmpty.*/PermitEmptyPasswords yes/' /etc/ssh/sshd_config
 
 # Enable service
-echo "Enable service ..."
+echo "Enable service ..." > /dev/ttyu0
 sysrc sshd_enable="YES"
 sysrc ntpd_enable="YES"
 sysrc ntpd_sync_on_start="YES"
 
 # Removing boot menu delay
-echo "Removing boot menu delay ..."
+echo "Removing boot menu delay ..." > /dev/ttyu0
 echo 'autoboot_delay="3"' >> /boot/loader.conf
 
-echo "End of installerconfig"
+echo "End of installerconfig" > /dev/ttyu0
 echo "{{ autoinstall_complete_msg }}" > /dev/ttyu0
 # shutdown -p now
 shutdown -r now
