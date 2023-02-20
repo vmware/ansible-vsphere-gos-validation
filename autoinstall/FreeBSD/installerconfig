@@ -2,30 +2,14 @@
 debug=yes
 nonInteractive=yes
 
-# Enable serial and internal consoles
-echo "Enabling serial and internal consoles" 
-echo "-Dhv" > /boot.config
-echo "cuau0   \"/usr/libexec/getty std.9600\"  xterm   on  secure" >> /etc/ttys
-
-# Variations in the root disk device name between VMware and Virtualbox
-if [ -e /dev/ada0 ]; then
-    DISKSLICE=ada0
-elif [ -e /dev/da0 ]; then
-    DISKSLICE=da0
-elif [ -e /dev/vtbd0 ]; then
-    DISKSLICE=vtbd0
-else
-    echo "Unknown disk for install.sh to work with!"
-    exit -1
-fi
-
-PARTITIONS="${DISKSLICE} gpt"
+PARTITIONS="da0 gpt"
 DISTRIBUTIONS="kernel.txz base.txz kernel-dbg.txz lib32.txz src.txz ports.txz"
 
-#hostname
+#!/bin/sh
+# Set hostname
 sysrc hostname="FreeBSD"
 
-gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 $DISKSLICE
+gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 da0
 # Set Time Zone to UTC
 echo "Setting Time Zone to UTC ..."
 /bin/cp /usr/share/zoneinfo/UTC /etc/localtime
@@ -100,4 +84,5 @@ echo 'autoboot_delay="3"' >> /boot/loader.conf
 
 echo "End of installerconfig" > /dev/ttyu0
 echo "{{ autoinstall_complete_msg }}" > /dev/ttyu0
-poweroff
+shutdown -r now
+
