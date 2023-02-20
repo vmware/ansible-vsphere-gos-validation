@@ -2,6 +2,11 @@
 debug=yes
 nonInteractive=yes
 
+# Enable serial and internal consoles
+echo "Enabling serial and internal consoles" 
+echo "-Dhv" > /boot.config
+echo "cuau0   \"/usr/libexec/getty std.9600\"  xterm   on  secure" >> /etc/ttys
+
 # Variations in the root disk device name between VMware and Virtualbox
 if [ -e /dev/ada0 ]; then
     DISKSLICE=ada0
@@ -16,54 +21,21 @@ fi
 
 PARTITIONS="${DISKSLICE} gpt"
 DISTRIBUTIONS="kernel.txz base.txz kernel-dbg.txz lib32.txz src.txz ports.txz"
-# DISTRIBUTIONS="kernel.txz base.txz"
-
-
-#!/bin/sh
-set -o xtrace
-
-echo 'Running installerconfig ...' > /dev/ttyu0
-# Enable serial and internal consoles
-echo "Enabling serial and internal consoles" 
-echo "-Dhv" > /boot.config
-echo "cuau0   \"/usr/libexec/getty std.9600\"  xterm   on  secure" >> /etc/ttys
 
 #hostname
 sysrc hostname="FreeBSD"
 
-gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 da0
+gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 $DISKSLICE
 # Set Time Zone to UTC
 echo "Setting Time Zone to UTC ..."
 /bin/cp /usr/share/zoneinfo/UTC /etc/localtime
 /usr/bin/touch /etc/wall_cmos_clock
 /sbin/adjkerntz -a
 
-echo "Set DHCP to NIC ${ifdev} ..." > /dev/ttyu0
+echo "Set DHCP to NIC nic0 ..." > /dev/ttyu0
 ifdev=$(ifconfig | grep '^[a-z]' | cut -d: -f1 | head -n 1)
 echo "Get ifname ${ifdev}"
 sysrc ifconfig_${ifdev}=DHCP
-sleep 5
-
-# Set latest repository to the new system
-echo "Set latest repository to the new system ..." > /dev/ttyu0
-env ASSUME_ALWAYS_YES=YES pkg bootstrap -f | cat
-bit=`uname -m`
-OSFamily=`uname -s`
-major_version=`freebsd-version -k | cut -d . -f 1`
-repo="${OSFamily}:${major_version}:${bit}"
-
-mkdir -p /usr/local/etc/pkg/repos
-cat << EOF > /usr/local/etc/pkg/repos/latest.conf
-FreeBSD: { enabled: no }
-
-latest: {                                                                     
-  url: "pkg+http://pkg.FreeBSD.org/${repo}/latest",
-  mirror_type: "srv",                                                           
-  signature_type: "fingerprints",                                               
-  fingerprints: "/usr/share/keys/pkg",                                         
-  enabled: yes                                                                 
-}
-EOF
 
 # Get DHCP for nic0
 echo "Get IP with dhclient ..." > /dev/ttyu0
@@ -76,29 +48,31 @@ ifconfig > /dev/ttyu0
 echo "Installing packages ..." > /dev/ttyu0
 env ASSUME_ALWAYS_YES=YES pkg bootstrap -y
 env ASSUME_ALWAYS_YES=YES pkg update -f
+env ASSUME_ALWAYS_YES=YES pkg upgrade -f
 # Hit issue: reset by peer during install packages
 # The open-vm-tools is not installed by default
+# packages_to_install='python3 open-vm-tools-nox11 sudo xorg lsblk bash curl wget xf86-video-vmware xf86-input-vmmouse ...'
 packages_to_install='python3 open-vm-tools-nox11 sudo'
 for package_to_install in $packages_to_install
 do
-    echo aaa | grep bbb
-    until [ $? -eq 0 ]
+    try_count=0
+    ret=1
+    until [ $ret -eq 0 ] || [ $try_count -gt 5 ]
     do
-        echo "will install package: $package_to_install" > /dev/ttyu0
-        check_results=`env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install`
-        echo $check_results > /dev/ttyu0
-        echo $check_results | grep "are already installed"
+        try_count=$((try_count+1))
+        echo "Install package $package_to_install (try $try_count time) ..." > /dev/ttyu0
+        env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install
+        ret=$?
     done
     echo "The package($package_to_install) is already installed" > /dev/ttyu0
 done
-# env ASSUME_ALWAYS_YES=YES pkg install -y sudo lsblk bash curl wget sudo
 
 # Add new user. 
 {% if new_user is defined and new_user != 'root' %}
 echo "{{ vm_password }}" | pw -V /etc useradd {{ new_user }} -h 0 -s /bin/sh -G wheel -d /home/{{ new_user }} -c "{{ new_user }} User"
 mkdir -p /home/{{ new_user }}
 chown 1001:1001 /home/{{ new_user }}
-echo '$new_user ALL=(ALL:ALL) ALL' >> /usr/local/etc/sudoers
+echo '{{ new_user }} ALL=(ALL:ALL) ALL' >> /usr/local/etc/sudoers
 {% endif %}
 
 # Set password of root user
@@ -113,7 +87,6 @@ chmod 0644 /root/.ssh/authorized_keys
 # We can't ssh to VM with empty password for root user
 sed -i .bak -e 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
 sed -i '' -e 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
-sed -i '' -e 's/#PermitEmpty.*/PermitEmptyPasswords yes/' /etc/ssh/sshd_config
 
 # Enable service
 echo "Enable service ..." > /dev/ttyu0
@@ -127,9 +100,4 @@ echo 'autoboot_delay="3"' >> /boot/loader.conf
 
 echo "End of installerconfig" > /dev/ttyu0
 echo "{{ autoinstall_complete_msg }}" > /dev/ttyu0
-# shutdown -p now
-shutdown -r now
-
-
-
-
+poweroff

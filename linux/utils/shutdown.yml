@@ -2,24 +2,17 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Shutdown VM via executing shutdown command in VM
-- name: Execute guest OS shutdown
-  ansible.builtin.command: "shutdown -h now"
-  delegate_to: "{{ vm_guest_ip }}"
-  become: true
-  changed_when: false
-  async: 1
-  poll: 0
-  when: guest_os_family != "FreeBSD"
+- name: "Set command to shutdown guestOS"
+  ansible.builtin.set_fact:
+    guest_shutdown_cmd: "{{ 'poweroff' if guest_os_family == 'FreeBSD' else 'shutdown -h now' }}"
 
-# The 'shutdown -h now' will let FreeBSD to halt
-- name: Execute guest OS shutdown for FreeBSD
-  ansible.builtin.command: "poweroff"
+- name: Execute guest OS shutdown
+  ansible.builtin.command: "{{ guest_shutdown_cmd }}"
   delegate_to: "{{ vm_guest_ip }}"
   become: true
   changed_when: false
   async: 1
   poll: 0
-  when: guest_os_family == "FreeBSD"
 
 - name: "Wait for port 22 to become stopped"
   ansible.builtin.wait_for:
