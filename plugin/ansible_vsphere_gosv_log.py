@@ -1,7 +1,23 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
+""" Ansible vSphere GOS Validation Log Plugin """
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
+
+import os
+import time
+import json
+import sys
+import importlib
+import shutil
+import logging
+from collections import OrderedDict
+from textwrap import TextWrapper
+import yaml
+from ansible import context
+from ansible import constants as C
+from ansible.playbook.task_include import TaskInclude
+from ansible.plugins.callback import CallbackBase
 
 DOCUMENTATION = '''
     name: ansible_vsphere_gosv_log
@@ -11,86 +27,61 @@ DOCUMENTATION = '''
       - This callback writes detail running log and test results to log file.
 '''
 
-import os
-import time
-import json
-import sys
-import yaml
-import re
-import importlib
-import shutil
-import logging
-from datetime import datetime
-from collections import OrderedDict
-from textwrap import TextWrapper
-
-from ansible import context
-from ansible import constants as C
-from ansible.playbook.task_include import TaskInclude
-from ansible.plugins.callback import CallbackBase
-from ansible.module_utils._text import to_bytes, to_native, to_text
-
 if sys.version_info.major == 2:
     reload(sys)
     sys.setdefaultencoding('utf8')
 else:
     importlib.reload(sys)
 
-"""_summary_
-Extract error message from task result
-"""
 def extract_error_msg(json_obj):
+    """
+    Extract error message from task result
+    """
     message = ''
     try:
         for key, value in json_obj.items():
-            if key == 'msg':
-                if isinstance(value, str):
-                    message += value.strip()
-                    # Extract stderr or stdout from command output when rc != 0
-                    if 'non-zero return code' in value:
-                        if 'rc' in json_obj and str(json_obj['rc']) != '':
-                            message += ': ' + str(json_obj['rc'])
-                        if 'stderr_lines' in json_obj and len(json_obj['stderr_lines']) > 0:
-                            if "" in json_obj['stderr_lines']:
-                                json_obj['stderr_lines'].remove("")
-                            message += '\n' + '\n'.join(json_obj['stderr_lines']).strip()
-                        elif 'stdout_lines' in json_obj and len(json_obj['stdout_lines']) > 0:
-                            if "" in json_obj['stderr_lines']:
-                                json_obj['stdout_lines'].remove("")
-                            message += '\n' + '\n'.join(json_obj['stdout_lines']).strip()
-                    if 'MODULE FAILURE' in value:
-                        if 'module_stderr' in json_obj and str(json_obj['module_stderr']) != '':
-                            message += '\n' + json_obj['module_stderr'].strip()
-                        elif 'module_stdout' in json_obj and str(json_obj['module_stdout']) != '':
-                            message += '\n' + json_obj['module_stdout'].strip()
+            if key != 'msg':
+                continue
 
-                elif isinstance(value, list):
-                    message += '\n'.join(value)
-                elif isinstance(value, dict):
-                    message += extract_error_msg(value)
-                else:
-                    message += str(value).strip()
+            if isinstance(value, str):
+                message += value.strip()
+                # Extract stderr or stdout from command output when rc != 0
+                if 'non-zero return code' in value:
+                    if str(json_obj.get('rc','')):
+                        message += ': ' + str(json_obj['rc'])
+                    if len(json_obj.get('stderr_lines', [])) > 0:
+                        message += '\n' + '\n'.join(list(filter(None, json_obj['stderr_lines']))).strip()
+                    if len(json_obj.get('stdout_lines', [])) > 0:
+                        message += '\n' + '\n'.join(list(filter(None, json_obj['stdout_lines']))).strip()
+                if 'MODULE FAILURE' in value:
+                    if 'module_stderr' in json_obj and str(json_obj['module_stderr']) != '':
+                        message += '\n' + json_obj['module_stderr'].strip()
+                    elif 'module_stdout' in json_obj and str(json_obj['module_stdout']) != '':
+                        message += '\n' + json_obj['module_stdout'].strip()
 
-                if message != '' and not message.endswith('\n'):
-                    message += '\n'
+            elif isinstance(value, list):
+                message += '\n'.join(value)
+            elif isinstance(value, dict):
+                message += extract_error_msg(value)
+            else:
+                message += str(value).strip()
 
-    except TypeError as e:
-        print("Failed to extract msg from below text as it is not in json format.\n" + str(e))
-        pass
+            if message != '' and not message.endswith('\n'):
+                message += '\n'
+
+    except TypeError as type_error:
+        print("Failed to extract msg from below text as it is not in json format.\n" + str(type_error))
 
     return message
 
 class vSphereInfo(object):
-    def __init__(self, product, hostname, version='', update_version='',
-                 build='', model='', cpu_model=''):
+    def __init__(self, product, hostname):
         self.product = product
         self.hostname = hostname
-        self.version = version
-        if update_version and update_version != 'N/A':
-            self.version += ' U' + update_version
-        self.build = build
-        self.model = model
-        self.cpu_model = cpu_model
+        self.version = ''
+        self.build = ''
+        self.model = ''
+        self.cpu_model = ''
 
     def __str__(self):
         info = {'hostname': self.hostname,
@@ -101,6 +92,9 @@ class vSphereInfo(object):
             info['cpu_model'] = self.cpu_model
         return json.dumps(info, indent=4)
 
+    def update_property(self, p_name, p_value):
+        setattr(self, p_name, p_value)
+
 class TestbedInfo(object):
     def __init__(self, vcenter_hostname, esxi_hostname,
                  ansible_gosv_facts):
@@ -110,45 +104,45 @@ class TestbedInfo(object):
         :param esxi_hostname:
         :param ansible_gosv_facts:
         """
-        self.vcenter_info = None
-        self.set_vcenter_info(vcenter_hostname, ansible_gosv_facts)
-        self.esxi_info = None
-        self.set_esxi_info(esxi_hostname, ansible_gosv_facts)
+        self.vcenter_info = vSphereInfo('vCenter', vcenter_hostname)
+        self.esxi_info = vSphereInfo('ESXi', esxi_hostname)
+        self.set_vcenter_info(ansible_gosv_facts)
+        self.set_esxi_info(ansible_gosv_facts)
 
-    def set_vcenter_info(self, vcenter_hostname, ansible_gosv_facts=None):
+    def set_vcenter_info(self, ansible_gosv_facts=None):
         """
         Update vCenter server info with ansible facts
         :param ansible_gosv_facts:
         :return:
         """
         if ansible_gosv_facts:
-            self.vcenter_info = vSphereInfo('vCenter', vcenter_hostname,
-                                            ansible_gosv_facts.get('vcenter_version', ''),
-                                            '',
-                                            ansible_gosv_facts.get('vcenter_build', ''))
-        else:
-            self.vcenter_info = vSphereInfo('vCenter', vcenter_hostname)
+            self.vcenter_info.update_property('version',
+                                              ansible_gosv_facts.get('vcenter_version', ''))
+            self.vcenter_info.update_property('build',
+                                              ansible_gosv_facts.get('vcenter_build', ''))
 
-    def set_esxi_info(self, esxi_hostname, ansible_gosv_facts=None):
+    def set_esxi_info(self, ansible_gosv_facts=None):
         """
         Update ESXi server info with ansible facts
         :param ansible_gosv_facts:
         :return:
         """
         if ansible_gosv_facts:
-            self.esxi_info = vSphereInfo('ESXi', esxi_hostname,
-                                         ansible_gosv_facts.get('esxi_version', ''),
-                                         ansible_gosv_facts.get('esxi_update_version', ''),
-                                         ansible_gosv_facts.get('esxi_build', ''),
-                                         ansible_gosv_facts.get('esxi_model_info', ''),
-                                         ansible_gosv_facts.get('esxi_cpu_model_info', ''))
-        else:
-            self.esxi_info = vSphereInfo('ESXi', esxi_hostname)
+            esxi_version = ansible_gosv_facts.get('esxi_version', '')
+            esxi_update_version = ansible_gosv_facts.get('esxi_update_version', '')
+            if esxi_version and esxi_update_version and esxi_update_version != 'N/A':
+                esxi_version += ' U' + esxi_update_version
+            self.esxi_info.update_property('version', esxi_version)
+            self.esxi_info.update_property('build',
+                                           ansible_gosv_facts.get('esxi_build', ''))
+            self.esxi_info.update_property('model',
+                                           ansible_gosv_facts.get('esxi_model_info', ''))
+            self.esxi_info.update_property('cpu_model',
+                                           ansible_gosv_facts.get('esxi_cpu_model_info', ''))
 
     def __str__(self):
         """
         Print testbed information as below:
-
         Testbed information:
         +-----------------------------------------------+--------------------------------------------+
         | Product | Version | Build    | Hostname or IP | Server Model                               |
@@ -266,7 +260,6 @@ class VmDetailInfo(VmGuestInfo):
     def __str__(self):
         """
         Display VM information as below:
-
         VM information:
         +---------------------------------------------------------------+
         | Name                      | test_vm                           |
@@ -411,8 +404,8 @@ class CallbackModule(CallbackBase):
 
         self.plugin_dir = os.path.dirname(os.path.realpath(__file__))
         self.cwd = os.path.dirname(self.plugin_dir)
-        self.log_dir = os.path.join(self.cwd, "logs", time.strftime("%Y-%m-%d-%H-%M-%S"))
-        self.current_log_dir = os.path.join(self.cwd, "logs/current")
+        self.log_dir = None
+        self.current_log_dir = None
         self.testrun_log_dir = None
         self.full_debug_log = "full_debug.log"
         self.failed_tasks_log = "failed_tasks.log"
@@ -440,29 +433,15 @@ class CallbackModule(CallbackBase):
         self._last_task_name = None
         self._task_type_cache = {}
 
-        if not os.path.exists(self.log_dir):
-            os.makedirs(self.log_dir)
-
-        if os.path.exists(self.current_log_dir):
-            try:
-                if os.path.islink(self.current_log_dir):
-                    os.unlink(self.current_log_dir)
-                else:
-                    shutil.rmtree(self.current_log_dir)
-            except OSError as e:
-                self._display.display("Error: {} : {}".format(self.current_log_dir, e.strerror), color=C.COLOR_ERROR)
-
-        os.symlink(self.log_dir, self.current_log_dir, target_is_directory=True)
-
         # Set logger
         self.logger_name = "ansible-vsphere-gos-validation"
         self.logger = logging.getLogger(self.logger_name)
         self.logger.setLevel(logging.DEBUG)
 
         msg = self._banner("PLUGIN [{}]".format(os.path.realpath(__file__)))
-        msg += "Plugin directory: {}\nProject directory: {}\nCurrent log directory: {}".format(
-            self.plugin_dir, self.cwd, self.current_log_dir)
-        self._display.display(msg, color=C.COLOR_VERBOSE)
+        msg += "Project directory: "  + self.cwd
+        msg += "\nPlugin directory: "  + self.plugin_dir
+        self._display.display(msg, color=C.COLOR_DEBUG)
 
     def add_logger_file_handler(self, log_file=None):
         """
@@ -612,7 +591,7 @@ class CallbackModule(CallbackBase):
             log_failed_tasks = False
 
         if 'known_issue' in task.tags and 'msg' in result._result:
-            self._display.display("TAGS: known_issue", color=C.COLOR_VERBOSE)
+            self._display.display("TAGS: known_issue", color=C.COLOR_WARN)
             log_header = ""
             if 'known_issue' not in self._play_tasks_cache:
                 self._play_tasks_cache['known_issue'] = []
@@ -825,11 +804,12 @@ class CallbackModule(CallbackBase):
                             json.dump(os_release_info_detail, json_output, indent=4)
 
     def _get_exception_traceback(self, result):
+        msg = ''
         if 'exception' in result:
             msg = "An exception occurred during task execution. "
             msg += "The full traceback is:\n" + str(result['exception'])
             del result['exception']
-            return msg
+        return msg
 
     def v2_runner_on_failed(self, result, ignore_errors=False):
         delegated_vars = result._result.get('_ansible_delegated_vars', None)
@@ -859,13 +839,13 @@ class CallbackModule(CallbackBase):
         json_file_path = os.path.join(self.log_dir, self.guest_info_json_file)
         if len(self.collected_guest_info) > 0:
             with open(json_file_path, 'w') as json_file:
-                self._display.display("Dump guest info into {}".format(json_file_path),
-                                      color=C.COLOR_VERBOSE)
                 json_objs = []
                 for guest_info in self.collected_guest_info.values():
                     json_objs.append(json.loads(str(guest_info)))
 
                 json.dump(json_objs, json_file, indent=4)
+                self._display.display("VM guest info is dumped into:\n{}".format(json_file_path),
+                                      color=C.COLOR_DEBUG)
 
     def _get_exception_traceback(self, result):
         if 'exception' in result:
@@ -928,7 +908,7 @@ class CallbackModule(CallbackBase):
                                                                   vm_guest_info.VMTools_Version,
                                                                   vm_guest_info.Hardware_Version)))
 
-                        if (guestinfo_hash not in self.collected_guest_info):
+                        if guestinfo_hash not in self.collected_guest_info:
                             self.collected_guest_info[guestinfo_hash] = vm_guest_info
 
         elif (task_file in ["deploy_vm.yml", "test_setup.yml"] and
@@ -1018,6 +998,32 @@ class CallbackModule(CallbackBase):
         self._clean_results(result._result, result._task.action)
         self._print_task_details(result, "skipped", loop_item=self._get_item_label(result._result))
 
+    def _set_log_dir(self, local_log_path):
+        # Set log dir
+        if local_log_path and os.path.exists(local_log_path):
+            self.log_dir = os.path.join(local_log_path, time.strftime("%Y-%m-%d-%H-%M-%S"))
+            self.current_log_dir = os.path.join(local_log_path, "current")
+        else:
+            self.log_dir = os.path.join(self.cwd, "logs", time.strftime("%Y-%m-%d-%H-%M-%S"))
+            self.current_log_dir = os.path.join(self.cwd, "logs/current")
+
+        # Unlink existing symbolic link for current log dir
+        if os.path.exists(self.current_log_dir):
+            try:
+                if os.path.islink(self.current_log_dir):
+                    os.unlink(self.current_log_dir)
+                else:
+                    shutil.rmtree(self.current_log_dir)
+            except OSError as os_error:
+                self._display.display("Error: {} : {}".format(self.current_log_dir, os_error.strerror),
+                                      color=C.COLOR_ERROR)
+
+        # Create new log dir
+        if not os.path.exists(self.log_dir):
+            os.makedirs(self.log_dir)
+
+        os.symlink(self.log_dir, self.current_log_dir, target_is_directory=True)
+
     def v2_playbook_on_start(self, playbook):
         playbook_path = os.path.realpath(playbook._file_name)
         self.start_time = time.time()
@@ -1032,12 +1038,19 @@ class CallbackModule(CallbackBase):
                     for extra_vars_item in extra_vars_list:
                         if extra_vars_item.find("=") != -1:
                             extra_vars[extra_vars_item.split("=")[0].strip()] = extra_vars_item.split("=")[1].strip()
+
         # Update testing vars file with extra variable
         if 'testing_vars_file' in extra_vars.keys():
             self.testing_vars_file = extra_vars['testing_vars_file']
         else:
-            self.testing_vars_file = os.path.join(self.cwd, "vars/test.yml"))
+            self.testing_vars_file = os.path.join(self.cwd, "vars/test.yml")
+        # Load testing vars
+        if os.path.exists(self.testing_vars_file):
+            with open(self.testing_vars_file, 'r') as fd:
+                self.testing_vars.update(yaml.load(fd, Loader=yaml.Loader))
 
+        # Update log dir
+        self._set_log_dir(self.testing_vars.get('local_log_path', ''))
 
         # Get testcase list
         if 'main.yml' in os.path.basename(playbook_path):
@@ -1054,11 +1067,11 @@ class CallbackModule(CallbackBase):
         msg += "Positional arguments: {}\n".format(' '.join(context.CLIARGS['args']))
         msg += "Tesing vars file: {}\n".format(self.testing_vars_file)
         msg += "Tesing testcase file: {}\n".format(self.testing_testcase_file)
-        msg += "Playbook dir: {}\n".format(self.cwd)
-        msg += "Plugin dir: {}\n".format(self.plugin_dir)
-        msg += "Log dir: {}".format(self.log_dir)
+        msg += "Playbook directory: {}\n".format(self.cwd)
+        msg += "Log directory: {}\n".format(self.log_dir)
+        msg += "Current log directory: {}\n".format(self.current_log_dir)
         self.logger.info(msg)
-        self._display.display(msg, color=C.COLOR_VERBOSE)
+        self._display.display(msg, color=C.COLOR_DEBUG)
 
     def v2_playbook_on_play_start(self, play):
         # Finish the last test case
