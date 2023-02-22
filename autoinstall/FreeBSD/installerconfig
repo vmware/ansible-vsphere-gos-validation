@@ -36,12 +36,12 @@ env ASSUME_ALWAYS_YES=YES pkg upgrade -f
 # Hit issue: reset by peer during install packages
 # The open-vm-tools is not installed by default
 # packages_to_install='python3 open-vm-tools-nox11 sudo xorg lsblk bash curl wget xf86-video-vmware xf86-input-vmmouse ...'
-packages_to_install='python3 open-vm-tools-nox11 sudo'
+packages_to_install='python3 sudo xorg gnome open-vm-tools xf86-video-vmware xf86-input-vmmouse bash wget'
 for package_to_install in $packages_to_install
 do
     try_count=0
     ret=1
-    until [ $ret -eq 0 ] || [ $try_count -gt 5 ]
+    until [ $ret -eq 0 ] || [ $try_count -gt 10 ]
     do
         try_count=$((try_count+1))
         echo "Install package $package_to_install (try $try_count time) ..." > /dev/ttyu0
@@ -77,6 +77,15 @@ echo "Enable service ..." > /dev/ttyu0
 sysrc sshd_enable="YES"
 sysrc ntpd_enable="YES"
 sysrc ntpd_sync_on_start="YES"
+
+# Config desktop after install xorg and gnome
+sysrc hald_enable="YES"
+sysrc dbus_enable="YES"
+sysrc gnome_enable="YES"
+sysrc moused_enable="YES"
+sysrc gdm_enable="YES"
+Xorg -configure
+cp xorg.conf.new /etc/X11/xorg.conf
 
 # Removing boot menu delay
 echo "Removing boot menu delay ..." > /dev/ttyu0
