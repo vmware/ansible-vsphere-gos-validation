@@ -1,27 +1,17 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Check VM's settings which shall be supported by newgos_testing
-# All VM network adapters should be in different vswitch port groups.
-- include_tasks: ../common/vm_get_guest_facts.yml
+# Check VM's settings which only has one network adapter and it
+# should be connected to VM.
+#
+- name: "Get VM's network adapters info"
+  include_tasks: ../common/vm_get_network_facts.yml
 
-# Check existing VM network settings
-- block:
-    - name: "Get all VM network adapters"
-      ansible.builtin.set_fact:
-        vm_hw_interfaces: "{{ vm_guest_facts.instance.hw_interfaces }}"
-
-    - name: "Initialize VM port groups"
-      ansible.builtin.set_fact:
-        vm_portgroups: []
-
-    - name: "Get VM port groups"
-      ansible.builtin.set_fact:
-        vm_portgroups: "{{ vm_portgroups | union([vm_guest_facts['instance']['hw_%s'|format(item)].summary]) }}"
-      with_items: "{{ vm_guest_facts.instance.hw_interfaces }}"
-
-    - name: "Assert VM network adapters are in different port groups"
-      ansible.builtin.assert:
-        that:
-          - vm_hw_interfaces | length == vm_portgroups | length
-        fail_msg: "Two or more VM network adapters are in same port group, which is not supported."
+- name: "Check VM only has one network adapter and it should be connected"
+  ansible.builtin.assert:
+    that:
+      - vm_network_adapters | length == 1
+      - vm_network_adapters['0'].connected | bool
+    fail_msg: >-
+      Test VM doesn't meet test requirement, which must have one network adapter and it
+      should be connected. Current VM's network adapters are '{{ vm_network_adapters }}'.

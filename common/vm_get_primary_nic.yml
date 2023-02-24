@@ -16,18 +16,19 @@
   ansible.builtin.assert:
     that:
       - vm_guest_mac_ipv4 | length >= 1
+      - vm_guest_mac_ipv4.values() | select | length >= 1
     fail_msg: "Not found valid IPv4 address for VM '{{ vm_name }}'"
 
-- name: Display the VM MAC and IP address dict
+- name: "Display the VM MAC and IP address dict"
   ansible.builtin.debug: var=vm_guest_mac_ipv4
 
-- block:
-    - name: "Get IP of VM '{{ vm_name }}' primary NIC with MAC address {{ vm_primary_mac }}"
-      ansible.builtin.set_fact:
-        vm_primary_ip: "{{ vm_guest_mac_ipv4[vm_primary_mac] }}"
+- name: "Get IP of VM '{{ vm_name }}' primary NIC with MAC address {{ vm_primary_mac }}"
+  ansible.builtin.set_fact:
+    vm_primary_ip: "{{ vm_guest_mac_ipv4[vm_primary_mac] }}"
   when: vm_primary_mac is defined and vm_primary_mac in vm_guest_mac_ipv4.keys()
 
-- block:
+- name: "Test VM's IP connection to get VM's primary NIC"
+  block:
     - name: "Set the only network interface as VM primary NIC of '{{ vm_name }}'"
       ansible.builtin.set_fact:
         vm_primary_mac: "{{ (vm_guest_mac_ipv4.keys() | list)[0] }}"
@@ -45,12 +46,15 @@
           ansible.builtin.command: ping -c 5 "{{ item.value }}"
           register: all_ping_results
           ignore_errors: true
+          when: item.value
           with_dict: "{{ vm_guest_mac_ipv4 }}"
 
         - name: "Get all reachable IP addresses for '{{ vm_name }}'"
           ansible.builtin.set_fact:
             vm_reachable_nics: "{{ vm_reachable_nics | combine({ping_result.item.key:ping_result.item.value}) }}"
-          when: ping_result.rc == 0
+          when:
+            - ping_result.rc is defined
+            - ping_result.rc == 0
           with_items: "{{ all_ping_results.results }}"
           loop_control:
             loop_var: ping_result
@@ -62,11 +66,14 @@
           when: vm_reachable_nics | length == 1
 
         # When VM all nics are not reachable or more than 1 nics are reachable
-        - block:
+        - name: "Test all of VM's network interfaces' SSH connection"
+          block:
             # If all nics are not reachable, test all of them
-            - name: "By default, test all network interfaces of VM '{{ vm_name }}'"
+            # Because they may not be able to ping but can be connected via SSH
+            - name: "Test SSH connection on all of VM's network adapters"
               ansible.builtin.set_fact:
                 test_vm_nics: "{{ vm_guest_mac_ipv4 }}"
+              when: vm_reachable_nics | length == 0
 
             # If more than 1 reachable nics are found, test these reachable nics
             - name: "Only test reachable network interfaces of VM '{{ vm_name }}'"
@@ -74,7 +81,7 @@
                 test_vm_nics: "{{ vm_reachable_nics }}"
               when: vm_reachable_nics | length > 1
 
-            - name: Display the reachable VM network interfaces
+            - name: "Display VM network interfaces to be tested"
               ansible.builtin.debug: var=test_vm_nics
 
             - name: "Initialize IP testing variable for VM '{{ vm_name }}'"
@@ -90,7 +97,6 @@
               loop_control:
                 loop_var: test_vm_nic
           when: vm_reachable_nics | length != 1
-
       when: vm_guest_mac_ipv4 | length > 1
   when: >
      (vm_primary_mac is undefined) or
