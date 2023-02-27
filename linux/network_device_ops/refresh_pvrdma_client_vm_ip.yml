@@ -1,0 +1,18 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   The PVRDMA client VM may have same IP address with parent VM after
+#   restart. It needs to take few seconds to refresh its own IP address.
+#   This task file will refresh client VM's IP every 10s.
+#
+- name: "Sleep 10s for client VM's guest IP refreshing"
+  ansible.builtin.pause:
+    seconds: 10
+
+- name: "Update client VM's guest IP in inventory"
+  include_tasks: ../../common/update_inventory.yml
+
+- name: "Update the fact of client VM's guest IP"
+  ansible.builtin.set_fact:
+    pvrdma_client_vm_guest_ip: "{{ vm_guest_ip }}"

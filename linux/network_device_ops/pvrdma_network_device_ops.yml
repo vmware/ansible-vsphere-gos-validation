@@ -48,14 +48,16 @@
         - name: "Set facts for PVRDMA server VM and client VM"
           ansible.builtin.set_fact:
             pvrdma_server_vm_name: "{{ vm_name }}"
+            pvrdma_server_vm_guest_ip: "{{ vm_guest_ip }}"
             pvrdma_server_vm_ipv4: "{{ vds_vmk_ip_addr | ansible.utils.ipmath(1) }}"
             pvrdma_server_vm_net_prefix: "{{ vds_vmk_net_prefix }}"
             pvrdma_server_vm_gateway: "{{ vds_vmk_ip_addr }}"
-            pvrdma_client_vm_name: "{{ vm_name }}_{{ timestamp }}"
+            pvrdma_client_vm_name: "{{ vm_name }}_client_{{ timestamp }}"
             pvrdma_client_vm_ipv4: "{{ vds_vmk_ip_addr | ansible.utils.ipmath(2) }}"
+            pvrdma_client_vm_guest_ip: ""
 
         # Clone a new VM as client VM from current VM, and current VM as server
-        - name: "Clone a new VM as PVRDMA client VM from current VM"
+        - name: "Clone a new VM as client VM from current VM"
           include_tasks: ../../common/vm_instant_clone.yml
           vars:
             parent_vm_name: "{{ pvrdma_server_vm_name }}"
@@ -86,29 +88,47 @@
           include_tasks: start_pvrdma_server.yml
 
         # Switch to client VM
-        - name: "Reset the client VM '{{ pvrdma_client_vm_name }}' for updating IP address"
+        - name: "Switch to client VM"
+          ansible.builtin.set_fact:
+            vm_name: "{{ pvrdma_client_vm_name }}"
+
+        - name: "Reset client VM '{{ pvrdma_client_vm_name }}' for updating IP address"
           include_tasks: ../../common/vm_set_power_state.yml
           vars:
-            vm_name: "{{ pvrdma_client_vm_name }}"
             vm_power_state_set: 'restarted'
 
-        - name: "Add client VM guest IP to inventory"
-          include_tasks: ../../common/update_inventory.yml
-          vars:
-            vm_name: "{{ pvrdma_client_vm_name }}"
-            update_inventory_timeout: 300
+        - name: "Get client VM's guest IP"
+          block:
+            - name: "Refresh client VM's guest IP till it has different IP with server VM"
+              include_tasks: refresh_pvrdma_client_vm_ip.yml
+              with_list: "{{ range(1, 11) | list }}"
+              loop_control:
+                loop_var: retry_count
+          when: >
+            (not pvrdma_client_vm_guest_ip) or
+            (pvrdma_client_vm_guest_ip == pvrdma_server_vm_guest_ip)
+
+        - name: "Check client VM's guest IP is not same with server VM's guest IP"
+          ansible.builtin.assert:
+            that:
+              - pvrdma_client_vm_guest_ip != pvrdma_server_vm_guest_ip
+            fail_msg: >-
+              Client VM '{{ pvrdma_client_vm_name }}' guest IP is '{{ pvrdma_client_vm_guest_ip }}',
+              which is same with server VM '{{ pvrdma_server_vm_name }}' guest IP after refreshing 10 times.
+            success_msg:
+              - "Server VM '{{ pvrdma_server_vm_name }}' guest IP is '{{ pvrdma_server_vm_guest_ip }}'."
+              - "Client VM '{{ pvrdma_client_vm_name }}' guest IP is '{{ pvrdma_client_vm_guest_ip }}'."
 
         - name: "Hot add a new {{ adapter_type }} network adapter on client VM and apply network config"
           include_tasks: hot_add_network_adapter.yml
           vars:
-            vm_name: "{{ pvrdma_client_vm_name }}"
             new_nic_ipv4: "{{ pvrdma_client_vm_ipv4 }}"
 
         - name: "Check the result of pinging gateway from client VM"
           ansible.builtin.assert:
             that:
               - ping_success_after_hotadd | bool
-            fail_msg: "Failed to ping gateway from client VM PVRDMA device"
+            fail_msg: "Failed to ping gateway from PVRDMA device on client VM {{ vm_name }}"
 
         - name: "Check PVRDMA device status and reload it if necessary on client VM"
           include_tasks: check_and_reload_pvrdma.yml
@@ -120,18 +140,24 @@
           ignore_errors: true
           register: rping_server_result
 
-        - name: "Display RDMA ping result"
+        - name: "Display RDMA ping result from client VM to server VM"
           ansible.builtin.debug: var=rping_server_result
 
-        - name: "Check the result of RDMA pinging server VM from client VM"
+        - name: "Check RDMA ping result from client VM to server VM"
           ansible.builtin.assert:
             that:
               - rping_server_result is defined
               - rping_server_result.rc is defined
               - rping_server_result.rc == 0
             fail_msg: >-
-              RDMA pinging server VM from client VM failed.
+              Failed to run RDMA ping from client VM '{{ pvrdma_client_vm_name }}'
+              to server VM '{{ pvrdma_server_vm_name }}' failed.
               Hit error '{{ rping_server_result.stderr | default() }}'
+
+        # Switch to server VM
+        - name: "Switch to server VM"
+          ansible.builtin.set_fact:
+            vm_name: "{{ pvrdma_server_vm_name }}"
 
         - name: "Power off the client VM"
           include_tasks: ../../common/vm_set_power_state.yml
@@ -144,8 +170,8 @@
           vars:
             vm_name: "{{ pvrdma_client_vm_name }}"
 
-        # Switch to server VM
-        - include_tasks: ../../common/update_inventory.yml
+        - name: "Update server VM's IP address"
+          include_tasks: ../../common/update_inventory.yml
 
         - name: "Stop PVRDMA listening on server VM"
           ansible.builtin.shell: "kill -9 {{ rping_server_process_pid }}"
