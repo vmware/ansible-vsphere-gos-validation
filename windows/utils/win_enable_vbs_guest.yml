@@ -12,10 +12,9 @@
 # 4. enable virtualization-based protection of Code Integrity policies
 # 5. enable virtualization-based protection of Code Integrity policies with UEFI lock (value 1)
 # 6. enable virtualization-based protection of Code Integrity policies with Require UEFI Memory Attributes Table
-# 7. enable CredentialGuard with UEFI lock (value 1)
-# 8. enable System Guard Secure Launch and SMM protection
 #
-- include_tasks: win_execute_cmd.yml
+- name: "Enable VBS and HVCI in guest OS"
+  include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: >-
       reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard" /v "EnableVirtualizationBasedSecurity" /t REG_DWORD /d 1 /f;
@@ -23,11 +22,33 @@
       reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard" /v "Locked" /t REG_DWORD /d 1 /f;
       reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v "Enabled" /t REG_DWORD /d 1 /f;
       reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v "Locked" /t REG_DWORD /d 1 /f;
-      reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v "HVCIMATRequired" /t REG_DWORD /d 1 /f;
-      reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v "LsaCfgFlags" /t REG_DWORD /d 1 /f;
-      reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\SystemGuard" /v "Enabled" /t REG_DWORD /d 1 /f
+      reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v "HVCIMATRequired" /t REG_DWORD /d 1 /f
 
-# Restart guest OS after configuration in guest
-- include_tasks: win_shutdown_restart.yml
+# Enable CredentialGuard with UEFI lock (value 1)
+# Starting in Windows 11 Enterprise, version 22H2 and Windows 11 Education, version 22H2,
+# compatible systems have Windows Defender Credential Guard turned on by default.
+#
+- name: "Enable Credential Guard in guest OS"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v "LsaCfgFlags" /t REG_DWORD /d 1 /f
+  when: >
+    (guest_os_product_type | lower == 'server') or
+    (guest_os_build_num | int < 22621) or
+    (guest_os_build_num | int >= 22621 and guest_os_edition | lower not in ['enterprise', 'education'])
+
+# - include_tasks: win_execute_cmd.yml
+# vars:
+# win_powershell_cmd: >-
+# reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DeviceGuard" /v "EnableVirtualizationBasedSecurity" /t REG_DWORD /d 1 /f;
+# reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DeviceGuard" /v "RequirePlatformSecurityFeatures" /t REG_DWORD /d 3 /f;
+# reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DeviceGuard" /v "HypervisorEnforcedCodeIntegrity" /t REG_DWORD /d 1 /f;
+# reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DeviceGuard" /v "HVCIMATRequired" /t REG_DWORD /d 1 /f
+# reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DeviceGuard" /v "LsaCfgFlags" /t REG_DWORD /d 1 /f;
+# reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DeviceGuard" /v "ConfigureSystemGuardLaunch" /t REG_DWORD /d 1 /f
+
+- name: "Restart guest OS after configuration"
+  include_tasks: win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"
