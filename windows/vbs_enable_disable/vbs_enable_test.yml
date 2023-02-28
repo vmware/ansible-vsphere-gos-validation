@@ -55,11 +55,28 @@
 # 6. 	If present, SMM mitigations are available.
 # 7. 	If present, MBEC/GMET is available.
 # 8. 	If present, APIC virtualization is available.
+#
+- name: "Handle known issue"
+  block:
+    - name: "Known issue - NX protections are not present in AvailableSecurityProperties on ESXi 7.0.3"
+      ansible.builtin.debug:
+        msg:
+          - "NX protections are not present in guest OS 'AvailableSecurityProperties' on ESXi 7.0.3, KB link TBD."
+      tags:
+        - known_issue
+  when:
+    - esxi_version is version('7.0.3', '=')
+    - esxi_build == '19193900'
+    - ['1', '2', '3', '4', '5', '6', '7'] | difference(win_dg_security_properties) == '5'
+
 - name: "Check available security properties got in guest OS"
   ansible.builtin.assert:
     that:
       - win_dg_security_properties | sort == ['1', '2', '3', '4', '5', '6', '7']
     fail_msg: "Got available security properties in guest OS is: {{ win_dg_security_properties }}, which missing '{{ ['1', '2', '3', '4', '5', '6', '7'] | difference(win_dg_security_properties) }}' compared with the expected list."
+  when: >
+    (esxi_version is version('7.0.3', '>') or esxi_version is version('7.0.3', '<')) or
+    (esxi_version is version('7.0.3', '=') and esxi_build | int > 19193900)
 
 # SecurityServicesRunning:
 # 0. 	No services running.
@@ -68,6 +85,7 @@
 # 3. 	If present, System Guard Secure Launch is running.
 # 4. 	If present, SMM Firmware Measurement is running.
 # VirtualizationBasedSecurityStatus: 2 means VBS is enabled and running
+#
 - name: "Check VBS and running security service status"
   ansible.builtin.assert:
     that:
