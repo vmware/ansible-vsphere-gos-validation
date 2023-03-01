@@ -1,0 +1,20 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Initialize MDAG policy related variables"
+  ansible.builtin.set_fact:
+    mdag_policy_path: "HKLM\SOFTWARE\Policies\Microsoft\AppHVSI"
+    network_isolation_policy_path: "HKLM\SOFTWARE\Policies\Microsoft\Windows\NetworkIsolation"
+
+- name: "Enable "
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-WindowsOptionalFeature -Online -FeatureName Windows-Defender-ApplicationGuard).State"
+
+- name: "Check if MDAG is enabled in guest OS"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.stdout_lines is defined
+      - win_powershell_cmd_output.stdout_lines | length == 1
+      - win_powershell_cmd_output.stdout_lines[0].strip() == 'Enabled'
+    fail_msg: "MDAG feature state in guest OS is not 'Enabled': '{{ win_powershell_cmd_output.stdout_lines | default('') }}'"

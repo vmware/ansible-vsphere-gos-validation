@@ -1,0 +1,25 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Disable MDAG"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Disable-WindowsOptionalFeature -Online -NoRestart -FeatureName Windows-Defender-ApplicationGuard"
+
+- name: "Restart the guest OS"
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+
+- name: "Get MDAG feature state"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-WindowsOptionalFeature -Online -FeatureName Windows-Defender-ApplicationGuard).State"
+
+- name: "Check if MDAG is disabled in guest OS"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.stdout_lines is defined
+      - win_powershell_cmd_output.stdout_lines | length == 1
+      - win_powershell_cmd_output.stdout_lines[0].strip() == 'Disabled'
+    fail_msg: "MDAG feature state in guest OS is not 'Disabled': '{{ win_powershell_cmd_output.stdout_lines | default('') }}'"

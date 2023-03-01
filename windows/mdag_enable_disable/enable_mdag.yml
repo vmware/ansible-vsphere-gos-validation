@@ -1,0 +1,87 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Hardware requirements to run MDAG:
+# 1. CPU Hardware virtualization is enabled.
+# 2. Minimum 4 cores (logical processors)
+# 3. Minimum 8-GB RAM
+#
+- name: "Initialize the VM hardware related variables"
+  ansible.builtin.set_fact:
+    vm_nested_virt_status: false
+    vm_initial_cpu_num: ""
+    vm_initial_mem_mb: ""
+
+- name: "Get VM Hardware virtualization status, CPU and Memory info"
+  include_tasks: ../../common/vm_get_config.yml
+  vars:
+    property_list: ['config.nestedHVEnabled', 'config.hardware.memoryMB', 'config.hardware.numCPU']
+
+- name: "Set fact of VM hardware related info"
+  ansible.builtin.set_fact:
+    vm_nested_virt_status: "{{ vm_config.config.nestedHVEnabled }}"
+    vm_initial_cpu_num: "{{ vm_config.config.hardware.numCPU }}"
+    vm_initial_mem_mb: "{{ vm_config.config.hardware.memoryMB }}"
+  when:
+    - vm_config.config is defined
+    - vm_config.config.nestedHVEnabled is defined
+    - vm_config.config.hardware.memoryMB is defined
+    - vm_config.config.hardware.numCPU is defined
+
+- name: "Edit VM configuration"
+  block:
+    - name: "Shutdown VM"
+      include_tasks: ../utils/win_shutdown_restart.yml
+      vars:
+        set_win_power_state: "shutdown"
+
+    - name: "Enable CPU Hardware virtualization for the VM"
+      include_tasks: ../../common/vm_set_nested_virtual.yml
+      vars:
+        vm_nested_virt: true
+      when: not vm_nested_virt_status
+
+    - name: "Set VM CPU number to 4"
+      include_tasks: ../../common/vm_set_cpu_number.yml
+      vars:
+        num_cores_per_socket: 2
+        num_cpus: 4
+      when: vm_initial_cpu_num | int < 4
+
+    - name: "Set VM memory size to 8 GB"
+      include_tasks: ../../common/vm_set_memory_size.yml
+      vars:
+        memory_mb: 8 * 1024
+      when: vm_initial_mem_mb | int < 8 * 1024
+
+    - name: "Poweron the VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-on'
+  when: >
+    (not vm_nested_virt_status) or
+    (vm_initial_cpu_num | int < 4) or 
+    (vm_initial_mem_mb | int < 8 * 1024) 
+
+- name: "Install MDAG"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Enable-WindowsOptionalFeature -Online -NoRestart -FeatureName Windows-Defender-ApplicationGuard"
+
+- name: "Restart the guest OS"
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+
+- name: "Get MDAG feature state"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-WindowsOptionalFeature -Online -FeatureName Windows-Defender-ApplicationGuard).State"
+
+- name: "Check if MDAG is enabled in guest OS"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.stdout_lines is defined
+      - win_powershell_cmd_output.stdout_lines | length == 1
+      - win_powershell_cmd_output.stdout_lines[0].strip() == 'Enabled'
+    fail_msg: "MDAG feature state in guest OS is not 'Enabled': '{{ win_powershell_cmd_output.stdout_lines | default('') }}'"
