@@ -63,7 +63,7 @@
     (vm_initial_cpu_num | int < 4) or 
     (vm_initial_mem_mb | int < 8 * 1024) 
 
-- name: "Install MDAG"
+- name: "Enable MDAG"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Enable-WindowsOptionalFeature -Online -NoRestart -FeatureName Windows-Defender-ApplicationGuard"
@@ -85,3 +85,27 @@
       - win_powershell_cmd_output.stdout_lines | length == 1
       - win_powershell_cmd_output.stdout_lines[0].strip() == 'Enabled'
     fail_msg: "MDAG feature state in guest OS is not 'Enabled': '{{ win_powershell_cmd_output.stdout_lines | default('') }}'"
+
+- name: "Get MDAG process"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-Process -Name vmmemMDAG"
+    win_execute_cmd_ignore_error: true
+
+- name: "Check if MDAG process is launched"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.stderr_lines is defined
+      - win_powershell_cmd_output.stderr_lines | length != 0
+      - "'Cannot find a process' in win_powershell_cmd_output.stderr_lines[0]"
+    fail_msg: "There should not be process vmmemMDAG just right after enabling MDAG."
+
+- name: "Restart the guest OS"
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+
+- name: "Get MDAG process"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-Process -Name vmmemMDAG"

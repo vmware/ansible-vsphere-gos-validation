@@ -11,7 +11,7 @@
 - name: "Set up the Network Isolation settings in Group Policy"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "reg add {{ network_isolation_policy_path }} /v CloudResources /t reg_sz /d ‘.baidu.com’ /f"
+    win_powershell_cmd: "reg add {{ network_isolation_policy_path }} /v CloudResources /t reg_sz /d '.microsoft.com' /f"
 
 - name: "Turn on Microsoft Defender Application Guard in Managed Mode "
   include_tasks: ../utils/win_execute_cmd.yml
@@ -19,7 +19,26 @@
     win_powershell_cmd: >-
       reg add {{ mdag_policy_path }} /v AllowAppHVSI_ProviderSet /t reg_dword /d 1 /f;
       reg add {{ mdag_policy_path }} /v AllowAppHVSI /t reg_dword /d 1 /f
-      
+
+- name: "Open trusted URL in Microsoft Edge"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "start msedge microsoft.com"
+
+- name: "Get MDAG process"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-Process -Name vmmemMDAG"
+    win_execute_cmd_ignore_error: true
+
+- name: "Check if MDAG process is launched"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.stdout_lines is defined
+      - win_powershell_cmd_output.stdout_lines | length != 0
+      - "'Cannot find a process' in win_powershell_cmd_output.stdout_lines[0]"
+    fail_msg: "MDAG should not be launched when open trusted URL."
+
 - name: "Open untrusted URL in Microsoft Edge"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
