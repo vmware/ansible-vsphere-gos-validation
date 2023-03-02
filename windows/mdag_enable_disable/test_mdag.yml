@@ -1,22 +1,35 @@
 # Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Test MDAG in guest OS
+# Test Application Guard in Enterprise-managed mode
 #
 - name: "Initialize MDAG policy related variables"
   ansible.builtin.set_fact:
     mdag_policy_path: "HKLM\\SOFTWARE\\Policies\\Microsoft\\AppHVSI"
     network_isolation_policy_path: "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\NetworkIsolation"
 
-- name: "Eanble "
+- name: "Set up the Network Isolation settings in Group Policy"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "(Get-WindowsOptionalFeature -Online -FeatureName Windows-Defender-ApplicationGuard).State"
+    win_powershell_cmd: "reg add {{ network_isolation_policy_path }} /v CloudResources /t reg_sz /d ‘.baidu.com’ /f"
 
-- name: "Check if MDAG is enabled in guest OS"
-  ansible.builtin.assert:
-    that:
-      - win_powershell_cmd_output.stdout_lines is defined
-      - win_powershell_cmd_output.stdout_lines | length == 1
-      - win_powershell_cmd_output.stdout_lines[0].strip() == 'Enabled'
-    fail_msg: "MDAG feature state in guest OS is not 'Enabled': '{{ win_powershell_cmd_output.stdout_lines | default('') }}'"
+- name: "Turn on Microsoft Defender Application Guard in Managed Mode "
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      reg add {{ mdag_policy_path }} /v AllowAppHVSI_ProviderSet /t reg_dword /d 1 /f;
+      reg add {{ mdag_policy_path }} /v AllowAppHVSI /t reg_dword /d 1 /f
+      
+- name: "Open untrusted URL in Microsoft Edge"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "start msedge bing.com"
+
+- name: "Wait for several minutes for launching MDAG"
+  ansible.builtin.pause:
+    minutes: 3
+
+- name: "Get MDAG process"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-Process -Name vmmemMDAG"
