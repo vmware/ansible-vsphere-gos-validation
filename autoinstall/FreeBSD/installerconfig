@@ -2,14 +2,27 @@
 debug=yes
 nonInteractive=yes
 
+{% if boot_disk_controller == 'nvme' %}
+PARTITIONS="nvd0 gpt"
+{% elif boot_disk_controller == 'sata' or boot_disk_controller == 'ide' %}
+PARTITIONS="ada0 gpt"
+{% else %}
 PARTITIONS="da0 gpt"
+{% endif %}
 DISTRIBUTIONS="kernel.txz base.txz kernel-dbg.txz lib32.txz src.txz ports.txz"
 
 #!/bin/sh
 # Set hostname
 sysrc hostname="FreeBSD-{{ hostname_timestamp }}"
 
+{% if boot_disk_controller == 'nvme' %}
+gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 nvd0
+{% elif boot_disk_controller == 'sata' or boot_disk_controller == 'ide' %}
+gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 ada0
+{% else %}
 gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 da0
+{% endif %}
+
 # Set Time Zone to UTC
 echo "Setting Time Zone to UTC ..."
 /bin/cp /usr/share/zoneinfo/UTC /etc/localtime
@@ -80,15 +93,6 @@ sysrc sshd_enable="YES"
 sysrc ntpd_enable="YES"
 sysrc ntpd_sync_on_start="YES"
 
-# Config desktop after install xorg and gnome
-sysrc hald_enable="YES"
-sysrc dbus_enable="YES"
-sysrc gnome_enable="YES"
-sysrc moused_enable="YES"
-sysrc gdm_enable="YES"
-Xorg -configure
-cp xorg.conf.new /etc/X11/xorg.conf
-
 # Removing boot menu delay
 echo "Reducing boot menu delay ..." > /dev/ttyu0
 echo 'autoboot_delay="3"' >> /boot/loader.conf
@@ -96,4 +100,3 @@ echo 'autoboot_delay="3"' >> /boot/loader.conf
 echo "End of installerconfig" > /dev/ttyu0
 echo "{{ autoinstall_complete_msg }}" > /dev/ttyu0
 shutdown -r now
-
