@@ -7,7 +7,7 @@ DISTRIBUTIONS="kernel.txz base.txz kernel-dbg.txz lib32.txz src.txz ports.txz"
 
 #!/bin/sh
 # Set hostname
-sysrc hostname="FreeBSD"
+sysrc hostname="FreeBSD-{{ hostname_timestamp }}"
 
 gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 da0
 # Set Time Zone to UTC
@@ -16,9 +16,9 @@ echo "Setting Time Zone to UTC ..."
 /usr/bin/touch /etc/wall_cmos_clock
 /sbin/adjkerntz -a
 
-echo "Set DHCP to NIC nic0 ..." > /dev/ttyu0
+echo "Set network interface with DHCP IP assignment ..." > /dev/ttyu0
 ifdev=$(ifconfig | grep '^[a-z]' | cut -d: -f1 | head -n 1)
-echo "Get ifname ${ifdev}"
+echo "Get ifname ${ifdev}" > /dev/ttyu0
 sysrc ifconfig_${ifdev}=DHCP
 
 # Get DHCP for nic0
@@ -29,26 +29,23 @@ echo "Check network ..." > /dev/ttyu0
 ifconfig > /dev/ttyu0
 
 # Set Proxy. without the proxy, maybe it will take more time to download pakages xorg & gnome
-{% if use_localhost_proxy is defined and use_localhost_proxy %}
-setenv HTTP_PROXY {{ http_proxy_localhost }}
+{% if http_proxy_vm is defined and http_proxy_vm %}
+setenv HTTP_PROXY {{ http_proxy_vm }}
 {% endif %}
 
 # Installing packages
 echo "Installing packages ..." > /dev/ttyu0
 env ASSUME_ALWAYS_YES=YES pkg bootstrap -y
 env ASSUME_ALWAYS_YES=YES pkg update -f
-env ASSUME_ALWAYS_YES=YES pkg upgrade -f
 # Hit issue: reset by peer during install packages
 # The open-vm-tools is not installed by default
 # packages_to_install='python3 open-vm-tools-nox11 sudo xorg lsblk bash curl wget xf86-video-vmware xf86-input-vmmouse ...'
 packages_to_install='python3 sudo xorg gnome open-vm-tools xf86-video-vmware xf86-input-vmmouse bash wget'
 for package_to_install in $packages_to_install
 do
-    try_count=0
     ret=1
-    until [ $ret -eq 0 ] || [ $try_count -gt 10 ]
+    until [ $ret -eq 0 ]
     do
-        try_count=$((try_count+1))
         echo "Install package $package_to_install (try $try_count time) ..." > /dev/ttyu0
         env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install
         ret=$?
@@ -93,7 +90,7 @@ Xorg -configure
 cp xorg.conf.new /etc/X11/xorg.conf
 
 # Removing boot menu delay
-echo "Removing boot menu delay ..." > /dev/ttyu0
+echo "Reducing boot menu delay ..." > /dev/ttyu0
 echo 'autoboot_delay="3"' >> /boot/loader.conf
 
 echo "End of installerconfig" > /dev/ttyu0
