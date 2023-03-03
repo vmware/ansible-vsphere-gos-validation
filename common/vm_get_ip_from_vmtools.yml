@@ -17,23 +17,26 @@
   include_tasks: vm_wait_guest_ip.yml
 
 # Set vm_guest_ip with IPv4 in guest info
-- name: "Initialize fact of VM IP address"
+- name: "Initialize facts of VM IP address and VM network"
   ansible.builtin.set_fact:
-    vm_guest_ip: "{{ vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4 }}"
+    vm_guest_ip: "{{ vm_guestinfo.instance.guest.ipAddress }}"
+    vm_guest_net: "{{ vm_guestinfo.instance.guest.net }}"
 
 - name: "Get all IP address in VM guest info"
   ansible.builtin.set_fact:
-    vm_guest_all_ip: "{{ vm_guest_all_ip | union(vm_guest_facts['instance']['hw_%s'|format(item)].ipaddresses) }}"
-  when: vm_guest_facts['instance']['hw_%s'|format(item)].ipaddresses
-  with_items: "{{ vm_guest_facts.instance.hw_interfaces }}"
+    vm_guest_all_ip: "{{ vm_guest_all_ip | union(item.ipAddress) }}"
+  when: item.ipAddress is defined and item.ipAddress
+  with_items: "{{ vm_guest_net }}"
 
 - name: "Set the fact of MAC and IP addresses"
   ansible.builtin.set_fact:
-    vm_guest_mac_ipv4: "{{ vm_guest_mac_ipv4 | combine({vm_guest_facts['instance']['hw_%s'|format(item)].macaddress: (vm_guest_facts['instance']['hw_%s'|format(item)].ipaddresses | ansible.utils.ipv4)[0]}) }}"
+    vm_guest_mac_ipv4: "{{ vm_guest_mac_ipv4 |
+                           combine({item.macAddress: (item.ipAddress | ansible.utils.ipv4)[0]}) }}"
   when:
-    - vm_guest_facts['instance']['hw_%s'|format(item)].ipaddresses
-    - vm_guest_facts['instance']['hw_%s'|format(item)].ipaddresses | ansible.utils.ipv4 | length == 1
-  with_items: "{{ vm_guest_facts.instance.hw_interfaces }}"
+    - item.macAddress is defined and item.macAddress
+    - item.ipAddress is defined
+    - item.ipAddress | ansible.utils.ipv4 | length == 1
+  with_items: "{{ vm_guest_net }}"
 
 # Get VM primary NIC
 - name: "Get VM primary network adapter by testing connection"
@@ -49,4 +52,7 @@
 
 - name: "Display VM's guest IP addresses retrieved by VMware Tools"
   ansible.builtin.debug:
-    msg: "Get VM '{{ vm_name }}' IP address from VMware tools: {{ vm_guest_ip }}, all IP addresses: {{ vm_guest_all_ip }}"
+    msg: 
+      - "VM '{{ vm_name }}' IP addresses collected by VMware tools are"
+      - "IPv4 address: {{ vm_guest_ip }}"
+      - "All IP addresses: {{ vm_guest_all_ip }}"
