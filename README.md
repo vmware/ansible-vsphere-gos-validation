@@ -57,6 +57,7 @@ This project supports below scenarios for end-to-end guest operating system vali
 * Deploy VM and install guest operating system from ISO image
 * Deploy VM from an OVA template
 * Existing VM with installed guest operating system, which should satisfy below requirments.
+  * VM has only one network adapter and the network adapter is connected.
   * SSH and Python are installed and enabled.
   * The vm_python variable in vars/test.yml must be set with correct python path. Or user can set PATH in /etc/environment in guest operating system to include the binary directory path to python.
   * The root user should be enabled and permitted to log in through SSH in Linux guest operating system.
