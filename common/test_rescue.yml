@@ -14,26 +14,43 @@
   ansible.builtin.set_fact:
     current_testcase_name: "{{ deploy_casename | default(ansible_play_name) }}"
   when: ansible_play_name == "deploy_vm"
-- ansible.builtin.debug:
+
+- name: "Print failed test case"
+  ansible.builtin.debug:
     msg: "Testcase: {{ current_testcase_name }} failed"
 
-- name: Check if current test case log folder exists
+- name: "Check if current test case log folder exists"
   ansible.builtin.stat:
     path: "{{ current_test_log_folder }}"
   register: current_test_folder_result
   ignore_errors: true
-- include_tasks: create_directory.yml
+
+- name: "Create current test case log folder"
+  include_tasks: create_directory.yml
   vars:
     dir_path: "{{ current_test_log_folder }}"
     dir_mode: "0777"
   when: not current_test_folder_result.stat.exists
 
-- block:
-    - include_tasks: vm_take_screenshot.yml
+- name: "Collect VM's information"
+  block:
+    - name: "Get VM's config, guest and summary properties"
+      include_tasks: vm_get_config.yml
+      vars:
+        property_list: ['config', 'guest', 'summary']
+
+    - name: "Dump VM's config, guest and summary properties to a json file"
+      ansible.builtin.copy:
+        dest: "{{ current_test_log_folder }}/vm_properties.json"
+        content: "{{ vm_config | to_nice_json }}"
+
+    - name: "Take a screenshot at VM current state"
+      include_tasks: vm_take_screenshot.yml
       vars:
         vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
 
-    - include_tasks: esxi_download_datastore_file.yml
+    - name: "Download VM's vmware.log"
+      include_tasks: esxi_download_datastore_file.yml
       vars:
         src_datastore: "{{ datastore }}"
         src_file_path: "{{ vm_dir_name }}/vmware.log"
@@ -41,7 +58,8 @@
         download_file_fail_ignore: true
       when: vm_dir_name is defined and vm_dir_name
 
-    - include_tasks: vm_take_snapshot.yml
+    - name: "Take a snapshot at VM current state"
+      include_tasks: vm_take_snapshot.yml
       vars:
         snapshot_name: "{{ current_testcase_name }}_fail_{{ timestamp }}"
         dump_memory: true
@@ -56,9 +74,9 @@
     - vm_exists is defined
     - vm_exists | bool
 
-- name: Testing exit due to failure
+- name: "Testing exit due to failure"
   ansible.builtin.fail:
-    msg: "Exit testing when 'exit_testing_when_fail' is set to {{ exit_testing_when_fail }} in test case {{ current_testcase_name }}"
+    msg: "Exit testing because 'exit_testing_when_fail' is set to {{ exit_testing_when_fail }} in test case {{ current_testcase_name }}"
   when:
     - exit_testing_when_fail is defined
     - exit_testing_when_fail | bool
