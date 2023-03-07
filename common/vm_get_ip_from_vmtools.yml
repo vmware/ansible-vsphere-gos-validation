@@ -1,7 +1,7 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get VM IPv4 address through VMware tools while VM is powered on
+# Get VM IPv4 address through VMware Tools while VM is powered on
 - name: "Initialize VM guest IP/IP list variables"
   ansible.builtin.set_fact:
     vm_guest_ip: ""
@@ -13,30 +13,34 @@
     vm_primary_mac: ""
   when: vm_primary_mac is undefined
 
-- name: "Wait for VM guest info"
+- name: "Wait for VM's guest IP address"
   include_tasks: vm_wait_guest_ip.yml
+
+# Set vm_guest_ip with IPv4 in guest info
+- name: "Initialize facts of VM IP address and VM network"
+  ansible.builtin.set_fact:
+    vm_guest_ip: "{{ vm_guestinfo.instance.guest.ipAddress }}"
+    vm_guest_net: "{{ vm_guestinfo.instance.guest.net }}"
 
 - name: "Get all IP address in VM guest info"
   ansible.builtin.set_fact:
-    vm_guest_all_ip: "{{ vm_guest_all_ip | union(vm_guest_facts['instance']['hw_%s'|format(item)].ipaddresses) }}"
-  when: vm_guest_facts['instance']['hw_%s'|format(item)].ipaddresses
-  with_items: "{{ vm_guest_facts.instance.hw_interfaces }}"
+    vm_guest_all_ip: "{{ vm_guest_all_ip | union(item.ipAddress) }}"
+  when: item.ipAddress is defined and item.ipAddress
+  with_items: "{{ vm_guest_net }}"
 
 - name: "Set the fact of MAC and IP addresses"
   ansible.builtin.set_fact:
-    vm_guest_mac_ipv4: "{{ vm_guest_mac_ipv4 | combine({vm_guest_facts['instance']['hw_%s'|format(item)].macaddress: (vm_guest_facts['instance']['hw_%s'|format(item)].ipaddresses | ansible.utils.ipv4)[0]}) }}"
+    vm_guest_mac_ipv4: "{{ vm_guest_mac_ipv4 |
+                           combine({item.macAddress: (item.ipAddress | ansible.utils.ipv4)[0]}) }}"
   when:
-    - vm_guest_facts['instance']['hw_%s'|format(item)].ipaddresses
-    - vm_guest_facts['instance']['hw_%s'|format(item)].ipaddresses | ansible.utils.ipv4 | length == 1
-  with_items: "{{ vm_guest_facts.instance.hw_interfaces }}"
-
-# Set vm_guest_ip with IPv4 in guest info
-- name: "Set fact of VM IP address"
-  ansible.builtin.set_fact:
-    vm_guest_ip: "{{ vm_guest_facts.instance.ipv4 }}"
+    - item.macAddress is defined and item.macAddress
+    - item.ipAddress is defined
+    - item.ipAddress | ansible.utils.ipv4 | length == 1
+  with_items: "{{ vm_guest_net }}"
 
 # Get VM primary NIC
-- include_tasks: vm_get_primary_nic.yml
+- name: "Get VM primary network adapter by testing connection"
+  include_tasks: vm_get_primary_nic.yml
 
 # If VM only has 1 IP, vm_primary_ip should be equal to vm_guest_ip
 # If VM has more than 1 IP, the IP in guest info might not be able to connected,
@@ -46,5 +50,9 @@
     vm_guest_ip: "{{ vm_primary_ip }}"
   when: vm_guest_ip != vm_primary_ip
 
-- ansible.builtin.debug:
-    msg: "Get VM '{{ vm_name }}' IP address from VMware tools: {{ vm_guest_ip }}, all IP addresses: {{ vm_guest_all_ip }}"
+- name: "Display VM's guest IP addresses retrieved by VMware Tools"
+  ansible.builtin.debug:
+    msg: 
+      - "VM '{{ vm_name }}' IP addresses collected by VMware Tools are"
+      - "IPv4 address: {{ vm_guest_ip }}"
+      - "All IP addresses: {{ vm_guest_all_ip }}"

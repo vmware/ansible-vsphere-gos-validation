@@ -81,16 +81,16 @@
 
 ### Tasks for getting VM IP
 * vm_get_ip.yml: Get VM IP address by calling vm_get_ip_from_vmtools.yml
-* vm_get_ip_from_vmtools.yml: Get VM IP address from VMware tools guestinfo
+* vm_get_ip_from_vmtools.yml: Get VM IP address from VMware Tools guestinfo
 * vm_get_primary_nic.yml: Get VM connectable network adapter MAC/IP address
-* vm_get_ip_from_notools.yml: Get VM IP address when there is no VMware tools installed
+* vm_get_ip_from_notools.yml: Get VM IP address when there is no VMware Tools installed
 * vm_get_world_id.yml: Get VM world ID on ESXi host
 * vm_get_ip_esxcli.yml: Get VM IP address on ESXi host by esxcli command
 * update_inventory.yml: Get VM IP address again or update the in memory hosts inventory info
 
 ### Tasks for VM information from command line
 * vm_shell_in_guest.yml: Execute shell command in guest
-* vm_guest_file_operation.yml: Create/delete directory or fetch/copy files in guest with VMware tools installed
+* vm_guest_file_operation.yml: Create/delete directory or fetch/copy files in guest with VMware Tools installed
 
 ### Tasks for VM log files
 * vm_wait_log_msg.yml: Check or wait for a message appear in VM's log file
@@ -105,8 +105,8 @@
 * vm_wait_ssh.yml: Wait for port 22 to be open for connect and get specified keyword
 * vm_wait_ping.yml: Wait for VM is connectable via ping
 * vm_wait_guest_ip.yml: Wait for guest IP addresses in guest info
-* vm_wait_guest_fullname.yml: Wait for VMware tools collecting guest fullname
-* vm_wait_guest_hostname.yml: Wait for VMware tools collecting guest OS hostname
+* vm_wait_guest_fullname.yml: Wait for VMware Tools collecting guest fullname
+* vm_wait_guest_hostname.yml: Wait for VMware Tools collecting guest OS hostname
 
 ### Tasks for VMware Tools
 * vm_get_vmtools_status.yml: Get VMware Tools status, version, release and build information
@@ -116,7 +116,7 @@
 ### Tasks for features on ESXi
 * esxi_enable_guest_ip_hack.yml: Enable guest IP hack on ESXi host
 * esxi_get_property.yml: Get specified property of ESXi host
-* esxi_get_bundled_tools_path.yml: Get the bundled VMware tools path on ESXi host
+* esxi_get_bundled_tools_path.yml: Get the bundled VMware Tools path on ESXi host
 * esxi_get_hardware_versions.yml: Get supported hardware versions and default hardware version on ESXi host
 * esxi_get_guest_ids.yml: Get supported guest ids for a hardware version on ESXi host
 * esxi_get_guest_config_options.yml: Get VM config options for a guest id on a hardware version

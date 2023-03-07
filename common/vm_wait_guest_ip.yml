@@ -4,11 +4,6 @@
 # Wait VM guest IP address in guest info is the one specified by parameter 'wait_ipv4'.
 # If 'wait_ipv4' is not defined, this task will wait for VM IP addresses are reported
 # in guest info.
-# Note:
-# vm_guest_facts.instance.ipv4 may give the IP address of virbr0 on
-# RHEL/CentOS/OracleLinux 7.x and later, which is not the real guest IP address of
-# Ethernet. So, here we do not use vm_guest_facts.instance.ipv4 to check guest IP
-# address. This issue has been fixed in VMware Tools 10.3.5.
 # Parameters:
 #   wait_ipv4: the IP address to wait for in guest info
 #   vm_get_ip_timeout(optional): timeout for retrying get VM IP addresses in guest info,
@@ -33,50 +28,40 @@
     datacenter: "{{ vsphere_host_datacenter }}"
     folder: "{{ vm_folder }}"
     name: "{{ vm_name }}"
-  delay: 5
+    schema: "vsphere"
+    properties: ['guest']
   retries: "{{ ((vm_get_ip_timeout | int) / 5) | int }}"
-  register: vm_guest_facts
+  register: vm_guestinfo
   ignore_errors: true
   until:
-    - vm_guest_facts.instance is defined
-    - vm_guest_facts.instance.guest_tools_status is defined
-    - vm_guest_facts.instance.guest_tools_status == "guestToolsRunning"
-    - vm_guest_facts.instance.hw_eth0 is defined
-    - vm_guest_facts.instance.hw_eth0.ipaddresses is defined
-    - vm_guest_facts.instance.hw_eth0.ipaddresses
-    - vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4
+    - vm_guestinfo.instance.guest.toolsRunningStatus is defined
+    - vm_guestinfo.instance.guest.toolsRunningStatus == "guestToolsRunning"
+    - vm_guestinfo.instance.guest.net is defined
+    - vm_guestinfo.instance.guest.net | map(attribute='ipAddress') | flatten | ansible.utils.ipv4
+    - vm_guestinfo.instance.guest.ipAddress is defined
+    - vm_guestinfo.instance.guest.ipAddress | ansible.utils.ipv4
+    - (vm_guestinfo.instance.guest.ipAddress in
+       vm_guestinfo.instance.guest.net | map(attribute='ipAddress') | flatten | ansible.utils.ipv4)
     - ((not wait_ipv4) or
-      (wait_ipv4 and wait_ipv4 in vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4))
+      (wait_ipv4 and wait_ipv4 == vm_guestinfo.instance.guest.ipAddress))
 
 - name: "Check VMware Tools is running and collects guest IPv4 address successfully"
   ansible.builtin.assert:
     that:
-      - vm_guest_facts.instance is defined
-      - vm_guest_facts.instance.guest_tools_status is defined
-      - vm_guest_facts.instance.guest_tools_status == "guestToolsRunning"
-      - vm_guest_facts.instance.hw_eth0 is defined
-      - vm_guest_facts.instance.hw_eth0.ipaddresses is defined
-      - vm_guest_facts.instance.hw_eth0.ipaddresses
-      - vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4
+      - vm_guestinfo.instance.guest.toolsRunningStatus is defined
+      - vm_guestinfo.instance.guest.toolsRunningStatus == "guestToolsRunning"
+      - vm_guestinfo.instance.guest.ipAddress is defined
+      - vm_guestinfo.instance.guest.ipAddress | ansible.utils.ipv4
+      - (vm_guestinfo.instance.guest.ipAddress in
+         vm_guestinfo.instance.guest.net | map(attribute='ipAddress') | flatten | ansible.utils.ipv4)
       - ((not wait_ipv4) or
-        (wait_ipv4 and wait_ipv4 in vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4))
-    fail_msg: >-
-      It's timed out for VMware Tools collecting guest IPv4 address in {{ vm_get_ip_timeout }} seconds.
-      Current VMware Tools running status is '{{ vm_guest_facts.instance.guest_tools_status | default("") }}'
-      and guest IP addresses are '{{ vm_guest_facts.instance.hw_eth0.ipaddresses | default("") }}'.
-
-# Retrieve IPv4 from eth0 ipaddresses to avoid getting virbr0 IP on RHEL-like guests
-- name: "Print VM guest IPv4 addresses"
-  ansible.builtin.debug:
-    msg: "VM guest IP addresses in VM guest facts: {{ vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4 }}"
-  when:
-    - vm_guest_facts.instance.hw_eth0.ipaddresses
-    - vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4
-
-# When retrieving IPv4 from eth0 ipaddresses fails, we can retrieve ipv4 instead
-- name: "Print VM guest IPv4 addresses"
-  ansible.builtin.debug:
-    msg: "Found VM guest IP address: {{ vm_guest_facts.instance.ipv4 }}"
-  when:
-    - (not vm_guest_facts.instance.hw_eth0.ipaddresses) or (not vm_guest_facts.instance.hw_eth0.ipaddresses | ansible.utils.ipv4)
-    - vm_guest_facts.instance.ipv4
+        (wait_ipv4 and wait_ipv4 == vm_guestinfo.instance.guest.ipAddress))
+    fail_msg:
+      - "It's timed out for VMware Tools collecting guest IPv4 address in {{ vm_get_ip_timeout }} seconds."
+      - "VMware Tools running status is '{{ vm_guestinfo.instance.guest.toolsRunningStatus | default() }}'."
+      - "VM's IP address in guest info is '{{ vm_guestinfo.instance.guest.ipAddress | default() }}'."
+      - "VM's all IP addresses in guest info are '{{ vm_guestinfo.instance.guest.net | default([]) | map(attribute='ipAddress') | flatten }}'."
+    success_msg:
+      - "Waiting for VM guest IPv4 address succeeded."
+      - "VM's IP address in guest info is '{{ vm_guestinfo.instance.guest.ipAddress | default() }}'."
+      - "VM's all IP addresses in guest info are {{ vm_guestinfo.instance.guest.net | default([]) | map(attribute='ipAddress') | flatten }}."
