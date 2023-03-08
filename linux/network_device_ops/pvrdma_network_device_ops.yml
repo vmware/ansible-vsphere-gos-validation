@@ -192,4 +192,11 @@
         - name: "Cleanup network"
           include_tasks: ../../common/vds_network_cleanup.yml
       rescue:
+        - name: "Switch to server VM"
+          ansible.builtin.set_fact:
+            vm_name: "{{ pvrdma_server_vm_name }}"
+          when:
+            - pvrdma_client_vm_name is defined
+            - vm_name == pvrdma_client_vm_name
+
         - include_tasks: ../../common/test_rescue.yml
