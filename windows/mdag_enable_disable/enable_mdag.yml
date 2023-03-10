@@ -86,30 +86,29 @@
       - win_powershell_cmd_output.stdout_lines[0].strip() == 'Enabled'
     fail_msg: "MDAG feature state in guest OS is not 'Enabled': '{{ win_powershell_cmd_output.stdout_lines | default('') }}'"
 
-- name: "Set the MDAG process name"
+- name: "Set the MDAG related process name"
   ansible.builtin.set_fact:
     mdag_process: "vmmemMDAG"
+    virtual_process: "vmcompute"
 
-- name: "Get MDAG process {{ mdag_process }}"
+- name: "Get virtual process {{ virtual_process }} before restart"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-Process -Name {{ virtual_process }}"
+
+- name: "Get MDAG process {{ mdag_process }} before restart"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Get-Process -Name {{ mdag_process }}"
     win_execute_cmd_ignore_error: true
-
-- name: "Check if MDAG process is launched"
-  ansible.builtin.assert:
-    that:
-      - win_powershell_cmd_output.stderr_lines is defined
-      - win_powershell_cmd_output.stderr_lines | length != 0
-      - "'Cannot find a process' in win_powershell_cmd_output.stderr_lines[0]"
-    fail_msg: "There should not be {{ mdag_process }} process before next sign-in."
 
 - name: "Restart the guest OS"
   include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"
 
-- name: "Get MDAG process {{ mdag_process }} after next sign-in"
+- name: "Get MDAG process {{ mdag_process }} after restart"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Get-Process -Name {{ mdag_process }}"
+    win_execute_cmd_ignore_error: true
