@@ -66,7 +66,7 @@
 - name: "Enable MDAG"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "Enable-WindowsOptionalFeature -Online -NoRestart -FeatureName Windows-Defender-ApplicationGuard"
+    win_powershell_cmd: "Enable-WindowsOptionalFeature -Online -NoRestart -FeatureName {{ mdag_feature_name }}"
 
 - name: "Restart the guest OS"
   include_tasks: ../utils/win_shutdown_restart.yml
@@ -76,7 +76,7 @@
 - name: "Get MDAG feature state"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "(Get-WindowsOptionalFeature -Online -FeatureName Windows-Defender-ApplicationGuard).State"
+    win_powershell_cmd: "(Get-WindowsOptionalFeature -Online -FeatureName {{ mdag_feature_name }}).State"
 
 - name: "Check if MDAG is enabled in guest OS"
   ansible.builtin.assert:
@@ -96,19 +96,24 @@
   vars:
     win_powershell_cmd: "Get-Process -Name {{ virtual_process }}"
 
-- name: "Get MDAG process {{ mdag_process }} before restart"
+- name: "Get MDAG process {{ mdag_process }}"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Get-Process -Name {{ mdag_process }}"
     win_execute_cmd_ignore_error: true
 
-- name: "Restart the guest OS"
-  include_tasks: ../utils/win_shutdown_restart.yml
-  vars:
-    set_win_power_state: "restart"
+- name: "Check MDAG process {{ mdag_process }} after restart"
+  block:
+    - name: "Restart the guest OS"
+      include_tasks: ../utils/win_shutdown_restart.yml
+      vars:
+        set_win_power_state: "restart"
 
-- name: "Get MDAG process {{ mdag_process }} after restart"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "Get-Process -Name {{ mdag_process }}"
-    win_execute_cmd_ignore_error: true
+    - name: "Get MDAG process {{ mdag_process }} after restart"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "Get-Process -Name {{ mdag_process }}"
+  when:
+    - guest_os_build_num | int > 22000
+    - win_powershell_cmd_output.rc is defined
+    - win_powershell_cmd_output.rc != 0
