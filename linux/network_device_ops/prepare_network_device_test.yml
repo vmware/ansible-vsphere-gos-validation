@@ -20,6 +20,19 @@
     - guest_os_ansible_distribution in ["SLES", "SLED"]
     - guest_os_ansible_distribution_major_ver | int == 12
 
+- name: "Get existing network interface before hotadd testing"
+  include_tasks: ../utils/get_network_adapters_status.yml
+
+- name: "Set fact of network adapter info before hotadd"
+  ansible.builtin.set_fact:
+    network_adapters_before_hotadd: "{{ guest_network_adapters }}"
+
+# Get eth0 device name in guest. Sometimes it is not 'eth0',
+# e.g., 'ens192', 'ens33', etc.
+- name: "Set fact of the first network adapter interface name in guest OS"
+  ansible.builtin.set_fact:
+    eth0_name: "{{ network_adapters_before_hotadd[0] }}"
+
 - name: "Install rdma packages for PVRDMA testing"
   block:
     - name: "Install rdma packages in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
@@ -35,17 +48,25 @@
         package_list: ["rdma-core", "librdmacm-utils"]
         package_state: "present"
       when: guest_os_family in ["Suse", "RedHat"]
+
+    - name: "Get network config file for '{{ eth0_name }}'"
+      include_tasks: ../utils/get_network_config_file.yml
+      vars:
+        network_adapter_name: "{{ eth0_name }}"
+
+    - name: "Remove MAC address or UUID from network config file"
+      block:
+        - name: "Get network config file state"
+          include_tasks: ../utils/get_file_stat_info.yml
+          vars:
+            guest_file_path: "{{ network_config_path }}"
+    
+        - name: "Remove MAC address or UUID from network config file for '{{ eth0_name }}'"
+          ansible.builtin.lineinfile:
+            path: "{{ network_config_path }}"
+            regexp: "^uuid|^UUID|^MAC|^mac"
+            state: absent
+          delegate_to: "{{ vm_guest_ip }}"
+          when: guest_file_exists
+      when: network_config_path
   when: adapter_type == "pvrdma"
-
-- name: "Get existing network interface before hotadd testing"
-  include_tasks: ../utils/get_network_adapters_status.yml
-
-- name: "Set fact of network adapter info before hotadd"
-  ansible.builtin.set_fact:
-    network_adapters_before_hotadd: "{{ guest_network_adapters }}"
-
-# Get eth0 device name in guest. Sometimes it is not 'eth0',
-# e.g., 'ens192', 'ens33', etc.
-- name: "Set fact of the first network adapter interface name in guest OS"
-  ansible.builtin.set_fact:
-    eth0_name: "{{ network_adapters_before_hotadd[0] }}"

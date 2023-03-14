@@ -7,11 +7,6 @@
 - name: "Get guest network device manager"
   include_tasks: ../utils/get_network_manager.yml
 
-- name: "Initialize facts of network config file tempate and path"
-  ansible.builtin.set_fact:
-    network_conf_template: ""
-    network_conf_path: ""
-
 - name: "Add network connection for {{ guest_os_ansible_distribution }}"
   block:
     - name: "Add network connection with static IP address"
@@ -58,66 +53,73 @@
           - nm_add_connection is defined
           - nm_add_connection.rc is defined
           - nm_add_connection.rc == 0
-        fail_msg: "Failed to add network connection"
-        success_msg: "{{ nm_add_connection.stdout | default('Successfully added network connection') }}"
+        fail_msg: "Failed to add network connection on VM {{ vm_name }}"
+        success_msg: "{{ nm_add_connection.stdout |
+                      default('Successfully added network connection on VM ' ~ vm_name) }}"
   when: guest_os_network_manager == "NetworkManager"
 
-# Set fact of network config file in guest OS except VMware Photon OS
-- block:
-    - name: "Set fact of the network configure file for {{ guest_os_ansible_distribution }}"
+# Set network config file in guest OS except VMware Photon OS
+- name: "Set network config file for {{ guest_os_ansible_distribution }}"
+  block:
+    - name: "Initialize fact of network config tempate"
       ansible.builtin.set_fact:
-        network_conf_template: rhel_network_conf.j2
-        network_conf_path: "/etc/sysconfig/network-scripts/ifcfg-{{ new_network_adapter }}"
+        network_config_template: ""
+
+    - name: "Get network config file for '{{ new_network_adapter }}'"
+      include_tasks: ../utils/get_network_config_file.yml
+      vars:
+        network_adapter_name: "{{ new_network_adapter }}"
+
+    - name: "Set fact of the network config template for {{ guest_os_ansible_distribution }}"
+      ansible.builtin.set_fact:
+        network_config_template: rhel_network_conf.j2
       when: guest_os_family == "RedHat"
 
-    - name: "Set fact of the network configure file for Ubuntu desktop"
+    - name: "Set fact of the network config template for Ubuntu desktop"
       ansible.builtin.set_fact:
-        network_conf_template: debian_network_conf.j2
-        network_conf_path: "/etc/network/interfaces"
+        network_config_template: debian_network_conf.j2
       when: >
         (guest_os_ansible_distribution == "Debian") or
-        (guest_os_ansible_distribution == "Ubuntu" and guest_os_with_gui is defined and guest_os_with_gui)
+        (guest_os_ansible_distribution == "Ubuntu" and
+         guest_os_with_gui is defined and guest_os_with_gui)
 
-    - block:
-        # Get netplan config file in Ubuntu server
-        - include_tasks: ../utils/get_netplan_config_file.yml
-        - name: "Set fact of the network configure file for Ubuntu server"
-          ansible.builtin.set_fact:
-            network_conf_template: ubuntu_netplan_conf.j2
-            network_conf_path: "{{ netplan_config_file }}"
-          when: netplan_config_file is defined
+    - name: "Set fact of the network config template for Ubuntu server"
+      ansible.builtin.set_fact:
+        network_config_template: ubuntu_netplan_conf.j2
       when:
         - guest_os_ansible_distribution == "Ubuntu"
         - guest_os_with_gui is defined and not guest_os_with_gui
 
-    - name: "Set fact of the network configure file for SLE"
+    - name: "Set fact of the network config template for SLE"
       ansible.builtin.set_fact:
-        network_conf_template: sles_network_conf.j2
-        network_conf_path: "/etc/sysconfig/network/ifcfg-{{ new_network_adapter }}"
+        network_config_template: sles_network_conf.j2
       when: guest_os_family == "Suse"
 
-    - name: "Set fact of the network configure file for Flatcar"
+    - name: "Set fact of the network config template for Flatcar"
       ansible.builtin.set_fact:
-        network_conf_template: flatcar_network_conf.j2
-        network_conf_path: "/etc/systemd/network/{{ new_network_adapter }}"
+        network_config_template: flatcar_network_conf.j2
       when: "'Flatcar' in guest_os_ansible_distribution"
 
-    # Create the network config file for new network interface
-    - name: "Create/Update network configure file '{{ network_conf_path }}'"
-      ansible.builtin.template:
-        src: "{{ network_conf_template }}"
-        dest: "{{ network_conf_path }}"
-        mode: "0666"
-      delegate_to: "{{ vm_guest_ip }}"
-
-    - name: "Get content of network configure file '{{ network_conf_path }}'"
-      ansible.builtin.command: "cat {{ network_conf_path }}"
-      register: network_config
-      changed_when: false
-      delegate_to: "{{ vm_guest_ip }}"
-
-    - name: "Print content of network configure file '{{ network_conf_path }}'"
-      ansible.builtin.debug: var=network_config.stdout_lines
+    - name: "Create or update network config file for new network interface"
+      block:
+        - name: "Create or update network config file '{{ network_config_path }}'"
+          ansible.builtin.template:
+            src: "{{ network_config_template }}"
+            dest: "{{ network_config_path }}"
+            mode: "0666"
+          delegate_to: "{{ vm_guest_ip }}"
+    
+        - name: "Get content of network config file '{{ network_config_path }}'"
+          ansible.builtin.command: "cat {{ network_config_path }}"
+          register: network_config
+          changed_when: false
+          delegate_to: "{{ vm_guest_ip }}"
+    
+        - name: "Print content of network config file '{{ network_config_path }}'"
+          ansible.builtin.debug: var=network_config.stdout_lines
+      when:
+        - network_config_template
+        - network_config_path
   when:
     - guest_os_network_manager != "NetworkManager"
     - guest_os_ansible_distribution not in ["VMware Photon OS", "Astra Linux (Orel)"]
@@ -174,7 +176,8 @@
       - link_status.stdout is defined
       - search_ip in link_status.stdout
     fail_msg: >-
-      Network adapter '{{ new_network_adapter }}' failed to obtain IPv4 address after 100 seconds.
+      Network adapter '{{ new_network_adapter }}' on VM {{ vm_name }}
+      failed to obtain IPv4 address after 100 seconds.
       Its current IPv4 address is '{{ link_status.stdout | default("") }}'.
 
 - name: "Print the new networ adapter IP address"

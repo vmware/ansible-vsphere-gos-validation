@@ -1,0 +1,76 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get network network config file for an interface
+# Parameters:
+#   network_adapter_name: The network interface name
+# Return:
+#   network_config_path: The network interface config file path
+#
+- name: "Initialize network config file for {{ network_adapter_name }}"
+  ansible.builtin.set_fact:
+    network_config_path: ""
+
+- name: "Get network device manager in guest OS"
+  include_tasks: get_network_manager.yml
+  when: guest_os_network_manager is undefined or not guest_os_network_manager
+
+- name: "Get network config file from NetworkManager"
+  block:
+    - name: "Get network connections"
+      ansible.builtin.shell: "nmcli -t -f NAME,ACTIVE,FILENAME connection show --active | grep '^{{ network_adapter_name }}:'"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: "network_conn_result"
+      ignore_errors: true
+
+    - name: "Set fact of network config file for '{{ network_adapter_name }}' on {{ guest_os_ansible_distribution }}"
+      ansible.builtin.set_fact:
+        network_config_path: "{{ network_conn_result.stdout_lines[0].split(':')[2] }}"
+      when:
+        - network_conn_result.rc is defined
+        - network_conn_result.rc == 0
+        - network_conn_result.stdout_lines | length == 1
+        - network_conn_result.stdout_lines[0].split(':') | length == 3
+  when: guest_os_network_manager == "NetworkManager"
+
+# Set fact of network config file in guest OS except VMware Photon OS
+- name: "Set fact of network config file"
+  block:
+    - name: "Set fact of network config file for '{{ network_adapter_name }}' on {{ guest_os_ansible_distribution }}"
+      ansible.builtin.set_fact:
+        network_config_path: "/etc/sysconfig/network-scripts/ifcfg-{{ network_adapter_name }}"
+      when: guest_os_family == "RedHat"
+
+    - name: "Set fact of network config file for '{{ network_adapter_name }}' on Ubuntu desktop"
+      ansible.builtin.set_fact:
+        network_config_path: "/etc/network/interfaces"
+      when: >
+        (guest_os_ansible_distribution == "Debian") or
+        (guest_os_ansible_distribution == "Ubuntu" and
+         guest_os_with_gui is defined and guest_os_with_gui)
+
+    - name: "Set fact of network config file in Ubuntu server"
+      block:
+        - name: "Get netplan config file in Ubuntu server"
+          include_tasks: ../utils/get_netplan_config_file.yml
+
+        - name: "Set fact of network config file for '{{ network_adapter_name }}' on Ubuntu server"
+          ansible.builtin.set_fact:
+            network_config_path: "{{ netplan_config_file }}"
+          when: netplan_config_file is defined
+      when:
+        - guest_os_ansible_distribution == "Ubuntu"
+        - guest_os_with_gui is defined and not guest_os_with_gui
+
+    - name: "Set fact of network config file for '{{ network_adapter_name }}' on SLE"
+      ansible.builtin.set_fact:
+        network_config_path: "/etc/sysconfig/network/ifcfg-{{ network_adapter_name }}"
+      when: guest_os_family == "Suse"
+
+    - name: "Set fact of network config file for '{{ network_adapter_name }}' on Flatcar"
+      ansible.builtin.set_fact:
+        network_config_path: "/etc/systemd/network/{{ network_adapter_name }}"
+      when: "'Flatcar' in guest_os_ansible_distribution"
+  when:
+    - guest_os_network_manager != "NetworkManager"
+    - guest_os_ansible_distribution not in ["VMware Photon OS", "Astra Linux (Orel)"]
