@@ -9,7 +9,12 @@ PARTITIONS="ada0 gpt"
 {% else %}
 PARTITIONS="da0 gpt"
 {% endif %}
+
+{% if guest_id.find('64Guest') != -1 %}
 DISTRIBUTIONS="kernel.txz base.txz kernel-dbg.txz lib32.txz src.txz ports.txz"
+{% else %}
+DISTRIBUTIONS="kernel.txz base.txz kernel-dbg.txz src.txz ports.txz"
+{% endif %}
 
 #!/bin/sh
 # Set hostname
@@ -57,7 +62,14 @@ mkdir -p /usr/local/etc/pkg/repos
 mount > /dev/ttyu0
 cp -rf /dist/packages/repos/FreeBSD_install_cdrom.conf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
 env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
+
+# We install packages from ISO image
+# Different packages between the 32bit image and 64bit image
+{% if guest_id.find('64Guest') != -1 %}
 packages_to_install='bash sudo xorg kde5'
+{% else %}
+packages_to_install='bash sudo xorg'
+{% endif %}
 for package_to_install in $packages_to_install
 do
     ret=1
@@ -75,7 +87,11 @@ done
 # Disable ISO repo and enable default repo
 rm -rf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
 env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
+{% if guest_id.find('64Guest') != -1 %}
 packages_to_install='sddm open-vm-tools xf86-video-vmware xf86-input-vmmouse wget curl'
+{% else %}
+packages_to_install='kde5 sddm open-vm-tools xf86-video-vmware xf86-input-vmmouse wget curl'
+{% endif %}
 for package_to_install in $packages_to_install
 do
     ret=1
