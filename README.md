@@ -103,3 +103,4 @@ $ docker pull projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validati
 $ docker run -it --privileged projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
 ```
 2. Launch testing in the started container following the steps in this section [Steps to Launch Testing](#steps-to-launch-testing)
+3. Test
