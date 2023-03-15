@@ -105,6 +105,10 @@
     win_powershell_cmd: "Get-Process -Name {{ mdag_process }}"
     win_execute_cmd_ignore_error: true
 
+- name: "Set the result of getting MDAG process"
+  ansible.builtin.set_fact:
+    mdag_process_result: "{{ win_powershell_cmd_output }}"
+
 - name: "Check MDAG process {{ mdag_process }} after restart"
   block:
     - name: "Restart the guest OS"
@@ -118,5 +122,5 @@
         win_powershell_cmd: "Get-Process -Name {{ mdag_process }}"
   when:
     - guest_os_build_num | int > 22000
-    - win_powershell_cmd_output.rc is defined
-    - win_powershell_cmd_output.rc != 0
+    - mdag_process_result.rc is defined
+    - mdag_process_result.rc != 0
