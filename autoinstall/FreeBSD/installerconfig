@@ -72,16 +72,15 @@ packages_to_install='bash sudo xorg'
 {% endif %}
 for package_to_install in $packages_to_install
 do
-    ret=1
-    try_count=1
-    until [ $ret -eq 0 ]
-    do
-        echo "Install package $package_to_install (try $try_count time) ..." > /dev/ttyu0
-        env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install
-        ret=$?
-        try_count=$((try_count+1))
-    done
-    echo "The package($package_to_install) is already installed" > /dev/ttyu0
+    echo "Install package $package_to_install (try $try_count time) ..." > /dev/ttyu0
+    env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install
+    ret=$?
+    if [ $ret == 0 ]
+    then    
+        echo "Succeed to install the package($package_to_install)" > /dev/ttyu0
+    else
+        echo "Failed to install the package($package_to_install)" > /dev/ttyu0
+    fi
 done
 
 # Disable ISO repo and enable default repo
