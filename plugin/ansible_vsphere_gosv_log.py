@@ -253,7 +253,7 @@ class VmDetailInfo(VmGuestInfo):
 
             self.Guest_OS_Distribution = ansible_gosv_facts.get('vm_guest_os_distribution', '')
             self.IP = ansible_gosv_facts.get('vm_guest_ip', '')
-            self.GUI_Installed = ansible_gosv_facts.get('guest_os_with_gui', '')
+            self.GUI_Installed = str(ansible_gosv_facts.get('guest_os_with_gui', ''))
             self.CloudInit_Version = ansible_gosv_facts.get('cloudinit_version', '')
             super().__init__(ansible_gosv_facts)
 
@@ -308,7 +308,7 @@ class VmDetailInfo(VmGuestInfo):
         for attr_name, attr_value in vars(self).items():
             if not attr_name.startswith('__') and not attr_name.startswith('ESXi') and attr_value is not None:
                 head_col_width = max([head_col_width, len(attr_name)])
-                if len(attr_value) > wrap_width:
+                if len(str(attr_value)) > wrap_width:
                     if attr_name == 'GuestInfo_Detailed_Data':
                         wrapped_vm_info[attr_name] = self.GuestInfo_Detailed_Data.replace("' ", "'\n").split('\n')
                     else:
@@ -322,7 +322,7 @@ class VmDetailInfo(VmGuestInfo):
                 else:
                     wrapped_vm_info[attr_name] = [attr_value]
 
-                max_text_line = max([len(line) for line in wrapped_vm_info[attr_name]])
+                max_text_line = max([len(str(line)) for line in wrapped_vm_info[attr_name]])
                 info_col_width = max([info_col_width, max_text_line])
 
         # Table width
@@ -406,7 +406,6 @@ class CallbackModule(CallbackBase):
         self.cwd = os.path.dirname(self.plugin_dir)
         self.log_dir = None
         self.current_log_dir = None
-        self.testrun_log_dir = None
         self.full_debug_log = "full_debug.log"
         self.failed_tasks_log = "failed_tasks.log"
         self.known_issues_log = "known_issues.log"
@@ -1168,11 +1167,13 @@ class CallbackModule(CallbackBase):
             self._print_test_results()
             self.remove_logger_file_handler(self.test_results_log)
 
-        if self.testrun_log_dir and self.log_dir != self.testrun_log_dir:
-            os.system("cp -rf {}/* {}".format(self.log_dir, self.testrun_log_dir))
+        if ('testrun_log_path' in self._ansible_gosv_facts and
+            self._ansible_gosv_facts['testrun_log_path'] and
+            self.log_dir != self._ansible_gosv_facts['testrun_log_path']):
+            os.system("cp -rf {}/* {}".format(self.log_dir, self._ansible_gosv_facts['testrun_log_path']))
             os.unlink(self.current_log_dir)
             os.system("rm -rf {}".format(self.log_dir))
-            os.symlink(self.testrun_log_dir, self.current_log_dir, target_is_directory=True)
+            os.symlink(self._ansible_gosv_facts['testrun_log_path'], self.current_log_dir, target_is_directory=True)
 
     def v2_playbook_on_task_start(self, task, is_conditional):
         self._task_start(task, prefix='TASK')
