@@ -322,7 +322,7 @@ class VmDetailInfo(VmGuestInfo):
                 else:
                     wrapped_vm_info[attr_name] = [attr_value]
 
-                max_text_line = max([len(str(line)) for line in wrapped_vm_info[attr_name]])
+                max_text_line = max([len(line) for line in wrapped_vm_info[attr_name]])
                 info_col_width = max([info_col_width, max_text_line])
 
         # Table width
@@ -376,12 +376,12 @@ class TestRun(object):
     def start(self):
         self.start_time = time.time()
         self.status = "Running"
-        print("Test {} is started.".format(self.id))
+        # print("DEBUG: Test {} is started.".format(self.id))
 
     def complete(self, status):
         self.duration = int(time.time() - self.start_time)
         self.status = status
-        print("Test {} is completed, result is {}.".format(self.id, self.status))
+        # print("DEBUG: Test {} is completed, result is {}.".format(self.id, self.status))
 
 class CallbackModule(CallbackBase):
     CALLBACK_NAME = 'ansible_vsphere_gosv_log'
@@ -395,7 +395,7 @@ class CallbackModule(CallbackBase):
         self.play = None
         self.log_msg = ''
         self.test_runs = OrderedDict()
-        self.testcase_list = []
+        self.not_completed_testcases = []
 
         self._ansible_gosv_facts = {}
 
@@ -411,7 +411,6 @@ class CallbackModule(CallbackBase):
         self.known_issues_log = "known_issues.log"
         self.test_results_log = "results.log"
         self.guest_info_json_file = "guest_info.json"
-        self.junit_results_xml = "junit_results.xml"
         self.collected_guest_info = {}
 
         # Testing vars file and testcase list file
@@ -423,7 +422,7 @@ class CallbackModule(CallbackBase):
         self._play_name = None
         self._play_path = None
 
-        # The last test case
+        # The last test case id, composed by <index>_<test_case_name>
         self._last_test_id = None
 
         # A tasks cache of current play
@@ -667,8 +666,9 @@ class CallbackModule(CallbackBase):
             for index, playbook in enumerate(playbooks):
                 test_name = os.path.basename(playbook['import_playbook']).replace('.yml', '')
                 test_id = "{}_{}".format((index+1), test_name)
+                print("Get test id: {}".format(test_id))
                 self.test_runs[test_id] = TestRun(test_id, test_name)
-                self.testcase_list.append(test_name)
+                self.not_completed_testcases.append(test_name)
 
     def _get_play_path(self, play):
         path = ""
@@ -698,8 +698,6 @@ class CallbackModule(CallbackBase):
         |  3 | gosc_cloudinit_dhcp  | * Failed | 00:12:58  |
         +--------------------------------------------------+
         """
-        print(str(self.test_runs.values()))
-
         total_exec_time = ""
         total_count = len(self.test_runs)
 
@@ -742,7 +740,6 @@ class CallbackModule(CallbackBase):
         test_idx = 0
         for test_id in self.test_runs:
             test_result = self.test_runs[test_id]
-            print("test_id={}, test_result={}".format(test_id, test_result))
             test_idx += 1
             test_exec_time = time.strftime('%H:%M:%S', time.gmtime(test_result.duration))
             if test_result.status == 'Passed':
@@ -824,7 +821,7 @@ class CallbackModule(CallbackBase):
             else:
                 self.test_runs[self._last_test_id].complete('Failed')
             # Pop up the completed test case
-            self.testcase_list.pop(0)
+            self.not_completed_testcases.pop(0)
 
         if result._task.loop and 'results' in result._result:
             self._process_items(result)
@@ -867,7 +864,7 @@ class CallbackModule(CallbackBase):
             else:
                 self.test_runs[self._last_test_id].complete('Failed')
             # Pop up the completed test case
-            self.testcase_list.pop(0)
+            self.not_completed_testcases.pop(0)
 
         if result._task.loop and 'results' in result._result:
             self._process_items(result)
@@ -952,7 +949,7 @@ class CallbackModule(CallbackBase):
                     self.test_runs[self._last_test_id].status == "Running"):
                 self.test_runs[self._last_test_id].complete(test_status)
                 # Pop up the completed test case
-                self.testcase_list.pop(0)
+                self.not_completed_testcases.pop(0)
 
     def v2_runner_on_skipped(self, result):
         self._clean_results(result._result, result._task.action)
@@ -970,7 +967,7 @@ class CallbackModule(CallbackBase):
                 self.test_runs[self._last_test_id].status == "Running"):
             self.test_runs[self._last_test_id].complete('Failed')
             # Pop up the completed test case
-            self.testcase_list.pop(0)
+            self.not_completed_testcases.pop(0)
 
     def v2_runner_retry(self, result):
         task_name = result.task_name or result._task
@@ -1058,7 +1055,6 @@ class CallbackModule(CallbackBase):
             # Update testcase list file with extra variable
             if 'testing_testcase_file' in extra_vars.keys():
                 self.testing_testcase_file = extra_vars['testing_testcase_file']
-                self._get_testcase_list(extra_vars['testing_testcase_file'])
             else:
                 self.testing_testcase_file = os.path.join(self.cwd, "linux/gosv_testcase_list.yml")
             self._get_testcase_list(self.testing_testcase_file)
@@ -1081,20 +1077,20 @@ class CallbackModule(CallbackBase):
                 self.test_runs[self._last_test_id].status == "Running"):
             self.test_runs[self._last_test_id].complete('Passed')
             # Pop up the completed test case
-            self.testcase_list.pop(0)
+            self.not_completed_testcases.pop(0)
 
         # Move to new started playbook
         self._play_name = play.get_name()
         self._play_path = self._get_play_path(play)
         self._load_testing_vars(play)
 
-        test_index = len(self.test_runs) - len(self.testcase_list)
+        test_index = len(self.test_runs) - len(self.not_completed_testcases)
+        # print("Current test index is: {}, play name: {}".format(test_index, self._play_name))
         # Start new test case
         if (test_index < len(self.test_runs) and
-            self.testcase_list[0] == self._play_name):
+            self.not_completed_testcases[0] == self._play_name):
             # Start new test case
             self._last_test_id = "{}_{}".format((test_index+1), self._play_name)
-            print("New test id is " + self._last_test_id)
             if self._last_test_id in self.test_runs:
                 self.test_runs[self._last_test_id].start()
 
@@ -1122,7 +1118,7 @@ class CallbackModule(CallbackBase):
                 self.test_runs[self._last_test_id].status == "Running"):
             self.test_runs[self._last_test_id].complete('Passed')
             # Pop up the completed test case
-            self.testcase_list.pop(0)
+            self.not_completed_testcases.pop(0)
 
         # Log play stats
         msg = self._banner("PLAY RECAP")
