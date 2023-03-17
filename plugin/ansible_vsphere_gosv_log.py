@@ -376,12 +376,12 @@ class TestRun(object):
     def start(self):
         self.start_time = time.time()
         self.status = "Running"
-        # print("Test {} is started.".format(self.id))
+        print("Test {} is started.".format(self.id))
 
     def complete(self, status):
         self.duration = int(time.time() - self.start_time)
         self.status = status
-        # print("Test {} is completed, result is {}.".format(self.id, self.status))
+        print("Test {} is completed, result is {}.".format(self.id, self.status))
 
 class CallbackModule(CallbackBase):
     CALLBACK_NAME = 'ansible_vsphere_gosv_log'
@@ -698,6 +698,7 @@ class CallbackModule(CallbackBase):
         |  3 | gosc_cloudinit_dhcp  | * Failed | 00:12:58  |
         +--------------------------------------------------+
         """
+        print(str(self.test_runs.values()))
 
         total_exec_time = ""
         total_count = len(self.test_runs)
@@ -741,6 +742,7 @@ class CallbackModule(CallbackBase):
         test_idx = 0
         for test_id in self.test_runs:
             test_result = self.test_runs[test_id]
+            print("test_id={}, test_result={}".format(test_id, test_result))
             test_idx += 1
             test_exec_time = time.strftime('%H:%M:%S', time.gmtime(test_result.duration))
             if test_result.status == 'Passed':
@@ -1092,7 +1094,7 @@ class CallbackModule(CallbackBase):
             self.testcase_list[0] == self._play_name):
             # Start new test case
             self._last_test_id = "{}_{}".format((test_index+1), self._play_name)
-            # print("New test id is " + self._last_test_id)
+            print("New test id is " + self._last_test_id)
             if self._last_test_id in self.test_runs:
                 self.test_runs[self._last_test_id].start()
 
