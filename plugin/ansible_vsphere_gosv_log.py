@@ -898,7 +898,13 @@ class CallbackModule(CallbackBase):
                 non_empty_facts = dict(filter(lambda item: item[1],
                                               ansible_facts.items()))
                 self._ansible_gosv_facts.update(non_empty_facts)
-                if task_file == "vm_get_guest_info.yml":
+                if ("deploy_vm_from" in task_file and
+                    "deploy_casename" in non_empty_facts and
+                    self._last_test_id and
+                    self._last_test_id in self.test_runs):
+                    # Update deploy_vm test case name
+                    self.test_runs[self._last_test_id].name = non_empty_facts['deploy_casename']
+                elif task_file == "vm_get_guest_info.yml":
                     # Save guest info
                     vm_guest_info = VmGuestInfo(self._ansible_gosv_facts)
                     if vm_guest_info.VMTools_Version:
