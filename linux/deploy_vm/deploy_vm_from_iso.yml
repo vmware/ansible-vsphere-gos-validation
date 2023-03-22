@@ -168,19 +168,13 @@
         - unattend_install_conf is defined
         - unattend_install_conf is match('Ubuntu/Desktop')
 
-    # FreeBSD 32bit image does not include package about desktop
-    # and will take much more time to download it from offical repo during autoinstall
-    - name: "Set times to try to get message for unattended installation completion"
-      ansible.builtin.set_fact:
-        vm_wait_autoinstall_log_retries: "{{ 720 if ('freebsd' in guest_id and '64Guest' not in guest_id) else 120 }}"
-
     # Wait autoinstall complete message appear in serial port output file
     - include_tasks: ../../common/vm_wait_log_msg.yml
       vars:
         vm_wait_log_name: "{{ vm_serial_port_output_file | basename }}"
         vm_wait_log_msg: "{{ autoinstall_complete_msg }}"
         vm_wait_log_delay: 30
-        vm_wait_log_retries: "{{ vm_wait_autoinstall_log_retries }}"
+        vm_wait_log_retries: 120
 
     - name: "Wait 60s for OS rebooting"
       ansible.builtin.pause:
