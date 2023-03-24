@@ -1,8 +1,8 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get expected IP and FQDN hostname bindings from cloudinit "/etc/hosts" template file
-- block:
+- name: "Get expected IP and FQDN hostname bindings from cloudinit '/etc/hosts' template file"
+  block:
     - name: "Initialize the fact of hosts template file"
       ansible.builtin.set_fact:
         hosts_template_file: ""
@@ -35,20 +35,24 @@
       when: hosts_template_file
   when: enable_cloudinit_gosc
 
-- include_tasks: ../utils/shutdown.yml
-- include_tasks: linux_gosc_execution.yml
+- name: "Shutdown OS"
+  include_tasks: ../utils/shutdown.yml
+
+- name: "Execute guest customization"
+  include_tasks: linux_gosc_execution.yml
   vars:
     type: "{{ ip_assignment }}"
     timeout: 900
 
 # Do not fail GOSC immediately if state keyword doesn't exist
-- include_tasks: ../../common/vm_wait_gosc_completed.yml
+- name: "Wait for GOSC state is completed"
+  include_tasks: ../../common/vm_wait_gosc_completed.yml
   vars:
     get_guest_reset_time_retries: 10
     check_gosc_state_keyword: false
 
 # Traditional GOSC will reboot guest OS (except for Photon) after all customization done
-- name: Sleep 30 seconds to wait guest reboot for traditional GOSC
+- name: "Sleep 30 seconds to wait guest reboot for traditional GOSC"
   ansible.builtin.pause:
     seconds: 30
   when:
@@ -60,10 +64,12 @@
 # Wait for guest IP not empty no matter GOSC with DHCP IP or static IP
 # Otherwise incorrect static IP will fail the task and quit test without
 # collecting information
-- include_tasks: ../../common/vm_wait_guest_ip.yml
+- name: "Wait for VM guest IP"
+  include_tasks: ../../common/vm_wait_guest_ip.yml
 
 # In case VM get new DHCP IP address after GOSC
-- include_tasks: ../../common/update_inventory.yml
+- name: "Update VM's guest IP in inventory"
+  include_tasks: ../../common/update_inventory.yml
   when: ip_assignment == "dhcp"
 
 - name: "Set fact of GOSC log files"
@@ -72,14 +78,26 @@
     gosc_cloudinit_log_file: "/var/log/cloud-init.log"
 
 # Wait GOSC completes message in logs
-- include_tasks: wait_gosc_complete_msg.yml
+- name: "Wait for traditional GOSC complete message"
+  include_tasks: wait_gosc_complete_msg.yml
   vars:
     wait_gosc_log_file: "{{ gosc_deploypkg_log_file }}"
     wait_gosc_msg_regexp: "Ran DeployPkg_DeployPackageFromFile successfully"
   when: not enable_cloudinit_gosc | bool
 
-- include_tasks: wait_gosc_complete_msg.yml
-  vars:
-    wait_gosc_log_file: "{{ gosc_cloudinit_log_file }}"
-    wait_gosc_msg_regexp: "Cloud-init .*finished at.*Datasource DataSourceOVF \\[seed=vmware-tools\\]"
+- name: "Wait for cloud-init GOSC complete message"
+  block:
+    - name: "Wait for cloud-init GOSC complete message when cloud-init version is lower than 23.1"
+      include_tasks: wait_gosc_complete_msg.yml
+      vars:
+        wait_gosc_log_file: "{{ gosc_cloudinit_log_file }}"
+        wait_gosc_msg_regexp: "Cloud-init .*finished at.*Datasource DataSourceOVF \\[seed=vmware-tools\\]"
+      when: cloudinit_version is version('23.1', '<')
+
+    - name: "Wait for cloud-init GOSC complete message when cloud-init version is equal to or greater than 23.1"
+      include_tasks: wait_gosc_complete_msg.yml
+      vars:
+        wait_gosc_log_file: "{{ gosc_cloudinit_log_file }}"
+        wait_gosc_msg_regexp: "Cloud-init .*finished at.*Datasource DataSourceVMware \\[seed=imc\\]"
+      when: cloudinit_version is version('23.1', '>=')
   when: enable_cloudinit_gosc | bool
