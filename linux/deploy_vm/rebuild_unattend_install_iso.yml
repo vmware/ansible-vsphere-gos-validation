@@ -30,54 +30,58 @@
 
 - name: "Rebuild ISO for Ubuntu desktop"
   block:
-    - name: Extract specific files inside ISO
+    - name: "Extract specific files inside ISO"
       community.general.iso_extract:
         image: "{{ src_iso_file_path }}"
         dest: "{{ src_iso_file_dir }}"
         files:
           - "boot/grub/grub.cfg"
 
-    - name: Modify boot entry
+    - name: "Modify boot entry"
       ansible.builtin.replace:
         path: "{{ src_iso_file_dir }}/grub.cfg"
         regexp: "set timeout=[1-9][0-9]{0,1}"
         replace: "default=0\nset timeout=2"
 
-    - name: Modify boot options
+    - name: "Modify boot options"
       ansible.builtin.replace:
         path: "{{ src_iso_file_dir }}/grub.cfg"
         regexp: "file=/cdrom/preseed/ubuntu.seed maybe-ubiquity quiet splash ---"
         replace: "file=/cdrom/preseed/ubuntu.seed boot=casper debug-ubiquity automatic-ubiquity quiet splash noprompt --- console=ttyS0,115200n8"
 
-    - name: "Print the content of modified file"
+    - name: "Print the content of modified file grub.cfg"
       debug:
         msg: "{{ lookup('file', src_iso_file_dir + '/grub.cfg') }}"
 
-    - name: Extract isolinux/txt.cfg inside ISO for old releases
+    - name: "Extract isolinux/txt.cfg inside ISO for old releases"
       community.general.iso_extract:
         image: "{{ src_iso_file_path }}"
         dest: "{{ src_iso_file_dir }}"
         files:
           - "isolinux/txt.cfg"
-        ignore_errors: true
-        register: result_extract_file
+      ignore_errors: true
+      register: result_extract_file
 
     - name: "Different file for some old releases such as Ubuntu 20.04 when the firmware is bios"
       block:
-        - name: Modify default boot mode
+        - name: "Modify default boot mode"
           ansible.builtin.replace:
           path: "{{ src_iso_file_dir }}/txt.cfg"
           regexp: "default live"
           replace: "default live-install"
 
-        - name: Modify boot options
+        - name: "Modify boot options"
           ansible.builtin.replace:
           path: "{{ src_iso_file_dir }}/txt.cfg"
           regexp: "file=/cdrom/preseed/ubuntu.seed only-ubiquity initrd=/casper/initrd quiet splash ---"
           replace: "file=/cdrom/preseed/ubuntu.seed boot=casper debug-ubiquity automatic-ubiquity quiet splash noprompt --- console=ttyS0,115200n8"
+        
+        - name: "Print the content of modified file txt.cfg"
+          debug:
+            msg: "{{ lookup('file', src_iso_file_dir + '/txt.cfg') }}"
       when: not result_extract_file.failed
 
-    - name: Customize the ISO without isolinux/txt.cfg
+    - name: "Customize the ISO without isolinux/txt.cfg"
       community.general.iso_customize:
         src_iso: "{{ src_iso_file_path }}"
         dest_iso: "{{ rebuilt_unattend_iso_path }}"
@@ -88,7 +92,7 @@
             dest_file: "/preseed/ubuntu.seed"
       when: result_extract_file.failed
 
-    - name: Customize the ISO with isolinux/txt.cfg
+    - name: "Customize the ISO with isolinux/txt.cfg"
       community.general.iso_customize:
         src_iso: "{{ src_iso_file_path }}"
         dest_iso: "{{ rebuilt_unattend_iso_path }}"
@@ -104,7 +108,7 @@
 
 - name: "Rebuild ISO for Photon"
   block:
-    - name: Extract specific files inside ISO
+    - name: "Extract specific files inside ISO"
       community.general.iso_extract:
         image: "{{ src_iso_file_path }}"
         dest: "{{ src_iso_file_dir }}"
@@ -128,7 +132,7 @@
         - "menu.cfg"
         - "grub.cfg"
 
-    - name: Customize the ISO
+    - name: "Customize the ISO"
       community.general.iso_customize:
         src_iso: "{{ src_iso_file_path }}"
         dest_iso: "{{ rebuilt_unattend_iso_path }}"
@@ -145,7 +149,7 @@
 
 - name: "Rebuild ISO for Debian"
   block:
-    - name: Extract specific files inside ISO
+    - name: "Extract specific files inside ISO"
       community.general.iso_extract:
         image: "{{ src_iso_file_path }}"
         dest: "{{ src_iso_file_dir }}"
@@ -216,7 +220,7 @@
     - name: "Print command output for updating initrd"
       ansible.builtin.debug: var=update_initrd_output
 
-    - name: Customize the ISO
+    - name: "Customize the ISO"
       community.general.iso_customize:
         src_iso: "{{ src_iso_file_path }}"
         dest_iso: "{{ rebuilt_unattend_iso_path }}"
@@ -266,7 +270,7 @@
       ansible.builtin.set_fact:
         ubuntu_bios_cfg_exist: false
 
-    - name: Extract isolinux/txt.cfg inside ISO if exists
+    - name: "Extract isolinux/txt.cfg inside ISO if exists"
       community.general.iso_extract:
         image: "{{ src_iso_file_path }}"
         dest: "{{ src_iso_file_dir }}"
@@ -297,7 +301,7 @@
           args:
             chdir: "{{ unattend_iso_cache }}"
 
-        - name: Customize the ISO
+        - name: "Customize the ISO"
           community.general.iso_customize:
             src_iso: "{{ src_iso_file_path }}"
             dest_iso: "{{ rebuilt_unattend_iso_path }}"
@@ -310,7 +314,7 @@
                 dest_file: "isolinux/txt.cfg"
       when: ubuntu_bios_cfg_exist
 
-    - name: Customize the ISO without txt.cfg
+    - name: "Customize the ISO without txt.cfg"
       community.general.iso_customize:
         src_iso: "{{ src_iso_file_path }}"
         dest_iso: "{{ rebuilt_unattend_iso_path }}"
