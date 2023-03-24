@@ -20,6 +20,20 @@
       vars:
         dir_path: "{{ local_cache }}"
         dir_mode: "0777"
+
+    - name: "Get test cases number in total"
+      ansible.builtin.set_fact:
+        gosv_testcases_count: >-
+          {{
+            lookup('file', testing_testcase_file |
+            default('linux/gosv_testcase_list.yml')) |
+            from_yaml | length
+          }}
+
+    - name: "Print test cases number in total"
+      ansible.builtin.debug:
+        msg: "There are {{ gosv_testcases_count }} test cases to run in total."
+
 # Prepare testing environment
 - import_playbook: env_setup/env_setup.yml
 # Execute test case one by one

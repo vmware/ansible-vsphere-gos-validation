@@ -743,13 +743,13 @@ class CallbackModule(CallbackBase):
             test_idx += 1
             test_exec_time = time.strftime('%H:%M:%S', time.gmtime(test_result.duration))
             if test_result.status == 'Passed':
-                msg += row_format.format(str(test_idx).rjust(idx_col_width),
+                msg += row_format.format(str(test_idx).rjust(idx_col_width, '0'),
                                          test_result.name.ljust(name_col_width),
                                          (status_mark + test_result.status).ljust(status_col_width),
                                          test_exec_time)
                 status_stats[test_result.status] += 1
             else:
-                msg += row_format.format(str(test_idx).rjust(idx_col_width),
+                msg += row_format.format(str(test_idx).rjust(idx_col_width, '0'),
                                          test_result.name.ljust(name_col_width),
                                          ("* " + test_result.status).ljust(status_col_width),
                                          test_exec_time)
@@ -890,7 +890,9 @@ class CallbackModule(CallbackBase):
                            "get_guest_ovt_version_build.yml",
                            "get_windows_system_info.yml",
                            "win_get_vmtools_version_build.yml",
-                           "check_inbox_driver.yml"] or
+                           "check_inbox_driver.yml",
+                           "reconfigure_flatcar_vm.yml",
+                           "reconfigure_vm_with_cloudinit.yml"] or
              "deploy_vm_from" in task_file) and
                 str(task.action) == "ansible.builtin.set_fact"):
             ansible_facts = task_result.get('ansible_facts', None)
@@ -898,7 +900,9 @@ class CallbackModule(CallbackBase):
                 non_empty_facts = dict(filter(lambda item: item[1],
                                               ansible_facts.items()))
                 self._ansible_gosv_facts.update(non_empty_facts)
-                if ("deploy_vm_from" in task_file and
+                if (("deploy_vm_from" in task_file or
+                     task_file in ["reconfigure_flatcar_vm.yml",
+                                   "reconfigure_vm_with_cloudinit.yml"]) and
                     "deploy_casename" in non_empty_facts and
                     self._last_test_id and
                     self._last_test_id in self.test_runs):
