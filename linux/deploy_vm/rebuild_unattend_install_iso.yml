@@ -53,35 +53,34 @@
       debug:
         msg: "{{ lookup('file', src_iso_file_dir + '/grub.cfg') }}"
 
-    - name: "Extract isolinux/txt.cfg inside ISO for old releases"
+    - name: "Extract isolinux/isolinux.cfg inside ISO for old releases"
       community.general.iso_extract:
         image: "{{ src_iso_file_path }}"
         dest: "{{ src_iso_file_dir }}"
         files:
-          - "isolinux/txt.cfg"
+          - "isolinux/isolinux.cfg"
       ignore_errors: true
       register: result_extract_file
 
     - name: "Different file for some old releases such as Ubuntu 20.04 when the firmware is bios"
       block:
-        - name: "Modify default boot mode"
-          ansible.builtin.replace:
-            path: "{{ src_iso_file_dir }}/txt.cfg"
-            regexp: "default live"
-            replace: "default live-install"
+        - name: "Modify boot option"
+          ansible.builtin.blockinfile:
+            path: "{{ src_iso_file_dir }}/isolinux.cfg"
+            insertafter: "^#.*etc.*"
+            block: |
+              default live-install
+              label live-install
+                menu label ^Install Ubuntu
+                kernel /casper/vmlinuz
+                append  file=/cdrom/preseed/ubuntu.seed boot=casper debug-ubiquity automatic-ubiquity initrd=/casper/initrd quiet splash noprompt --- console=ttyS0,115200n8
 
-        - name: "Modify boot options"
-          ansible.builtin.replace:
-            path: "{{ src_iso_file_dir }}/txt.cfg"
-            regexp: "file=/cdrom/preseed/ubuntu.seed only-ubiquity initrd=/casper/initrd quiet splash ---"
-            replace: "file=/cdrom/preseed/ubuntu.seed boot=casper debug-ubiquity automatic-ubiquity quiet splash noprompt --- console=ttyS0,115200n8"
-        
-        - name: "Print the content of modified file txt.cfg"
+        - name: "Print the content of modified file isolinux.cfg"
           debug:
-            msg: "{{ lookup('file', src_iso_file_dir + '/txt.cfg') }}"
+            msg: "{{ lookup('file', src_iso_file_dir + '/isolinux.cfg') }}"
       when: not result_extract_file.failed
 
-    - name: "Customize the ISO without isolinux/txt.cfg"
+    - name: "Customize the ISO without isolinux/isolinux.cfg"
       community.general.iso_customize:
         src_iso: "{{ src_iso_file_path }}"
         dest_iso: "{{ rebuilt_unattend_iso_path }}"
@@ -92,7 +91,7 @@
             dest_file: "/preseed/ubuntu.seed"
       when: result_extract_file.failed
 
-    - name: "Customize the ISO with isolinux/txt.cfg"
+    - name: "Customize the ISO with isolinux/isolinux.cfg"
       community.general.iso_customize:
         src_iso: "{{ src_iso_file_path }}"
         dest_iso: "{{ rebuilt_unattend_iso_path }}"
@@ -101,8 +100,8 @@
             dest_file: "/boot/grub/grub.cfg"
           - src_file: "{{ new_unattend_install_conf }}"
             dest_file: "/preseed/ubuntu.seed"
-          - src_file: "{{ src_iso_file_dir }}/txt.cfg"
-            dest_file: "/isolinux/txt.cfg"
+          - src_file: "{{ src_iso_file_dir }}/isolinux.cfg"
+            dest_file: "/isolinux/isolinux.cfg"
       when: not result_extract_file.failed
   when: unattend_install_conf is match('Ubuntu/Desktop')
 
