@@ -16,6 +16,7 @@
 15. For UnionTech OS Server 20 1050a unattend auto-install, please use file UOS/Server/20/1050a/ks.cfg.
 16. For UnionTech OS Server 20 1050e unattend auto-install, please use file UOS/Server/20/1050e/ks.cfg.
 17. For Fedora Server 36 or later unattend auto-install, please use file Fedora/36/Server/ks.cfg.
+18. For FreeBSD 13 or later unattend auto-install, please use file FreeBSD/installerconfig
 
 # Notes
 ## For Windows
