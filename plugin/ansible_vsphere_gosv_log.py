@@ -1092,12 +1092,13 @@ class CallbackModule(CallbackBase):
             self.not_completed_testcases.pop(0)
 
         # Move to new started playbook
+        self._last_test_id = None
         self._play_name = play.get_name()
         self._play_path = self._get_play_path(play)
         self._load_testing_vars(play)
 
         test_index = len(self.test_runs) - len(self.not_completed_testcases)
-        # print("Current test index is: {}, play name: {}".format(test_index, self._play_name))
+        # print("DEBUG: Current test index is: {}, play name: {}".format(test_index, self._play_name))
         # Start new test case
         if (test_index < len(self.test_runs) and
             self.not_completed_testcases[0] == self._play_name):
@@ -1107,8 +1108,12 @@ class CallbackModule(CallbackBase):
 
             if self._last_test_id in self.test_runs:
                 self.test_runs[self._last_test_id].start()
+            else:
+                self._last_test_id = None
 
-        if self._play_name:
+        if self._last_test_id:
+            msg = self._banner("PLAY [{}]".format(self._last_test_id))
+        elif self._play_name:
             msg = self._banner("PLAY [{}]".format(self._play_name))
         else:
             msg = self._banner("PLAY")
