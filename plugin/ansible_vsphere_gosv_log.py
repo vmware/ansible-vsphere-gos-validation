@@ -394,6 +394,7 @@ class CallbackModule(CallbackBase):
         self.hosts = []
         self.play = None
         self.log_msg = ''
+        self.testcases_count = 0
         self.test_runs = OrderedDict()
         self.not_completed_testcases = []
 
@@ -663,9 +664,10 @@ class CallbackModule(CallbackBase):
 
         with open(testcase_file_path, 'r') as fd:
             playbooks = yaml.load(fd, Loader=yaml.Loader)
+            self.testcases_count = len(playbooks)
             for index, playbook in enumerate(playbooks):
                 test_name = os.path.basename(playbook['import_playbook']).replace('.yml', '')
-                test_id = "{}_{}".format((index+1), test_name)
+                test_id = "{}_{}".format(str(index+1).rjust(len(str(self.testcases_count)), '0'), test_name)
                 print("Get test id: {}".format(test_id))
                 self.test_runs[test_id] = TestRun(test_id, test_name)
                 self.not_completed_testcases.append(test_name)
@@ -1100,7 +1102,9 @@ class CallbackModule(CallbackBase):
         if (test_index < len(self.test_runs) and
             self.not_completed_testcases[0] == self._play_name):
             # Start new test case
-            self._last_test_id = "{}_{}".format((test_index+1), self._play_name)
+            self._last_test_id = "{}_{}".format(str(test_index+1).rjust(len(str(self.testcases_count)), '0'),
+                                                self._play_name)
+
             if self._last_test_id in self.test_runs:
                 self.test_runs[self._last_test_id].start()
 
