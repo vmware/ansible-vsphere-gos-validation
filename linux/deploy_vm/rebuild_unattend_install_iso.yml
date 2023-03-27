@@ -90,7 +90,10 @@
                 dest_file: "/preseed/ubuntu.seed"
               - src_file: "{{ src_iso_file_dir }}/isolinux.cfg"
                 dest_file: "/isolinux/isolinux.cfg"
-      when: not result_extract_file.failed
+      when: 
+        - result_extract_file is defined
+        - result_extract_file.failed is defined
+        - not result_extract_file.failed
 
     - name: "Customize the ISO without isolinux/isolinux.cfg"
       community.general.iso_customize:
@@ -101,7 +104,10 @@
             dest_file: "/boot/grub/grub.cfg"
           - src_file: "{{ new_unattend_install_conf }}"
             dest_file: "/preseed/ubuntu.seed"
-      when: result_extract_file.failed
+      when: 
+        - result_extract_file is defined
+        - result_extract_file.failed is defined
+        - result_extract_file.failed
   when: unattend_install_conf is match('Ubuntu/Desktop')
 
 - name: "Rebuild ISO for Photon"
