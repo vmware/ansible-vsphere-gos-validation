@@ -50,7 +50,7 @@
         replace: "file=/cdrom/preseed/ubuntu.seed boot=casper debug-ubiquity automatic-ubiquity quiet splash noprompt --- console=ttyS0,115200n8"
 
     - name: "Print the content of modified file grub.cfg"
-      debug:
+      ansible.builtin.debug:
         msg: "{{ lookup('file', src_iso_file_dir + '/grub.cfg') }}"
 
     - name: "Extract isolinux/isolinux.cfg inside ISO for old releases"
@@ -76,8 +76,20 @@
                 append  file=/cdrom/preseed/ubuntu.seed boot=casper debug-ubiquity automatic-ubiquity initrd=/casper/initrd quiet splash noprompt --- console=ttyS0,115200n8
 
         - name: "Print the content of modified file isolinux.cfg"
-          debug:
+          ansible.builtin.debug:
             msg: "{{ lookup('file', src_iso_file_dir + '/isolinux.cfg') }}"
+
+        - name: "Customize the ISO with isolinux/isolinux.cfg"
+          community.general.iso_customize:
+            src_iso: "{{ src_iso_file_path }}"
+            dest_iso: "{{ rebuilt_unattend_iso_path }}"
+            add_files:
+              - src_file: "{{ src_iso_file_dir }}/grub.cfg"
+                dest_file: "/boot/grub/grub.cfg"
+              - src_file: "{{ new_unattend_install_conf }}"
+                dest_file: "/preseed/ubuntu.seed"
+              - src_file: "{{ src_iso_file_dir }}/isolinux.cfg"
+                dest_file: "/isolinux/isolinux.cfg"
       when: not result_extract_file.failed
 
     - name: "Customize the ISO without isolinux/isolinux.cfg"
@@ -90,19 +102,6 @@
           - src_file: "{{ new_unattend_install_conf }}"
             dest_file: "/preseed/ubuntu.seed"
       when: result_extract_file.failed
-
-    - name: "Customize the ISO with isolinux/isolinux.cfg"
-      community.general.iso_customize:
-        src_iso: "{{ src_iso_file_path }}"
-        dest_iso: "{{ rebuilt_unattend_iso_path }}"
-        add_files:
-          - src_file: "{{ src_iso_file_dir }}/grub.cfg"
-            dest_file: "/boot/grub/grub.cfg"
-          - src_file: "{{ new_unattend_install_conf }}"
-            dest_file: "/preseed/ubuntu.seed"
-          - src_file: "{{ src_iso_file_dir }}/isolinux.cfg"
-            dest_file: "/isolinux/isolinux.cfg"
-      when: not result_extract_file.failed
   when: unattend_install_conf is match('Ubuntu/Desktop')
 
 - name: "Rebuild ISO for Photon"
