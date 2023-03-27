@@ -689,16 +689,16 @@ class CallbackModule(CallbackBase):
         """
         Print test results in a table as below
 
-        Test Results (Total: 3, Failed: 1, No Run: 1, Elapsed Time: 00:18:42):
-        +--------------------------------------------------+
-        | ID | Name                 |   Status | Exec Time |
-        +--------------------------------------------------+
-        |  1 | deploy_vm            | * No Run | 00:00:01  |
-        +--------------------------------------------------+
-        |  2 | vgauth_check_service |   Passed | 00:03:02  |
-        +--------------------------------------------------+
-        |  3 | gosc_cloudinit_dhcp  | * Failed | 00:12:58  |
-        +--------------------------------------------------+
+        Test Results (Total: 30, Passed: 27, Skipped: 3, Elapsed Time: 02:22:32)
+        +-------------------------------------------------------------------------+
+        | ID | Name                                 |   Status        | Exec Time |
+        +-------------------------------------------------------------------------+
+        | 01 | deploy_vm_efi_paravirtual_vmxnet3    |   Passed        | 00:22:03  |
+        | 02 | check_inbox_driver                   |   Passed        | 00:01:17  |
+        | 03 | ovt_verify_install                   |   Passed        | 00:26:03  |
+        | .. | ...                                  |   ...            | ...       |
+        | 30 | ovt_verify_uninstall                 |   Passed        | 00:02:09  |
+        +-------------------------------------------------------------------------+
         """
         total_exec_time = ""
         total_count = len(self.test_runs)
@@ -713,6 +713,18 @@ class CallbackModule(CallbackBase):
             self.logger.info(msg)
             self._display.display(msg, color=C.COLOR_VERBOSE)
             return
+
+        # Block test cases when deploy_vm failed
+        deploy_vm_failed = False
+        for test_id in self.test_runs:
+            if 'deploy_vm' in self.test_runs[test_id].name:
+                deploy_vm_failed = (self.test_runs[test_id].status == 'Failed')
+                continue
+
+            # For test cases after deploy_vm, set their status to 'Blocked'
+            if deploy_vm_failed:
+                self.test_runs[test_id].status = 'Blocked'
+
 
         # Get the column width
         idx_col_width = max([len(str(total_count)), 2])
@@ -745,7 +757,7 @@ class CallbackModule(CallbackBase):
             test_idx += 1
             test_exec_time = time.strftime('%H:%M:%S', time.gmtime(test_result.duration))
             if test_result.status == 'Passed':
-                msg += row_format.format(str(test_idx).rjust(idx_col_width, '0'),
+                msg += row_format.format(str(test_idx).rjust(min([idx_col_width, len(str(total_count))]), '0'),
                                          test_result.name.ljust(name_col_width),
                                          (status_mark + test_result.status).ljust(status_col_width),
                                          test_exec_time)
@@ -880,7 +892,8 @@ class CallbackModule(CallbackBase):
         task_args = task.args
         task_file = os.path.basename(task.get_path()).split(':')[0].strip()
         if ((task_file in ["create_local_log_path.yml",
-                            "vcenter_get_version_build.yml",
+                           "set_current_testcase_facts.yml",
+                           "vcenter_get_version_build.yml",
                            "esxi_get_version_build.yml",
                            "esxi_get_model.yml",
                            "vm_get_vm_info.yml",
@@ -900,12 +913,11 @@ class CallbackModule(CallbackBase):
                 non_empty_facts = dict(filter(lambda item: item[1],
                                               ansible_facts.items()))
                 self._ansible_gosv_facts.update(non_empty_facts)
-                if ("deploy_vm_from" in task_file and
-                    "deploy_casename" in non_empty_facts and
+                if ("current_testcase_name" in non_empty_facts and
                     self._last_test_id and
                     self._last_test_id in self.test_runs):
                     # Update deploy_vm test case name
-                    self.test_runs[self._last_test_id].name = non_empty_facts['deploy_casename']
+                    self.test_runs[self._last_test_id].name = non_empty_facts['current_testcase_name']
                 elif task_file == "vm_get_guest_info.yml":
                     # Save guest info
                     vm_guest_info = VmGuestInfo(self._ansible_gosv_facts)
