@@ -1,0 +1,30 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Set current test case index, name and log folder
+# Parameters:
+#   create_test_log_folder: True to create log folder for current test case.
+#   test_log_folder_mode: The mode of log folder for current test case. Default is 0755.
+#
+# Supposing there are N test cases,
+# if N < 10, test cases will be 1 ~ N
+# if N >= 10, test cases will be 01 ~ N
+# so that test cases log folders are sorted
+- name: "Set current test case index and name"
+  ansible.builtin.set_fact:
+    current_testcase_index: "{{ '{:<}'.format(((current_testcase_index | default(0) | int + 1) | string).
+                                              rjust(gosv_testcases_count | string | length, '0')) }}"
+    current_testcase_name: "{{ ansible_play_name }}"
+
+- name: "Set the log folder path for current test case on local machine"
+  ansible.builtin.set_fact:
+    current_test_log_folder: "{{ testrun_log_path }}/{{ current_testcase_index }}_{{ ansible_play_name }}"
+
+- name: "Create log folder for current test case"
+  include_tasks: create_directory.yml
+  vars:
+    dir_path: "{{ current_test_log_folder }}"
+    dir_mode: "{{ test_log_folder_mode | default('0755') }}"
+  when:
+    - create_test_log_folder is defined
+    - create_test_log_folder | bool

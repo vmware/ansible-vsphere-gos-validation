@@ -9,23 +9,17 @@
   vars_files:
     - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
+    - name: "Set current test case index, name and log folder"
+      include_tasks: ../../common/set_current_testcase_facts.yml
+      vars:
+        create_test_log_folder: "{{ new_vm is defined and new_vm | bool }}"
+
     - name: "Skip test case"
       include_tasks: ../../common/skip_test_case.yml
       vars:
         skip_msg: "Skip test case due to new_vm is set to '{{ new_vm | default(false) }}'"
         skip_reason: "Skipped"
       when: new_vm is undefined or (not new_vm | bool)
-
-    - name: "Set current test case log path on local machine"
-      ansible.builtin.set_fact:
-        current_test_log_folder: "{{ testrun_log_path }}/{{ ansible_play_name }}"
-
-    - name: "Create the current test case log folder with mode '0755'"
-      ansible.builtin.file:
-        path: "{{ current_test_log_folder }}"
-        state: directory
-        mode: '0755'
-      register: create_log_path
 
     # Change vm_username to root if it is not. And add a new user after VM deployment
     - name: "Set user account for new VM"

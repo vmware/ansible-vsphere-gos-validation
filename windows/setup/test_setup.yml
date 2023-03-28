@@ -5,37 +5,38 @@
 # if base snapshot exists, revert to the base snapshot when it exists.
 # If base snapshot does not exist, then take a snapshot of VM as the base snapshot.
 #
-- name: "Set current test case name and log path on local machine"
-  ansible.builtin.set_fact:
-    current_testcase_name: "{{ ansible_play_name }}"
-    current_test_log_folder: "{{ testrun_log_path }}/{{ ansible_play_name }}"
-
-- name: "Create current test case log folder when required"
-  include_tasks: ../../common/create_directory.yml
+- name: "Set current test case index, name and log folder"
+  include_tasks: ../../common/set_current_testcase_facts.yml
   vars:
-    dir_path: "{{ current_test_log_folder }}"
-    dir_mode: "0777"
-  when: create_current_test_folder is defined and create_current_test_folder
+    create_test_log_folder: "{{ create_current_test_folder is defined and create_current_test_folder }}"
+    test_log_folder_mode: "0777"
 
-- include_tasks: base_snapshot_check_revert.yml
+- name: "Check base snapshot existence and/or revert to it"
+  include_tasks: base_snapshot_check_revert.yml
 
-- include_tasks: ../../common/vm_get_ip.yml
+- name: "Get VM guest IP"
+  include_tasks: ../../common/vm_get_ip.yml
   vars:
     vm_get_ip_timeout: 600
-- include_tasks: ../utils/win_check_winrm.yml
-- include_tasks: ../utils/add_windows_host.yml
+
+- name: "Check Windows winrm is connectable"
+  include_tasks: ../utils/win_check_winrm.yml
+
+- name: "Add Windows host to in-memory inventory"
+  include_tasks: ../utils/add_windows_host.yml
+
 - name: "Print VM guest IP address"
   ansible.builtin.debug: var=vm_guest_ip
 
-# Pause Windows Update
-- include_tasks: ../utils/win_pause_windows_update.yml
+- name: "Pause Windows Update"
+  include_tasks: ../utils/win_pause_windows_update.yml
   when: not base_snapshot_exists
 
-# Get VMware tools status
-- include_tasks: ../../common/vm_get_vmtools_status.yml
+- name: "Get VMware Tools status"
+  include_tasks: ../../common/vm_get_vmtools_status.yml
 
-# Skip test case run when VMware tools is required but not installed or not running
-- include_tasks: ../../common/skip_test_case.yml
+- name: "Block test case because VMware Toos is not installed or not running"
+  include_tasks: ../../common/skip_test_case.yml
   vars:
     skip_msg: "Test case '{{ current_testcase_name }}' is blocked because VMware tools installed: {{ vmtools_is_installed | default(false) }}, running: {{ vmtools_is_running | default(false) }}"
     skip_reason: "Blocked"
@@ -44,23 +45,24 @@
     - skip_test_no_vmtools
     - not (vmtools_is_running is defined and vmtools_is_running | bool)
 
-- include_tasks: ../utils/win_get_vmtools_version_build.yml
+- name: "Get VMware Tools version and build"
+  include_tasks: ../utils/win_get_vmtools_version_build.yml
   when:
     - vmtools_is_installed is defined
     - vmtools_is_installed | bool
     - vmtools_info_from_vmtoolsd is undefined or not vmtools_info_from_vmtoolsd
 
-# Get guest OS info if not defined
-- include_tasks: ../utils/get_windows_system_info.yml
+- name: "Get guest OS system info"
+  include_tasks: ../utils/get_windows_system_info.yml
   when: guest_os_system_info_retrieved is undefined or not guest_os_system_info_retrieved
 
-# Get VM guest info guest id, guest full name and guest detailed data
-- include_tasks: ../../common/vm_get_guest_info.yml
+- name: "Get VM guest info including guest id, full name, family and detailed data"
+  include_tasks: ../../common/vm_get_guest_info.yml
   when:
     - vmtools_is_running is defined
     - vmtools_is_running | bool
     - guestinfo_gathered is undefined or not guestinfo_gathered
 
-# Take base snapshot if not exist
-- include_tasks: create_base_snapshot.yml
+- name: "Take a base snapshot if it does not exist"
+  include_tasks: create_base_snapshot.yml
   when: not base_snapshot_exists
