@@ -668,7 +668,7 @@ class CallbackModule(CallbackBase):
             for index, playbook in enumerate(playbooks):
                 test_name = os.path.basename(playbook['import_playbook']).replace('.yml', '')
                 test_id = "{}_{}".format(str(index+1).rjust(len(str(self.testcases_count)), '0'), test_name)
-                print("Get test id: {}".format(test_id))
+                # print("DEBUG: Get test id: {}".format(test_id))
                 self.test_runs[test_id] = TestRun(test_id, test_name)
                 self.not_completed_testcases.append(test_name)
 
@@ -757,7 +757,11 @@ class CallbackModule(CallbackBase):
             test_idx += 1
             test_exec_time = time.strftime('%H:%M:%S', time.gmtime(test_result.duration))
             if test_result.status == 'Passed':
-                msg += row_format.format(str(test_idx).rjust(min([idx_col_width, len(str(total_count))]), '0'),
+                if len(str(total_count)) == 1:
+                    align_char = ' '
+                else:
+                    align_char = '0'
+                msg += row_format.format(str(test_idx).rjust(idx_col_width, align_char),
                                          test_result.name.ljust(name_col_width),
                                          (status_mark + test_result.status).ljust(status_col_width),
                                          test_exec_time)
@@ -910,7 +914,7 @@ class CallbackModule(CallbackBase):
                 str(task.action) == "ansible.builtin.set_fact"):
             ansible_facts = task_result.get('ansible_facts', None)
             if ansible_facts:
-                non_empty_facts = dict(filter(lambda item: item[1],
+                non_empty_facts = dict(filter(lambda item: item[1] != '',
                                               ansible_facts.items()))
                 self._ansible_gosv_facts.update(non_empty_facts)
                 if ("current_testcase_name" in non_empty_facts and
@@ -1168,6 +1172,10 @@ class CallbackModule(CallbackBase):
 
         # Dump guest info into a json file
         self._dump_guest_info()
+
+        # Debug about ansible facts
+        # print("DEBUG: retieved ansible facts\n{}".format(json.dumps(self._ansible_gosv_facts,
+        #                                                            indent=4)))
 
         # Print test summary when there is test run
         if len(self.test_runs) > 0:
