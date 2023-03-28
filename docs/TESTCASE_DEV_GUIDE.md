@@ -19,17 +19,13 @@
 - Set the playbook 'name' to the same name as the playbook file or test case name.
 2. hosts
 - Set the playbook 'hosts' to "localhost", as tasks executed on local machine, when there are tasks need to be executed on remote VM or ESXi server, use "delegate_to" keyword on the task.
-3. vars_files
-- Set the playbook 'vars_files' to the relative path to the configuration file "vars/test.yml", and/or other required variables file.
-4. tasks
+3. tasks
 - This part contains "block" and "rescue" sections, write all the tasks of test case execution and validation in "block" part, "rescue" part includes a common task "common/test_rescue.yml". It means any task fails in "block" part, the testing will jump to the "rescue" part to execute failure/error handling tasks.
 
 Below is an example of test case playbook:
 ```
 - name: new_test_case
   hosts: localhost
-  vars_files:
-    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
     - name: "Test case block"
       block:
