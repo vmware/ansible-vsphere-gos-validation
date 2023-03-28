@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Set current test case index, name and log folder
-# Paramers:
+# Parameters:
 #   create_test_log_folder: True to create log folder for current test case.
 #   test_log_folder_mode: The mode of log folder for current test case. Default is 0755.
 #
@@ -10,32 +10,21 @@
 # if N < 10, test cases will be 1 ~ N
 # if N >= 10, test cases will be 01 ~ N
 # so that test cases log folders are sorted
-- name: "Set current test case index"
+- name: "Set current test case index and name"
   ansible.builtin.set_fact:
     current_testcase_index: "{{ '{:<}'.format(((current_testcase_index | default(0) | int + 1) | string).
                                               rjust(gosv_testcases_count | string | length, '0')) }}"
-
-- name: "Set current test case name"
-  ansible.builtin.set_fact:
     current_testcase_name: "{{ ansible_play_name }}"
-  when: current_testcase_name is undefined or not current_testcase_name
 
 - name: "Set the log folder path for current test case on local machine"
   ansible.builtin.set_fact:
     current_test_log_folder: "{{ testrun_log_path }}/{{ current_testcase_index }}_{{ ansible_play_name }}"
 
 - name: "Create log folder for current test case"
-  block:
-    - name: "Create log folder for current test case with mode {{ test_log_folder_mode | default('0755') }}"
-      ansible.builtin.file:
-        path: "{{ current_test_log_folder }}"
-        state: directory
-        mode: "{{ test_log_folder_mode | default('0755') }}"
-      register: create_log_path
-
-    - name: "Display the result of creating log folder for current test case"
-      ansible.builtin.debug: var=create_log_path
-      when: enable_debug is defined and enable_debug
+  include_tasks: create_directory.yml
+  vars:
+    dir_path: "{{ current_test_log_folder }}"
+    dir_mode: "{{ test_log_folder_mode | default('0755') }}"
   when:
     - create_test_log_folder is defined
     - create_test_log_folder | bool
