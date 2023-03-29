@@ -749,6 +749,12 @@ class CallbackModule(CallbackBase):
                                  "Exec Time")
         msg += row_border
 
+        # Set align character for test case index
+        if len(str(total_count)) == 1:
+            align_char = ' '
+        else:
+            align_char = '0'
+
         # Table rows
         status_stats = OrderedDict([('Passed', 0), ('Failed', 0), ('Blocked', 0), ('Skipped', 0), ('No Run', 0)])
         test_idx = 0
@@ -757,17 +763,13 @@ class CallbackModule(CallbackBase):
             test_idx += 1
             test_exec_time = time.strftime('%H:%M:%S', time.gmtime(test_result.duration))
             if test_result.status == 'Passed':
-                if len(str(total_count)) == 1:
-                    align_char = ' '
-                else:
-                    align_char = '0'
                 msg += row_format.format(str(test_idx).rjust(idx_col_width, align_char),
                                          test_result.name.ljust(name_col_width),
                                          (status_mark + test_result.status).ljust(status_col_width),
                                          test_exec_time)
                 status_stats[test_result.status] += 1
             else:
-                msg += row_format.format(str(test_idx).rjust(idx_col_width, '0'),
+                msg += row_format.format(str(test_idx).rjust(idx_col_width, align_char),
                                          test_result.name.ljust(name_col_width),
                                          ("* " + test_result.status).ljust(status_col_width),
                                          test_exec_time)
