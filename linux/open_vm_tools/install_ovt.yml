@@ -5,31 +5,33 @@
 # Parameters
 #   ovt_packages: open-vm-tools package names
 
-# Update online repo for CentOS archived version and stream version
-- include_tasks: ../utils/add_official_online_repo.yml
-  when: guest_os_ansible_distribution == 'CentOS'
+- name: "Add online package repositories for {{ guest_os_ansible_distribution }}"
+  include_tasks: ../utils/add_official_online_repo.yml
+  when: guest_os_ansible_distribution in ['CentOS', 'VMware Photon OS']
 
-- block:
-    # Add a local repo from ISO image for RHEL/SLES/SLED
-    - include_tasks: ../utils/add_local_dvd_repo.yml
+- name: "Add package repositories for {{ guest_os_ansible_distribution }}"
+  block:
+    - name: "Add a local package repository from ISO image for {{ guest_os_ansible_distribution }}"
+      include_tasks: ../utils/add_local_dvd_repo.yml
       when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat']
 
-    # Add online repo for OracleLinux, Ubuntu, Debian and Photon
-    - include_tasks: ../utils/add_official_online_repo.yml
-      when: guest_os_ansible_distribution in ['OracleLinux', 'Ubuntu', 'Debian', 'VMware Photon OS']
+    - name: "Add online package repositories for {{ guest_os_ansible_distribution }}"
+      include_tasks: ../utils/add_official_online_repo.yml
+      when: guest_os_ansible_distribution in ['OracleLinux', 'Ubuntu', 'Debian']
   when: linux_ovt_repo_url is undefined or not linux_ovt_repo_url
 
-- include_tasks: ../utils/add_extra_online_repo.yml
+- name: "Add an extra open-vm-tools repository from URL"
+  include_tasks: ../utils/add_extra_online_repo.yml
   vars:
     extra_repo_name: "open-vm-tools-repo"
     extra_repo_baseurl: "{{ linux_ovt_repo_url }}"
   when: linux_ovt_repo_url is defined and linux_ovt_repo_url
 
-# Get OS commands to install open-vm-tools
-- include_tasks: get_install_uninstall_cmd.yml
+- name: "Get OS commands to install open-vm-tools"
+  include_tasks: get_install_uninstall_cmd.yml
 
-# Update package metadata
-- include_tasks: ../utils/repo_update.yml
+- name: "Update package metadata"
+  include_tasks: ../utils/repo_update.yml
 
 # Install open-vm-tools packages
 - name: "Install packages {{ ovt_packages }}"
@@ -52,14 +54,14 @@
       - ovt_install_result.rc | int == 0
     fail_msg: "Failed to install open-vm-tools by executing command: {{ ' '.join(ovt_install_result.cmd) }}."
 
-# Eject CDROM /dev/sr0 from guest
-- include_tasks: ../utils/eject_cdrom_in_guest.yml
+- name: "Eject CDROM device from guest OS"
+  include_tasks: ../utils/eject_cdrom_in_guest.yml
   when:
     - linux_ovt_repo_url is undefined or not linux_ovt_repo_url
     - guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat']
 
-# Reboot and Wait for tools running
-- include_tasks: ../utils/reboot.yml
+- name: "Reboot guest OS"
+  include_tasks: ../utils/reboot.yml
 
-# Get VMware Tools version and build
-- include_tasks: ../utils/get_guest_ovt_version_build.yml
+- name: "Get VMware Tools version and build"
+  include_tasks: ../utils/get_guest_ovt_version_build.yml
