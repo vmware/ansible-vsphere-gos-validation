@@ -50,7 +50,6 @@
 * vm_remove_network_adapter.yml: Remove network adapter from VM
 * vm_configure_network_adapter.yml: Reconfig VM network adapter connection settings
 * vm_wait_network_connected.yml: Wait for network adapter to be connected
-* vm_test_nic.yml: Check if given network adapter is connectable through ssh
 * vm_get_network_facts.yml: Get VM network adapters info
 * vm_get_netadapter_number.yml: Get VM network adapters number with different types
 
@@ -82,7 +81,6 @@
 ### Tasks for getting VM IP
 * vm_get_ip.yml: Get VM IP address by calling vm_get_ip_from_vmtools.yml
 * vm_get_ip_from_vmtools.yml: Get VM IP address from VMware Tools guestinfo
-* vm_get_primary_nic.yml: Get VM connectable network adapter MAC/IP address
 * vm_get_ip_from_notools.yml: Get VM IP address when there is no VMware Tools installed
 * vm_get_world_id.yml: Get VM world ID on ESXi host
 * vm_get_ip_esxcli.yml: Get VM IP address on ESXi host by esxcli command

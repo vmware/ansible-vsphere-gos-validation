@@ -2,30 +2,42 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Get VM IP Address using esxcli command or from VMware Tools guestinfo
-- name: Initialize VM guest IP address variable
+# Parameter:
+#   vm_primary_nic_mac: The VM's primary network adapter MAC address must be set
+# Return:
+#   vm_guest_ip: The VM's guest IPv4 address
+#
+- name: "Check vm_primary_nic_mac is set"
+  ansible.builtin.assert:
+    that:
+      - vm_primary_nic_mac is defined
+      - vm_primary_nic_mac
+    fail_msg: "Parameter 'vm_primary_nic_mac' must be set for getting VM's guest IPv4 address."
+
+- name: "Initialize VM guest IP address variable"
   ansible.builtin.set_fact:
     vm_guest_ip: ""
 
-# Get VM power status
-- include_tasks: vm_get_power_state.yml
+- name: "Get VM power status"
+  include_tasks: vm_get_power_state.yml
 
-# Power on VM when VM power status is not poweredOn
-- include_tasks: vm_set_power_state.yml
+- name: "Power on VM"
+  include_tasks: vm_set_power_state.yml
   vars:
     vm_power_state_set: 'powered-on'
   when: vm_power_state_get != "poweredOn"
 
-# Get VMware tools status
-- include_tasks: vm_get_vmtools_status.yml
+- name: "Get VMware Tools status"
+  include_tasks: vm_get_vmtools_status.yml
 
-# Get VM IP address when VMware tools is installed
-- include_tasks: vm_get_ip_from_vmtools.yml
+- name: "Get VM IP address when VMware Tools is running"
+  include_tasks: vm_get_ip_from_vmtools.yml
   when:
     - vmtools_is_running is defined
     - vmtools_is_running | bool
 
-# Get VM IP address when VMware tools not installed or not get from VMware tools
-- include_tasks: vm_get_ip_from_notools.yml
+- name: "Get VM IP address when VMware Tools is not installed or not running"
+  include_tasks: vm_get_ip_from_notools.yml
   when: >
     (vmtools_is_installed is undefined) or
     (not vmtools_is_installed | bool) or

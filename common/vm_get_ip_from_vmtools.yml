@@ -8,11 +8,6 @@
     vm_guest_all_ip: []
     vm_guest_mac_ipv4: {}
 
-- name: "Initialize VM's primary MAC address"
-  ansible.builtin.set_fact:
-    vm_primary_mac: ""
-  when: vm_primary_mac is undefined
-
 - name: "Wait for VM's guest IP address"
   include_tasks: vm_wait_guest_ip.yml
 
@@ -38,17 +33,12 @@
     - item.ipAddress | ansible.utils.ipv4 | length == 1
   with_items: "{{ vm_guest_net }}"
 
-# Get VM primary NIC
-- name: "Get VM primary network adapter by testing connection"
-  include_tasks: vm_get_primary_nic.yml
-
-# If VM only has 1 IP, vm_primary_ip should be equal to vm_guest_ip
-# If VM has more than 1 IP, the IP in guest info might not be able to connected,
-# then we need to update it with vm_primary_ip because vm_primary_ip is the connectable IP.
-- name: "Set fact of VM guest IP with primary IP"
+- name: "Set fact of VM guest IPv4 address with primary network adapter's IPv4 address"
   ansible.builtin.set_fact:
-    vm_guest_ip: "{{ vm_primary_ip }}"
-  when: vm_guest_ip != vm_primary_ip
+    vm_guest_ip: "{{ vm_guest_mac_ipv4[vm_primary_nic_mac] }}"
+  when:
+    - vm_guest_mac_ipv4[vm_primary_nic_mac] is defined
+    - vm_guest_mac_ipv4[vm_primary_nic_mac]
 
 - name: "Display VM's guest IP addresses retrieved by VMware Tools"
   ansible.builtin.debug:
