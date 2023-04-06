@@ -14,6 +14,10 @@
   vars:
     win_check_file_exist_file: "{{ win_get_folder_src_path }}"
 
+- name: "Set the result of file existing"
+  ansible.builtin.set_fact:
+    win_file_exist: "{{ win_check_file_exist_result }}"
+
 - block:
     - include_tasks: win_get_sub_files_folders.yml
       vars:
@@ -30,8 +34,8 @@
     - ansible.builtin.debug:
         msg: "Specified folder '{{ win_get_folder_src_path }}' is empty: {{ win_get_files_folders_list }}"
       when: win_get_files_folders_list | length | int == 0
-  when: win_check_file_exist_result
+  when: win_file_exist
 
 - ansible.builtin.debug:
     msg: "Folder not exist in guest OS: {{ win_get_folder_src_path }}, skip getting files"
-  when: not win_check_file_exist_result
+  when: not win_file_exist
