@@ -74,7 +74,7 @@ This project supports below scenarios for end-to-end guest operating system vali
 | AlmaLinux 8.x, 9.x                              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise 15 SP3 and later          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise 12 SP5, 15 SP0/SP1/SP2    |                                  |                          | :heavy_check_mark:                 |
-| VMware Photon OS 3.x, 4.x, 5.x                  | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
+| VMware Photon OS 3.0, 4.0, 5.0                  | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Ubuntu 18.04 and later live-server              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Ubuntu 20.04 and later cloud image              |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Ubuntu 18.04 desktop                            |                                  |                          | :heavy_check_mark:                 |
