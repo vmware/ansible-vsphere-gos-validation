@@ -1,0 +1,53 @@
+#cloud-config
+autoinstall:
+  version: 1
+  early-commands:
+    - echo '{{ autoinstall_start_msg }}' >/dev/ttyS0
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  user-data:
+    package_update: false
+    package_upgrade: false
+    disable_root: false
+    ssh_pwauth: yes
+    chpasswd:
+      list: |
+        root:{{ vm_password_hash }}
+      expire: false
+    runcmd:
+      - echo '{{ autoinstall_complete_msg }}' >/dev/ttyS0
+{% if new_user is defined and new_user != 'root' %}
+    users:
+      - name: {{ new_user }}
+        passwd: {{ vm_password_hash }}
+        sudo: ALL=(ALL) NOPASSWD:ALL
+        ssh_authorized_keys:
+          - {{ ssh_public_key }}
+{% endif %}
+  ssh:
+    install-server: true
+    allow-pw: yes
+    authorized-keys:
+      - {{ ssh_public_key }}
+  storage:
+    layout:
+      name: lvm
+  identity:
+    hostname: ubuntu
+    username: {{ vm_username }}
+    password: {{ vm_password_hash }}
+  apt:
+    preserve_sources_list: false
+    geoip: true
+  packages:
+    - sg3-utils
+    - ndctl
+    - rdma-core
+    - rdmacm-utils
+    - ibverbs-utils
+  late-commands:
+    - rm -f /etc/cloud/cloud.cfg.d/*-installer.cfg 2>/dev/null
+    - echo 'Acquire::ForceIPv4 "true";' >>/etc/apt/apt.conf.d/99force-ipv4
+    - sed -i 's/^#PermitRootLogin .*/PermitRootLogin yes/' /target/etc/ssh/sshd_config
+    - sed -i 's/^#PasswordAuthentication .*/PasswordAuthentication yes/' /target/etc/ssh/sshd_config

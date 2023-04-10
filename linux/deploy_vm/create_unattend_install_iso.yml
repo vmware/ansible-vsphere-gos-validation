@@ -9,7 +9,7 @@
     msg:
       - "The unattend install config file is {{ unattend_install_template }}"
 
-# unattend_install_conf is not for Ubuntu Server
+# unattend_install_conf is not for Ubuntu Server, Ubuntu Desktop 23.04 and later
 - block:
     - name: "Create temp folder for generating unattend install ISO file"
       include_tasks: ../../common/create_temp_file_dir.yml
@@ -75,9 +75,11 @@
         unattend_install_conf is match('Debian') or
         unattend_install_conf is match('Ubuntu/Desktop/') or
         unattend_install_conf is match('FreeBSD')
-  when: unattend_install_conf is not match('Ubuntu/Server/')
+  when:
+    - unattend_install_conf is not match('Ubuntu/Server/')
+    - unattend_install_conf is not match('Ubuntu/Flutter/')
 
-# unattend_install_conf is for Ubuntu Server
+# unattend_install_conf is for Ubuntu Server / Ubuntu desktop 23.04 or later
 - block:
     - name: "Set fact for autoinstall start message to be printed to VM serial port"
       ansible.builtin.set_fact:
@@ -112,7 +114,9 @@
       ansible.builtin.set_fact:
         os_installation_iso_list: ["[{{ datastore }}] {{ new_os_installation_iso }}"]
         os_install_iso_list_len: 1
-  when: unattend_install_conf is match('Ubuntu/Server/')
+  when: >
+    unattend_install_conf is match('Ubuntu/Server/') or
+    unattend_install_conf is match('Ubuntu/Flutter/')
 
 - name: "Set fact of unattended install ISO path on datastore {{ datastore }}"
   ansible.builtin.set_fact:

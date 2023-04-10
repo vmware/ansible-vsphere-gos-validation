@@ -338,3 +338,43 @@
       - src_file: "{{ new_unattend_install_conf }}"
         dest_file: "/etc/installerconfig"
   when: unattend_install_conf is match('FreeBSD')
+
+- name: "Rebuild ISO for Ubuntu Desktop 23.04 and later"
+  block:
+    - name: Extract specific files inside ISO
+      community.general.iso_extract:
+        image: "{{ src_iso_file_path }}"
+        dest: "{{ src_iso_file_dir }}"
+        files:
+          - 'boot/grub/grub.cfg'
+          - 'md5sum.txt'
+
+    - name: "Add autoinstall to boot kernel command"
+      ansible.builtin.replace:
+        path: "{{ unattend_iso_cache }}/grub.cfg"
+        regexp: '(.*vmlinuz)(\s+layerfs-path=)'
+        replace: "\\1 autoinstall \\2"
+
+    - name: "Set timeout to 5 seconds at boot menu"
+      ansible.builtin.replace:
+        path: "{{ unattend_iso_cache }}/grub.cfg"
+        regexp: 'set timeout=.*'
+        replace: "set timeout=5"
+
+    - name: "Update md5sum"
+      ansible.builtin.shell: |
+        md5=`md5sum grub.cfg | awk '{print $1}'`
+        sed -i "/.\/boot\/grub\/grub.cfg/ s/^[^ ]*/$md5/" md5sum.txt
+      args:
+        chdir: "{{ unattend_iso_cache }}"
+
+    - name: "Customize the ISO"
+      community.general.iso_customize:
+        src_iso: "{{ src_iso_file_path }}"
+        dest_iso: "{{ rebuilt_unattend_iso_path }}"
+        add_files:
+          - src_file: "{{ src_iso_file_dir }}/grub.cfg"
+            dest_file: "boot/grub/grub.cfg"
+          - src_file: "{{ src_iso_file_dir }}/md5sum.txt"
+            dest_file: "md5sum.txt"
+  when: unattend_install_conf is match('Ubuntu/Flutter')
