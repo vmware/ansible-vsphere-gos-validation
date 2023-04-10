@@ -82,6 +82,40 @@
             package_state: "present"
           when: guest_os_ansible_distribution != "VMware Photon OS"
 
+        # Need to install the latest cloud-init to Oracle Linux 8.7, 9.1 and pass the GOSC tests in Ansible
+        - name: "Update cloud-init GOSC in OracleLinux 8.7 & 9.1"
+          block:
+            - name: "Known issue - failure of cloud-init GOSC in Oracle Linux 8.7 and 9.1"
+              ansible.builtin.debug:
+                msg:
+                  - "Cloud-init guest customization would fail because cloud-init-local.service couldn't start when using cloud-init 22.1-5.0.1."
+                  - "The issue has been resolved in cloud-init 22.1-6.0.1. Here will upgrade cloud-init to latest version for resolution."
+                  - "Please refer to https://bugzilla.oracle.com/bugzilla/show_bug.cgi?id=18115 for details."
+              tags:
+                - known_issue
+
+            - name: "Uninstall current cloud-init"
+              include_tasks: ../utils/install_uninstall_package.yml
+              vars:
+                package_list: ["cloud-init"]
+                package_state: "absent"
+
+            - name: "Remove /etc/cloud dir before install the latest cloud-init"
+              ansible.builtin.shell: |
+                if [ -e "/etc/cloud" ] ; then
+                  rm -rf "/etc/cloud";
+                fi
+              delegate_to: "{{ vm_guest_ip }}"
+
+            - name: "Install latest cloud-init version"
+              include_tasks: ../utils/install_uninstall_package.yml
+              vars:
+                package_list: ["cloud-init"]
+                package_state: "latest"
+          when:
+            - guest_os_ansible_distribution == "OracleLinux"
+            - guest_os_ansible_distribution_ver in ['8.7', '9.1']
+
         # Check whether cloud-init version meets cloud-init GOSC requirements
         # Debian 10 and 11 cloud-init GOSC requires cloud-init 22.1 or later installed.
         # See https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1008039
