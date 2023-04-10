@@ -28,16 +28,19 @@
     unattend_install_conf: "Ubuntu/Server/user-data.j2"
   when: ubuntu_install_method is defined and ubuntu_install_method == "cloud-init"
 
-- name: "Set fact of Ubuntu desktop unattend install file"
+- name: "Set fact of Ubuntu desktop"
   block:
-    ansible.builtin.set_fact:
-      unattend_install_conf: "Ubuntu/Desktop/ubuntu.seed"
-    
+    - name: “Set autoinstall method for Ubuntu Desktop”
+      ansible.builtin.set_fact:
+        unattend_install_conf: "Ubuntu/Desktop/ubuntu.seed"
+
     - name: "Set fact of desktop unattend install file for Ubuntu 23.04 or later"
       block:
-        ansible.builtin.set_fact:
-          ubuntu_install_method: "cloud-init"
-        ansible.builtin.set_fact:
-          unattend_install_conf: "Ubuntu/Flutter/user-data.j2"
+        - name: “Set autoinstall method for Ubuntu Desktop 23.04 or later”
+          ansible.builtin.set_fact:
+            ubuntu_install_method: "cloud-init"
+        - name: "Set fact of unattend install file for Ubuntu 23.04 or later"
+          ansible.builtin.set_fact:
+            unattend_install_conf: "Ubuntu/Flutter/user-data.j2"
       when: ubuntu_version and ubuntu_version is version('23.04', '>=')
   when: ubuntu_edition == 'desktop'
