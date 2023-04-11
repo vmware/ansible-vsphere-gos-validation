@@ -6,34 +6,36 @@
     vm_vbs_enabled_before: false
     guest_vbs_enabled_before: false
 
-# Get VM VBS status before enable
-- include_tasks: ../../common/vm_get_vbs_status.yml
+- name: "Get VM VBS status before enable"
+  include_tasks: ../../common/vm_get_vbs_status.yml
 - name: "Set fact of VM VBS current status before enable"
   ansible.builtin.set_fact:
     vm_vbs_enabled_before: "{{ vm_vbs_enabled }}"
 
 - name: "VM VBS is not enabled"
   block:
-    # Shutdown guest OS before enabling VBS on VM
-    - include_tasks: ../utils/win_shutdown_restart.yml
+    - name: "Shutdown guest OS before enabling VBS on VM"
+      include_tasks: ../utils/win_shutdown_restart.yml
       vars:
         set_win_power_state: "shutdown"
-    # Enable VBS on VM
-    - include_tasks: ../utils/win_enable_vbs_vm.yml
+    - name: "Enable VBS on VM"
+      include_tasks: ../utils/win_enable_vbs_vm.yml
       vars:
         win_enable_vbs: true
-    - include_tasks: ../../common/vm_set_power_state.yml
+    - name: "Power on VM"
+      include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: "powered-on"
-    - include_tasks: ../utils/win_update_inventory.yml
-    # Check VM VBS status
-    - include_tasks: ../../common/vm_get_vbs_status.yml
+    - name: "Update in-memory inventory after VM power on"
+      include_tasks: ../utils/win_update_inventory.yml
+    - name: "Get VM VBS status"
+      include_tasks: ../../common/vm_get_vbs_status.yml
     - name: "Check VM VBS status after enable"
       ansible.builtin.assert:
         that:
           - vm_vbs_enabled is defined
           - vm_vbs_enabled | bool
-        fail_msg: "VM VBS status is not enabled after enabling it."
+        fail_msg: "VM VBS status is '{{ vm_vbs_enabled | default('') }}', not enabled after enabling it."
   when: not vm_vbs_enabled_before
 
 - name: "Get Device Guard available security properties in guest OS"
@@ -42,7 +44,7 @@
 - name: "Enable VBS and security services in guest OS"
   include_tasks: ../utils/win_enable_vbs_guest.yml
 
-- name: "Get running security services"
+- name: "Get VBS status and running security services"
   include_tasks: ../utils/win_get_vbs_guest.yml
 
 # AvailableSecurityProperties:
@@ -79,12 +81,15 @@
     (esxi_version is version('7.0.3', '==') and esxi_build | int >= 21424296)
 
 # SecurityServicesRunning:
-# 0. 	No services running.
-# 1. 	If present, Windows Defender Credential Guard is running.
-# 2. 	If present, HVCI is running.
-# 3. 	If present, System Guard Secure Launch is running.
-# 4. 	If present, SMM Firmware Measurement is running.
-# VirtualizationBasedSecurityStatus: 2 means VBS is enabled and running
+# 0.    No services running.
+# 1.    If present, Windows Defender Credential Guard is running.
+# 2.    If present, HVCI is running.
+# 3.    If present, System Guard Secure Launch is running.
+# 4.    If present, SMM Firmware Measurement is running.
+# VirtualizationBasedSecurityStatus:
+# 2 means VBS is enabled and running
+# 1 means VBS is enabled but not running
+# 0 means VBS is not enabled
 #
 - name: "Check VBS and running security service status"
   ansible.builtin.assert:
@@ -92,4 +97,4 @@
       - win_vbs_status_guest | int == 2
       - "'1' in win_vbs_running_service"
       - "'2' in win_vbs_running_service"
-    fail_msg: "VBS is not running '{{ win_vbs_status_guest }}', or HVCI/Credential Guard is not in the SecurityServicesRunning list: '{{ win_vbs_running_service }}'."
+    fail_msg: "VBS status is '{{ win_vbs_status_guest }}', not expected '2', or HVCI '2'/Credential Guard '1' is not in the SecurityServicesRunning list: '{{ win_vbs_running_service }}'."
