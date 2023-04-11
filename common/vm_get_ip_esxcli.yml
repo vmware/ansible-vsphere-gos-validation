@@ -16,12 +16,12 @@
       - vm_world_id
     fail_msg: "Can not get VM IP address by esxcli command if VM world ID is not defined or empty."
 
-- name: "Set facts of VM's MAC and IPv4 addresses and esxcli command to get them for VM '{{ vm_name }}'"
+- name: "Set facts for getting primary network adapter IPv4 address for VM '{{ vm_name }}'"
   ansible.builtin.set_fact:
     vm_guest_mac_ipv4: "{{ {vm_primary_nic_mac: ''} }}"
     esxcli_cmd: "esxcli network vm port list -w '{{ vm_world_id }}' | awk '/MAC Address|IP Address/ {key=$3; getline; print key \": \" $3;}' | grep '{{ vm_primary_nic_mac }}'"
 
-- name: "Wait for getting VM '{{ vm_name }}' IP address on ESXi '{{ esxi_hostname }}'"
+- name: "Wait for getting VM '{{ vm_name }}' primary IP address on ESXi '{{ esxi_hostname }}'"
   ansible.builtin.shell: "{{ esxcli_cmd }}"
   delegate_to: "{{ esxi_hostname }}"
   register: get_vm_ip_esxcli
@@ -36,7 +36,7 @@
   ignore_errors: true
   changed_when: false
 
-- name: "Set the fact of valid MAC address and IP address for VM '{{ vm_name }}'"
+- name: "Set the fact of primary MAC address and IP address for VM '{{ vm_name }}'"
   ansible.builtin.set_fact:
     vm_guest_mac_ipv4: "{{ get_vm_ip_esxcli.stdout | from_yaml }}"
   when:
@@ -44,6 +44,9 @@
     - get_vm_ip_esxcli.stdout
     - get_vm_ip_esxcli.stdout | from_yaml
     - (get_vm_ip_esxcli.stdout | from_yaml)[vm_primary_nic_mac] is defined
+
+- name: "Print the fact of primary MAC and IPv4 address for VM '{{ vm_name }}'"
+  ansible.builtin.debug: var=vm_guest_mac_ipv4
 
 - name: "Set fact of VM guest IP with primary IP for VM '{{ vm_name }}'"
   ansible.builtin.set_fact:
