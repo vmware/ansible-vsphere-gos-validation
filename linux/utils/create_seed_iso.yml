@@ -45,13 +45,15 @@
     path: "{{ meta_data_path }}"
     line: "local-hostname: {{ local_hostname }}"
 
-- name: "Dump cloud-init user data"
-  ansible.builtin.debug:
-    msg: "{{ lookup('file', user_data_path).split('\n') }}"
-
-- name: "Dump cloud-init meta data"
-  ansible.builtin.debug:
-    msg: "{{ lookup('file', meta_data_path).split('\n') }}"
+- name: "Collect cloud-init meta data and user data to log folder"
+  ansible.builtin.copy:
+    src: "{{ cloud_init_data }}"
+    dest: "{{ current_test_log_folder }}/{{ cloud_init_data | basename }}"
+  with_items:
+    - "{{ meta_data_path }}"
+    - "{{ user_data_path }}"
+  loop_control:
+    loop_var: cloud_init_data
 
 - name: "Create seed.iso as cloud-init local datasource"
   include_tasks: ../../common/create_iso.yml
