@@ -63,19 +63,19 @@
     - name: "Known issue - NX protections are not present in AvailableSecurityProperties on ESXi 7.0.3"
       ansible.builtin.debug:
         msg:
-          - "NX protections are not present in guest OS 'AvailableSecurityProperties' issue exists on ESXi 7.0.3 build {{ esxi_build }}, which is fixed in ESXi 7.0U3L patch build 21424296. Please refer to KB article: https://kb.vmware.com/s/article/91199."
+          - "The issue of 'NX protections are not present in guest OS AvailableSecurityProperties' exists on this ESXi 7.0.3 build '{{ esxi_build }}', which is fixed in ESXi 7.0U3l patch build 21424296. Please refer to KB article: https://kb.vmware.com/s/article/91199."
       tags:
         - known_issue
   when:
     - esxi_version is version('7.0.3', '==')
     - esxi_build | int < 21424296
-    - "['1', '2', '3', '4', '5', '6', '7'] | difference(win_dg_security_properties) == ['5']"
+    - range(1, 8) | difference(win_dg_security_properties) == [5]
 
 - name: "Check available security properties got in guest OS"
   ansible.builtin.assert:
     that:
-      - win_dg_security_properties | sort == ['1', '2', '3', '4', '5', '6', '7']
-    fail_msg: "Got available security properties in guest OS is: {{ win_dg_security_properties }}, which missing '{{ ['1', '2', '3', '4', '5', '6', '7'] | difference(win_dg_security_properties) }}' compared with the expected list."
+      - win_dg_security_properties | sort == range(1, 8)
+    fail_msg: "Available security properties list got in guest OS: {{ win_dg_security_properties }}, '{{ range(1, 8) | difference(win_dg_security_properties) }}' is missed compared with expected list '{{ range(1, 8) }}'."
   when: >
     (esxi_version is version('7.0.3', '>') or esxi_version is version('7.0.3', '<')) or
     (esxi_version is version('7.0.3', '==') and esxi_build | int >= 21424296)
@@ -97,4 +97,4 @@
       - win_vbs_status_guest | int == 2
       - "'1' in win_vbs_running_service"
       - "'2' in win_vbs_running_service"
-    fail_msg: "VBS status is '{{ win_vbs_status_guest }}', not expected '2', or HVCI '2'/Credential Guard '1' is not in the SecurityServicesRunning list: '{{ win_vbs_running_service }}'."
+    fail_msg: "VBS status is '{{ win_vbs_status_guest }}' not expected '2', or HVCI '2'/Credential Guard '1' is not in the SecurityServicesRunning list: '{{ win_vbs_running_service }}'."
