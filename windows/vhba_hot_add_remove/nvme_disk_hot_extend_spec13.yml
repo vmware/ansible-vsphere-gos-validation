@@ -9,17 +9,25 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
-        - include_tasks: ../../common/skip_test_case.yml
-          vars:
-            skip_msg: "Skip this test case due to ESXi version '{{ esxi_version }}' is not >= 7.0.2."
-            skip_reason: "Not Supported"
-          when: esxi_version is undefined or esxi_version is version('7.0.2', '<')
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
 
-        - include_tasks: vhba_test.yml
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >- 
+              The NVMe 1.3 Spec is supported from ESXi 7.0.2 hardware version 19. 
+              Skip this test case due to VM's hardware version is '{{ vm_hardware_version_num }}'.
+            skip_reason: "Not Supported"
+          when: vm_hardware_version_num is undefined or vm_hardware_version_num | int < 19
+
+        - name: "Start VHBA test"
+          include_tasks: vhba_test.yml
           vars:
             test_disk_controller_type: "nvme"
             test_purpose: "hot-extend"
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
