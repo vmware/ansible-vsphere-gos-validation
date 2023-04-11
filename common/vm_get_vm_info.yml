@@ -1,8 +1,8 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get VM's vmx file path
-- include_tasks: vm_get_config.yml
+- name: "Get VM's configs about VM paths, guest and hardware version"
+  include_tasks: vm_get_config.yml
   vars:
     property_list:
       - 'config.files.logDirectory'
@@ -11,7 +11,7 @@
       - 'config.guestFullName'
       - 'config.version'
 
-- name: Set fact of VM path related variables
+- name: "Set facts about VM's configs about VM paths, guest and hardware version"
   ansible.builtin.set_fact:
     vm_files_path: "{{ vm_config.config.files.logDirectory | replace('[', '/vmfs/volumes/') | replace('] ', '/') }}"
     vm_files_path_ds: "{{ vm_config.config.files.logDirectory }}"
@@ -22,8 +22,21 @@
     vm_guest_os_version: "{{ vm_config.config.guestFullName }}"
     vm_hardware_version: "{{ vm_config.config.version }}"
     vm_hardware_version_num: "{{ vm_config.config.version.split('-')[-1] }}"
+    vm_primary_nic_mac: ""
 
-- ansible.builtin.debug:
+- name: "Get VM's network adapter"
+  include_tasks: vm_get_network_facts.yml
+
+- name: "Set fact of VM's primary network adapter MAC address"
+  ansible.builtin.set_fact:
+    vm_primary_nic_mac: "{{ vm_network_adapters['0'].mac_addr }}"
+  when:
+    - vm_network_adapters is defined
+    - vm_network_adapters['0'] is defined
+    - vm_network_adapters['0'].mac_addr is defined
+
+- name: "Display VM's information"
+  ansible.builtin.debug:
     msg:
       - "VM datastore: {{ datastore }}"
       - "VM files path: {{ vm_files_path }}"
@@ -33,3 +46,4 @@
       - "VM guest ID: {{ vm_guest_id }}"
       - "VM hardware version: {{ vm_hardware_version }}"
       - "VM hardware version number: {{ vm_hardware_version_num }}"
+      - "VM primary network adapter MAC address: {{ vm_primary_nic_mac }}"

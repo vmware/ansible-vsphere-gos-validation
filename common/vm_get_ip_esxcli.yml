@@ -16,111 +16,41 @@
       - vm_world_id
     fail_msg: "Can not get VM IP address by esxcli command if VM world ID is not defined or empty."
 
-- name: "Initialize the fact for finding VM primary network adapter"
+- name: "Set facts for getting primary network adapter IPv4 address for VM '{{ vm_name }}'"
   ansible.builtin.set_fact:
-    find_primary_nic: false
+    vm_guest_mac_ipv4: "{{ {vm_primary_nic_mac: ''} }}"
+    esxcli_cmd: "esxcli network vm port list -w '{{ vm_world_id }}' | awk '/MAC Address|IP Address/ {key=$3; getline; print key \": \" $3;}' | grep '{{ vm_primary_nic_mac }}'"
 
-- block:
-    # Wait for network adapters ready after VM power-on/reset
-    - include_tasks: vm_wait_network_connected.yml
+- name: "Wait for getting VM '{{ vm_name }}' primary IP address on ESXi '{{ esxi_hostname }}'"
+  ansible.builtin.shell: "{{ esxcli_cmd }}"
+  delegate_to: "{{ esxi_hostname }}"
+  register: get_vm_ip_esxcli
+  until:
+    - get_vm_ip_esxcli.stdout is defined
+    - get_vm_ip_esxcli.stdout
+    - (get_vm_ip_esxcli.stdout | from_yaml)[vm_primary_nic_mac] is defined
+    - (get_vm_ip_esxcli.stdout | from_yaml)[vm_primary_nic_mac] != '0.0.0.0'
+    - (get_vm_ip_esxcli.stdout | from_yaml)[vm_primary_nic_mac] is not match('^169.254.')
+  retries: "{{ ((vm_get_ip_timeout | default(300) | int) / 5) | int }}"
+  delay: 5
+  ignore_errors: true
+  changed_when: false
 
-    - name: "Initialize the connected network adapter number for VM '{{ vm_name }}'"
-      ansible.builtin.set_fact:
-        vm_connected_nic_number: 0
+- name: "Set the fact of primary MAC address and IP address for VM '{{ vm_name }}'"
+  ansible.builtin.set_fact:
+    vm_guest_mac_ipv4: "{{ get_vm_ip_esxcli.stdout | from_yaml }}"
+  when:
+    - get_vm_ip_esxcli.stdout is defined
+    - get_vm_ip_esxcli.stdout
+    - get_vm_ip_esxcli.stdout | from_yaml
+    - (get_vm_ip_esxcli.stdout | from_yaml)[vm_primary_nic_mac] is defined
 
-    - include_tasks: vm_get_network_facts.yml
+- name: "Print the fact of primary MAC and IPv4 address for VM '{{ vm_name }}'"
+  ansible.builtin.debug: var=vm_guest_mac_ipv4
 
-    - name: "Get connected network adapter number form VM '{{ vm_name }}'"
-      ansible.builtin.set_fact:
-        vm_connected_nic_number: "{{ vm_network_adapters | dict2items | selectattr('value.connected', 'equalto', true) | length }}"
-
-    - name: "VM '{{ vm_name }}' has {{ vm_connected_nic_number }} network adapter(s) connected"
-      ansible.builtin.assert:
-        that:
-          - vm_connected_nic_number | int >= 1
-        fail_msg: "Not found connected network adapter on VM '{{ vm_name }}'"
-
-    - name: "VM '{{ vm_name }}' has more than one network adapter connected. Need to find the primary NIC."
-      ansible.builtin.set_fact:
-        find_primary_nic: true
-      when: vm_connected_nic_number | int > 1
-  when: (router_vm_name is undefined) or (vm_name != router_vm_name)
-
-# Deployed router VM can only get 1 valid IP even though it has 2 network adapteres
-- block:
-    - name: "Wait for getting VM '{{ vm_name }}' IP address on ESXi '{{ esxi_hostname }}'"
-      ansible.builtin.shell: esxcli network vm port list -w '{{ vm_world_id }}' | awk '/IP Address/ {print $3}' | sed '/0.0.0.0/d' | sed '/^169.254./d'
-      delegate_to: "{{ esxi_hostname }}"
-      register: get_vm_ip_esxcli
-      until:
-        - get_vm_ip_esxcli is defined
-        - get_vm_ip_esxcli.stdout is defined
-        - get_vm_ip_esxcli.stdout
-      retries: "{{ ((vm_get_ip_timeout | default(300) | int) / 5) | int }}"
-      delay: 5
-      failed_when: false
-      changed_when: false
-
-    - name: "Set fact of VM guest IP with primary IP"
-      ansible.builtin.set_fact:
-        vm_guest_ip: "{% for ip in get_vm_ip_esxcli.stdout_lines %}{% if ip %}{{ ip.strip('\"') }}{% endif %}{% endfor %}"
-  when: not find_primary_nic
-
-# Wait for target VM's all IP obtained
-- block:
-    - name: "Initialize VM's primary MAC address for VM '{{ vm_name }}'"
-      ansible.builtin.set_fact:
-        vm_primary_mac: ""
-      when: vm_primary_mac is undefined
-
-    - name: "Initialize esxcli command for VM '{{ vm_name }}'"
-      ansible.builtin.set_fact:
-        esxcli_cmd: "esxcli network vm port list -w '{{ vm_world_id }}' | awk '/MAC Address|IP Address/ {key=$3; getline; print key \",\" $3;}'"
-
-    # If vm_primary_mac has been found, we can only wait for the IP of the primary mac
-    - name: "Set esxcli command with filter of MAC address {{ vm_primary_mac }} for VM '{{ vm_name }}'"
-      ansible.builtin.set_fact:
-        esxcli_cmd: "esxcli network vm port list -w '{{ vm_world_id }}' | awk '/MAC Address|IP Address/ {key=$3; getline; print key \",\" $3;}' | grep '{{ vm_primary_mac }}'"
-      when:
-        - vm_primary_mac is defined
-        - vm_primary_mac
-
-    - name: "Wait for getting VM '{{ vm_name }}' IP address on ESXi '{{ esxi_hostname }}'"
-      ansible.builtin.shell: "{{ esxcli_cmd }}"
-      delegate_to: "{{ esxi_hostname }}"
-      register: get_vm_ip_esxcli
-      until:
-        - get_vm_ip_esxcli is defined
-        - get_vm_ip_esxcli.stdout is defined
-        - get_vm_ip_esxcli.stdout
-        - not "'0.0.0.0' in get_vm_ip_esxcli.stdout"
-        - not "',169.254.' in get_vm_ip_esxcli.stdout"
-      retries: "{{ ((vm_get_ip_timeout | default(300) | int) / 5) | int }}"
-      delay: 5
-      failed_when: false
-      changed_when: false
-
-    - name: "Set fact of the VM IP info from esxcli command"
-      ansible.builtin.set_fact:
-        vm_ip_esxcli: "{{ get_vm_ip_esxcli.stdout_lines }}"
-    - name: "Print VM IP address got from esxcli command"
-      ansible.builtin.debug: var=vm_ip_esxcli
-
-    - name: "Initialize the fact of VM network interfaces for VM '{{ vm_name }}'"
-      ansible.builtin.set_fact:
-        vm_guest_mac_ipv4: {}
-    - name: "Set the fact of valid MAC address and IP address for VM '{{ vm_name }}'"
-      ansible.builtin.set_fact:
-        vm_guest_mac_ipv4: "{{ vm_guest_mac_ipv4 |combine({item.split(',')[0]:item.split(',')[1]}) }}"
-      when: item.split(',') | length == 2 and item.split(',')[1] != '0.0.0.0'
-      with_items: "{{ vm_ip_esxcli }}"
-
-    - include_tasks: vm_get_primary_nic.yml
-
-    - name: "Set fact of VM guest IP with primary IP for VM '{{ vm_name }}'"
-      ansible.builtin.set_fact:
-        vm_guest_ip: "{{ vm_primary_ip }}"
-  when: find_primary_nic is defined and find_primary_nic
+- name: "Set fact of VM guest IP with primary IP for VM '{{ vm_name }}'"
+  ansible.builtin.set_fact:
+    vm_guest_ip: "{{ vm_guest_mac_ipv4[vm_primary_nic_mac] }}"
 
 - ansible.builtin.debug:
     msg: "Get VM '{{ vm_name }}' IP address using esxcli command: {{ vm_guest_ip }}"

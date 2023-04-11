@@ -52,6 +52,7 @@
             pvrdma_server_vm_gateway: "{{ vds_vmk_ip_addr }}"
             pvrdma_client_vm_name: "{{ vm_name }}_client_{{ timestamp }}"
             pvrdma_client_vm_ipv4: "{{ vds_vmk_ip_addr | ansible.utils.ipmath(2) }}"
+            pvrdma_client_vm_primary_nic_mac: ""
             pvrdma_client_vm_guest_ip: ""
 
         # Clone a new VM as client VM from current VM, and current VM as server
@@ -90,6 +91,17 @@
           ansible.builtin.set_fact:
             vm_name: "{{ pvrdma_client_vm_name }}"
 
+        - name: "Get client VM '{{ pvrdma_client_vm_name }}' primary network adapter MAC address"
+          include_tasks: ../../common/vm_get_network_facts.yml
+
+        - name: "Set fact of client VM '{{ pvrdma_client_vm_name }}' primary network adapter MAC address"
+          ansible.builtin.set_fact:
+            pvrdma_client_vm_primary_nic_mac: "{{ vm_network_adapters['0'].mac_addr }}"
+          when:
+            - vm_network_adapters is defined
+            - vm_network_adapters['0'] is defined
+            - vm_network_adapters['0'].mac_addr is defined
+
         - name: "Reset client VM '{{ pvrdma_client_vm_name }}' for updating IP address"
           include_tasks: ../../common/vm_set_power_state.yml
           vars:
@@ -119,6 +131,8 @@
 
         - name: "Add client VM's IP address into inventory"
           include_tasks: ../../common/update_inventory.yml
+          vars:
+            vm_primary_nic_mac: "{{ pvrdma_client_vm_primary_nic_mac }}"
 
         - name: "Hot add a new {{ adapter_type }} network adapter on client VM and apply network config"
           include_tasks: hot_add_network_adapter.yml

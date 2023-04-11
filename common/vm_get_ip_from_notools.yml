@@ -1,7 +1,19 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get VM IP address when there is no VMware tools installed in VM
+# Get VM IP address when there is no VMware Tools installed in VM
+# Parameter:
+#   vm_primary_nic_mac: The VM's primary network adapter MAC address
+# Return:
+#   vm_guest_ip: The VM's guest IPv4 address
+#
+- name: "Check vm_primary_nic_mac is set for VM '{{ vm_name }}'"
+  ansible.builtin.assert:
+    that:
+      - vm_primary_nic_mac is defined
+      - vm_primary_nic_mac
+    fail_msg: "Parameter 'vm_primary_nic_mac' must be set for getting VM's guest IPv4 address."
+
 - name: "Initialize VM world ID and VM IP address for '{{ vm_name }}'"
   ansible.builtin.set_fact:
     vm_world_id: ""
@@ -17,14 +29,20 @@
 
 # When not get vm_world_id and VM original power status is power on,
 # power off and power on VM to try again
-- block:
-    - include_tasks: vm_set_power_state.yml
+- name: "Reset VM to get VM world ID"
+  block:
+    - name: "Power off VM"
+      include_tasks: vm_set_power_state.yml
       vars:
         vm_power_state_set: 'powered-off'
-    - include_tasks: vm_set_power_state.yml
+
+    - name: "Power on VM"
+      include_tasks: vm_set_power_state.yml
       vars:
         vm_power_state_set: 'powered-on'
-    - include_tasks: vm_get_world_id.yml
+
+    - name: "Get VM word ID after reset"
+      include_tasks: vm_get_world_id.yml
   when: not vm_world_id
 
 # Fail after VM power off and power on still not get vm world ID
@@ -34,7 +52,8 @@
       - vm_world_id
     fail_msg: "Failed to get VM world ID after power off and power on VM."
 
-# Get VM IP address via esxcli command by VM world ID
-- include_tasks: vm_get_ip_esxcli.yml
-- name: Display the VM IP address got via esxcli command
+- name: "Get VM IP address via esxcli command by VM world ID"
+  include_tasks: vm_get_ip_esxcli.yml
+
+- name: "Display the VM IP address got via esxcli command"
   ansible.builtin.debug: var=vm_guest_ip
