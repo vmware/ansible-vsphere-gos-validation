@@ -1,54 +1,62 @@
 # Copyright 2022-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Shutdown guest OS to disable VBS on VM
-- include_tasks: ../utils/win_shutdown_restart.yml
+- name: "Shutdown guest OS to disable VBS on VM"
+  include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "shutdown"
 
-# Disable VBS on VM
-- include_tasks: ../utils/win_enable_vbs_vm.yml
+- name: "Disable VBS on VM"
+  include_tasks: ../utils/win_enable_vbs_vm.yml
   vars:
     win_enable_vbs: false
 
-# Power on VM
-- include_tasks: ../../common/vm_set_power_state.yml
+- name: "Power on VM"
+  include_tasks: ../../common/vm_set_power_state.yml
   vars:
     vm_power_state_set: "powered-on"
-- include_tasks: ../utils/win_update_inventory.yml
+- name: "Update in-memory inventory after VM power on"
+  include_tasks: ../utils/win_update_inventory.yml
 
-# Check VM VBS status on VM
-- include_tasks: ../../common/vm_get_vbs_status.yml
-- name: "Check VM VBS status after enable"
+- name: "Get VM VBS status"
+  include_tasks: ../../common/vm_get_vbs_status.yml
+- name: "Check VM VBS status after disable"
   ansible.builtin.assert:
     that:
       - vm_vbs_enabled is defined
       - not vm_vbs_enabled | bool
-    fail_msg: "VM VBS status is not disabled after disabling it."
+    fail_msg: "VM VBS enabled status is '{{ vm_vbs_enabled | default('') }}', not disabled after disabling it."
 
-# Get VBS status in guest OS
-- include_tasks: ../utils/win_get_vbs_guest.yml
+- name: "Get VBS status in guest OS"
+  include_tasks: ../utils/win_get_vbs_guest.yml
 
-# SecurityServicesRunning: 0 means No services running
-# VirtualizationBasedSecurityStatus: 1 means VBS is enabled but not running
+# SecurityServicesRunning:
+# 0.    No services running.
+# 1.    If present, Windows Defender Credential Guard is running.
+# 2.    If present, HVCI is running.
+# 3.    If present, System Guard Secure Launch is running.
+# 4.    If present, SMM Firmware Measurement is running.
+# VirtualizationBasedSecurityStatus:
+# 2 means VBS is enabled and running
+# 1 means VBS is enabled but not running
+# 0 means VBS is not enabled
+#
 - name: "Check VBS and running security service status"
   ansible.builtin.assert:
     that:
       - win_vbs_status_guest | int == 1
-      - win_vbs_running_service[0] | int != 2
-    fail_msg: "Either VBS is running '{{ win_vbs_status_guest }}', or HVCI is running '{{ win_vbs_running_service }}'."
+      - "'2' not in win_vbs_running_service"
+    fail_msg: "VBS status is '{{ win_vbs_status_guest }}' not expected '1', or HVCI '2' is in SecurityServicesRunning list '{{ win_vbs_running_service }}'."
 
-# Disable VBS in guest
-- include_tasks: ../utils/win_disable_vbs_guest.yml
+- name: "Disable VBS in guest OS"
+  include_tasks: ../utils/win_disable_vbs_guest.yml
 
-# Get VBS status in guest OS
-- include_tasks: ../utils/win_get_vbs_guest.yml
+- name: "Get VBS status in guest OS"
+  include_tasks: ../utils/win_get_vbs_guest.yml
 
-# SecurityServicesRunning: 0 means No services running
-# VirtualizationBasedSecurityStatus: 0 means VBS is not enabled
 - name: "Check VBS and running security service status"
   ansible.builtin.assert:
     that:
       - win_vbs_status_guest | int == 0
-      - win_vbs_running_service[0] | int == 0
-    fail_msg: "Either VBS is not disabled '{{ win_vbs_status_guest }}', or still running security service '{{ win_vbs_running_service }}'."
+      - win_vbs_running_service == ['0']
+    fail_msg: "VBS status is '{{ win_vbs_status_guest }}' not expected '0', or SecurityServicesRunning list is '{{ win_vbs_running_service }}', not expected ['0']."
