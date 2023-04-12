@@ -69,13 +69,13 @@
   when:
     - esxi_version is version('7.0.3', '==')
     - esxi_build | int < 21424296
-    - range(1, 8) | difference(win_dg_security_properties) == [5]
+    - (range(1, 8) | list) | difference(win_dg_security_properties) == [5]
 
 - name: "Check available security properties got in guest OS"
   ansible.builtin.assert:
     that:
       - win_dg_security_properties | sort == range(1, 8) | list
-    fail_msg: "Available security properties list got in guest OS: {{ win_dg_security_properties }}, '{{ range(1, 8) | difference(win_dg_security_properties) }}' is missed compared with expected list '{{ range(1, 8) }}'."
+    fail_msg: "Available security properties list got in guest OS: {{ win_dg_security_properties }}, '{{ (range(1, 8) | list) | difference(win_dg_security_properties) }}' is missed compared with expected list '{{ range(1, 8) }}'."
   when: >
     (esxi_version is version('7.0.3', '>') or esxi_version is version('7.0.3', '<')) or
     (esxi_version is version('7.0.3', '==') and esxi_build | int >= 21424296)
