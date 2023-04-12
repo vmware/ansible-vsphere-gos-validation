@@ -2,7 +2,7 @@
 autoinstall:
   version: 1
   early-commands:
-    - ping -c 5 127.0.0.1
+    - echo '{{ autoinstall_start_msg }}' >/dev/ttyS0
   locale: en_US.UTF-8
   keyboard:
     layout: us
@@ -16,6 +16,8 @@ autoinstall:
   storage:
     layout:
       name: direct
+    grub:
+      reorder_uefi: False
   timezone: US/Eastern
   identity:
     hostname: ubuntu
@@ -45,18 +47,21 @@ autoinstall:
     allow-pw: yes
     authorized-keys:
       - {{ ssh_public_key }}
-  packages:
-    - build-essential
-    - locales
-    - cloud-init
-    - open-vm-tools
-    - open-vm-tools-desktop
-    - rdma-core
-    - rdmacm-utils
-    - ibverbs-utils
   late-commands:
+    - echo "# apt-get update" >> /dev/ttyS0
+    - curtin in-target --target=/target -- apt-get update -y >> /dev/ttyS0
+    - echo "# apt-get install build-essential" >> /dev/ttyS0
+    - curtin in-target --target=/target -- apt-get install -y --force-yes build-essential  >> /dev/ttyS0
+    - echo "# apt-get install cloud-init" >> /dev/ttyS0
+    - curtin in-target --target=/target -- apt-get install -y --force-yes cloud-init >> /dev/ttyS0
+    - echo "# apt-get install open-vm-tools open-vm-tools-desktop" >> /dev/ttyS0
+    - curtin in-target --target=/target -- apt-get install -y --force-yes open-vm-tools open-vm-tools-desktop >> /dev/ttyS0
+    - echo "# apt-get install rdma-core rdmacm-utils" >> /dev/ttyS0
+    - curtin in-target --target=/target -- apt-get install -y --force-yes rdma-core rdmacm-utils >> /dev/ttyS0
+    - echo "# apt-get install ibverbs-utils" >> /dev/ttyS0
+    - curtin in-target --target=/target -- apt-get install -y --force-yes ibverbs-utils >> /dev/ttyS0
     - rm -f /etc/cloud/cloud.cfg.d/*-installer.cfg 2>/dev/null
     - sed -i 's/^#PermitRootLogin .*/PermitRootLogin yes/' /target/etc/ssh/sshd_config
     - sed -i 's/^#PasswordAuthentication .*/PasswordAuthentication yes/' /target/etc/ssh/sshd_config
     - echo "{{ autoinstall_complete_msg }}" >> /dev/ttyS0
-  shutdown: 'poweroff'
+  shutdown: 'reboot'
