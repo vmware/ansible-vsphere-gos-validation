@@ -23,16 +23,16 @@ autoinstall:
     username: {{ vm_username }}
     password: {{ vm_password_hash }}
   user-data:
-    disable_root: false
-    ssh_pwauth: yes
-    chpasswd:
-      list: |
-        root:{{ vm_password_hash }}
-      expire: false
-{% if new_user is defined and new_user != 'root' %}
     users:
+      - name: root
+        lock_passwd: false
+        hashed_passwd: {{ vm_password_hash }}
+        ssh_authorized_keys:
+          - {{ ssh_public_key }}
+{% if new_user is defined and new_user != 'root' %}
       - name: {{ new_user }}
-        passwd: {{ vm_password_hash }}
+        lock_passwd: false
+        hashed_passwd: {{ vm_password_hash }}
         sudo: ALL=(ALL) NOPASSWD:ALL
         ssh_authorized_keys:
           - {{ ssh_public_key }}
@@ -44,10 +44,8 @@ autoinstall:
       - {{ ssh_public_key }}
   packages:
     - build-essential
-    - vim
     - locales
     - cloud-init
-    - openssh-server
     - open-vm-tools
     - open-vm-tools-desktop
     - rdma-core
