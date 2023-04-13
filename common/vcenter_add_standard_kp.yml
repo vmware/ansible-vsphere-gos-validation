@@ -16,14 +16,18 @@
 #   kms_username (optional): the username to authenticate to KMS server.
 #   kms_password (optional): the user password to authenticate to KMS server.
 #
-- name: Check KMS server info list is set
+- name: "Check KMS server info list is set"
   ansible.builtin.assert:
     that:
       - kms_info_list is defined
-      - kms_info_list | length != 0
-    fail_msg: "'kms_info_list' parameter is required when adding new standard key provider."
+      - kms_info_list | length > 0
+      - kms_info_list[0].kms_name is defined
+      - kms_info_list[0].kms_name
+      - kms_info_list[0].kms_ip is defined
+      - kms_info_list[0].kms_ip
+    fail_msg: "Parameter 'kms_info_list' is required and set to the list of dict with keys 'kms_name', 'kms_ip' when adding new Standard key provider."
 
-- name: Add Standard key provider to vCenter
+- name: "Add Standard key provider to vCenter"
   community.vmware.vcenter_standard_key_provider:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -43,6 +47,6 @@
       download_self_signed_cert: "{{ vc_cert_download_path | default('/tmp/') }}"
   register: add_standard_kms_result
 
-- name: Display the result of adding Standard key provider
+- name: "Display the result of adding Standard key provider"
   ansible.builtin.debug: var=add_standard_kms_result
   when: enable_debug

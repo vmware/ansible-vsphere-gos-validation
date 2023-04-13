@@ -17,29 +17,34 @@
   ansible.builtin.set_fact:
     current_testcase_name: "deploy_vm_{{ firmware }}_{{ boot_disk_controller }}_{{ network_adapter_type }}"
 
-# Check configured VM CPU number and cores per socket number
-- include_tasks: check_cpu_socket.yml
+- name: "Check configured VM CPU number and cores per socket number"
+  include_tasks: check_cpu_socket.yml
 
-# Get or check configured ISO file list
-- include_tasks: ../../common/get_iso_file_list.yml
+- name: "Get configured ISO file list"
+  include_tasks: ../../common/get_iso_file_list.yml
 
-# Generate unattend install iso file
-- include_tasks: create_unattend_install_iso.yml
+- name: "Generate unattend install ISO file"
+  include_tasks: create_unattend_install_iso.yml
   when: unattend_install_conf is defined and unattend_install_conf
-- ansible.builtin.debug:
-    msg: "unattend_install_conf is not defined or set to a file path, will not generate unattend iso file"
+- name: "Not Generate unattend install ISO file"
+  ansible.builtin.debug:
+    msg: "[WARNING] Parameter 'unattend_install_conf' is not configured in vars/test.yml."
   when: unattend_install_conf is undefined or not unattend_install_conf
 
-# Compose VM CDROMs with ISO file list
-- include_tasks: ../../common/compose_vm_cdroms.yml
+- name: "Compose VM CDROMs with ISO file list"
+  include_tasks: ../../common/compose_vm_cdroms.yml
 
-# Create new VM
-- include_tasks: ../../common/vm_create.yml
+- name: "Create new VM"
+  include_tasks: ../../common/vm_create.yml
   when: boot_disk_controller != 'ide'
-- include_tasks: ../../common/vm_create_with_ide_disk.yml
+
+- name: "Create new VM with IDE boot disk controller"
+  include_tasks: ../../common/vm_create_with_ide_disk.yml
   when: boot_disk_controller == 'ide'
 
-- include_tasks: ../../common/vm_get_vm_info.yml
+- name: "Get new VM info"
+  include_tasks: ../../common/vm_get_vm_info.yml
+
 - name: "Set fact of vm_exists to True"
   ansible.builtin.set_fact:
     vm_exists: true
@@ -49,26 +54,26 @@
   block:
     - name: "Set features on 64bit VM"
       block:
-        # Add virtual TPM device
-        - include_tasks: ../../common/vm_add_vtpm_device.yml
-          vars:
-            vc_cert_path: "{{ current_test_log_folder }}"
+        - name: "Add virtual TPM device"
+          include_tasks: ../../common/vm_add_vtpm_device.yml
           when: virtual_tpm is defined and virtual_tpm | bool
-        # Enable secureboot
-        - include_tasks: ../../common/vm_set_boot_options.yml
+        - name: "Enable secure boot"
+          include_tasks: ../../common/vm_set_boot_options.yml
           vars:
             secure_boot_enabled_set: "{{ secureboot_enabled | default(false) }}"
             enter_bios_setup: true
-        # Enable VBS
-        - include_tasks: ../utils/win_enable_vbs_vm.yml
+        - name: "Enable VM VBS"
+          include_tasks: ../utils/win_enable_vbs_vm.yml
           vars:
             win_enable_vbs: true
           when: enable_vbs is defined and enable_vbs | bool
       when: guest_id is defined and "'64' in guest_id"
-    - include_tasks: ../../common/vm_set_power_state.yml
+    - name: "Power on VM"
+      include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: "powered-on"
-    - include_tasks: ../../common/vm_guest_send_key.yml
+    - name: "Send key strokes to VM console"
+      include_tasks: ../../common/vm_guest_send_key.yml
       vars:
         keys_send:
           - DOWNARROW
@@ -77,17 +82,18 @@
           - ENTER
   when: firmware is defined and firmware | lower == "efi"
 
-# Power on VM directly when VM firmware is BIOS
-- include_tasks: ../../common/vm_set_power_state.yml
+- name: "Power on VM"
+  include_tasks: ../../common/vm_set_power_state.yml
   vars:
     vm_power_state_set: "powered-on"
   when: firmware is defined and firmware | lower == "bios"
+
 - name: "Wait 3 minutes while OS install"
   ansible.builtin.pause:
     minutes: 3
 
-# Check Image APPROVED in vmware.log when VM secureboot is enabled
-- include_tasks: ../../common/vm_wait_log_msg.yml
+- name: "Check Image APPROVED in vmware.log when VM secureboot is enabled"
+  include_tasks: ../../common/vm_wait_log_msg.yml
   vars:
     vm_wait_log_name: "vmware.log"
     vm_wait_log_msg: "SECUREBOOT: Image APPROVED"
@@ -98,24 +104,31 @@
     - firmware is defined and firmware | lower == 'efi'
     - secureboot_enabled is defined and secureboot_enabled
 
-- include_tasks: ../../common/vm_wait_network_connected.yml
-- include_tasks: ../../common/vm_get_ip.yml
+- name: "Wait for VM network adapter is connected"
+  include_tasks: ../../common/vm_wait_network_connected.yml
+
+- name: "Get VM IP address"
+  include_tasks: ../../common/vm_get_ip.yml
   vars:
     vm_get_ip_timeout: 3600
-- include_tasks: ../utils/win_check_winrm.yml
+
+- name: "Check WinRM is connectable"
+  include_tasks: ../utils/win_check_winrm.yml
   vars:
     win_check_winrm_timeout: 1800
 - name: "Wait another 1 minute after OS becomes connectable"
   ansible.builtin.pause:
     minutes: 1
-- include_tasks: ../utils/add_windows_host.yml
+- name: "Add Windows host to in-memory inventory"
+  include_tasks: ../utils/add_windows_host.yml
 
-- name: "Enable VBS in guest OS"
+- name: "Enable VBS"
   block:
-    - include_tasks: ../utils/win_enable_vbs_guest.yml
-    # Get VBS status in guest OS
-    - include_tasks: ../utils/win_get_vbs_guest.yml
-    - name: "Check VBS and running security service status"
+    - name: "Enable VBS in guest OS"
+      include_tasks: ../utils/win_enable_vbs_guest.yml
+    - name: "Get VBS status in guest OS"
+      include_tasks: ../utils/win_get_vbs_guest.yml
+    - name: "Check VBS and HVCI are running"
       ansible.builtin.assert:
         that:
           - win_vbs_status_guest | int == 2
@@ -123,4 +136,5 @@
         fail_msg: "VBS is not running '{{ win_vbs_status_guest }}', or HVCI is not running '{{ win_vbs_running_service }}'."
   when: enable_vbs is defined and enable_vbs | bool
 
-- include_tasks: detach_cdrom_iso.yml
+- name: "Detach ISO image from VM CDROMs"
+  include_tasks: detach_cdrom_iso.yml
