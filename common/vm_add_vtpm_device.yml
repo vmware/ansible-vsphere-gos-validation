@@ -1,46 +1,21 @@
 # Copyright 2022-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# The prerequsite of adding virtual TPM device to VM is
-# key provider configured on vCenter.
+# Add new vTPM device to VM and check device exists.
 #
-# When 'key_provider_type' parameter is set, add a new key
-# provider with specified type firstly, now only support
-# Standard key provider configuration.
-#
-- block:
-    - name: Check key provider type value
-      ansible.builtin.assert:
-        that:
-          - key_provider_type | lower == 'standard'
-        fail_msg: "Parameter 'key_provider_type' valid value is 'standard', but configured '{{ key_provider_type }}'."
-
-    - name: Set fact of new key provider name
-      ansible.builtin.set_fact:
-        new_kp_name: "{{ key_provider_type | lower }}{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}"
-
-    - include_tasks: vcenter_add_standard_kp.yml
-      vars:
-        standard_kp_name: "{{ new_kp_name }}"
-        vc_cert_download_path: "{{ vc_cert_path }}"
-      when: key_provider_type | lower == 'standard'
-  when:
-    - key_provider_type is defined
-    - key_provider_type
-
-# When key provider type is not configured, means use the existing configured one.
-# Will add get existing configured key provider info after new community.vmware module added
-# TBD: add a new task to check key provider status when key_provider_type is not defined.
-
-- include_tasks: vm_add_remove_vtpm.yml
+- name: "Add new vTPM device to VM"
+  include_tasks: vm_add_remove_vtpm.yml
   vars:
     vtpm_operation: 'present'
-- include_tasks: vm_get_device_with_label.yml
+
+- name: "Get vTPM device on VM"
+  include_tasks: vm_get_device_with_label.yml
   vars:
     device_label: 'Virtual TPM'
-- name: Check Virtual TPM device on VM
+
+- name: "Check vTPM device exists on VM"
   ansible.builtin.assert:
     that:
       - device_info_with_label is defined
       - device_info_with_label != ""
-    fail_msg: "Can not get Virtual TPM device on VM."
+    fail_msg: "Can not get vTPM device on VM: '{{ device_info_with_label | default('') }}'"

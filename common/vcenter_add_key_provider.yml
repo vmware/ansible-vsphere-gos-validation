@@ -1,0 +1,40 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# The prerequsite of adding virtual TPM device to VM is key provider
+# configured on vCenter server.
+# When 'key_provider_type' parameter is set, add a new key provider with
+# specified type firstly, now only support Standard key provider configuration.
+#
+# Parameters:
+#   key_provider_type: valid values are 'standard', 'native', now only 'standard'
+#     is supported.
+#   vc_cert_path: the file path on local machine for saving vCenter certificate.
+#
+- name: "Set fact of default key provider type"
+  ansible.builtin.set_fact:
+    key_provider_type: 'standard'
+  when: key_provider_type is undefined or not key_provider_type
+
+- name: "Check configured key provider type"
+  ansible.builtin.assert:
+    that:
+      - key_provider_type | lower == 'standard'
+    fail_msg: "Now the valid value of parameter 'key_provider_type' is 'standard', while configured value is '{{ key_provider_type }}'."
+
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - vc_cert_path is defined
+      - vc_cert_path
+    fail_msg: "Parameter 'vc_cert_path' is required to be set to a valid path in local machine."
+
+- name: "Set fact of new key provider name"
+  ansible.builtin.set_fact:
+    new_kp_name: "{{ key_provider_type | lower }}{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}"
+
+- name: "Add key provider on vCenter server"
+  include_tasks: vcenter_add_standard_kp.yml
+  vars:
+    standard_kp_name: "{{ new_kp_name }}"
+    vc_cert_download_path: "{{ vc_cert_path }}"
