@@ -94,6 +94,10 @@
     mdag_process: "vmmemMDAG"
     virtual_process: "vmcompute"
 
+- name: "Initialize the status of MDAG process"
+  ansible.builtin.set_fact:
+    mdag_process_running: false
+
 - name: "Get virtual process {{ virtual_process }} before restart"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
@@ -105,9 +109,10 @@
     win_powershell_cmd: "Get-Process -Name {{ mdag_process }}"
     win_execute_cmd_ignore_error: true
 
-- name: "Set the result of getting MDAG process"
+- name: "Set running status of MDAG process"
   ansible.builtin.set_fact:
-    mdag_process_result: "{{ win_powershell_cmd_output }}"
+    mdag_process_running: "{{ win_powershell_cmd_output.rc == 0 }}"
+  when: win_powershell_cmd_output.rc is defined
 
 - name: "Check MDAG process {{ mdag_process }} after restart"
   block:
@@ -120,7 +125,16 @@
       include_tasks: ../utils/win_execute_cmd.yml
       vars:
         win_powershell_cmd: "Get-Process -Name {{ mdag_process }}"
+        win_execute_cmd_ignore_error: true
+
+    - name: "Set running status of MDAG process"
+      ansible.builtin.set_fact:
+        mdag_process_running: "{{ win_powershell_cmd_output.rc == 0 }}"
+      when: win_powershell_cmd_output.rc is defined
   when:
     - guest_os_build_num | int > 22000
-    - mdag_process_result.rc is defined
-    - mdag_process_result.rc != 0
+    - not mdag_process_running
+
+- name: "Display status of the MDAG process {{ mdag_process }}"
+  ansible.builtin.debug:
+    msg: "MDAG process {{ mdag_process }} running status: {{ mdag_process_running }}"
