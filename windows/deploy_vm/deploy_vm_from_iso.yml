@@ -124,6 +124,14 @@
 
 - name: "Enable VBS"
   block:
+    - name: "Get guest OS system info"
+      include_tasks: ../utils/get_windows_system_info.yml
+      when: guest_os_system_info_retrieved is undefined or not guest_os_system_info_retrieved
+    # Test code, comparing the info got here and in test_setup
+    - name: "Set fact that ansible system information about guest OS has been retrieved"
+      ansible.builtin.set_fact:
+        guest_os_system_info_retrieved: false
+
     - name: "Enable VBS in guest OS"
       include_tasks: ../utils/win_enable_vbs_guest.yml
     - name: "Get VBS status in guest OS"
