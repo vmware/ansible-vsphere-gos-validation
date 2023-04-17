@@ -4,6 +4,9 @@
 # Check VM's settings which only has one network adapter and it
 # should be connected to VM.
 #
+- name: "Get VM's power state"
+  include_tasks: ../common/vm_get_power_state.yml
+
 - name: "Get VM's network adapters info"
   include_tasks: ../common/vm_get_network_facts.yml
 
@@ -11,7 +14,8 @@
   ansible.builtin.assert:
     that:
       - vm_network_adapters | length == 1
-      - vm_network_adapters['0'].connected | bool
+      - ((vm_power_state_get == "poweredOn" and vm_network_adapters['0'].connected | bool) or
+         (vm_power_state_get != "poweredOn" and vm_network_adapters['0'].start_connected | bool))
     fail_msg: >-
       VM doesn't meet test requirement, which must have one network adapter and it
       should be connected. Current VM's network adapters are '{{ vm_network_adapters }}'.
