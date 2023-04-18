@@ -14,19 +14,21 @@
       {%- else -%}unknown
       {%- endif -%}
 
-- name: "Set Ubuntu autoinstall method"
-  ansible.builtin.set_fact:
-    ubuntu_install_method: |-
-      {%- if ubuntu_version and ubuntu_version is version('20.04', '>=') -%}cloud-init
-      {%- elif ubuntu_version and ubuntu_version is version('20.04', '<') -%}simulation
-      {%- else -%}cloud-init
-      {%- endif -%}
-  when: ubuntu_edition == 'server'
+- name: "Set fact of Ubuntu Server"
+  block:
+    - name: "Set Ubuntu autoinstall method"
+      ansible.builtin.set_fact:
+        ubuntu_install_method: |-
+          {%- if ubuntu_version and ubuntu_version is version('20.04', '>=') -%}cloud-init
+          {%- elif ubuntu_version and ubuntu_version is version('20.04', '<') -%}simulation
+          {%- else -%}cloud-init
+          {%- endif -%}
 
-- name: "Set fact of Ubuntu unattend install file"
-  ansible.builtin.set_fact:
-    unattend_install_conf: "Ubuntu/Server/user-data.j2"
-  when: ubuntu_install_method is defined and ubuntu_install_method == "cloud-init"
+    - name: "Set fact of Ubuntu unattend install file"
+      ansible.builtin.set_fact:
+        unattend_install_conf: "Ubuntu/Server/user-data.j2"
+      when: ubuntu_install_method == "cloud-init"
+  when: ubuntu_edition == 'server'
 
 - name: "Set fact of Ubuntu desktop"
   block:

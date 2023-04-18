@@ -1,7 +1,7 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Sometime we need to wait for a while to get mac address after create VM
+# Wait for VM's primary network adapter having MAC address
 - name: "Check the mac address is available or not"
   community.vmware.vmware_guest_network:
     validate_certs: "{{ validate_certs | default(false) }}"
@@ -16,9 +16,25 @@
   until:
     - gather_network_facts.network_data is defined
     - gather_network_facts.network_data['0'] is defined
-    - gather_network_facts.network_data['0'].mac_addr is defined
     - gather_network_facts.network_data['0'].mac_addr != ""
   retries: ((300 | int) / 5 ) | int
   delay: 5
   ignore_errors: true
   changed_when: false
+
+- name: "Check VM's primary network adapter have mac address"
+  ansible.builtin.assert:
+    that:
+      - gather_network_facts.network_data is defined
+      - gather_network_facts.network_data['0'] is defined
+      - gather_network_facts.network_data['0'].mac_addr != ""
+    fail_msg: >-
+      It's timed out to get VM's primary network adapter having MAC address
+
+- name: "Set fact of VM network adapters info"
+  ansible.builtin.set_fact:
+    vm_network_adapters: "{{ gather_network_facts.network_data }}"
+
+- name: "Print the VM network adapters info"
+  ansible.builtin.debug: var=vm_network_adapters
+  when: enable_debug is defined and enable_debug

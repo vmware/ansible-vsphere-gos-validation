@@ -51,6 +51,7 @@
 * vm_configure_network_adapter.yml: Reconfig VM network adapter connection settings
 * vm_wait_network_connected.yml: Wait for network adapter to be connected
 * vm_get_network_facts.yml: Get VM network adapters info
+* vm_wait_primary_nic_mac.yml: Wait for VM's primary network adapter having MAC address
 * vm_get_netadapter_number.yml: Get VM network adapters number with different types
 
 ### Tasks for VM disk settings
