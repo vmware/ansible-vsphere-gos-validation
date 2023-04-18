@@ -1,0 +1,24 @@
+# Copyright 2021-2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Sometime we need to wait for a while to get mac address after create VM
+- name: "Check the mac address is available or not"
+  community.vmware.vmware_guest_network:
+    validate_certs: "{{ validate_certs | default(false) }}"
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    gather_network_info: true
+  register: gather_network_facts
+  until:
+    - gather_network_facts.network_data is defined
+    - gather_network_facts.network_data['0'] is defined
+    - gather_network_facts.network_data['0'].mac_addr is defined
+    - gather_network_facts.network_data['0'].mac_addr != ""
+  retries: ((300 | int) / 5 ) | int
+  delay: 5
+  ignore_errors: true
+  changed_when: false
