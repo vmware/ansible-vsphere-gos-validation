@@ -1,4 +1,4 @@
-# Copyright 2021-2023 VMware, Inc.
+# Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Wait for VM's primary network adapter having MAC address
@@ -19,25 +19,26 @@
     - gather_network_facts.network_data['0'] is defined
     - gather_network_facts.network_data['0'].mac_addr is defined
     - gather_network_facts.network_data['0'].mac_addr
-  retries: 120
-  delay: 5
+  retries: 20
+  delay: 3
   ignore_errors: true
   changed_when: false
 
-- name: "Check VM's primary network adapter have mac address"
-  ansible.builtin.assert:
-    that:
-      - gather_network_facts.network_data is defined
-      - gather_network_facts.network_data['0'] is defined
-      - gather_network_facts.network_data['0'].mac_addr is defined
-      - gather_network_facts.network_data['0'].mac_addr
-    fail_msg: >-
-      It's timed out to wait for VM's primary network adapter having MAC address in 10 minutes. Current VM's network facts is {{ gather_network_facts }}.
+- name: "Get VM's primary network adapter MAC address"
+  block:
+    - name: "Set fact of VM network adapters info"
+      ansible.builtin.set_fact:
+        vm_network_adapters: "{{ gather_network_facts.network_data }}"
 
-- name: "Set fact of VM network adapters info"
-  ansible.builtin.set_fact:
-    vm_network_adapters: "{{ gather_network_facts.network_data }}"
+    - name: "Print the VM network adapters info"
+      ansible.builtin.debug: var=vm_network_adapters
+      when: enable_debug is defined and enable_debug
 
-- name: "Print the VM network adapters info"
-  ansible.builtin.debug: var=vm_network_adapters
-  when: enable_debug is defined and enable_debug
+    - name: "Set fact of VM's primary network adapter MAC address"
+      ansible.builtin.set_fact:
+        vm_primary_nic_mac: "{{ vm_network_adapters['0'].mac_addr }}"
+  when:
+    - gather_network_facts.network_data is defined
+    - gather_network_facts.network_data['0'] is defined
+    - gather_network_facts.network_data['0'].mac_addr is defined
+    - gather_network_facts.network_data['0'].mac_addr

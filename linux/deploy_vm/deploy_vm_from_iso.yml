@@ -187,6 +187,23 @@
       when:
         - unattend_install_conf is defined
         - unattend_install_conf is match('Photon') or unattend_install_conf is match('Ubuntu')
+    
+    - name: "Get VM's primary network adapter MAC address after poweron VM"
+      block:
+        - name: "Get VM's network adapter"
+          include_tasks: vm_get_network_facts.yml
+
+        - name: "Set fact of VM's primary network adapter MAC address"
+          ansible.builtin.set_fact:
+            vm_primary_nic_mac: "{{ vm_network_adapters['0'].mac_addr }}"
+          when:
+            - vm_network_adapters is defined
+            - vm_network_adapters['0'] is defined
+            - vm_network_adapters['0'].mac_addr is defined
+            - vm_network_adapters['0'].mac_addr
+      when:
+        - vm_primary_nic_mac is defined
+        - vm_primary_nic_mac != ""
 
     # Get guest IP
     - include_tasks: ../../common/update_inventory.yml
