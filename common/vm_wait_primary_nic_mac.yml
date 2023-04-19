@@ -3,6 +3,10 @@
 ---
 # Wait for VM's primary network adapter having MAC address
 #
+- name: "Initialize VM network adapters primary mac"
+  ansible.builtin.set_fact:
+    vm_primary_nic_mac: ""
+
 - name: "Check the mac address is available or not"
   community.vmware.vmware_guest_network:
     validate_certs: "{{ validate_certs | default(false) }}"
@@ -24,19 +28,13 @@
   ignore_errors: true
   changed_when: false
 
-- name: "Get VM's primary network adapter MAC address"
-  block:
-    - name: "Set fact of VM network adapters info"
-      ansible.builtin.set_fact:
-        vm_network_adapters: "{{ gather_network_facts.network_data }}"
+- name: "Print the VM network info"
+  ansible.builtin.debug: var=gather_network_facts
+  when: enable_debug is defined and enable_debug
 
-    - name: "Print the VM network adapters info"
-      ansible.builtin.debug: var=vm_network_adapters
-      when: enable_debug is defined and enable_debug
-
-    - name: "Set fact of VM's primary network adapter MAC address"
-      ansible.builtin.set_fact:
-        vm_primary_nic_mac: "{{ vm_network_adapters['0'].mac_addr }}"
+- name: "Set fact of VM's primary network adapter MAC address"
+  ansible.builtin.set_fact:
+    vm_primary_nic_mac: "{{ gather_network_facts.network_data['0'].mac_addr }}"
   when:
     - gather_network_facts.network_data is defined
     - gather_network_facts.network_data['0'] is defined
