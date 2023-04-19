@@ -14,21 +14,34 @@
       {%- else -%}unknown
       {%- endif -%}
 
-- name: "Set Ubuntu autoinstall method"
-  ansible.builtin.set_fact:
-    ubuntu_install_method: |-
-      {%- if ubuntu_version and ubuntu_version is version('20.04', '>=') -%}cloud-init
-      {%- elif ubuntu_version and ubuntu_version is version('20.04', '<') -%}simulation
-      {%- else -%}cloud-init
-      {%- endif -%}
+- name: "Set fact of Ubuntu Server"
+  block:
+    - name: "Set Ubuntu autoinstall method"
+      ansible.builtin.set_fact:
+        ubuntu_install_method: |-
+          {%- if ubuntu_version and ubuntu_version is version('20.04', '<') -%}simulation
+          {%- else -%}cloud-init
+          {%- endif -%}
+
+    - name: "Set fact of Ubuntu unattend install file"
+      ansible.builtin.set_fact:
+        unattend_install_conf: "Ubuntu/Server/user-data.j2"
+      when: ubuntu_install_method == "cloud-init"
   when: ubuntu_edition == 'server'
 
-- name: "Set fact of Ubuntu unattend install file"
-  ansible.builtin.set_fact:
-    unattend_install_conf: "Ubuntu/Server/user-data.j2"
-  when: ubuntu_install_method is defined and ubuntu_install_method == "cloud-init"
+- name: "Set fact of Ubuntu desktop"
+  block:
+    - name: “Set autoinstall method for Ubuntu Desktop”
+      ansible.builtin.set_fact:
+        unattend_install_conf: "Ubuntu/Desktop/Ubiquity/ubuntu.seed"
 
-- name: "Set fact of Ubuntu desktop unattend install file"
-  ansible.builtin.set_fact:
-    unattend_install_conf: "Ubuntu/Desktop/ubuntu.seed"
+    - name: "Set fact of desktop unattend install file for Ubuntu 23.04 or later"
+      block:
+        - name: “Set autoinstall method for Ubuntu Desktop 23.04 or later”
+          ansible.builtin.set_fact:
+            ubuntu_install_method: "cloud-init"
+        - name: "Set fact of unattend install file for Ubuntu 23.04 or later"
+          ansible.builtin.set_fact:
+            unattend_install_conf: "Ubuntu/Desktop/Subiquity/user-data.j2"
+      when: ubuntu_version and ubuntu_version is version('23.04', '>=')
   when: ubuntu_edition == 'desktop'

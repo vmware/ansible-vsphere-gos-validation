@@ -163,12 +163,12 @@
     # We can get the text "ubuntu login:" from the serial output when the installer begin to run
     # but get this text again after finish installation and reboot
     # When we get text "gdm.service", We are so close to the state "system is up" after rebooting.
-    - name: "Set autoinstall complete message for Ubuntu Desktop"
+    - name: "Set autoinstall complete message for Ubuntu Desktop 20.04 ~ 22.10"
       ansible.builtin.set_fact:
         autoinstall_complete_msg: "gdm.service"
       when:
         - unattend_install_conf is defined
-        - unattend_install_conf is match('Ubuntu/Desktop')
+        - unattend_install_conf is match('Ubuntu/Desktop/Ubiquity')
 
     # Wait autoinstall complete message appear in serial port output file
     - include_tasks: ../../common/vm_wait_log_msg.yml
@@ -187,6 +187,10 @@
       when:
         - unattend_install_conf is defined
         - unattend_install_conf is match('Photon') or unattend_install_conf is match('Ubuntu')
+    
+    - name: "Get VM's primary network adapter MAC address after poweron VM"
+      include_tasks: ../../common/vm_wait_primary_nic_mac.yml
+      when: vm_primary_nic_mac is undefined or not vm_primary_nic_mac
 
     # Get guest IP
     - include_tasks: ../../common/update_inventory.yml

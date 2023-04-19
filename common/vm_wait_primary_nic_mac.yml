@@ -1,0 +1,47 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Wait for VM's primary network adapter having MAC address
+#
+- name: "Initialize primary network adapter MAC address"
+  ansible.builtin.set_fact:
+    vm_primary_nic_mac: ""
+
+- name: "Wait for VM primary network adapter MAC address"
+  community.vmware.vmware_guest_network:
+    validate_certs: "{{ validate_certs | default(false) }}"
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    gather_network_info: true
+  register: gather_network_facts
+  until:
+    - gather_network_facts.network_data is defined
+    - gather_network_facts.network_data['0'] is defined
+    - gather_network_facts.network_data['0'].mac_addr is defined
+    - gather_network_facts.network_data['0'].mac_addr
+  retries: 20
+  delay: 3
+  ignore_errors: true
+  changed_when: false
+
+- name: "Print the VM network info"
+  ansible.builtin.debug: var=gather_network_facts
+  when: enable_debug is defined and enable_debug
+
+- name: "Set fact of VM's primary network adapter MAC address"
+  ansible.builtin.set_fact:
+    vm_primary_nic_mac: "{{ gather_network_facts.network_data['0'].mac_addr }}"
+  when:
+    - gather_network_facts.network_data is defined
+    - gather_network_facts.network_data['0'] is defined
+    - gather_network_facts.network_data['0'].mac_addr is defined
+    - gather_network_facts.network_data['0'].mac_addr
+
+- name: "Display VM's primary network adapter MAC address"
+  ansible.builtin.debug:
+    msg:
+      - "VM primary network adapter MAC address: {{ vm_primary_nic_mac }}"

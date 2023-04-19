@@ -28,7 +28,7 @@
   ansible.builtin.set_fact:
     unattend_install_file_name: "{{ new_unattend_install_conf | basename }}"
 
-- name: "Rebuild ISO for Ubuntu desktop"
+- name: "Rebuild ISO for Ubuntu 20.04 ~ 22.10 desktop"
   block:
     - name: "Extract specific files inside ISO"
       community.general.iso_extract:
@@ -108,7 +108,7 @@
         - result_extract_file is defined
         - result_extract_file.failed is defined
         - result_extract_file.failed
-  when: unattend_install_conf is match('Ubuntu/Desktop')
+  when: unattend_install_conf is match('Ubuntu/Desktop/Ubiquity')
 
 - name: "Rebuild ISO for Photon"
   block:
@@ -256,6 +256,7 @@
         path: "{{ unattend_iso_cache }}/grub.cfg"
         regexp: '(.*vmlinuz)(.*)'
         replace: "\\1 autoinstall \\2"
+      when: unattend_install_conf is match('Ubuntu/Server') or unattend_install_conf is match('Ubuntu/Desktop/Subiquity')
 
     - name: "Set timeout to 5 seconds at boot menu"
       ansible.builtin.replace:
@@ -328,7 +329,7 @@
           - src_file: "{{ src_iso_file_dir }}/md5sum.txt"
             dest_file: "md5sum.txt"
       when: not ubuntu_bios_cfg_exist
-  when: unattend_install_conf is match('Ubuntu/Server')
+  when: unattend_install_conf is match('Ubuntu/Server') or unattend_install_conf is match('Ubuntu/Desktop/Subiquity')
 
 - name: "Rebuild ISO for FreeBSD"
   community.general.iso_customize:
