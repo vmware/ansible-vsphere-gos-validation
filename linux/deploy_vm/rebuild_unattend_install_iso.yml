@@ -377,22 +377,21 @@
         replace: "set default=1\nset timeout=3"
 
     - name: "Update Pardus grub.cfg for autoinstall"
-      ansible.builtin.blockinfile:
+      ansible.builtin.lineinfile:
         path: "{{ src_iso_file_dir }}/grub.cfg"
         insertafter: "^submenu.*English.*{#"
-        block: |
-            set default="autoinstall"
-            set timeout=5
+        line: '  set default="autoinstall"'
 
     - name: "Update Pardus grub.cfg for autoinstall"
       ansible.builtin.blockinfile:
         path: "{{ src_iso_file_dir }}/grub.cfg"
-        insertbefore: "^}#"
+        insertafter: ".*autoinstall.*"
         block: |
+          # menuentry for unattended installation
             menuentry "Automated installation" --id autoinstall {
-                set background_color=black
-                linux    /install/gtk/vmlinuz auto=true file=/cdrom/{{ unattend_install_file_name }} vga=788 --- quiet
-                initrd   /install/gtk/initrd.gz
+              set background_color=black
+              linux    /install/gtk/vmlinuz auto=true file=/cdrom/{{ unattend_install_file_name }} video=vesa:ywrap,mtrr vga=788 --- quiet
+              initrd   /install/gtk/initrd.gz
             }
 
     - name: "Update md5sum for Pardus ISO files"
