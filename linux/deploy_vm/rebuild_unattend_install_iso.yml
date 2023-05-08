@@ -424,6 +424,41 @@
 
     - name: "Print command output for updating initrd"
       ansible.builtin.debug: var=update_initrd_output
+    
+    - name: "Get file to get code name"
+      ansible.builtin.shell: "cat {{ src_iso_file_dir }}/md5sum.txt | grep '\.\/dists\/[a-zA-Z]+\/Release$' | cut -d. -f 2"
+      register: release_file_path
+    
+    - name: "Print release file path"
+      ansible.builtin.debug: var=release_file_path
+    
+    - name: "Extract specific release file inside ISO"
+      community.general.iso_extract:
+        image: "{{ src_iso_file_path }}"
+        dest: "{{ src_iso_file_dir }}"
+        files:
+          - "{{ release_file_path.stdout.split('/', 1)[-1] }}"
+    
+    - name: "Get codename of the ISO distribution"
+      ansible.builtin.shell: "cat {{ src_iso_file_dir }}/Release | grep Codename | cut -d: -f 2"
+      register: codename_output
+    
+    - name: "Set facts of the codename"
+      ansible.builtin.set_fact:
+        os_codename: "{{ codename_output.stdout.split() }}"
+
+    - name: "Print codename"
+      ansible.builtin.debug: var=os_codename
+
+    - name: "Replace the codename in file preseed.cfg"
+      ansible.builtin.replace:
+        path: "{{ new_unattend_install_conf }}"
+        regexp: "yirmibir"
+        replace: "{{ os_codename }}"
+    
+    - name: "Print the content of unattend install config file after replace codename"
+      ansible.builtin.debug:
+        msg: "{{ lookup('file', new_unattend_install_conf) | split('\n') }}"
 
     - name: "Customize the ISO"
       community.general.iso_customize:
