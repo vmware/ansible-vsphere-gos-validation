@@ -1,0 +1,44 @@
+# Copyright 2022-2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Rebuild OS ISO image with unattended install file
+# Parameter:
+#   rebuilt_unattend_iso_path: Local path to the rebuilt ISO image with unattend install config file
+#
+- name: "Extract specific files inside ISO"
+  community.general.iso_extract:
+    image: "{{ src_iso_file_path }}"
+    dest: "{{ src_iso_file_dir }}"
+    files:
+      - 'boot/grub2/grub.cfg'
+      - 'isolinux/isolinux.cfg'
+      - 'isolinux/menu.cfg'
+
+- name: "Update timeout for boot menu"
+  ansible.builtin.replace:
+    path: "{{ src_iso_file_dir }}/isolinux.cfg"
+    regexp: "timeout 0"
+    replace: "timeout 1"
+
+- name: "Update boot menu with kickstart for VMware Photon OS"
+  ansible.builtin.replace:
+    path: "{{ src_iso_file_dir }}/{{ item }}"
+    regexp: '(.*)(root=[^ ]+)(.*)'
+    replace: "\\1\\2 ks=cdrom:/isolinux/{{ unattend_install_file_name }} \\3"
+  with_items:
+    - "menu.cfg"
+    - "grub.cfg"
+
+- name: "Customize the ISO"
+  community.general.iso_customize:
+    src_iso: "{{ src_iso_file_path }}"
+    dest_iso: "{{ rebuilt_unattend_iso_path }}"
+    add_files:
+      - src_file: "{{ src_iso_file_dir }}/menu.cfg"
+        dest_file: "isolinux/menu.cfg"
+      - src_file: "{{ src_iso_file_dir }}/grub.cfg"
+        dest_file: "boot/grub2/grub.cfg"
+      - src_file: "{{ src_iso_file_dir }}/isolinux.cfg"
+        dest_file: "isolinux/isolinux.cfg"
+      - src_file: "{{ new_unattend_install_conf }}"
+        dest_file: "isolinux/{{ unattend_install_file_name }}"

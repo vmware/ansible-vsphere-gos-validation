@@ -1,0 +1,178 @@
+# Copyright 2022-2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Rebuild OS ISO image with unattended install file
+# Parameter:
+#   rebuilt_unattend_iso_path: Local path to the rebuilt ISO image with unattend install config file
+#
+- name: "Rebuild ISO for Ubuntu 20.04 ~ 22.10 desktop"
+  block:
+    - name: "Extract specific files inside ISO"
+      community.general.iso_extract:
+        image: "{{ src_iso_file_path }}"
+        dest: "{{ src_iso_file_dir }}"
+        files:
+          - "boot/grub/grub.cfg"
+
+    - name: "Modify boot entry"
+      ansible.builtin.replace:
+        path: "{{ src_iso_file_dir }}/grub.cfg"
+        regexp: "set timeout=[1-9][0-9]{0,1}"
+        replace: "default=0\nset timeout=2"
+
+    - name: "Modify boot options"
+      ansible.builtin.replace:
+        path: "{{ src_iso_file_dir }}/grub.cfg"
+        regexp: "file=/cdrom/preseed/ubuntu.seed maybe-ubiquity quiet splash ---"
+        replace: "file=/cdrom/preseed/ubuntu.seed boot=casper debug-ubiquity automatic-ubiquity quiet splash noprompt --- console=ttyS0,115200n8"
+
+    - name: "Print the content of modified file grub.cfg"
+      ansible.builtin.debug:
+        msg: "{{ lookup('file', src_iso_file_dir + '/grub.cfg') }}"
+
+    - name: "Extract isolinux/isolinux.cfg inside ISO for old releases"
+      community.general.iso_extract:
+        image: "{{ src_iso_file_path }}"
+        dest: "{{ src_iso_file_dir }}"
+        files:
+          - "isolinux/isolinux.cfg"
+      ignore_errors: true
+      register: result_extract_file
+
+    - name: "Modify isolinux.cfg for some old releases such as Ubuntu 20.04 when the firmware is bios"
+      block:
+        - name: "Modify boot option"
+          ansible.builtin.blockinfile:
+            path: "{{ src_iso_file_dir }}/isolinux.cfg"
+            insertafter: "^#.*etc.*"
+            block: |
+              default live-install
+              label live-install
+                menu label ^Install Ubuntu
+                kernel /casper/vmlinuz
+                append  file=/cdrom/preseed/ubuntu.seed boot=casper debug-ubiquity automatic-ubiquity initrd=/casper/initrd quiet splash noprompt --- console=ttyS0,115200n8
+
+        - name: "Print the content of modified file isolinux.cfg"
+          ansible.builtin.debug:
+            msg: "{{ lookup('file', src_iso_file_dir + '/isolinux.cfg') }}"
+
+        - name: "Customize the ISO with isolinux/isolinux.cfg"
+          community.general.iso_customize:
+            src_iso: "{{ src_iso_file_path }}"
+            dest_iso: "{{ rebuilt_unattend_iso_path }}"
+            add_files:
+              - src_file: "{{ src_iso_file_dir }}/grub.cfg"
+                dest_file: "/boot/grub/grub.cfg"
+              - src_file: "{{ new_unattend_install_conf }}"
+                dest_file: "/preseed/ubuntu.seed"
+              - src_file: "{{ src_iso_file_dir }}/isolinux.cfg"
+                dest_file: "/isolinux/isolinux.cfg"
+      when: 
+        - result_extract_file is defined
+        - result_extract_file.failed is defined
+        - not result_extract_file.failed
+
+    - name: "Customize the ISO without isolinux/isolinux.cfg"
+      community.general.iso_customize:
+        src_iso: "{{ src_iso_file_path }}"
+        dest_iso: "{{ rebuilt_unattend_iso_path }}"
+        add_files:
+          - src_file: "{{ src_iso_file_dir }}/grub.cfg"
+            dest_file: "/boot/grub/grub.cfg"
+          - src_file: "{{ new_unattend_install_conf }}"
+            dest_file: "/preseed/ubuntu.seed"
+      when: 
+        - result_extract_file is defined
+        - result_extract_file.failed is defined
+        - result_extract_file.failed
+  when: unattend_install_conf is match('Ubuntu/Desktop/Ubiquity')
+
+- name: "Rebuild ISO for Ubuntu live server"
+  block:
+    - name: Extract specific files inside ISO
+      community.general.iso_extract:
+        image: "{{ src_iso_file_path }}"
+        dest: "{{ src_iso_file_dir }}"
+        files:
+          - 'boot/grub/grub.cfg'
+          - 'md5sum.txt'
+
+    - name: "Add autoinstall to UEFI boot kernel command for Ubuntu live server"
+      ansible.builtin.replace:
+        path: "{{ unattend_iso_cache }}/grub.cfg"
+        regexp: '(.*vmlinuz)(.*)'
+        replace: "\\1 autoinstall \\2"
+      when: unattend_install_conf is match('Ubuntu/Server') or unattend_install_conf is match('Ubuntu/Desktop/Subiquity')
+
+    - name: "Set timeout to 5 seconds at boot menu"
+      ansible.builtin.replace:
+        path: "{{ unattend_iso_cache }}/grub.cfg"
+        regexp: 'set timeout=.*'
+        replace: "set timeout=5"
+
+    - name: "Update md5sum for UEFI boot config file"
+      ansible.builtin.shell: |
+        md5=`md5sum grub.cfg | awk '{print $1}'`
+        sed -i "/.\/boot\/grub\/grub.cfg/ s/^[^ ]*/$md5/" md5sum.txt
+      args:
+        chdir: "{{ unattend_iso_cache }}"
+
+    - name: "set var ubuntu_bios_cfg_exist to default false"
+      ansible.builtin.set_fact:
+        ubuntu_bios_cfg_exist: false
+
+    - name: "Extract isolinux/txt.cfg inside ISO if exists"
+      community.general.iso_extract:
+        image: "{{ src_iso_file_path }}"
+        dest: "{{ src_iso_file_dir }}"
+        files:
+          - 'isolinux/txt.cfg'
+      register: check_file_result
+      ignore_errors: true
+
+    - debug: var=check_file_result
+
+    - name: "set var ubuntu_bios_cfg_exist to true or not"
+      ansible.builtin.set_fact:
+        ubuntu_bios_cfg_exist: true
+      when: not check_file_result.failed
+
+    - name: "Update BIOS boot config file if it exists and Customize ISO"
+      block:
+        - name: "Add autoinstall to BIOS boot kernel command for Ubuntu live server"
+          ansible.builtin.replace:
+            path: "{{ unattend_iso_cache }}/txt.cfg"
+            regexp: '(.*initrd)(.*)'
+            replace: "\\1 autoinstall \\2"
+
+        - name: "Update md5sum for BIOS boot config file"
+          ansible.builtin.shell: |
+            md5=`md5sum txt.cfg | awk '{print $1}'`
+            sed -i "/.\/isolinux\/txt.cfg/ s/^[^ ]*/$md5/" md5sum.txt
+          args:
+            chdir: "{{ unattend_iso_cache }}"
+
+        - name: "Customize the ISO"
+          community.general.iso_customize:
+            src_iso: "{{ src_iso_file_path }}"
+            dest_iso: "{{ rebuilt_unattend_iso_path }}"
+            add_files:
+              - src_file: "{{ src_iso_file_dir }}/grub.cfg"
+                dest_file: "boot/grub/grub.cfg"
+              - src_file: "{{ src_iso_file_dir }}/md5sum.txt"
+                dest_file: "md5sum.txt"
+              - src_file: "{{ src_iso_file_dir }}/txt.cfg"
+                dest_file: "isolinux/txt.cfg"
+      when: ubuntu_bios_cfg_exist
+
+    - name: "Customize the ISO without txt.cfg"
+      community.general.iso_customize:
+        src_iso: "{{ src_iso_file_path }}"
+        dest_iso: "{{ rebuilt_unattend_iso_path }}"
+        add_files:
+          - src_file: "{{ src_iso_file_dir }}/grub.cfg"
+            dest_file: "boot/grub/grub.cfg"
+          - src_file: "{{ src_iso_file_dir }}/md5sum.txt"
+            dest_file: "md5sum.txt"
+      when: not ubuntu_bios_cfg_exist
+  when: unattend_install_conf is match('Ubuntu/Server') or unattend_install_conf is match('Ubuntu/Desktop/Subiquity')
