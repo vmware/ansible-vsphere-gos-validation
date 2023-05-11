@@ -1,0 +1,110 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Rebuild Pardus ISO image with unattended install file
+# Parameters:
+#   rebuilt_unattend_iso_path: Local path to the rebuilt ISO image with unattend install config file
+#   src_iso_file_path: Local path of source ISO image file
+#   src_iso_file_dir: Local dir of source ISO image file
+#
+- name: "Extract specific files inside ISO"
+  community.general.iso_extract:
+    image: "{{ src_iso_file_path }}"
+    dest: "{{ src_iso_file_dir }}"
+    files:
+      - 'boot/grub/grub.cfg'
+      - 'isolinux/isolinux.cfg'
+      - 'isolinux/install_en.cfg'
+      - 'isolinux/install.cfg'
+      - 'md5sum.txt'
+
+- name: "Update timeout of file isolinux.cfg"
+  ansible.builtin.replace:
+    path: "{{ src_iso_file_dir }}/isolinux.cfg"
+    regexp: "timeout 0"
+    replace: "timeout 1"
+
+- name: "Update file isolinux.cfg"
+  ansible.builtin.replace:
+    path: "{{ src_iso_file_dir }}/isolinux.cfg"
+    regexp: "default .*"
+    replace: "default installgui"
+
+- name: "Update default boot label"
+  ansible.builtin.lineinfile:
+    path: "{{ src_iso_file_dir }}/{{ item }}"
+    insertbefore: "^label install$"
+    line: "default installgui"
+  with_items:
+    - "install_en.cfg"
+    - "install.cfg"
+
+- name: "Update boot parameters with preseed.cfg"
+  ansible.builtin.replace:
+    path: "{{ src_iso_file_dir }}/{{ item }}"
+    regexp: '(.*)(append )(.*)'
+    replace: "\\1\\2 auto=true file=/cdrom/{{ unattend_install_file_name }} \\3"
+  with_items:
+    - "install_en.cfg"
+    - "install.cfg"
+
+- name: "Update default memuentry for grub.cfg"
+  ansible.builtin.replace:
+    path: "{{ src_iso_file_dir }}/grub.cfg"
+    regexp: "set default=0"
+    replace: "set default=1\nset timeout=3"
+
+- name: "Update default boot entry for autoinstall"
+  ansible.builtin.lineinfile:
+    path: "{{ src_iso_file_dir }}/grub.cfg"
+    insertafter: "^submenu.*English.*{#"
+    line: '  set default="autoinstall"'
+
+- name: "Update boot parameters for autoinstall"
+  ansible.builtin.blockinfile:
+    path: "{{ src_iso_file_dir }}/grub.cfg"
+    insertafter: ".*autoinstall.*"
+    block: |
+      # menuentry for unattended installation
+        menuentry "Automated installation" --id autoinstall {
+          set background_color=black
+          linux    /install/gtk/vmlinuz auto=true file=/cdrom/{{ unattend_install_file_name }} video=vesa:ywrap,mtrr vga=788 --- quiet
+          initrd   /install/gtk/initrd.gz
+        }
+
+- name: "Update md5sum for Pardus ISO files"
+  ansible.builtin.shell: "{{ item }}"
+  with_items:
+    - "sed -i '#./isolinux/isolinux.cfg#d' md5sum.txt"
+    - "echo \"`md5sum isolinux.cfg | awk '{print $1}'` ./isolinux/isolinux.cfg\" >>md5sum.txt"
+    - "sed -i '#./boot/grub/grub.cfg#d' md5sum.txt"
+    - "echo \"`md5sum grub.cfg | awk '{print $1}'` ./boot/grub/grub.cfg\" >>md5sum.txt"
+    - "sed -i '#./isolinux/install_en.cfg#d' md5sum.txt"
+    - "echo \"`md5sum install_en.cfg | awk '{print $1}'` ./isolinux/install_en.cfg\" >>md5sum.txt"
+    - "sed -i '#./isolinux/install.cfg#d' md5sum.txt"
+    - "echo \"`md5sum install.cfg | awk '{print $1}'` ./isolinux/install.cfg\" >>md5sum.txt"
+  args:
+    chdir: "{{ src_iso_file_dir }}"
+  register: update_initrd_output
+
+- name: "Print command output for updating initrd"
+  ansible.builtin.debug: var=update_initrd_output
+
+- name: "Customize the ISO"
+  community.general.iso_customize:
+    src_iso: "{{ src_iso_file_path }}"
+    dest_iso: "{{ rebuilt_unattend_iso_path }}"
+    add_files:
+      - src_file: "{{ src_iso_file_dir }}/grub.cfg"
+        dest_file: "boot/grub/grub.cfg"
+      - src_file: "{{ src_iso_file_dir }}/isolinux.cfg"
+        dest_file: "isolinux/isolinux.cfg"
+      - src_file: "{{ src_iso_file_dir }}/install_en.cfg"
+        dest_file: "isolinux/install_en.cfg"
+      - src_file: "{{ src_iso_file_dir }}/install.cfg"
+        dest_file: "isolinux/install.cfg"
+      - src_file: "{{ src_iso_file_dir }}/md5sum.txt"
+        dest_file: "md5sum.txt"
+      - src_file: "{{ new_unattend_install_conf }}"
+        dest_file: "{{ unattend_install_file_name }}"
+

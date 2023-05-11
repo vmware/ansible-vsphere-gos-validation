@@ -267,6 +267,19 @@
         cdrom_controller_num: "{{ vm_cdroms[0].controller_number | int }}"
         cdrom_unit_num: "{{ vm_cdroms[0].unit_number | int }}"
       when: guest_os_ansible_distribution == "Ubuntu"
+    
+    - name: "Download serial output file before removing serial port"
+      include_tasks: ../../common/esxi_download_datastore_file.yml
+      vars:
+        src_datastore: "{{ datastore }}"
+        src_file_path: "{{ vm_dir_name }}/{{ vm_serial_port_output_file | basename }}"
+        dest_file_path: "{{ current_test_log_folder }}/{{ vm_serial_port_output_file | basename }}"
+        download_file_fail_ignore: true
+      when: 
+        - vm_dir_name is defined
+        - vm_dir_name
+        - vm_serial_port_output_file is defined
+        - vm_serial_port_output_file
 
     - include_tasks: ../../common/vm_remove_serial_port.yml
 

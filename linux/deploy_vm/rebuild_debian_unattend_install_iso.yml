@@ -1,0 +1,95 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Rebuild Debian ISO image with unattended install file
+# Parameters:
+#   rebuilt_unattend_iso_path: Local path to the rebuilt ISO image with unattend install config file
+#   src_iso_file_path: Local path of source ISO image file
+#   src_iso_file_dir: Local dir of source ISO image file
+#
+- name: "Extract specific files inside ISO"
+  community.general.iso_extract:
+    image: "{{ src_iso_file_path }}"
+    dest: "{{ src_iso_file_dir }}"
+    files:
+      - 'boot/grub/grub.cfg'
+      - 'isolinux/isolinux.cfg'
+      - 'isolinux/gtk.cfg'
+      - 'md5sum.txt'
+
+- name: "Update timeout for boot menu"
+  ansible.builtin.replace:
+    path: "{{ src_iso_file_dir }}/isolinux.cfg"
+    regexp: "timeout 0"
+    replace: "timeout 1"
+
+- name: "Search string in md5sum.txt"
+  ansible.builtin.shell: grep '/install.386/' {{ src_iso_file_dir }}/md5sum.txt
+  ignore_errors: true
+  register: result_search_str
+
+- name: "Print the result of searching str in file md5sum.txt"
+  ansible.builtin.debug: var=result_search_str
+
+- name: "Set fact of Debian install type"
+  ansible.builtin.set_fact:
+    debian_install_type: |-
+      {%- if result_search_str.failed -%}install.amd
+      {%- else -%}install.386
+      {%- endif -%}
+
+- debug: var=debian_install_type
+
+- name: "Update timeout for boot menu"
+  ansible.builtin.replace:
+    path: "{{ src_iso_file_dir }}/isolinux.cfg"
+    regexp: "default .*"
+    replace: "default installgui"
+
+- name: "Update Debian grub.cfg for autoinstall"
+  ansible.builtin.blockinfile:
+    path: "{{ src_iso_file_dir }}/grub.cfg"
+    block: |
+      set default="autoinstall"
+      set timeout=5
+      menuentry "Automated installation" --id autoinstall {
+          set background_color=black
+          linux    /{{ debian_install_type }}/vmlinuz auto=true file=/cdrom/{{ unattend_install_file_name }} vga=788 --- quiet
+          initrd   /{{ debian_install_type }}/gtk/initrd.gz
+      }
+
+- name: "Update boot menu with preseed.cfg for Debian"
+  ansible.builtin.replace:
+    path: "{{ src_iso_file_dir }}/gtk.cfg"
+    regexp: '(.*)(initrd.gz )(.*)'
+    replace: "\\1\\2 auto=true file=/cdrom/{{ unattend_install_file_name }} \\3"
+
+- name: "Update md5sum for Debian ISO files"
+  ansible.builtin.shell: "{{ item }}"
+  with_items:
+    - "sed -i '#./isolinux/isolinux.cfg#d' md5sum.txt"
+    - "echo \"`md5sum isolinux.cfg | awk '{print $1}'` ./isolinux/isolinux.cfg\" >>md5sum.txt"
+    - "sed -i '#./boot/grub/grub.cfg#d' md5sum.txt"
+    - "echo \"`md5sum grub.cfg | awk '{print $1}'` ./boot/grub/grub.cfg\" >>md5sum.txt"
+  args:
+    chdir: "{{ src_iso_file_dir }}"
+  register: update_initrd_output
+
+- name: "Print command output for updating initrd"
+  ansible.builtin.debug: var=update_initrd_output
+
+- name: "Customize the ISO"
+  community.general.iso_customize:
+    src_iso: "{{ src_iso_file_path }}"
+    dest_iso: "{{ rebuilt_unattend_iso_path }}"
+    add_files:
+      - src_file: "{{ src_iso_file_dir }}/grub.cfg"
+        dest_file: "boot/grub/grub.cfg"
+      - src_file: "{{ src_iso_file_dir }}/isolinux.cfg"
+        dest_file: "isolinux/isolinux.cfg"
+      - src_file: "{{ src_iso_file_dir }}/gtk.cfg"
+        dest_file: "isolinux/gtk.cfg"
+      - src_file: "{{ src_iso_file_dir }}/md5sum.txt"
+        dest_file: "md5sum.txt"
+      - src_file: "{{ new_unattend_install_conf }}"
+        dest_file: "{{ unattend_install_file_name }}"
