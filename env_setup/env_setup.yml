@@ -9,7 +9,7 @@
     - name: "Get ansible info"
       include_tasks: get_ansible_info.yml
 
-    - name: "Get default variables"
+    - name: "Set default variables"
       include_tasks: set_default_variables.yml
 
     - name: "Create this test run log files path"
@@ -38,7 +38,7 @@
         fail_msg: "VM '{{ vm_name }}' doesn't exist. Please set new_vm to True to deploy the VM or provide an existing VM name."
       when: new_vm is undefined or not new_vm | bool
 
-    - name: "Get vCenter and ESXi version info"
+    - name: "Get vCenter Server version and build"
       include_tasks: ../common/vcenter_get_version_build.yml
       when: vcenter_is_defined is defined and vcenter_is_defined
     
@@ -71,14 +71,14 @@
             cleanup_old_snapshots: false
           when: cleanup_old_snapshots is undefined
 
-        - name: "Cleanup existing snapshots of existing VM if required"
+        - name: "Revert and cleanup existing snapshots on existing VM if required"
           include_tasks: ../common/vm_cleanup_snapshot.yml
 
         - name: "Get VM power state"
-          include_tasks: ../../common/vm_get_power_state.yml
+          include_tasks: ../common/vm_get_power_state.yml
 
-        - name: "Poweron VM"
-          include_tasks: ../../common/vm_set_power_state.yml
+        - name: "Power on VM"
+          include_tasks: ../common/vm_set_power_state.yml
           vars:
             vm_power_state_set: "powered-on"
           when: vm_power_state_get == "poweredOff"
@@ -86,7 +86,7 @@
         - name: "Check VM settings"
           include_tasks: check_vm_settings.yml
 
-        - name: "Get VM related info if testing on existing VM"
+        - name: "Get existing VM info"
           include_tasks: ../common/vm_get_vm_info.yml        
       when: vm_exists is defined and vm_exists
 
