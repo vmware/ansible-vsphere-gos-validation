@@ -34,12 +34,6 @@
         fail_msg: "VM '{{ vm_name }}' doesn't exist. Please set new_vm to True to deploy the VM or provide an existing VM name."
       when: new_vm is undefined or not new_vm | bool
 
-    # Check VM settings
-    - include_tasks: check_vm_settings.yml
-
-    # Get VM related info if testing on existing VM
-    - include_tasks: ../common/vm_get_vm_info.yml
-      when: vm_exists is defined and vm_exists
     - name: Set fact of the VM datastore path
       ansible.builtin.set_fact:
         vm_datastore_path: "/vmfs/volumes/{{ datastore }}"
@@ -104,4 +98,10 @@
           vars:
             vm_power_state_set: "powered-on"
           when: vm_power_state_get == "poweredOff"
+         
+        # Check VM settings
+        - include_tasks: check_vm_settings.yml
+
+        # Get VM related info if testing on existing VM
+        - include_tasks: ../common/vm_get_vm_info.yml
       when: (new_vm is undefined) or (not new_vm | bool)
