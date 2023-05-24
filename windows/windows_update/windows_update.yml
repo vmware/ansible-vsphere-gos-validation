@@ -1,0 +1,93 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This case is to test Microsoft's Windows updates
+#
+- name: windows_update
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+
+        - name: "Initialize the msu file related Variables"
+          ansible.builtin.set_fact:
+            suvp_share_point: "\\\\whql-suvp.eng.vmware.com\\SUVP"
+            msu_file_src: "Z:\\{{windows_update_msu_path }}"
+            msu_file_name: "{{ windows_update_msu_path | win_basename }}"
+
+        - name: "Set the msu file destination"
+          ansible.builtin.set_fact:
+            wu_kb_number: "{{ msu_file_name | regex_search('KB\\d+') }}"
+            msu_file_dest: "C:\\{{ msu_file_name }}"
+
+        - name: "Install the Windows Update msu file"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              net use Z: {{ suvp_share_point }} {{ suvp_pwd }} /user:{{ suvp_name }};
+              Copy-Item -Path {{ msu_file_src }} -Destination {{ msu_file_dest }}  -ErrorAction Stop;
+              wusa.exe {{ msu_file_dest }} /quiet /norestart;
+              $kb_installed = Get-HotFix | Where HotFixID -eq {{ wu_kb_number }};
+              $check_attempt = 0;
+              do {Start-Sleep -seconds 300;$check_attempt = $check_attempt + 1;$kb_installed = Get-HotFix | Where HotFixID -eq {{ wu_kb_number }};
+              Write-Host "$check_attempt Attempt";}
+              while (!($kb_installed) -and ($check_attempt -le 11));
+              
+
+#        - name: "Install the Windows Update msu file"
+#          include_tasks: ../utils/win_execute_cmd.yml
+#          vars:
+#            win_powershell_cmd: "wusa.exe {{ msu_file_dest }} /quiet /norestart"
+
+        - name: "Restart guest OS after installing updates"
+          include_tasks: ../utils/win_shutdown_restart.yml
+          vars:
+            set_win_power_state: "restart"
+
+        - name: "Check if the specified Windows Update is installed"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "Get-HotFix | Where HotFixID -eq {{ wu_kb_number }}"
+
+        - name: "Check the result of installing {{ wu_kb_number }}"
+          ansible.builtin.assert:
+            that:
+              - win_powershell_cmd_output.rc is defined
+              - win_powershell_cmd_output.rc == 0
+              - win_powershell_cmd_output.stdout_lines is defined
+              - win_powershell_cmd_output.stdout_lines | length != 0
+            fail_msg: "{{ wu_kb_number }} is not installed after 1 hour. Please check it."
+
+#        - name: "Execute the script to install updates"
+#          include_tasks: ../utils/win_execute_cmd.yml
+#          vars:
+#            win_powershell_cmd: "powershell.exe -ExecutionPolicy bypass -File {{ install_wu_script }}"
+#
+
+        - name: "Reset base snapshot after installing updates"
+          include_tasks: ../../common/reset_base_snapshot.yml
+
+#
+#        - name: "Clean the folder {{ wu_dest_file }}"
+#          include_tasks: ../utils/win_execute_cmd.yml
+#          vars:
+#            win_powershell_cmd: "rm {{ wu_dest_file }}\\*"
+#          when: win_is_folder_result
+#
+
+#
+#        - name: "Check the installed Windows Update"
+#          include_tasks: ../utils/win_execute_cmd.yml
+#          vars:
+#            win_powershell_cmd: "Got-Hotfix"
+#
+
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
