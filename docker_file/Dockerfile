@@ -1,17 +1,17 @@
 # ansible-vsphere-gos-validation
 # For users launch guest OS validation test on vSphere
-# version: 1.0
+# version: 2.3
 
-# Use latest Photon OS as parent image
-FROM photon:latest
+# Use latest Photon OS 4.0 docker image as parent image
+FROM photon:4.0
 WORKDIR /root/ansible-vsphere-gos-validation
 
 # Install the required packages
 RUN tdnf makecache && \
     tdnf install -y python3 zip vim wget python3-pip \
-    sshpass gawk nfs-utils iana-etc python3-lxml && \
-    pip3 install setuptools wheel jmespath && \
-    pip3 install pycdlib netaddr pywinrm pyvmomi pypsrp
+    sshpass gawk nfs-utils iana-etc python3-lxml \
+    python3-setuptools python3-jmespath python3-netaddr && \
+    pip3 install wheel pycdlib pywinrm pyvmomi pypsrp
 
 # Install ansible-core (starts from Ansible 2.11)
 RUN pip3 install ansible-core
