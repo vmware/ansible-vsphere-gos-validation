@@ -75,10 +75,9 @@ This project supports below scenarios for end-to-end guest operating system vali
 | SUSE Linux Enterprise 15 SP3 and later          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise 12 SP5, 15 SP0/SP1/SP2    |                                  |                          | :heavy_check_mark:                 |
 | VMware Photon OS 3.0, 4.0, 5.0                  | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
-| Ubuntu 18.04 and later live-server              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Ubuntu 20.04 and later cloud image              |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
+| Ubuntu 18.04 live-server                        | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Ubuntu 18.04 desktop                            |                                  |                          | :heavy_check_mark:                 |
-| Ubuntu 20.04 and later desktop                  | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Ubuntu 20.04 and later                          | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Flatcar 2592.0.0 and later                      |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Debian 10.10 and later, 11.x                    | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Debian 9.x, 10.9 and earlier                    |                                  |                          | :heavy_check_mark:                 |
@@ -87,16 +86,18 @@ This project supports below scenarios for end-to-end guest operating system vali
 | UnionTech OS Server 20 1050a                    | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Fedora Server 36 and later                      | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | ProLinux Server 7.9, 8.5                        | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Pardus 21.2 Server and later                    | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Pardus 21.2 XFCE Desktop and later              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| FreeBSD 13 and later (*)                        | :heavy_check_mark:               |                          |                                    |
+| Pardus 21.2 Server,XFCE Desktop and later (*)    | :heavy_check_mark:               |                          |                                   |
 
-Note: This compatible guest operating systems list is used for this project only. For guest operating system support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
+**Notes**
+1. This compatible guest operating systems list is used for this project only. For guest operating system support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
+2. Guest OS marked with (*) only supports autoinstall and doesn't support end-to-end tests for now.
 
 ### Docker images
-* Latest (Release v2.2):
+* Latest (Release v2.3):
   * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
-* Release v2.2:
-  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v2.2
+* Release v2.3:
+  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v2.3
 
 Launch testing using Docker image
 1. Execute below commands in your machine
