@@ -3,14 +3,21 @@
 ---
 # Add or delete a domain user on vCenter Server
 # Parameters:
-#   vcenter_domain_name: The vCenter Server user domain name. Default is vcenter_username domain.
 #   vcenter_domain_user_name: The domain user name.
-#   vcenter_domain_user_first_name: The first name of domain user. Default is same as user name.
-#   vcenter_domain_user_last_name: The last name of domain user. Default is same as domain name.
 #   vcenter_domain_user_password: The domain user password.
-#   vcenter_domain_user_group: The user group which domain user belongs to. Default is empty.
 #   vcenter_domain_user_op: The operation of managing domain user: add or delete.
+#   vcenter_domain_name(optional): The vCenter Server user domain name.
+#     Default is vcenter_username domain.
+#   vcenter_domain_user_first_name(optional): The first name of domain user.
+#     Default is same as user name.
+#   vcenter_domain_user_last_name(optional): The last name of domain user.
+#     Default is same as domain name.
+#   vcenter_domain_user_group(optional): The user group which domain user belongs to.
+#     Default is empty.
 #
+# vcenter_is_defined is defined in common/set_vmware_module_hostname.yml
+# groups['vcenter'] is defined in common/add_vsphere_hosts_in_inventory.yml
+# both of them are set at env_setup
 - name: "Check vCenter Server is defined and added into memory inventory"
   ansible.builtin.assert:
     that:
@@ -24,17 +31,20 @@
       and vCenter Server hostname in memory inventory is
       {{ groups['vcenter'] is defined and vcenter_hostname in groups['vcenter'] }}.
 
-- name: "Check vcenter_domain_user_name and vcenter_domain_user_op is set"
+- name: "Check vcenter_domain_user_name, vcenter_domain_user_password and vcenter_domain_user_op are set"
   ansible.builtin.assert:
     that:
       - vcenter_domain_user_name is defined
       - vcenter_domain_user_name
+      - vcenter_domain_user_password is defined
+      - vcenter_domain_user_password
       - vcenter_domain_user_op is defined
       - vcenter_domain_user_op in ['add', 'delete']
     fail_msg: >-
-      Parameter 'vcenter_domain_user_name' or 'vcenter_domain_user_op' is incorrect
-      for managing domain user.
+      Parameter 'vcenter_domain_user_name','vcenter_domain_user_password' and 'vcenter_domain_user_op'
+      must be set correclty for managing domain user.
       Current vcenter_domain_user_name is {{ vcenter_domain_user_name | default('undefined') }},
+      vcenter_domain_user_password is {{ vcenter_domain_user_password | default('undefined') }},
       and vcenter_domain_user_op is {{ vcenter_domain_user_op | default('undefined') }}.
 
 - name: "Set default user domain of vCenter Server"
@@ -64,7 +74,7 @@
   when: vcenter_domain_user_op == "delete"
 
 - name: "{{ vcenter_domain_user_op | capitalize }} domain user '{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}'"
-  ansible.builtin.command: "{{  manage_domain_user_cmd }}"
+  ansible.builtin.command: "{{ manage_domain_user_cmd }}"
   ignore_errors: true
   delegate_to: "{{ vcenter_hostname }}"
   register: manage_domain_user_result
