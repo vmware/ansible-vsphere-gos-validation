@@ -2,26 +2,19 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Set the fact of open-vm-tools packages, processes and services
-
+#
 - name: "Initialize the fact of open-vm-tools packages, processe and service"
   ansible.builtin.set_fact:
     ovt_packages: ["open-vm-tools"]
     ovt_processes: [{"uid": "root", "cmd":"vmtoolsd"}]
     ovt_service: "vmtoolsd"
 
-- name: "Initialize the fact of VGAuth processe and service"
-  ansible.builtin.set_fact:
-    vgauth_service: "vgauthd"
-    vgauth_process: {"uid": "root", "cmd": "VGAuthService"}
-  when: "'Flatcar' not in guest_os_ansible_distribution"
-
-- name: "Set the fact of open-vm-tools service name for Ubuntu/Debian"
+- name: "Set the fact of open-vm-tools service name for {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
     ovt_service: "open-vm-tools"
-    vgauth_service: "vgauth"
   when: guest_os_family in ["Debian", "Astra Linux (Orel)"]
 
-- name: "Add extra package libvmtools0 for SUSE"
+- name: "Add extra package libvmtools0 for {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
     ovt_packages: "{{ ovt_packages | union(['libvmtools0']) }}"
   when: guest_os_family == "Suse"

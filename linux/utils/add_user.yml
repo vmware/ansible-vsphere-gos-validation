@@ -1,37 +1,38 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Add a new user to guest
+# Add a new user in guest OS
 # Parameter:
-#   os_username: The user name to be added
-#   os_group: (Optional)The group name for the new user name.
+#   guest_user_name: The new user name
+#   guest_user_password: The new user's password
+#   guest_user_group: (Optional)The group name for the new user name.
 
 # If user already exists, return changed with 'false'
-- name: "Get user '{{ os_username }}' info"
+- name: "Get user '{{ guest_user_name }}' info"
   ansible.builtin.getent:
     database: passwd
-    key: "{{ os_username }}"
+    key: "{{ guest_user_name }}"
   failed_when: false
   register: getent_user_result
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: "User '{{ os_username }}' already exists"
+- name: "User '{{ guest_user_name }}' already exists"
   ansible.builtin.debug: var=getent_user_result.ansible_facts.getent_passwd
   when:
     - getent_user_result.ansible_facts is defined
     - getent_user_result.ansible_facts.getent_passwd is defined
-    - getent_user_result.ansible_facts.getent_passwd[os_username] is defined
+    - getent_user_result.ansible_facts.getent_passwd[guest_user_name] is defined
 
 # Create a new user if it doesn't exist
-- name: "Add a new user '{{ os_username }}'"
+- name: "Add a new user '{{ guest_user_name }}'"
   ansible.builtin.user:
-    name: "{{ os_username }}"
-    group: "{{ os_group | default('users') }}"
-    password: "{{ vm_password | password_hash('sha512') }}"
+    name: "{{ guest_user_name }}"
+    group: "{{ guest_user_group | default('users') }}"
+    password: "{{ guest_user_password | default(vm_password) | password_hash('sha512') }}"
     update_password: on_create
     expires: -1
   delegate_to: "{{ vm_guest_ip }}"
   when: >
     getent_user_result.ansible_facts is undefined or
     getent_user_result.ansible_facts.getent_passwd is undefined or
-    getent_user_result.ansible_facts.getent_passwd[os_username] is undefined
+    getent_user_result.ansible_facts.getent_passwd[guest_user_name] is undefined

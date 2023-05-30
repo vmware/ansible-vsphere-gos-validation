@@ -1,0 +1,50 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Gather information about a domain user on vCenter Server
+# Parameters:
+#   vcenter_domain_name: The vCenter Server user domain name. Default is same with vcenter_username domain.
+#   vcenter_domain_user_name: The domain user name.
+#
+- name: "Assert vcenter_domain_user_name is set"
+  ansible.builtin.assert:
+    that:
+      - vcenter_is_defined is defined
+      - vcenter_is_defined
+      - vcenter_domain_user_name is defined
+      - vcenter_domain_user_name
+    fail_msg: >-
+      vCenter Server information must be defined in testing vars file and
+      parameter 'vcenter_domain_user_name' must be set for gathering domain user info.
+      Current vcenter_is_defined is {{ vcenter_is_defined | default('undefined')}},
+      vcenter_domain_user_name is {{ vcenter_domain_user_name | default('undefined') }}.
+
+- name: "Set default user domain of vCenter Server"
+  ansible.builtin.set_fact:
+    vcenter_domain_name: "{{ vcenter_username.split('@')[-1] }}"
+  when: vcenter_domain_name is undefined or not vcenter_domain_name
+
+- name: "Initialize the fact of vCenter Server domain user"
+  ansible.builtin.set_fact:
+    vcenter_domain_user_info: ""
+
+- name: "Get info of domain user '{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}'"
+  community.vmware.vcenter_domain_user_group_info:
+    hostname: '{{ vcenter_hostname }}'
+    username: '{{ vcenter_username }}'
+    password: '{{ vcenter_password }}'
+    validate_certs: "{{ validate_certs | default(false) }}"
+    domain: "{{ vcenter_domain_name }}"
+    search_string: "{{ vcenter_domain_name }}\\{{ vcenter_domain_user_name }}"
+    exact_match: true
+  register: get_domain_user_result
+
+- name: "Set fact of vCenter domain user existing or not"
+  ansible.builtin.set_fact:
+    vcenter_domain_user_info: "{{ get_domain_user_result.domain_user_groups[0] }}"
+  when:
+    - get_domain_user_result.domain_user_groups is defined
+    - get_domain_user_result.domain_user_groups | length > 0
+
+- name: "Display gathered domain user information"
+  ansible.builtin.debug: var=vcenter_domain_user_info

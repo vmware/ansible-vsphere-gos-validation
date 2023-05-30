@@ -1,0 +1,52 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Enable debug logging for VGAuthService within Windows guest OS
+# See https://kb.vmware.com/s/article/1007873 for details.
+#
+- name: "Set facts of VGAuthService config file"
+  ansible.builtin.set_fact:
+    vgauth_config_file: "C:\\ProgramData\\VMware\\VMware VGAuth\\vgauth.conf"
+
+- name: "Check VGAuthService config file exists or not"
+  include_tasks: win_check_file_exist.yml
+  vars:
+    win_check_file_exist_file: "{{ vgauth_config_file }}"
+
+- include_tasks: win_write_to_file.yml
+  vars:
+    write_file_path: "{{ vgauth_config_file }}"
+    write_file_content: |
+      [service]
+      samlSchemaDir=C:\\Program Files\\VMware\\VMware Tools\\VMware VGAuth\\schemas
+      logfile=C:\\ProgramData\\VMware\\VMware VGAuth\\logfile.txt
+      aliasStoreDir=C:\\ProgramData\\VMware\\VMware VGAuth\\aliasStore\\
+      loglevel=verbose
+      enableLogging=true
+      enableCoreDumps=true
+      maxOldLogFiles=10
+      maxLogSize=10
+ 
+      [localization]
+      msgCatalog=C:\\ProgramData\\VMware\\VMware VGAuth\\msgCatalogs\\
+  when: not win_check_file_exist_result
+
+- name: "Update VGAuthService config file with logging options"
+  community.windows.win_lineinfile:
+    path: "{{ vgauth_config_file }}"
+    regexp: "^(# *)?loglevel.*"
+    line: "loglevel=verbose"
+    state: present
+  delegate_to: "{{ vm_guest_ip }}"
+  when: win_check_file_exist_result
+
+- name: "Save VGAuthService config file to local log directory"
+  include_tasks: win_get_file.yml
+  vars:
+    win_get_file_src_path: "{{ vgauth_config_file }}"
+    win_get_file_dst_path: "{{ current_test_log_folder }}/"
+
+- name: "Retart guest OS to make config take effect"
+  include_tasks: win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"

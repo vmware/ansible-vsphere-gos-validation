@@ -1,0 +1,101 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Enable debug logging for VGAuthService within Linux guest OS
+# See https://kb.vmware.com/s/article/1007873 for details.
+#
+- name: "Set facts about VGAuthService"
+  include_tasks: set_vgauth_facts.yml
+
+- name: "Set default VGAuthService debug log directory"
+  ansible.builtin.set_fact:
+    vgauth_log_dir: "/tmp/vmware-vgauthsvc-{{ lookup('pipe', 'date +%s') }}"
+
+- name: "Set facts of VGAuthService log files"
+  ansible.builtin.set_fact:
+    vgauth_log_files: "{{ vgauth_log_dir }}/vmware-vgauthsvc.log"
+    vgauth_latest_log_file: "{{ vgauth_log_dir }}/vmware-vgauthsvc.log.0"
+
+- name: "Set facts of VGAuthService config section and options for enabling debug logging"
+  ansible.builtin.set_fact:
+    vgauth_logging_section: service
+    vgauth_logging_options: |-
+      samlSchemaDir = /etc/vmware-tools/vgauth/schemas
+      loglevel=verbose
+      logfile={{ vgauth_log_files }}
+      enableLogging=true
+      enableCoreDumps=true
+      maxOldLogFiles=10
+      maxLogSize=10
+
+- name: "Prepare log directory {{ vgauth_log_dir }} for new logs"
+  ansible.builtin.shell: |
+    if [ -e {{ vgauth_log_dir }} ] ; then
+        rm -rf {{ vgauth_log_dir }};
+    fi;
+    mkdir -p {{ vgauth_log_dir }};
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Get VGAuthService config file stat info"
+  include_tasks: get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ vgauth_config_file }}"
+
+- name: "Create VGAuthService config file with logging options"
+  ansible.builtin.copy:
+    dest: "{{ vgauth_config_file }}"
+    content: |
+      [{{ vgauth_logging_section }}]
+      {{ vgauth_logging_options }}
+
+      [localization]
+      msgCatalog = /usr/share/open-vm-tools
+  delegate_to: "{{ vm_guest_ip }}"
+  when: not guest_file_exists
+
+- name: "Update VGAuthService config file with logging options"
+  include_tasks: ../../common/update_ini_style_file.yml
+  vars:
+    file_path: "{{ vgauth_config_file }}"
+    section_name: "{{ vgauth_logging_section }}"
+    option_name: "{{ item.key }}"
+    option_value: "{{ item.value }}"
+    ini_state: present
+  loop: "{{ vgauth_logging_options | replace('=',': ') | from_yaml | dict2items }}"
+  when: guest_file_exists
+
+- name: "Save VGAuthService config file to local log directory"
+  include_tasks: fetch_file.yml
+  vars:
+    fetch_file_src_path: "{{ vgauth_config_file }}"
+    fetch_file_dst_path: "{{ current_test_log_folder }}/"
+    fetch_file_ignore_errors: false
+
+# Debian family OS doesn't have '-s' option in VGAuthService start command,
+# which leads to no VGAuthService log file genereated. This block added '-s'
+# option so that we can collect VGAuthService log from Debian family OS
+- name: "Run VGAuthService in daemon mode on {{ guest_os_ansible_distribution }}"
+  block:
+    - name: "Update VGAuthService to run in daemon mode"
+      include_tasks: ../../common/update_ini_style_file.yml
+      vars:
+        file_path: "{{ vgauth_service_file }}"
+        section_name: "Service"
+        option_name: "ExecStart"
+        option_value: "/usr/bin/VGAuthService -s"
+        ini_state: present
+
+    - name: "Reload {{ vgauth_service_name }} service"
+      ansible.builtin.shell: "systemctl daemon-reload "
+      delegate_to: "{{ vm_guest_ip }}"
+  when:
+    - guest_os_family in ["Debian", "Astra Linux (Orel)"]
+    - vgauth_service_file is defined
+    - vgauth_service_file
+
+- name: "Restart VGAuthService to make config take effect"
+  include_tasks: service_operation.yml
+  vars:
+    service_name: "{{ vgauth_service_name }}"
+    service_enabled: true
+    service_state: "restarted"
