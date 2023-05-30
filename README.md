@@ -86,13 +86,12 @@ This project supports below scenarios for end-to-end guest operating system vali
 | UnionTech OS Server 20 1050a                    | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Fedora Server 36 and later                      | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | ProLinux Server 7.9, 8.5                        | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| FreeBSD 13 and later (*)                            | :heavy_check_mark:               |                          |                                    |
-| Pardus 21.2 Server and later                    | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Pardus 21.2 XFCE Desktop and later              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| FreeBSD 13 and later (*)                        | :heavy_check_mark:               |                          |                                    |
+| Pardus 21.2 Server,XFCE Desktop and later (*)    | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 
 **Notes**
 1. This compatible guest operating systems list is used for this project only. For guest operating system support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
-2. Guest OS marked with (*) only supports autoinstall and not support end-to-end tests for now.
+2. Guest OS marked with (*) only supports autoinstall and doesn't support end-to-end tests for now.
 
 ### Docker images
 * Latest (Release v2.3):
