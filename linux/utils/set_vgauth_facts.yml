@@ -1,0 +1,22 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Set facts of VGAuthService config file, log file, process, service name and file
+#
+- name: "Initialize facts of VGAuthService process, config file and default latest log file"
+  ansible.builtin.set_fact:
+    vgauth_process: {"uid": "root", "cmd": "VGAuthService"}
+    vgauth_config_file: "/etc/vmware-tools/vgauth.conf"
+    vgauth_latest_log_file: "/var/log/vmware-vgauthsvc.log.0"
+
+- name: "Set the fact of VGAuthService service name and file for {{ guest_os_ansible_distribution }}"
+  ansible.builtin.set_fact:
+    vgauth_service_name: "vgauthd"
+    vgauth_service_file: "/lib/systemd/system/vgauthd.service"
+  when: guest_os_family not in ["Debian", "Astra Linux (Orel)"]
+
+- name: "Set the fact of VGAuthService service name for {{ guest_os_ansible_distribution }}"
+  ansible.builtin.set_fact:
+    vgauth_service_name: "vgauth"
+    vgauth_service_file: "/lib/systemd/system/vgauth.service"
+  when: guest_os_family in ["Debian", "Astra Linux (Orel)"]

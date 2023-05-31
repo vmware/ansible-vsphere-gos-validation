@@ -1,0 +1,56 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Collect VGAuthService logs to local test case log directory
+#
+- name: "Initialize facts for collecting VGAuthService logs"
+  ansible.builtin.set_fact:
+    vgauth_log_file_src: "C:\\ProgramData\\VMware\\VMware VGAuth\\logfile.txt.0"
+    vgauth_log_file_dest: ""
+    vgauth_log_is_collected: false
+
+- name: "Check VGAuthService log file exists or not"
+  include_tasks: ../utils/win_check_file_exist.yml
+  vars:
+    win_check_file_exist_file: "{{ vgauth_log_file_src }}"
+
+- name: "Collect VGAuthService log file"
+  block:
+    - name: "Get VGAuthService status"
+      include_tasks: win_get_service_status.yml
+      vars:
+        win_service_name: "VGAuthService"
+
+    - name: "Set VGAuthService status"
+      ansible.builtin.set_fact:
+        vgauth_service_status: "{{ service_status }}"
+
+    # Stop VGAuthService in case of log file in use error
+    - name: "Stop VGAuthService before getting its log file"
+      include_tasks: win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "Stop-Service -Name VGAuthService"
+      when: vgauth_service_status == "Running"
+
+    - name: "Get VGAuthServce log file"
+      include_tasks: win_get_file.yml
+      vars:
+        win_get_file_src_path: "{{ vgauth_log_file_src }}"
+        win_get_file_dst_path: "{{ current_test_log_folder }}"
+
+    - name: "Start VGAuthService after getting its log file"
+      include_tasks: win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "Start-Service -Name VGAuthService"
+      when: vgauth_service_status == "Running"
+
+    - name: "Set facts of VGAuthService file collected at localhost"
+      ansible.builtin.set_fact:
+        vgauth_log_file_dest: "{{ fetch_file.dest }}"
+        vgauth_log_is_collected: True
+      when:
+        - fetch_file.failed is defined
+        - not fetch_file.failed
+        - fetch_file.dest is defined
+        - fetch_file.dest
+  when: win_check_file_exist_result

@@ -12,11 +12,13 @@
   tasks:
     - name: "Test case block"
       block:
-        - include_tasks: ../setup/test_setup.yml
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: true
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip this test case for Flatcar"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Flatcar doesn't have VGAuth service"
             skip_reason: "Not Supported"
@@ -24,27 +26,27 @@
              (guest_os_ansible_distribution is defined) and
              ('Flatcar' in guest_os_ansible_distribution)
 
-        - name: "Initialize the variable for VGAuth process and service"
-          ansible.builtin.set_fact:
-            vgauth_process: "VGAuthService"
-            vgauth_service: "vgauthd"
+        - name: "Set facts of VGAuthService process and service"
+          include_tasks: ../utils/set_vgauth_facts.yml
 
-        - name: "Set the vgauth service name for Ubuntu/Debian"
-          ansible.builtin.set_fact:
-            vgauth_service: "vgauth"
-          when: guest_os_family in ["Debian", "Astra Linux (Orel)"]
-
-        # Check VGAuth processe is running
-        - include_tasks: ../utils/check_process_status.yml
+        - name: "Check VGAuthService processe is running"
+          include_tasks: ../utils/check_process_status.yml
           vars:
-            process_name: "{{ vgauth_process }}"
+            process_uid: "{{ vgauth_process.uid }}"
+            process_name: "{{ vgauth_process.cmd }}"
             expected_process_state: "present"
 
-        # Check VGAuth service is active and enabled
-        - include_tasks: ../utils/check_service_status.yml
+        - name: "Check VGAuthService is active and enabled"
+          include_tasks: ../utils/check_service_status.yml
           vars:
-            service_name: "{{ vgauth_service }}"
+            service_name: "{{ vgauth_service_name }}"
             expected_service_state: "running"
             expected_service_status: "enabled"
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+      always:
+        - name: "Collect VGAuthServcie logs"
+          include_tasks: ../utils/collect_vgauth_logs.yml
+          vars:
+            vgauth_log_file_src: "{{ vgauth_latest_log_file }}"

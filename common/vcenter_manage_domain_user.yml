@@ -1,0 +1,131 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Add or delete a domain user on vCenter Server
+# Parameters:
+#   vcenter_domain_user_name: The domain user name.
+#   vcenter_domain_user_password: The domain user password.
+#   vcenter_domain_user_op: The operation of managing domain user: add or delete.
+#   vcenter_domain_name(optional): The vCenter Server user domain name.
+#     Default is vcenter_username domain.
+#   vcenter_domain_user_first_name(optional): The first name of domain user.
+#     Default is same as user name.
+#   vcenter_domain_user_last_name(optional): The last name of domain user.
+#     Default is same as domain name.
+#   vcenter_domain_user_group(optional): The user group which domain user belongs to.
+#     Default is empty.
+#
+# vcenter_is_defined is defined in common/set_vmware_module_hostname.yml
+# groups['vcenter'] is defined in common/add_vsphere_hosts_in_inventory.yml
+# both of them are set at env_setup
+- name: "Check vCenter Server is defined and added into memory inventory"
+  ansible.builtin.assert:
+    that:
+      - vcenter_is_defined is defined
+      - vcenter_is_defined
+      - groups['vcenter'] is defined
+      - vcenter_hostname in groups['vcenter']
+    fail_msg: >-
+      vCenter Server information and its SSH username and password must be set in testing vars file.
+      Current vcenter_is_defined is {{ vcenter_is_defined | default('undefined') }},
+      and vCenter Server hostname in memory inventory is
+      {{ groups['vcenter'] is defined and vcenter_hostname in groups['vcenter'] }}.
+
+- name: "Check vcenter_domain_user_name, vcenter_domain_user_password and vcenter_domain_user_op are set"
+  ansible.builtin.assert:
+    that:
+      - vcenter_domain_user_name is defined
+      - vcenter_domain_user_name
+      - vcenter_domain_user_password is defined
+      - vcenter_domain_user_password
+      - vcenter_domain_user_op is defined
+      - vcenter_domain_user_op in ['add', 'delete']
+    fail_msg: >-
+      Parameter 'vcenter_domain_user_name','vcenter_domain_user_password' and 'vcenter_domain_user_op'
+      must be set correclty for managing domain user.
+      Current vcenter_domain_user_name is {{ vcenter_domain_user_name | default('undefined') }},
+      vcenter_domain_user_password is {{ vcenter_domain_user_password | default('undefined') }},
+      and vcenter_domain_user_op is {{ vcenter_domain_user_op | default('undefined') }}.
+
+- name: "Set default user domain of vCenter Server"
+  ansible.builtin.set_fact:
+    vcenter_domain_name: "{{ vcenter_username.split('@')[-1] }}"
+  when: vcenter_domain_name is undefined or not vcenter_domain_name
+
+- name: "Set command for adding domain user"
+  ansible.builtin.set_fact:
+    manage_domain_user_cmd: >-
+      /usr/lib/vmware-vmafd/bin/dir-cli user create
+      --account "{{ vcenter_domain_user_name }}"
+      --user-password "{{ vcenter_domain_user_password }}"
+      --first-name "{{ vcenter_domain_user_first_name | default(vcenter_domain_user_name) }}"
+      --last-name "{{ vcenter_domain_user_last_name | default(vcenter_domain_name) }}"
+      --login "{{ vcenter_username }}"
+      --password "{{ vcenter_password }}"
+  when: vcenter_domain_user_op == "add"
+
+- name: "Set command for deleteing domain user"
+  ansible.builtin.set_fact:
+    manage_domain_user_cmd: >-
+      /usr/lib/vmware-vmafd/bin/dir-cli user delete
+      --account "{{ vcenter_domain_user_name }}"
+      --login "{{ vcenter_username }}"
+      --password "{{ vcenter_password }}"
+  when: vcenter_domain_user_op == "delete"
+
+- name: "{{ vcenter_domain_user_op | capitalize }} domain user '{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}'"
+  ansible.builtin.command: "{{ manage_domain_user_cmd }}"
+  ignore_errors: true
+  delegate_to: "{{ vcenter_hostname }}"
+  register: manage_domain_user_result
+
+- name: "Display result of managing domain user"
+  ansible.builtin.debug: var=manage_domain_user_result
+  when: enable_debug | bool
+
+- name: "Check the result of managing domain user '{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}'"
+  ansible.builtin.assert:
+    that:
+      - manage_domain_user_result.rc is defined
+      - manage_domain_user_result.rc == 0
+    fail_msg: >-
+      Failed to {{ vcenter_domain_user_op }} domain user '{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}'.
+      Return code is '{{ manage_domain_user_result.rc | default("unknown") }}'.
+      Hit error '{{ manage_domain_user_result.stderr | default("unknown") }}'.
+    success_msg: "{{ manage_domain_user_result.stdout | default(omit) }}"
+
+- name: "Add domain user to user group"
+  block:
+    - name: "Set command for adding domain user to user group"
+      ansible.builtin.set_fact:
+        modify_user_group_cmd: >-
+          /usr/lib/vmware-vmafd/bin/dir-cli group modify
+          --name "{{ vcenter_domain_user_group }}"
+          --add "{{ vcenter_domain_user_name }}"
+          --login "{{ vcenter_username }}"
+          --password "{{ vcenter_password }}"
+
+    - name: "Add domain user to user group '{{ vcenter_domain_user_group }}'"
+      ansible.builtin.command: "{{ modify_user_group_cmd }}"
+      delegate_to: "{{ vcenter_hostname }}"
+      register: modify_user_group_result
+
+    - name: "Display result of adding domain user to user group"
+      ansible.builtin.debug: var=modify_user_group_result
+      when: enable_debug | bool
+
+    - name: "Check the result of adding domain user to user group '{{ vcenter_domain_user_group }}'"
+      ansible.builtin.assert:
+        that:
+          - modify_user_group_result.rc is defined
+          - modify_user_group_result.rc == 0
+        fail_msg: >-
+          Failed to add domain user '{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}'
+          to user group '{{ vcenter_domain_user_group }}'.
+          Return code is '{{ modify_user_group_result.rc | default("unknown") }}'.
+          Hit error '{{ modify_user_group_result.stderr | default("unknown") }}'
+        success_msg: "{{ modify_user_group_result.stdout | default(omit) }}"
+  when:
+    - vcenter_domain_user_op == "add"
+    - vcenter_domain_user_group is defined
+    - vcenter_domain_user_group

@@ -1,0 +1,42 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Collect VGAuthService logs to local test case log directory
+# Parameter:
+#   vgauth_log_file_src: The VGAuthService log file path
+#
+- name: "Initialize the latest VGAuthService log path in guest OS"
+  ansible.builtin.set_fact:
+    vgauth_log_file_src: "/var/log/vmware-vgauthsvc.log.0"
+  when: vgauth_log_file_src is undefined or not vgauth_log_file_src
+
+- name: "Initialize facts of collected VGAuthService log path at localhost"
+  ansible.builtin.set_fact:
+    vgauth_log_file_dest: ""
+    vgauth_log_is_collected: false
+
+- name: "Get VGAuthService log file info"
+  include_tasks: get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ vgauth_log_file_src }}"
+
+- name: "Set fact of VGAuthService log exists or not"
+  ansible.builtin.set_fact:
+    vgauth_log_file_exists: "{{ guest_file_exists }}"
+
+- name: "Collect VGAuthService log file"
+  block:
+    - name: "Collect VGAuthServce log to test case log dir"
+      include_tasks: fetch_file.yml
+      vars:
+        fetch_file_src_path: "{{ vgauth_log_file_src }}"
+        fetch_file_dst_path: "{{ current_test_log_folder }}/"
+
+    - name: "Set facts of VGAuthService file collected at localhost"
+      ansible.builtin.set_fact:
+        vgauth_log_file_dest: "{{ fetch_file_local_path }}"
+        vgauth_log_is_collected: True
+      when:
+        - fetch_file_local_path is defined
+        - fetch_file_local_path
+  when: vgauth_log_file_exists | bool

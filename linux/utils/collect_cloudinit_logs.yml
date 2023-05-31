@@ -23,6 +23,9 @@
         operation: "fetch_file"
         src_path: "{{ cloudinit_logs_src_path }}"
         dest_path: "{{ cloudinit_logs_local_path }}"
+      when:
+        - vm_shell_result.exit_code is defined
+        - vm_shell_result.exit_code == 0
   when:
     - vmtools_is_running is defined
     - vmtools_is_running | bool
@@ -31,12 +34,17 @@
     - name: "Collect cloud-init logs"
       ansible.builtin.shell: "/usr/bin/cloud-init collect-logs -u -t {{ cloudinit_logs_src_path }}"
       delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: True
+      register: collect_cloudinit_logs_result
 
     - name: "Fetch cloud-init logs from guest OS"
       include_tasks: fetch_file.yml
       vars:
         fetch_file_src_path: "{{ cloudinit_logs_src_path }}"
         fetch_file_dst_path: "{{ cloudinit_logs_local_path }}"
+      when:
+        - collect_cloudinit_logs_result.rc is defined
+        - collect_cloudinit_logs_result.rc == 0
   when:
     - vmtools_is_running is undefined or not (vmtools_is_running | bool)
     - vm_guest_ip is defined
