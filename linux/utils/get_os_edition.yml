@@ -1,0 +1,41 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get guest OS edition
+# For example,
+#   Ubuntu: Desktop, Server, Cloud Image
+#   Pardus: Desktop, Server
+#
+- name: "Initialize the fact of guest OS edition"
+  ansible.builtin.set_fact:
+    guest_os_edition: ""
+
+- name: "Get Ubuntu edition"
+  block:
+    - name: "Get installed packages on {{ guest_os_ansible_distribution }}"
+      include_tasks: get_installed_packages.yml
+
+    - name: "Set fact of Ubuntu edition"
+      ansible.builtin.set_fact:
+        guest_os_edition: |-
+          {%- if 'linux-image-virtual' in guest_installed_packages -%}CloudImage
+          {%- elif 'ubuntu-server' in guest_installed_packages -%}Server
+          {%- elif 'ubuntu-desktop' in guest_installed_packages -%}Desktop
+          {%- else -%}{%- endif -%}
+      when: guest_installed_packages | length > 0
+  when: guest_os_ansible_distribution == "Ubuntu"
+
+- name: "Get Pardus edition"
+  block:
+    - name: "Get display manager on {{ guest_os_ansible_distribution }}"
+      include_tasks: check_guest_os_gui.yml
+      when: guest_os_display_manager is undefined
+
+    - name: "Set fact of Pardus edition"
+      ansible.builtin.set_fact:
+        guest_os_edition: |-
+          {%- if guest_os_display_manager == 'lightdm' -%}XFCE
+          {%- elif guest_os_display_manager == 'gdm' -%}GNOME
+          {%- else -%}Server
+          {%- endif -%}
+  when: guest_os_ansible_distribution is match("Pardus.*")
