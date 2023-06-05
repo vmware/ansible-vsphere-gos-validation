@@ -60,10 +60,21 @@
       include_tasks: ../../common/vm_get_config.yml
       vars:
         property_list: ['guest']
-
-    - name: "Display toolsVersion of open-vm-tools in OVA"
-      debug: var=vm_config.guest.toolsVersion
-      when: vm_config.guest is defined and vm_config.guest.toolsVersion is defined
+    
+    - name: "Check toolsVersion of open-vm-tools in OVA after deploy VM"
+      block:
+        - name: "Display toolsVersion of open-vm-tools in OVA"
+          debug: var=vm_config.guest.toolsVersion
+        
+        - name: "Check toolsVersion of open-vm-tools in OVA is 2147483647"
+          ansible.builtin.assert:
+            that:
+              - vm_config.guest.toolsVersion == "2147483647"
+            fail_msg: "toolsVersion of open-vm-tools in OVA is not 2147483647"
+      when:
+        - vm_config.guest is defined 
+        - vm_config.guest.toolsStatus is defined
+        - vm_config.guest.toolsStatus is match("NotRunning")
 
     - name: "Power on VM"
       include_tasks: ../../common/vm_set_power_state.yml
@@ -77,13 +88,6 @@
 
     - name: "Try to get OS type from guest info"
       include_tasks: get_ova_guest_os_type.yml
-
-    - name: "Check toolsVersion of open-vm-tools in OVA is 2147483647"
-      ansible.builtin.assert:
-        that:
-          - vm_config.guest.toolsVersion == "2147483647"
-        fail_msg: "ddb.toolsVersion of open-vm-tools in OVA is not 2147483647"
-      when: ovf_vm_vmtools_info['Install Type'] == "guestToolsTypeOpenVMTools"
 
     # Revert to snapshot "FreshDeployedFromOVA" to
     # proceed the following tasks so that VM's reconfiguration can be
