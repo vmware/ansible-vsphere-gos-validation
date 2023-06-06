@@ -22,9 +22,6 @@
     ovf_vm_guest_bitness: ""
     ovf_vm_hardware_config_file: 'ovf_deploy_vm_info.json'
 
-- name: "Get VM info"
-  include_tasks: vm_get_vm_info.yml
-
 - name: "Get all the VM hardwares info"
   include_tasks: vm_get_config.yml
 
@@ -33,7 +30,7 @@
     ovf_vm_hardware_config: >-
       {{
         ovf_vm_hardware_config |
-        combine({'Guest OS ID': vm_guest_id | default(''),
+        combine({'Guest OS ID': vm_config.config.guestId | default(''),
                  'Guest OS Version': vm_config.config.guestFullName | default(''),
                  'Hardware Version': vm_hardware_version | default(''),
                  'CPU Number': vm_config.config.hardware.numCPU | default(''),
@@ -153,11 +150,16 @@
     ovf_vm_vmtools_info: >-
       {{
         ovf_vm_vmtools_info |
-        combine({'Version': vm_config.config.tools.toolsVersion | default(''),
+        combine({'Config Tools Version': vm_config.config.tools.toolsVersion | default(''),
                  'Install Type': vm_config.config.tools.toolsInstallType | default(''),
                  'Upgrade Policy': vm_config.config.tools.toolsUpgradePolicy | default(''),
                  'Sync Time with Host': vm_config.config.tools.syncTimeWithHost | default('')})
       }}
+
+- name: "Power on VM"
+  include_tasks: vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-on'
 
 - name: "Wait for VMware Tools running"
   include_tasks: vm_wait_vmtools_status.yml
@@ -168,12 +170,12 @@
 - name: "Get VM's guest info"
   include_tasks: vm_get_guest_info.yml
 
-- name: "Update VMware Tools version"
+- name: "Get Guest Tools version"
   ansible.builtin.set_fact:
     ovf_vm_vmtools_info: >-
       {{
         ovf_vm_vmtools_info |
-        combine({'Version': guestinfo_vmtools_info })
+        combine({'Guest Tools Version': guestinfo_vmtools_info })
       }}
   when: guestinfo_vmtools_info
 

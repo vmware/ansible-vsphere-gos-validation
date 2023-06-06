@@ -55,36 +55,28 @@
       include_tasks: ../../common/vm_take_snapshot.yml
       vars:
         snapshot_name: "{{ base_snapshot_for_reconfig }}"
-    
-    - name: "Get open-vm-tools info in OVA"
-      include_tasks: ../../common/vm_get_config.yml
-      vars:
-        property_list: ['guest']
-    
-    - name: "Check toolsVersion of open-vm-tools in OVA after deploy VM"
-      block:
-        - name: "Display toolsVersion of open-vm-tools in OVA"
-          debug: var=vm_config.guest.toolsVersion
-        
-        - name: "Check toolsVersion of open-vm-tools in OVA is 2147483647"
-          ansible.builtin.assert:
-            that:
-              - vm_config.guest.toolsVersion == "2147483647"
-            fail_msg: "toolsVersion of open-vm-tools in OVA is not 2147483647"
-      when:
-        - vm_config.guest is defined 
-        - vm_config.guest.toolsStatus is defined
-        - vm_config.guest.toolsStatus is match("NotRunning")
-
-    - name: "Power on VM"
-      include_tasks: ../../common/vm_set_power_state.yml
-      vars:
-        vm_power_state_set: 'powered-on'
 
     - name: "Collect OVA configs"
       include_tasks: "../../common/collect_ovf_vm_config.yml"
       vars:
         ovf_vm_hardware_config_path: "{{ current_test_log_folder }}"
+    
+    - name: "Get VM info"
+      include_tasks: ../../common/vm_get_vm_info.yml
+
+    - name: "Check toolsVersion of open-vm-tools in OVA after deploy VM"
+      block:
+        - name: "Display toolsVersion of open-vm-tools in OVA"
+          debug: var=ovf_vm_vmtools_info['Config Tools Version']
+        
+        - name: "Check toolsVersion of open-vm-tools in OVA is expected"
+          ansible.builtin.assert:
+            that:
+              - ovf_vm_vmtools_info['Config Tools Version'] in ['2147483647', ovf_vm_vmtools_info['Guest Tools Version']]
+            fail_msg: "toolsVersion of open-vm-tools in OVA is not expected"
+      when:
+        - ovf_vm_vmtools_info['Config Tools Version'] is defined
+        - ovf_vm_vmtools_info['Config Tools Version'] != ""
 
     - name: "Try to get OS type from guest info"
       include_tasks: get_ova_guest_os_type.yml
