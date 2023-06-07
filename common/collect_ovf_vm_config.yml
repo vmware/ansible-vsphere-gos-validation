@@ -250,12 +250,10 @@
     dest: "{{ ovf_vm_hardware_config_path }}/{{ ovf_vm_hardware_config_file }}"
     content: "{{ [ovf_vm_hardware_config] | to_nice_json }}"
 
-- name: "Display ddb.toolsVersion of open-vm-tools in OVA"
-  debug: var=ovf_vm_vmtools_info['Config Tools Version']
-        
 - name: "Check ddb.toolsVersion of open-vm-tools in OVA is expected"
   ansible.builtin.assert:
     that:
       - ovf_vm_vmtools_info['Config Tools Version'] | string | length > 0 or vm_extra_config['guestinfo.vmtools.versionNumber'] | length > 0
       - ovf_vm_vmtools_info['Config Tools Version'] | string in ['2147483647', vm_extra_config['guestinfo.vmtools.versionNumber']]
     fail_msg: "The ddb.toolsVersion in OVA template is {{ ovf_vm_vmtools_info['Config Tools Version'] }}, not as expected '2147483647' or {{ vm_extra_config['guestinfo.vmtools.versionNumber'] }}."
+    success_msg: "The ddb.toolsVersion in OVA template is {{ ovf_vm_vmtools_info['Config Tools Version'] }}, which is as expected."
