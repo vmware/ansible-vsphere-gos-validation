@@ -98,6 +98,9 @@
 - name: "Check whether guest OS has GUI"
   include_tasks: check_guest_os_gui.yml
 
+- name: "Get guest OS edition"
+  include_tasks: get_os_edition.yml
+
 - name: "Print Linux guest OS information"
   ansible.builtin.debug:
     msg:
@@ -110,13 +113,17 @@
       - "Guest OS version: {{ guest_os_ansible_distribution_ver }}"
       - "Guest OS kernel: {{ guest_os_ansible_kernel }}"
       - "Guest OS release: {{ guest_os_ansible_distribution_release }}"
+      - "Guest OS edition: {{ guest_os_edition }}"
       - "Guest OS family: {{ guest_os_family }}"
       - "Guest OS with desktop environment: {{ guest_os_with_gui }}"
       - "Guest OS display manager: {{ guest_os_display_manager }}"
 
 - name: "Set fact of VM guest OS type"
   ansible.builtin.set_fact:
-    vm_guest_os_distribution: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} {{ guest_os_ansible_architecture }}"
+    vm_guest_os_distribution: >-
+      {{ guest_os_ansible_distribution }}
+      {{ (guest_os_ansible_distribution_ver ~ ' ' ~ guest_os_edition).strip() }}
+      {{ guest_os_ansible_architecture }}
 
 - name: "Set fact that ansible system information about guest OS has been retrieved"
   ansible.builtin.set_fact:

@@ -4,30 +4,35 @@
 # Description:
 #   Check whether the guest OS version supports secureboot testing
 #
-- include_tasks: ../../common/skip_test_case.yml
+- name: "Skip test case for hardware version lower than 13"
+  include_tasks: ../../common/skip_test_case.yml
   vars:
     skip_msg: >-
-      Secure boot is not supported on VM with hardware version {{ vm_hardware_version_num }}.
+      Skip test case {{ ansible_play_name }} because secure boot is not supported
+      on VM with hardware version {{ vm_hardware_version_num }}.
     skip_reason: "Not Supported"
   when: vm_hardware_version_num | int < 13
 
-- include_tasks: ../../common/skip_test_case.yml
+- name: "Skip test case for not supported guest OS"
+  include_tasks: ../../common/skip_test_case.yml
   vars:
     skip_msg: >-
-      {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} doesn't support secure boot.
+      Skip test case {{ ansible_play_name }} because secure boot is not supported
+      by {{ vm_guest_os_distribution }}.
     skip_reason: "Not Supported"
   when: >
     (guest_os_ansible_distribution == "Rocky" and
       guest_os_ansible_distribution_ver is version('8.4', '<=')) or
-    (guest_os_ansible_distribution == "Astra Linux (Orel)")
+    guest_os_ansible_distribution is match('Pardus.*') or
+    (guest_os_ansible_distribution in ["Astra Linux (Orel)", "ProLinux", "UnionTech", "Uos"])
 
-- name: "Skip secureboot testing for OS version which has vulnerable bootloaders"
+- name: "Skip test case for OS version which has vulnerable bootloaders"
   block:
     - include_tasks: ../../common/skip_test_case.yml
       vars:
         skip_msg: >-
-          {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} image has vulnerable
-          bootloader, which is denied for secure boot from ESXi 8.0 release.
+          Skip test case {{ ansible_play_name }} because {{ vm_guest_os_distribution }} image has
+          vulnerable bootloader, which is denied for secure boot from ESXi 8.0 release.
           Please refer to https://kb.vmware.com/s/article/88737.
         skip_reason: "Not Supported"
       when: >

@@ -1,0 +1,30 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get all installed packages on guest OS
+# Return:
+#   guest_installed_packages: A list of all installed packages
+#
+- name: "Initialize the fact of guest installed pacakges"
+  ansible.builtin.set_fact:
+    guest_installed_packages: []
+
+- name: "Get installed packages on {{ guest_os_ansible_distribution }}"
+  ansible.builtin.package_facts:
+    manager: auto
+  delegate_to: "{{ vm_guest_ip }}"
+  register: guest_package_facts
+
+- name: "Set fact of installed packages on {{ guest_os_ansible_distribution }}"
+  ansible.builtin.set_fact:
+    guest_installed_packages: >-
+      {{
+        guest_package_facts.ansible_facts.packages |
+        dict2items |
+        map(attribute='value') |
+        flatten |
+        map(attribute='name')
+      }}
+  when:
+    - guest_package_facts.ansible_facts.packages is defined
+    - guest_package_facts.ansible_facts.packages | length > 0

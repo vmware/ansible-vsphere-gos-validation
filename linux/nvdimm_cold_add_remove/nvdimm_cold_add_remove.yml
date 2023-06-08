@@ -10,30 +10,42 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: false
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case for not supported guest OS"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "{{ guest_os_ansible_distribution }} doesn't support NVDIMM"
+            skip_msg: >-
+              Skip test case {{ ansible_play_name }} because {{ vm_guest_os_distribution }}
+              doesn't support NVDIMM.
             skip_reason: "Not Supported"
           when: >
             ('Flatcar' in guest_os_ansible_distribution or
-             guest_os_ansible_distribution == 'UnionTech')
+             guest_os_ansible_distribution in ['UnionTech', 'Uos', 'Amazon'] or
+             (guest_os_ansible_distribution == 'Ubuntu' and
+              guest_os_edition == 'CloudImage'))
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case for 32-bit guest OS"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "NVDIMM is not supported on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} {{ guest_os_bit }}"
+            skip_msg: >-
+              Skip test case {{ ansible_play_name }} because NVDIMM is not supported
+              for 32-bit guest OS {{ vm_guest_os_distribution }}.
             skip_reason: "Not Supported"
           when: guest_os_bit == "32-bit"
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case for hardware version lower than 14"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: >-
+              Skip test case {{ ansible_play_name }} because
               NVDIMM support starts from ESXi 6.7 and VM hardware version 14.
-              VM hardware version is '{{ vm_hardware_version_num }}', which is not >= 14.
+              VM hardware version is {{ vm_hardware_version_num }}, which is not >= 14.
             skip_reason: "Not Supported"
           when: vm_hardware_version_num | int < 14
 
@@ -42,12 +54,15 @@
           vars:
             guest_id: "{{ vm_guest_id }}"
             esxi_hardware_version: "{{ vm_hardware_version_num }}"
-        - include_tasks: ../../common/skip_test_case.yml
+
+        - name: "Skip test case for not supported guest ID"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: >-
-              This guest ID '{{ vm_guest_id }}' with hardware version '{{ vm_hardware_version_num }}'
-              does not support persistent memory, support_persistent_memory config option value
-              is '{{ guest_config_options.support_persistent_memory | default('') }}'.
+              Skip test case {{ ansible_play_name }} because the VM's guest ID {{ vm_guest_id }}
+              with hardware version {{ vm_hardware_version_num }} does not support persistent memory,
+              support_persistent_memory config option value
+              is '{{ guest_config_options.support_persistent_memory | default("") }}'.
             skip_reason: "Not Supported"
           when: >
             (guest_config_options.support_persistent_memory is undefined) or
@@ -66,7 +81,7 @@
           include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: >-
-              Test case '{{ ansible_play_name }}' is blocked because guest OS doesn't have libnvdimm module.
+              Test case {{ ansible_play_name }} is blocked because guest OS doesn't have libnvdimm module.
             skip_reason: "Blocked"
           when: >
             (guest_libnvdimm_module_info.filename is undefined) or
@@ -75,12 +90,14 @@
 
         - name: "Get ESXi host persistent memory info"
           include_tasks: ../../common/esxi_get_pmem_info.yml
-        - include_tasks: ../../common/skip_test_case.yml
+
+        - name: "Block test case because of ESXi PMem doesn't meet test requirements"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: >-
-              Test case '{{ ansible_play_name }}' is blocked because ESXi PMem is less than 16MB.
-              ESXi total persistent memory size is '{{ esxi_pmem_total_mb }} MB'
-              ESXi available persistent memory size is '{{ esxi_pmem_available_mb }} MB'
+              Test case {{ ansible_play_name }} is blocked because ESXi PMem is less than 16MB.
+              ESXi total persistent memory size is {{ esxi_pmem_total_mb }} MB,
+              ESXi available persistent memory size is {{ esxi_pmem_available_mb }} MB.
             skip_reason: "Blocked"
           when: >
             (esxi_pmem_total_mb | int == 0) or
@@ -92,4 +109,5 @@
         - name: "Test VM NVDIMM cold-remove"
           include_tasks: cold_remove_nvdimm_test.yml
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
