@@ -28,12 +28,15 @@
 
 - name: "Test case block"
   block:
-    - include_tasks: ../../common/get_iso_file_list.yml
+    - name: "Get OS installation ISO file list"
+      include_tasks: ../../common/get_iso_file_list.yml
 
-    - include_tasks: ubuntu/prepare_ubuntu_iso_install.yml
+    - name: "Prepare for Ubuntu installation"
+      include_tasks: ubuntu/prepare_ubuntu_iso_install.yml
       when: "'ubuntu' in guest_id"
 
-    - block:
+    - name: "Set default unattend install conf file"
+      block:
         - name: "Set default unattend install conf file for VMware Photon OS"
           ansible.builtin.set_fact:
             unattend_install_conf: "Photon/ks.cfg"
@@ -42,76 +45,87 @@
         - name: "Set default unattend install conf file for Debian"
           ansible.builtin.set_fact:
             unattend_install_conf: "Debian/10/preseed.cfg"
-          when: "'debian10' in guest_id or 'debian11' in guest_id"
-        
+          when: guest_id is match("debian1\\d+")
+
         - name: "Set default unattend install conf file for FreeBSD"
           ansible.builtin.set_fact:
             unattend_install_conf: "FreeBSD/installerconfig"
           when: "'freebsd' in guest_id"
       when: unattend_install_conf is undefined or not unattend_install_conf
 
-    - ansible.builtin.debug:
+    - name: "warning: unattend_install_conf is undefined"
+      ansible.builtin.debug:
         msg: "unattend_install_conf is not defined or set to a file path, will not generate unattend iso file"
       when: unattend_install_conf is undefined or not unattend_install_conf
 
-    # Generate unattend install iso file
-    - include_tasks: create_unattend_install_iso.yml
+    - name: "Generate unattend install iso file"
+      include_tasks: create_unattend_install_iso.yml
       when: unattend_install_conf is defined and unattend_install_conf
 
-    # Compose VM CDROMs to mount OS install ISO files
-    - include_tasks: ../../common/compose_vm_cdroms.yml
-    # Create a new VM
-    - include_tasks: ../../common/vm_create.yml
+    - name: "Compose VM CDROMs to mount OS install ISO files"
+      include_tasks: ../../common/compose_vm_cdroms.yml
+
+    - name: "Create a new VM with {{ boot_disk_controller }} disk"
+      include_tasks: ../../common/vm_create.yml
       when: boot_disk_controller != 'ide'
-    - include_tasks: ../../common/vm_create_with_ide_disk.yml
+
+    - name: "Create a new VM with {{ boot_disk_controller }} disk"
+      include_tasks: ../../common/vm_create_with_ide_disk.yml
       when: boot_disk_controller == 'ide'
-    - include_tasks: ../../common/vm_get_vm_info.yml
+
+    - name: "Get VM info"
+      include_tasks: ../../common/vm_get_vm_info.yml
+
     - name: "Set fact of vm_exists to True"
       ansible.builtin.set_fact:
         vm_exists: true
 
-    # Add a serial port to monitor autoinstall process
-    - include_tasks: ../../common/vm_add_serial_port.yml
+    - name: "Add a serial port to monitor autoinstall process"
+      include_tasks: ../../common/vm_add_serial_port.yml
 
-    - block:
-        - include_tasks: ../../common/vm_get_video_card.yml
+    - name: "Set video memory size"
+      block:
+        - name: "Get VM's video card info"
+          include_tasks: ../../common/vm_get_video_card.yml
 
-        - name: Get VM default video memory size
+        - name: "Get VM default video memory size"
           ansible.builtin.set_fact:
             vm_default_video_memory_mb: "{{ (vm_video_cart_facts.instance.video_memory | int) / 1024 }}"
 
-        # Increase VM's video card memory to 8 MB in case desktop can't be loaded
-        - include_tasks: ../../common/vm_set_video_card.yml
+        - name: "Increase VM's video card memory to 8 MB in case desktop can't be loaded"
+          include_tasks: ../../common/vm_set_video_card.yml
           vars:
             video_memory_mb: 8
           when: vm_default_video_memory_mb | int < 8
       when: install_guest_with_desktop
 
-    # Enable secureboot
-    - include_tasks: ../../common/vm_set_boot_options.yml
+    - name: "Enable secure boot on VM"
+      include_tasks: ../../common/vm_set_boot_options.yml
       vars:
         secure_boot_enabled_set: true
       when:
         - firmware is defined and firmware | lower == 'efi'
         - secureboot_enabled is defined and secureboot_enabled
 
-    # Add virtual TPM device
-    - include_tasks: ../../common/vm_add_vtpm_device.yml
+    - name: "Add virtual TPM device"
+      include_tasks: ../../common/vm_add_vtpm_device.yml
       vars:
         vc_cert_path: "{{ current_test_log_folder }}"
       when:
         - firmware is defined and firmware | lower == 'efi'
         - virtual_tpm is defined and virtual_tpm | bool
 
-    - include_tasks: ../../common/vm_set_power_state.yml
+    - name: "Power on VM"
+      include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: 'powered-on'
-    - name: Sleep 5 seconds to wait boot screen display
+
+    - name: "Sleep 5 seconds to wait boot screen display"
       ansible.builtin.pause:
         seconds: 5
 
-    # Check Image APPROVED in vmware.log when VM secureboot is enabled
-    - include_tasks: ../../common/vm_wait_log_msg.yml
+    - name: "Check Image APPROVED in vmware.log when VM secure boot is enabled"
+      include_tasks: ../../common/vm_wait_log_msg.yml
       vars:
         vm_wait_log_name: "vmware.log"
         vm_wait_log_msg: "SECUREBOOT: Image APPROVED"
@@ -122,12 +136,14 @@
         - firmware is defined and firmware | lower == 'efi'
         - secureboot_enabled is defined and secureboot_enabled
 
-    - include_tasks: ubuntu/ubuntu_install_os.yml
+    - name: "Install Ubuntu OS"
+      include_tasks: ubuntu/ubuntu_install_os.yml
       when: "'ubuntu' in guest_id"
 
-    # For SLES, OS installation with BIOS firmware, sendkey to boot
+    # For SLES, OS installation with BIOS firmware, send key to boot
     # screen to start new installation instead of booting from local
-    - include_tasks: ../../common/vm_guest_send_key.yml
+    - name: "Select boot menu for SLES/SLED"
+      include_tasks: ../../common/vm_guest_send_key.yml
       vars:
         keys_send:
           - DOWNARROW
@@ -137,10 +153,11 @@
         - ('SLE' in unattend_install_conf or 'openSUSE' in unattend_install_conf)
         - firmware is defined and firmware|lower == "bios"
 
-    # For RHEL, CentOS, RockyLinux, OracleLinux, sendkey to boot screen to not do
+    # For RHEL, CentOS, RockyLinux, OracleLinux, send key to boot screen to not do
     # disk check and start installation directly. RockyLinux is using Other 4.x or
     # later Linux (64-bit) as guest OS type.
-    - include_tasks: ../../common/vm_guest_send_key.yml
+    - name: "Select boot menu for RHEL or Fedora family OS"
+      include_tasks: ../../common/vm_guest_send_key.yml
       vars:
         keys_send:
           - UPARROW
@@ -151,8 +168,9 @@
            ('CentOS' in unattend_install_conf) or
            ('Fedora' in unattend_install_conf))
 
-    # For UnionTech OS Server, sendkey to boot screen
-    - include_tasks: ../../common/vm_guest_send_key.yml
+    # For UnionTech OS, send key to boot screen
+    - name: "Select boot menu for UnionTech OS"
+      include_tasks: ../../common/vm_guest_send_key.yml
       vars:
         keys_send:
           - ENTER
@@ -170,8 +188,8 @@
         - unattend_install_conf is defined
         - unattend_install_conf is match('Ubuntu/Desktop/Ubiquity')
 
-    # Wait autoinstall complete message appear in serial port output file
-    - include_tasks: ../../common/vm_wait_log_msg.yml
+    - name: "Wait autoinstall complete message appear in serial port output file"
+      include_tasks: ../../common/vm_wait_log_msg.yml
       vars:
         vm_wait_log_name: "{{ vm_serial_port_output_file | basename }}"
         vm_wait_log_msg: "{{ autoinstall_complete_msg }}"
@@ -182,25 +200,22 @@
       ansible.builtin.pause:
         seconds: 60
 
-    # For VMware Photon OS and Ubuntu
-    - include_tasks: ../../common/vm_wait_guest_fullname.yml
+    - name: "Wait for guest full name is collected"
+      include_tasks: ../../common/vm_wait_guest_fullname.yml
       when:
         - unattend_install_conf is defined
-        - unattend_install_conf is match('Photon') or unattend_install_conf is match('Ubuntu')
-    
-    - name: "Get VM's primary network adapter MAC address after poweron VM"
-      include_tasks: ../../common/vm_wait_primary_nic_mac.yml
-      when: vm_primary_nic_mac is undefined or not vm_primary_nic_mac
+        - unattend_install_conf | lower is not match('.*(minimal|server_without_gui).*')
 
-    # Get guest IP
-    - include_tasks: ../../common/update_inventory.yml
+    - name: "Get VM guest IPv4 address and add to in-memory inventory"
+      include_tasks: ../../common/update_inventory.yml
       vars:
         update_inventory_timeout: 600
 
-    # Retrieve guest system info
-    - include_tasks: ../utils/get_linux_system_info.yml
+    - name: "Get Linux system info"
+      include_tasks: ../utils/get_linux_system_info.yml
 
-    - block:
+    - name: "Wait for guest OS service is ready"
+      block:
         # For SLE, RHEL8/CentOS8/OracleLinux8 with desktop: display-manager
         # service running at the end of installation to wait user login.
         # Otherwise, systemd-logind service running at the end of installaiton
@@ -212,7 +227,8 @@
               {%- else -%}systemd-logind
               {%- endif -%}
 
-        - include_tasks: ../utils/wait_for_service_status.yml
+        - name: "Wait for service {{ wait_service_name }} is running"
+          include_tasks: ../utils/wait_for_service_status.yml
           vars:
             - service_name: "{{ wait_service_name }}"
             - wait_service_status: "running"
@@ -220,8 +236,8 @@
         - guest_os_with_gui is defined
         - guest_os_family in ["RedHat", "Suse"] or guest_os_ansible_distribution == "Ubuntu"
 
-    # Eject unattend/seed iso and delete it from datastore
-    - include_tasks: eject_del_unattend_install_iso.yml
+    - name: "Eject unattend/seed iso and delete it from datastore"
+      include_tasks: eject_del_unattend_install_iso.yml
       when:
         - transferred_unattend_iso is defined
         - transferred_unattend_iso
@@ -255,8 +271,8 @@
         - guest_os_ansible_distribution_ver == "9.0"
         - "'uek' in guest_os_ansible_kernel"
 
-    # Remove serial port
-    - include_tasks: ../utils/shutdown.yml
+    - name: "Shutdown guest OS"
+      include_tasks: ../utils/shutdown.yml
     
     - name: "Change CD/DVD to client device and set disk as first boot device for Ubuntu"
       block:
@@ -274,7 +290,7 @@
             boot_order_list:
               - disk
       when: guest_os_ansible_distribution == "Ubuntu"
-    
+
     - name: "Download serial output file before removing serial port"
       include_tasks: ../../common/esxi_download_datastore_file.yml
       vars:
@@ -282,31 +298,35 @@
         src_file_path: "{{ vm_dir_name }}/{{ vm_serial_port_output_file | basename }}"
         dest_file_path: "{{ current_test_log_folder }}/{{ vm_serial_port_output_file | basename }}"
         download_file_fail_ignore: true
-      when: 
+      when:
         - vm_dir_name is defined
         - vm_dir_name
         - vm_serial_port_output_file is defined
         - vm_serial_port_output_file
 
-    - include_tasks: ../../common/vm_remove_serial_port.yml
+    - name: "Remove serial port"
+      include_tasks: ../../common/vm_remove_serial_port.yml
 
-    - ansible.builtin.fail:
+    - name: "Failed to remove serial port"
+      ansible.builtin.fail:
         msg: "Failed to remove serial port from VM"
       when: >
         remove_serial_port is undefined or
         remove_serial_port.changed is undefined or
         not remove_serial_port.changed
 
-    - include_tasks: ../../common/vm_set_power_state.yml
+    - name: "Power on VM"
+      include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: 'powered-on'
 
     - name: "Check Oracle Linux 9.0 kernel UEK R7 is upgraded"
       block:
-        - include_tasks: ../../common/update_inventory.yml
+        - name: "Update VM guest IPv4 address in in-memory inventory"
+          include_tasks: ../../common/update_inventory.yml
 
-        # Refresh guest system info
-        - include_tasks: ../utils/get_linux_system_info.yml
+        - name: "Refresh Linux system info"
+          include_tasks: ../utils/get_linux_system_info.yml
 
         - name: "Get Oracle Linux 9.0 UEK R7 version after upgrading"
           ansible.builtin.set_fact:
@@ -325,7 +345,8 @@
         - ol9_uekr7_is_upgraded
 
   rescue:
-    - include_tasks: ../../common/test_rescue.yml
+    - name: "Test case failure"
+      include_tasks: ../../common/test_rescue.yml
       vars:
         exit_testing_when_fail: true
   always:
