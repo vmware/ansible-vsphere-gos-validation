@@ -46,7 +46,9 @@
       when:
         - "'Flatcar' not in guest_os_ansible_distribution"
         - not (guest_os_ansible_distribution == "Ubuntu" and
-               guest_os_ansible_distribution_major_ver >= "22")
+               guest_os_ansible_distribution_major_ver | int >= 22)
+        - not (guest_os_ansible_distribution == "Debian" and
+               guest_os_ansible_distribution_major_ver | int >= 12)
         - guest_os_ansible_distribution != "Fedora"
 
     - name: "Rescan scsi devices in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
@@ -83,7 +85,9 @@
       when: >
         ('Flatcar' in guest_os_ansible_distribution or
          (guest_os_ansible_distribution == "Ubuntu" and
-          guest_os_ansible_distribution_major_ver >= "22") or
+          guest_os_ansible_distribution_major_ver | int >= 22) or
+         (guest_os_ansible_distribution == "Debian" and
+          guest_os_ansible_distribution_major_ver | int >= 12) or
          guest_os_ansible_distribution == "Fedora")
   when: new_disk_ctrl_type == 'lsilogic'
 
@@ -164,5 +168,3 @@
     - lsblk_result is defined
     - lsblk_result.unreachable is defined
     - lsblk_result.unreachable
-
-
