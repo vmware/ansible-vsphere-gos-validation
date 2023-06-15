@@ -4,8 +4,17 @@
 # Check VM's settings which only has one network adapter and it
 # should be connected to VM.
 #
+- name: "Get VM power state"
+  include_tasks: vm_get_power_state.yml
+
+- name: "Power on VM"
+  include_tasks: vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+  when: vm_power_state_get == "poweredOff"
+
 - name: "Get VM's network adapters info"
-  include_tasks: ../common/vm_get_network_facts.yml
+  include_tasks: vm_get_network_facts.yml
 
 - name: "Check VM only has one network adapter and it should be connected"
   ansible.builtin.assert:
