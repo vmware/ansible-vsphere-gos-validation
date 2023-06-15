@@ -79,7 +79,7 @@ This project supports below scenarios for end-to-end guest operating system vali
 | Ubuntu 18.04 desktop                          |                                  |                          | :heavy_check_mark:                 |
 | Ubuntu 20.04 and later                        | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Flatcar 2592.0.0 and later                    |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
-| Debian 10.10 and later, 11.x                  | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Debian 10.10 and later, 11.x, 12.x            | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Debian 9.x, 10.9 and earlier                  |                                  |                          | :heavy_check_mark:                 |
 | Windows 10, 11                                | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Windows Server 2019, 2022                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
