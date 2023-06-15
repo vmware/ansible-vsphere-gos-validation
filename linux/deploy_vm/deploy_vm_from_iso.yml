@@ -257,15 +257,22 @@
 
     # Remove serial port
     - include_tasks: ../utils/shutdown.yml
+    
+    - name: "Change CD/DVD to client device and set disk as first boot device for Ubuntu"
+      block:
+        - name: "Change VM's CD/DVD Drive 1 to client device"
+          include_tasks: ../../common/vm_configure_cdrom.yml
+          vars:
+            cdrom_state: present
+            cdrom_type: client
+            cdrom_controller_num: "{{ vm_cdroms[0].controller_number | int }}"
+            cdrom_unit_num: "{{ vm_cdroms[0].unit_number | int }}"
 
-    # Disconnect OS image from Ubuntu Linux VM and change to client device
-    - name: "Change VM's CD/DVD Drive 1 to client device"
-      include_tasks: ../../common/vm_configure_cdrom.yml
-      vars:
-        cdrom_state: present
-        cdrom_type: client
-        cdrom_controller_num: "{{ vm_cdroms[0].controller_number | int }}"
-        cdrom_unit_num: "{{ vm_cdroms[0].unit_number | int }}"
+        - name: "Change the boot disk to be first in boot order"
+          include_tasks: ../../common/vm_set_boot_options.yml
+          vars:
+            boot_order_list:
+              - disk
       when: guest_os_ansible_distribution == "Ubuntu"
     
     - name: "Download serial output file before removing serial port"
