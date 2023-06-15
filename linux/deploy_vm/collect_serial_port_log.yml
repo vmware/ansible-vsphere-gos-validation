@@ -1,0 +1,23 @@
+# Copyright 2021-2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Collect serial port log file
+#
+- name: "Collect serial port log"
+  block:
+    - name: "Set fact of serial output file name"
+      ansible.builtin.set_fact:
+        vm_serial_port_file_name: "{{ vm_serial_port_file_path.split()[-1] | basename }}"
+    
+    - name: "Download serial output file before removing serial port"
+      include_tasks: ../../common/esxi_download_datastore_file.yml
+      vars:
+        src_datastore: "{{ datastore }}"
+        src_file_path: "{{ vm_dir_name }}/{{ vm_serial_port_file_name  }}"
+        dest_file_path: "{{ current_test_log_folder }}/{{ vm_serial_port_file_name }}"
+        download_file_fail_ignore: true
+  when:
+    - vm_dir_name is defined
+    - vm_dir_name
+    - vm_serial_port_file_path is defined
+    - vm_serial_port_file_path

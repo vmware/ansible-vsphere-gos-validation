@@ -87,16 +87,24 @@
         - (hardware_version == "latest" or
            (vm_hardware_version_num | int < hardware_version | int))
 
-    - name: "Get VM info"
-      include_tasks: ../../common/vm_get_vm_info.yml
+
+    # Add serial port for Ubuntu OVA when hardware_version > 10.
+    # Otherwise, it would hang at boot time
+    # Add serial port for Flatcar and RHCOS for collecting console output
+    - name: "Add a serial port for VM"
+      include_tasks: ../../common/vm_add_serial_port.yml
+      when: >-
+        (ova_guest_os_type == 'ubuntu' and
+         vm_hardware_version_num | int > 10) or
+         ova_guest_os_type in ['flatcar', 'rhcos']
 
     - name: "Reconfigure VM with cloud-init"
       include_tasks: reconfigure_vm_with_cloudinit.yml
       when: ova_guest_os_type in ['photon', 'ubuntu', 'amazon']
 
-    - name: "Reconfigure Flatcar VM with Ignition"
-      include_tasks: flatcar/reconfigure_flatcar_vm.yml
-      when: ova_guest_os_type == 'flatcar'
+    - name: "Reconfigure VM with Ignition"
+      include_tasks: reconfigure_vm_with_ignition.yml
+      when: ova_guest_os_type in ['flatcar', 'rhcos']
 
     - name: "Warning about unknown guest OS type"
       ansible.builtin.debug:
@@ -104,7 +112,46 @@
           WARNING: The guest OS type of the OVA doesn't match known guest OS type for
           reconfiguration. Please add it if needed or the following tests might fail.
       when: ova_guest_os_type == 'unknown'
+
+    - name: "Remove serial port"
+      block:
+        - name: "Shutdown guest OS"
+          include_tasks: ../utils/shutdown.yml
+        
+        - name: "Collect serial port log before removing serial port"
+          include_tasks: collect_serial_port_log.yml
+        
+        - name: "Remove serial port from VM"
+          include_tasks: ../../common/vm_remove_serial_port.yml
+
+        # The workaround "Remove CDROM" for issue: https://bugs.launchpad.net/cloud-init/+bug/1992509
+        - name: "Remove existing CDROMs"
+          include_tasks: ../../common/vm_configure_cdrom.yml
+          vars:
+            cdrom_type: client
+            cdrom_controller_type: "{{ vm_cdrom.controller_label.split()[0] | lower }}"
+            cdrom_controller_num: "{{ vm_cdrom.bus_num }}"
+            cdrom_unit_num: "{{ vm_cdrom.unit_num }}"
+            cdrom_state: absent
+          with_items: "{{ vm_existing_cdrom_list }}"
+          loop_control:
+            loop_var: vm_cdrom
+          when:
+            - ova_guest_os_type == 'ubuntu'
+            - vm_existing_cdrom_list is defined
+            - vm_existing_cdrom_list | length > 0
+        
+        - name: "Power on VM"
+          include_tasks: ../../common/vm_set_power_state.yml
+          vars:
+            vm_power_state_set: 'powered-on'
+      when:
+        - vm_serial_port_file_path is defined
+        - vm_serial_port_file_path
   rescue:
+    - name: "Collect serial port log at failure"
+      include_tasks: collect_serial_port_log.yml
+    
     - name: "Test case failure"
       include_tasks: ../../common/test_rescue.yml
       vars:

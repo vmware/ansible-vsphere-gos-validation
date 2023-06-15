@@ -1,0 +1,48 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Use Ignition to configure guest OS username, password, SSH authorized keys, etc
+#
+- name: "Generate Ignition config file"
+  include_tasks: flatcar/generate_ignition_config.yml
+
+- name: "Defining the Ignition configs in Guestinfo"
+  include_tasks: ../../common/vm_set_extra_config.yml
+  vars:
+    vm_advanced_settings:
+      - key: "guestinfo.ignition.config.data"
+        value: "{{ ignition_config_data }}"
+      - key: "guestinfo.ignition.config.data.encoding"
+        value: "base64"
+
+- name: "Power on VM"
+  include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-on'
+
+- name: "Get VM's extra config"
+  include_tasks: ../../common/vm_get_extra_config.yml
+
+- name: "Wait for guest full name is collected by VMware Tools"
+  include_tasks: ../../common/vm_wait_guest_fullname.yml
+
+# Set vm_python to auto
+- name: "Reset vm_python to auto"
+  ansible.builtin.set_fact:
+    vm_python: "auto"
+  when: vm_python is defined and vm_python != "auto"
+
+# Get guest ip
+- name: "Get VM's guest IP address and add it to in-memory inventory"
+  include_tasks: ../../common/update_inventory.yml
+  vars:
+    update_inventory_timeout: 300
+
+- name: "Post config on Flatcar"
+  include_tasks: flatcar/flatcar_post_config.yml
+  when: ova_guest_os_type == "flatcar"
+
+# Retrieve guest system info
+- include_tasks: ../utils/get_linux_system_info.yml
+
+
