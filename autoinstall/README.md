@@ -19,6 +19,7 @@
 18. For Fedora Server 36 or later unattend auto-install, please use file Fedora/36/Server/ks.cfg.
 19. For FreeBSD 13 or later unattend auto-install, please use file FreeBSD/installerconfig.
 20. For Pardus 21.2 Server and XFCE Desktop or later unattend auto-install, please use file Pardus/preseed.cfg.
+21. For openSUSE Leap 15.3 or later unattend auto-install, please use file openSUSE/15/autoinst.xml.
 
 # Notes
 ## For Windows
