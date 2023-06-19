@@ -11,7 +11,8 @@
   tasks:
     - name: "Test case block"
       block:
-        - include_tasks: ../setup/test_setup.yml
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: true
 
@@ -23,13 +24,13 @@
           when: guest_os_ansible_distribution == 'FreeBSD'
 
         # Take quiesce snapshot
-        - name: Set quiesce snapshot variables
+        - name: "Set quiesce snapshot variables"
           ansible.builtin.set_fact:
             qs_snapshot_name: "quiesce_snapshot_{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
             backup_script_dir: "/etc/vmware-tools/backupScripts.d"
             vss_shell_script: "vss_script_sh.sh"
             vss_bin_script: "vss_script_bin_{{ guest_os_bit | replace('-', '') }}"
-            vss_log_path: "/vss.log"
+            vss_log_path: "/var/vss.log"
             vss_content: ""
 
         # Copy vss_script_sh.sh to /etc/vmware-tools/backupScripts.d/vss_script_sh.sh
@@ -48,7 +49,7 @@
           delegate_to: "{{ vm_guest_ip }}"
 
         # Copy pre-freeze-script and post-thaw-script to /usr/sbin/
-        - name: Copy custom script pre-freeze-script and post-thaw-script to /usr/sbin
+        - name: "Copy custom script pre-freeze-script and post-thaw-script to /usr/sbin"
           ansible.builtin.copy:
             src: "{{ vss_bin_script }}"
             dest: "/usr/sbin/{{ item }}"
@@ -57,7 +58,7 @@
             - pre-freeze-script
             - post-thaw-script
           delegate_to: "{{ vm_guest_ip }}"
-          when: guest_os_ansible_distribution != 'Flatcar'
+          when: guest_os_ansible_distribution not in ['Flatcar', 'RHCOS']
 
         # Ensure /vss.log is absent
         - name: "Remove {{ vss_log_path }} if it exists"
@@ -66,7 +67,8 @@
             state: absent
           delegate_to: "{{ vm_guest_ip }}"
 
-        - include_tasks: ../../common/vm_take_snapshot.yml
+        - name: "Take quiesce snapshot"
+          include_tasks: ../../common/vm_take_snapshot.yml
           vars:
             snapshot_name: "{{ qs_snapshot_name }}"
             is_quiesce: "yes"
@@ -87,14 +89,14 @@
             msg: "{{ vss_log_path }} doesn't exist after quiesce snapshot"
           when: not (guest_file_exists | bool)
 
-        # Retrieve /vss.log
-        - include_tasks: ../../common/vm_guest_file_operation.yml
+        - name: "Retrieve {{ vss_log_path }}"
+          include_tasks: ../../common/vm_guest_file_operation.yml
           vars:
             operation: "fetch_file"
             src_path: "{{ vss_log_path }}"
             dest_path: "{{ current_test_log_folder }}{{ vss_log_path }}"
 
-        - name: "Get file content in /vss.log"
+        - name: "Get file content in {{ vss_log_path }}"
           ansible.builtin.shell: "cat {{ current_test_log_folder }}{{ vss_log_path }}"
           changed_when: false
           register: vss_content
@@ -103,7 +105,7 @@
         - name: "{{ ansible_play_name }} failed"
           ansible.builtin.fail:
             msg: "{{ vss_log_path }} has incorrect content"
-          when: (guest_os_ansible_distribution != 'Flatcar') and
+          when: (guest_os_ansible_distribution not in ['Flatcar', 'RHCOS']) and
               (( not vss_content ) or
               ( vss_content.stdout_lines is undefined ) or
               ( vss_content.stdout_lines | length != 4 ) or
@@ -116,16 +118,17 @@
         - name: "{{ ansible_play_name }} failed"
           ansible.builtin.fail:
             msg: "{{ vss_log_path }} has incorrect content"
-          when: (guest_os_ansible_distribution == 'Flatcar') and
+          when: (guest_os_ansible_distribution in ['Flatcar', 'RHCOS']) and
              (( not vss_content ) or
              ( vss_content.stdout_lines is undefined ) or
              ( vss_content.stdout_lines | length != 2 ) or
              ( vss_content.stdout_lines[0] != "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh freeze") or
              ( vss_content.stdout_lines[1] != "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw" ))
 
-        # Remove quiesce snapshot for successful test
-        - include_tasks: ../../common/vm_remove_snapshot.yml
+        - name: "Remove quiesce snapshot for successful test"
+          include_tasks: ../../common/vm_remove_snapshot.yml
           vars:
             snapshot_name: "{{ qs_snapshot_name }}"
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
