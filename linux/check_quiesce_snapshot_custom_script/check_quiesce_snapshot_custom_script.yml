@@ -60,7 +60,7 @@
           delegate_to: "{{ vm_guest_ip }}"
           when: guest_os_ansible_distribution not in ['Flatcar', 'RHCOS']
 
-        # Ensure /vss.log is absent
+        # Ensure /var/vss.log is absent
         - name: "Remove {{ vss_log_path }} if it exists"
           ansible.builtin.file:
             path: "{{ vss_log_path }}"
@@ -74,7 +74,7 @@
             is_quiesce: "yes"
             dump_memory: "no"
 
-        # After snapshot is taken, check log file /vss.log in guest, which should have below contents:
+        # After snapshot is taken, check log file /var/vss.log in guest, which should have below contents:
         # /usr/sbin/pre-freeze-script freeze
         # /etc/vmware-tools/backupScripts.d/vss_script_sh.sh freeze
         # /etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw
@@ -101,7 +101,7 @@
           changed_when: false
           register: vss_content
 
-        # Test failed for non-Flatcar guest
+        # Test failed for Linux guest which is not Flactcar or RHCOS
         - name: "{{ ansible_play_name }} failed"
           ansible.builtin.fail:
             msg: "{{ vss_log_path }} has incorrect content"
@@ -114,7 +114,7 @@
               ( vss_content.stdout_lines[2] != "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw" ) or
               ( vss_content.stdout_lines[3] != "/usr/sbin/post-thaw-script thaw" ))
 
-        # Test failed for Flatcar guest
+        # Test failed for Flatcar or RHCOS guest
         - name: "{{ ansible_play_name }} failed"
           ansible.builtin.fail:
             msg: "{{ vss_log_path }} has incorrect content"
