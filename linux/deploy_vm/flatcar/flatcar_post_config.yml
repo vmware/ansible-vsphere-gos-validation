@@ -28,17 +28,3 @@
     file: "/etc/ssh/sshd_config"
     reg_exp: "^#?PermitRootLogin"
     line_content: "PermitRootLogin yes"
-
-# Change user password in case Ignition config doesn't work
-- name: "Get user names for password changing"
-  ansible.builtin.set_fact:
-    usernames: "{{ [vm_username] | union(['core']) }}"
-
-- name: "Change password for user {{ vm_username }}"
-  ansible.builtin.user:
-    name: "{{ username }}"
-    password: "{{ vm_password | password_hash('sha512') }}"
-  delegate_to: "{{ vm_guest_ip }}"
-  with_items: "{{ usernames }}"
-  loop_control:
-    loop_var: username
