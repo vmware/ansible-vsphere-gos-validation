@@ -1,0 +1,36 @@
+# Copyright 2021-2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check VM's settings which only has one network adapter and it
+# should be connected to VM.
+#
+- name: "Get VM power state"
+  include_tasks: vm_get_power_state.yml
+
+- name: "Power on VM"
+  include_tasks: vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+  when: vm_power_state_get == "poweredOff"
+
+- name: "Get VM's network adapters info"
+  include_tasks: vm_get_network_facts.yml
+
+- name: "Check VM only has one network adapter and it should be connected"
+  block:
+    - name: "Set fact for exit_testing_when_fail"
+      ansible.builtin.set_fact:
+        exit_testing_when_fail: true
+
+    - name: "Test fail due to improper VM settings"
+      ansible.builtin.fail:
+        msg: >-
+          VM doesn't meet test requirement, which must have one network adapter and it
+          should be connected. Current VM's network adapters are '{{ vm_network_adapters }}'.
+  when: >
+    (vm_network_adapters | length != 1 ) or 
+    (not vm_network_adapters['0'].connected | bool)
+
+- name: "Set the fact for checking VM settings"
+  ansible.builtin.set_fact:
+    vm_settings_checked: true
