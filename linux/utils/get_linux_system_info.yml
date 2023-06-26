@@ -69,20 +69,6 @@
       when: guest_os_redhat_release | regex_search("Red *Hat", ignorecase=True)
   when: not guest_os_ansible_distrib_is_correct
 
-- name: "Get Debian OS version from /etc/debian_version"
-  block:
-    - name: "Get Debian version"
-      ansible.builtin.command: cat /etc/debian_version
-      register: debian_version_result
-      delegate_to: "{{ vm_guest_ip }}"
-
-    - name: "Update guest OS distribution version"
-      ansible.builtin.set_fact:
-        guest_os_ansible_distribution_ver: "{{ debian_version_result.stdout }}"
-        guest_os_ansible_distribution_minor_ver: "{{ debian_version_result.stdout.split('.')[-1] }}"
-      when: debian_version_result.stdout is defined and debian_version_result.stdout
-  when: guest_os_ansible_distribution == "Debian"
-
 - name: "Set OS family for {{ guest_os_ansible_distribution }} to RedHat"
   ansible.builtin.set_fact:
     guest_os_family: "RedHat"

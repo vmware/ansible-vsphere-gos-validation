@@ -3,6 +3,8 @@
 ---
 # Get guest system info when it's not defined before
 # Note:
+#   For Debian 10.x and 11.x, its 'ansible_distribution_version' only shows major version,
+# minor version can be retrieved from 'ansible_distribution_minor_version'.
 #   For FreeBSD 11.4, there is no 'ansible_distribution_major_version' in guest_system_info,
 # use version info in 'ansible_distribution_release'.
 #   For Windows guest, there is no 'ansible_distribution_release' in guest_system_info,
@@ -32,7 +34,10 @@
     guest_os_ansible_architecture: "{{ guest_system_info.ansible_architecture | default('') }}"
     guest_os_ansible_distribution_ver: "{{ guest_system_info.ansible_distribution_version if guest_system_info.ansible_distribution != 'FreeBSD' else guest_system_info.ansible_kernel }}"
     guest_os_ansible_distribution_major_ver: "{{ guest_system_info.ansible_distribution_major_version if 'ansible_distribution_major_version' in guest_system_info else guest_system_info.ansible_distribution_release.split('-')[0].split('.')[0] }}"
-    guest_os_ansible_distribution_minor_ver: "{{ guest_system_info.ansible_distribution_version.split('.')[1] if guest_system_info.ansible_distribution_version.split('.') | length >= 2 else 0 }}"
+    guest_os_ansible_distribution_minor_ver: |-
+      {%- if guest_system_info.ansible_distribution_minor_version | default('') != '' -%}{{ guest_system_info.ansible_distribution_minor_version }}
+      {%- elif guest_system_info.ansible_distribution_version.split('.') | length >= 2 -%}{{ guest_system_info.ansible_distribution_version.split('.')[1] }}
+      {%- else -%}0{%- endif -%}
     guest_os_ansible_kernel: "{{ guest_system_info.ansible_kernel | default('') }}"
     guest_os_ansible_distribution_release: "{{ guest_system_info.ansible_distribution_release | default('') }}"
     guest_os_ansible_pkg_mgr: "{{ guest_system_info.ansible_pkg_mgr | default('') }}"
