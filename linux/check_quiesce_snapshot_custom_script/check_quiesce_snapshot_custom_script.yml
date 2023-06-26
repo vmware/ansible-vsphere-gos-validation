@@ -31,8 +31,7 @@
             vss_shell_script: "vss_script_sh.sh"
             vss_bin_script: "vss_script_bin_{{ guest_os_bit | replace('-', '') }}"
             vss_log_path: |-
-              {%- if 'Flatcar' in guest_os_ansible_distribution or
-               guest_os_ansible_distribution == 'RHCOS' -%}/var/vss.log
+              {%- if guest_os_ansible_distribution in ['Flatcar', 'RHCOS'] -%}/var/vss.log
               {%- else -%}/vss.log
               {%- endif -%}
             vss_content: ""
@@ -105,29 +104,29 @@
           changed_when: false
           register: vss_content
 
-        # Test failed for Linux guest which is not Flactcar or RHCOS
-        - name: "{{ ansible_play_name }} failed"
-          ansible.builtin.fail:
-            msg: "{{ vss_log_path }} has incorrect content"
-          when: (guest_os_ansible_distribution not in ['Flatcar', 'RHCOS']) and
-              (( not vss_content ) or
-              ( vss_content.stdout_lines is undefined ) or
-              ( vss_content.stdout_lines | length != 4 ) or
-              ( vss_content.stdout_lines[0] != "/usr/sbin/pre-freeze-script freeze" ) or
-              ( vss_content.stdout_lines[1] != "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh freeze" ) or
-              ( vss_content.stdout_lines[2] != "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw" ) or
-              ( vss_content.stdout_lines[3] != "/usr/sbin/post-thaw-script thaw" ))
+        # Guest OS is not Flatcar or RHCOS
+        - name: "Check file content in {{ vss_log_path }}"
+          ansible.builtin.assert:
+            that:
+              - vss_content.stdout_lines is defined
+              - vss_content.stdout_lines | length == 4
+              - vss_content.stdout_lines[0] == "/usr/sbin/pre-freeze-script freeze"
+              - vss_content.stdout_lines[1] == "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh freeze"
+              - vss_content.stdout_lines[2] == "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw"
+              - vss_content.stdout_lines[3] == "/usr/sbin/post-thaw-script thaw"
+            fail_msg: "{{ vss_log_path }} has incorrect content"
+          when: guest_os_ansible_distribution not in ['Flatcar', 'RHCOS']
 
-        # Test failed for Flatcar or RHCOS guest
-        - name: "{{ ansible_play_name }} failed"
-          ansible.builtin.fail:
-            msg: "{{ vss_log_path }} has incorrect content"
-          when: (guest_os_ansible_distribution in ['Flatcar', 'RHCOS']) and
-             (( not vss_content ) or
-             ( vss_content.stdout_lines is undefined ) or
-             ( vss_content.stdout_lines | length != 2 ) or
-             ( vss_content.stdout_lines[0] != "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh freeze") or
-             ( vss_content.stdout_lines[1] != "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw" ))
+        # Guest OS is Flatcar or RHCOS
+        - name: "Check file content in {{ vss_log_path }}"
+          ansible.builtin.assert:
+            that:
+              - vss_content.stdout_lines is defined
+              - vss_content.stdout_lines | length == 2
+              - vss_content.stdout_lines[0] == "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh freeze"
+              - vss_content.stdout_lines[1] == "/etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw"
+            fail_msg: "{{ vss_log_path }} has incorrect content"
+          when: guest_os_ansible_distribution in ['Flatcar', 'RHCOS']
 
         - name: "Remove quiesce snapshot for successful test"
           include_tasks: ../../common/vm_remove_snapshot.yml
