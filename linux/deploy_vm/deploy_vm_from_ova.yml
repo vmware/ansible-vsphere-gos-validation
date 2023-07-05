@@ -88,15 +88,11 @@
         - (hardware_version == "latest" or
            (vm_hardware_version_num | int < hardware_version | int))
 
-    # Add serial port for Ubuntu OVA when hardware_version > 10.
-    # Otherwise, it would hang at boot time
+    # Add serial port for Ubuntu OVA in case of hang at boot time
     # Add serial port for Flatcar and RHCOS for collecting console output
     - name: "Add a serial port for VM"
       include_tasks: ../../common/vm_add_serial_port.yml
-      when: >-
-        (ova_guest_os_type == 'ubuntu' and
-         vm_hardware_version_num | int > 10) or
-         ova_guest_os_type in ['flatcar', 'rhcos']
+      when: ova_guest_os_type in ['ubuntu', 'flatcar', 'rhcos']
 
     - name: "Reconfigure VM with cloud-init"
       include_tasks: reconfigure_vm_with_cloudinit.yml
@@ -114,9 +110,7 @@
       when: ova_guest_os_type == 'unknown'
 
     - name: "Remove serial port"
-      when:
-        - vm_serial_port_file_path is defined
-        - vm_serial_port_file_path
+      when: ova_guest_os_type in ['ubuntu', 'flatcar', 'rhcos']
       block:
         - name: "Shutdown guest OS"
           include_tasks: ../utils/shutdown.yml
