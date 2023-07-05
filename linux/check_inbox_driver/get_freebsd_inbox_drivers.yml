@@ -1,0 +1,58 @@
+# Copyright 2023-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of mandatory and optional inbox drivers"
+  ansible.builtin.set_fact:
+    inbox_drivers:
+      - /boot/kernel/vmci.ko
+      - /boot/kernel/pvscsi.ko
+      - /sys/dev/virtio/balloon/virtio_balloon.c
+      - /sys/dev/vmware/vmxnet3/if_vmx.c
+
+- name: "Set fact of mandatory and optional inbox devices"
+  ansible.builtin.set_fact:
+    inbox_builtin_devices:
+      - virtio_balloon
+      - pvscsi
+      - vmx
+
+- name: "Set fact of mandatory autoload modules"
+  ansible.builtin.set_fact:
+    inbox_autoload_modules:
+      - vmci
+
+- name: "Check inbox driver's file exists"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  with_items: "{{ inbox_drivers }}"
+  register: stat_drivers_filenames
+
+- name: "Check all inbox drivers' filenames exist"
+  ansible.builtin.assert:
+    that:
+      - stat_driver_filename.stat is defined
+      - stat_driver_filename.stat.exists is defined
+      - stat_driver_filename.stat.exists
+    fail_msg: "Inbox driver file {{ stat_driver_filename.stat.path }} doesn't exist"
+  with_items: "{{ stat_drivers_filenames.results }}"
+  loop_control:
+    loop_var: stat_driver_filename
+
+- name: "Check the kernel builtin devices"
+  ansible.builtin.command: "sysctl -a | grep '^device' | grep '{{ inbox_builtin_device }}'"
+  register: kernel_devices_result
+  delegate_to: "{{ vm_guest_ip }}"
+  failed_when: check_module_result.rc != 0
+  loop: "{{ inbox_builtin_devices }}"
+  loop_control:
+    loop_var: inbox_builtin_device
+
+- name: "Check autoload modules"
+  ansible.builtin.command: "kldstat | grep {{ module_name }}"
+  register: check_module_result
+  delegate_to: "{{ vm_guest_ip }}"
+  failed_when: check_module_result.rc != 0
+  loop: "{{ inbox_autoload_modules }}"
+  loop_control:
+    loop_var: module_name

@@ -55,7 +55,13 @@
         - include_tasks: get_xorg_version.yml
 
         # Get Linux inbox drivers
-        - include_tasks: get_inbox_drivers.yml
+        - name: "Check inbox drivers for non-freebsd"
+          include_tasks: get_inbox_drivers.yml
+          when: guest_os_ansible_distribution != "FreeBSD"
+        
+        - name: "Check inbox drivers for freebsd"
+          include_tasks: get_freebsd_inbox_drivers.yml
+          when: guest_os_ansible_distribution == "FreeBSD"
 
       rescue:
         - include_tasks: ../../common/test_rescue.yml
