@@ -21,6 +21,11 @@
     inbox_autoload_modules:
       - vmci
 
+- name: "Update autoload modules when guest OS has open-vm-tools"
+  ansible.builtin.set_fact:
+    inbox_autoload_modules: "{{ inbox_autoload_modules + ['vmmemctl'] }}"
+  when: vmtools_is_ovt is defined and vmtools_is_ovt
+
 - name: "Check inbox driver's file exists"
   ansible.builtin.stat:
     path: "{{ item }}"
@@ -43,7 +48,7 @@
   ansible.builtin.command: "sysctl -a | grep '^device' | grep '{{ inbox_builtin_device }}'"
   register: kernel_devices_result
   delegate_to: "{{ vm_guest_ip }}"
-  failed_when: check_module_result.rc != 0
+  failed_when: kernel_devices_result.rc != 0
   loop: "{{ inbox_builtin_devices }}"
   loop_control:
     loop_var: inbox_builtin_device
