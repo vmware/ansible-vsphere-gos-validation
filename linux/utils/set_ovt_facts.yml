@@ -9,6 +9,13 @@
     ovt_processes: [{"uid": "root", "cmd":"vmtoolsd"}]
     ovt_service: "vmtoolsd"
 
+- name: "Reinitialize the fact of open-vm-tools packages for FreeBSD without desktop"
+  ansible.builtin.set_fact:
+    ovt_packages: ["open-vm-tools-nox11"]
+  when:
+    - guest_os_ansible_distribution == "FreeBSD"
+    - guest_os_with_gui is undefined or not guest_os_with_gui
+
 - name: "Set the fact of open-vm-tools service name for {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
     ovt_service: "open-vm-tools"
@@ -19,8 +26,17 @@
     ovt_packages: "{{ ovt_packages | union(['libvmtools0']) }}"
   when: guest_os_family == "Suse"
 
-- name: "Update the fact of open-vm-tools packages and proecesses for OS with desktop"
+- name: "Update the fact of open-vm-tools packages and proecesses for non-FreeBSD OS with desktop"
   ansible.builtin.set_fact:
     ovt_packages: "{{ ovt_packages | union(['open-vm-tools-desktop']) }}"
     ovt_processes: "{{ ovt_processes | union([{'uid':'vmware', 'cmd':'vmtoolsd -n vmusr'}]) }}"
-  when: guest_os_with_gui is defined and guest_os_with_gui
+  when: 
+    - guest_os_with_gui is defined and guest_os_with_gui
+    - guest_os_family != "FreeBSD"
+
+- name: "Update the fact of proecesses for FreeBSD with desktop"
+  ansible.builtin.set_fact:
+    ovt_processes: "{{ ovt_processes | union([{'uid':'vmware', 'cmd':'vmtoolsd -n vmusr'}]) }}"
+  when: 
+    - guest_os_with_gui is defined and guest_os_with_gui
+    - guest_os_family == "FreeBSD"
