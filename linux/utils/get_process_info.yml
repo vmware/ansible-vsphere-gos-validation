@@ -11,8 +11,12 @@
   ansible.builtin.set_fact:
     process_list: []
 
+- name: "Initialize get process command"
+  ansible.builtin.set_fact:
+    get_process_cmd: "{% if guest_os_family == 'FreeBSD' %}ps -aux{% else %}ps -ef{% endif %}"
+
 - name: "Get '{{ process_name }}' process information"
-  ansible.builtin.shell: "ps -ef | grep '{{ process_name }}' | grep -v grep"
+  ansible.builtin.shell: "{{ get_process_cmd }} | grep '{{ process_name }}' | grep -v grep"
   register: ps_result
   failed_when: false
   delegate_to: "{{ vm_guest_ip }}"
