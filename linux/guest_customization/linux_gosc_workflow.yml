@@ -13,7 +13,8 @@
       ansible.builtin.set_fact:
         enable_cloudinit_gosc: "{% if gosc_workflow  == 'cloud-init' %}True{% else %}False{% endif %}"
 
-    - include_tasks: ../setup/test_setup.yml
+    - name: "Test setup"
+      include_tasks: ../setup/test_setup.yml
       vars:
         skip_test_no_vmtools: true
 
@@ -21,6 +22,7 @@
       include_tasks: check_gosc_support_status.yml
 
     - name: "Prepare for GOSC testing on VMware Photon OS"
+      when: guest_os_ansible_distribution == "VMware Photon OS"
       block:
         # Traditional GOSC in VMware Photon OS is implemented with cloud-init,
         # so will upgrade cloud-init to the latest version in VMware Photon OS
@@ -30,11 +32,12 @@
             package_list: ["cloud-init"]
             package_state: "latest"
 
-        - include_tasks: ../utils/get_cloudinit_version.yml
+        - name: "Get cloud-init version"
+          include_tasks: ../utils/get_cloudinit_version.yml
 
         # In VMware Photon OS 4.0, open-vm-tools-gosc is provided with GOSC scripts
         # from open-vm-tools 11.3.5
-        - name: "Install 'open-vm-tools-gosc-{{ vmtools_version }}' for GOSC"
+        - name: "Install GOSC required package 'open-vm-tools-gosc-{{ vmtools_version }}'"
           include_tasks: ../utils/install_uninstall_package.yml
           vars:
             package_list: ["open-vm-tools-gosc-{{ vmtools_version }}"]
@@ -44,10 +47,12 @@
             - guest_os_ansible_distribution_major_ver | int >= 4
             - vmtools_version is defined
             - vmtools_version is version('11.3.5', '>=')
-      when: guest_os_ansible_distribution == "VMware Photon OS"
 
     # Install perl if guest OS doesn't have it
     - name: "Prepare for perl GOSC testing on {{ guest_os_ansible_distribution }}"
+      when:
+        - not enable_cloudinit_gosc | bool
+        - guest_os_family == "RedHat"
       block:
         - name: "Check perl existence"
           ansible.builtin.command: "which perl"
@@ -56,6 +61,7 @@
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "Install perl"
+          when: which_perl_result.rc is undefined or which_perl_result.rc != 0
           block:
             - name: "Set perl package name on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
               ansible.builtin.set_fact:
@@ -68,12 +74,9 @@
               vars:
                 package_list: ["{{ guest_perl_package_name }}"]
                 package_state: "latest"
-          when: which_perl_result.rc is undefined or which_perl_result.rc != 0
-      when:
-        - not enable_cloudinit_gosc | bool
-        - guest_os_family == "RedHat"
 
     - name: "Prepare for cloud-init GOSC"
+      when: enable_cloudinit_gosc
       block:
         - name: "Install 'cloud-init' for cloud-init GOSC on {{ guest_os_ansible_distribution }}"
           include_tasks: ../utils/install_uninstall_package.yml
@@ -84,6 +87,9 @@
 
         # Need to install the latest cloud-init to Oracle Linux 8.7, 9.1 and pass the GOSC tests in Ansible
         - name: "Update cloud-init GOSC in OracleLinux 8.7 & 9.1"
+          when:
+            - guest_os_ansible_distribution == "OracleLinux"
+            - guest_os_ansible_distribution_ver in ['8.7', '9.1']
           block:
             - name: "Known issue - failure of cloud-init GOSC in Oracle Linux 8.7 and 9.1"
               ansible.builtin.debug:
@@ -112,9 +118,6 @@
               vars:
                 package_list: ["cloud-init"]
                 package_state: "latest"
-          when:
-            - guest_os_ansible_distribution == "OracleLinux"
-            - guest_os_ansible_distribution_ver in ['8.7', '9.1']
 
         # Check whether cloud-init version meets cloud-init GOSC requirements
         # Debian 10 and 11 cloud-init GOSC requires cloud-init 22.1 or later installed.
@@ -126,9 +129,11 @@
             gosc_required_cloudinit_version: >-
               {% if guest_os_ansible_distribution != 'Debian' %}18.5{% else %}22.1{% endif %}
 
-        - include_tasks: ../utils/get_cloudinit_version.yml
+        - name: "Get cloud-init version"
+          include_tasks: ../utils/get_cloudinit_version.yml
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case due to cloud-init version doesn't meet cloud-init GOSC requirements"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_reason: "Not Supported"
             skip_msg: >-
@@ -137,7 +142,6 @@
           when: >
             (not cloudinit_version) or
             not (cloudinit_version is version(gosc_required_cloudinit_version, '>='))
-      when: enable_cloudinit_gosc
 
     - name: "Get DNS server info before GOSC"
       include_tasks: ../utils/get_system_dns.yml
@@ -154,14 +158,14 @@
     - name: "Update cloud-init config for {{ gosc_workflow }} GOSC"
       include_tasks: ../utils/enable_disable_cloudinit_cfg.yml
 
-    # Prepare router VM, vSwitch and portgroup
-    - include_tasks: ../../common/network_testbed_setup.yml
+    - name: "Prepare router VM, vSwitch and portgroup"
+      include_tasks: ../../common/network_testbed_setup.yml
       when:
         - router_vm_required | default(false)
         - router_vm_deployed is undefined or not router_vm_deployed | bool
 
     # Initialize the GOSC spec
-    - name: Initialize the GOS customization spec
+    - name: "Initialize the GOS customization spec"
       ansible.builtin.set_fact:
         linux_gosc_spec: {'domain': 'gosc.test.com', 'timezone': "Europe/Berlin", 'dns_suffix': ["test.com", "gosc.test.com"]}
 
@@ -190,9 +194,38 @@
         - {'hwclockUTC': true}
       when: ip_assignment == "dhcp"
 
-    # Execute guest customization on VM
-    - include_tasks: linux_gosc_start.yml
-    # Check guest customization results
-    - include_tasks: linux_gosc_verify.yml
+    - name: "Execute guest customization on VM"
+      include_tasks: linux_gosc_start.yml
+
+    - name: "Check guest customization results"
+      include_tasks: linux_gosc_verify.yml
   rescue:
-    - include_tasks: ../../common/test_rescue.yml
+    - name: "Test case failure"
+      include_tasks: ../../common/test_rescue.yml
+  always:
+    - name: "Collect GOSC log"
+      when:
+        - gosc_deploypkg_log_local is defined
+        - gosc_deploypkg_log_local
+      block:
+        - name: "Get stat of {{ gosc_deploypkg_log_local }}"
+          ansible.builtin.stat:
+            path: "{{ gosc_deploypkg_log_local }}"
+          register: gosc_deploypkg_log_stat
+
+        - name: "Fetch GOSC log file {{ gosc_deploypkg_log_file }}"
+          include_tasks: ../../common/vm_guest_file_operation.yml
+          vars:
+            operation: "fetch_file"
+            src_path: "{{ gosc_deploypkg_log_file }}"
+            dest_path: "{{ gosc_deploypkg_log_local }}"
+          when:
+            - not (gosc_deploypkg_log_stat.stat.exists | default(False))
+            - vmtools_is_running is defined
+            - vmtools_is_running | bool
+
+    - name: "Colect cloud-init logs"
+      include_tasks: ../utils/collect_cloudinit_logs.yml
+      when: >
+        (gosc_workflow == "cloud-init") or
+        (guest_os_ansible_distribution == "VMware Photon OS")
