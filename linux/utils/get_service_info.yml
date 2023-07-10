@@ -24,19 +24,14 @@
         service_fullname: |-
           {%- if ".service" in service_name -%}{{ service_name }}
           {%- else -%}{{ service_name + ".service" }}{%- endif -%}
-    - name: "Check service info"
+  
+    - name: "Get service information about '{{ service_fullname }}'"
+      ansible.builtin.set_fact:
+        service_info: "{{ service_facts_result.ansible_facts.services[service_fullname] }}"
       when:
         - service_facts_result.ansible_facts is defined
         - service_facts_result.ansible_facts.services is defined
         - service_fullname in service_facts_result.ansible_facts.services
-      block:
-        - name: "Get service information about '{{ service_fullname }}'"
-          ansible.builtin.set_fact:
-            service_info: "{{ service_facts_result.ansible_facts.services[service_fullname] }}"
-
-        - name: "Print service information"
-          ansible.builtin.debug:
-            msg: "Service information: {{ service_info }}"
 
 - name: "Get and check service info for FreeBSD"
   when: guest_os_family == "FreeBSD"
@@ -46,9 +41,17 @@
       register: service_facts_result
       delegate_to: "{{ vm_guest_ip }}"
 
-    - name: "Print service {{ service_name }} information"
-      ansible.builtin.debug:
-        msg: "Service information: {{ service_facts_result.stdout }}"
+    - name: "Get service information about '{{ service_fullname }}'"
+      ansible.builtin.set_fact:
+        service_info: >-
+          {{
+            service_info |
+            combine({'path': service_facts_result.stdout, 'state': active})
+          }}
       when:
         - service_facts_result.rc == 0
         - service_facts_result.stdout is defined
+
+- name: "Print service {{ service_name }} information"
+  ansible.builtin.debug:
+    msg: "Service information: {{ service_info }}"
