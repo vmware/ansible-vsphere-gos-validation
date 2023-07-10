@@ -9,12 +9,16 @@
     ovt_processes: [{"uid": "root", "cmd":"vmtoolsd"}]
     ovt_service: "vmtoolsd"
 
-- name: "Reinitialize the fact of open-vm-tools packages for FreeBSD without desktop"
-  ansible.builtin.set_fact:
-    ovt_packages: ["open-vm-tools-nox11"]
-  when:
-    - guest_os_ansible_distribution == "FreeBSD"
-    - guest_os_with_gui is undefined or not guest_os_with_gui
+- name: "Reinitialize the fact of open-vm-tools packages for FreeBSD"
+  when: guest_os_ansible_distribution == "FreeBSD"
+  block:
+    - name: "Reinitialize the fact of ovt_service for FreeBSD"
+      ansible.builtin.set_fact:
+        ovt_service: "vmware-guestd"
+    - name: "Reinitialize the fact of ovt_packages for FreeBSD without GUI"
+      ansible.builtin.set_fact:
+        ovt_packages: ["open-vm-tools-nox11"]
+      when: guest_os_with_gui is undefined or not guest_os_with_gui
 
 - name: "Set the fact of open-vm-tools service name for {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
