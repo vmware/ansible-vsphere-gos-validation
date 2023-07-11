@@ -3,6 +3,8 @@
 ---
 # Hot add a new network adapter and apply network config
 #
+
+# FreeBSD does not support "dmesg --clear"
 - name: "Clear dmesg ring buffer"
   ansible.builtin.shell: "dmesg -c"
   changed_when: false
@@ -22,12 +24,22 @@
   delegate_to: "{{ vm_guest_ip }}"
   register: dmesg_delta
 
+- name: "Set match string for newly added NIC in dmesg ring buffer"
+  ansible.builtin.set_fact:
+    nic_match_in_dmesg: |-
+      {%- if guest_os_family == "FreeBSD" -%}
+          {%- if adapter_type == 'vmxnet3' -%}VMware VMXNET3
+          {%- else  -%}Intel(R) Gigabit
+          {%- endif -%}
+      {%-  else -%}{{ adapter_type }}
+      {%- endif -%}
+
 - name: "Set fact of device messages in dmesg ring buffer"
   ansible.builtin.set_fact:
     new_network_adapter_dmesg: >-
       {{
         dmesg_delta.stdout_lines | default([]) |
-        select('match', '.*' ~ adapter_type ~ '.*')
+        select('match', '.*' ~ nic_match_in_dmesg ~ '.*')
       }}
 
 - name: "Assert messages about new network adapter is printed"
