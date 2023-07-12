@@ -8,6 +8,7 @@
   include_tasks: ../utils/get_network_manager.yml
 
 - name: "Add network connection for {{ guest_os_ansible_distribution }}"
+  when: guest_os_network_manager == "NetworkManager"
   block:
     - name: "Add network connection with static IP address"
       block:
@@ -56,10 +57,12 @@
         fail_msg: "Failed to add network connection on VM {{ vm_name }}"
         success_msg: "{{ nm_add_connection.stdout |
                       default('Successfully added network connection on VM ' ~ vm_name) }}"
-  when: guest_os_network_manager == "NetworkManager"
 
 # Set network config file in guest OS except VMware Photon OS
 - name: "Set network config file for {{ guest_os_ansible_distribution }}"
+  when:
+    - guest_os_network_manager != "NetworkManager"
+    - guest_os_ansible_distribution not in ["VMware Photon OS", "Astra Linux (Orel)"]
   block:
     - name: "Initialize fact of network config tempate"
       ansible.builtin.set_fact:
@@ -100,6 +103,11 @@
         network_config_template: flatcar_network_conf.j2
       when: guest_os_ansible_distribution == 'Flatcar'
 
+    - name: "Set fact of the network config template for FreeBSD"
+      ansible.builtin.set_fact:
+        network_config_template: freebsd_network_conf.j2
+      when: guest_os_family == "FreeBSD"
+
     - name: "Create or update network config file for new network interface"
       block:
         - name: "Create or update network config file '{{ network_config_path }}'"
@@ -120,11 +128,11 @@
       when:
         - network_config_template
         - network_config_path
-  when:
-    - guest_os_network_manager != "NetworkManager"
-    - guest_os_ansible_distribution not in ["VMware Photon OS", "Astra Linux (Orel)"]
 
 - name: "Apply new netplan configuration file in Ubuntu server"
+  when:
+    - guest_os_ansible_distribution == "Ubuntu"
+    - guest_os_network_manager == "netplan"
   block:
     # IP could be changed after netplan apply
     - name: "Apply netplan configuration file for new added nic {{ new_network_adapter }} in Ubuntu"
@@ -141,23 +149,47 @@
 
     # Update VM's guest IP
     - include_tasks: ../../common/update_inventory.yml
-  when:
-    - guest_os_ansible_distribution == "Ubuntu"
-    - guest_os_network_manager == "netplan"
 
+- name: "Apply new netplan configuration file in FreeBSD"
+  when: guest_os_ansible_distribution == "FreeBSD"
+  block:
+    - name: "Restart network service {{ item }}"
+      ansible.builtin.command: service {{ item }} restart
+      with_items:
+        - "netif"
+        - "routing"
+      delegate_to: "{{ vm_guest_ip }}"
+      async: 20
+      poll: 0
+      ignore_errors: true
+      register: restart_service_result
+
+    - name: "Sleep 20s for network taking effect"
+      ansible.builtin.pause:
+        seconds: 20
+  
 - include_tasks: ../utils/set_network_adapter_status.yml
   vars:
     network_adapter_name: "{{ new_network_adapter }}"
     network_adapter_status: "up"
-  when: guest_os_network_manager != "netplan"
+  when: 
+    - guest_os_network_manager != "netplan"
+    - guest_os_network_manager != "netif"
 
 # Get IP address of new interface
 - name: "Set fact of searching IPv4 address"
   ansible.builtin.set_fact:
     search_ip: "{% if adapter_type == 'pvrdma' %}{{ new_nic_ipv4 }}{% else %}192.168{% endif %}"
 
+- name: "Set command to get link status for the new network adapter"
+  ansible.builtin.set_fact:
+    get_link_status_cmd: |-
+      {%- if guest_os_ansible_distribution == 'FreeBSD' -%}ifconfig {{ new_network_adapter }} | grep inet
+      {%- else -%}ip -br addr show {{ new_network_adapter }} | awk '{print $3}'
+      {%- endif -%}
+
 - name: "Wait for network adapter '{{ new_network_adapter }}' IPv4 address"
-  ansible.builtin.shell: "ip -br addr show {{ new_network_adapter }} | awk '{print $3}'"
+  ansible.builtin.shell: "{{ get_link_status_cmd }}"
   register: link_status
   changed_when: false
   until:

@@ -12,6 +12,7 @@
 
 # RHEL/SLED/Ubuntu Desktop network interfaces are managed by NetworkManager
 - name: "Set network interface status with NetworkManager"
+  when: guest_os_network_manager == "NetworkManager"
   block:
     - name: "Bring {{ network_adapter_status }} network interface"
       block:
@@ -59,7 +60,6 @@
           It's timed out to wait for {{ network_adapter_name }} status
           becoming '{{ expected_nmcli_device_status }}' in 150 seconds.
           Current status is '{{ nmcli_device_status.stdout | default('') }}'
-  when: guest_os_network_manager == "NetworkManager"
 
 # SLES is using Wicked to manage network interface
 - name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'"
@@ -79,7 +79,16 @@
   delegate_to: "{{ vm_guest_ip }}"
   when: guest_os_network_manager in ["systemd-networkd", "netplan"]
 
+# FreeBSD is using ifconfig to manage network interface
+- name: "Bring {{ network_adapter_status }} network interface '{{ network_adapter_name }}'"
+  ansible.builtin.shell: "ifconfig {{ network_adapter_name }} {{ network_adapter_status | lower }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  when: guest_os_network_manager == "netif"
+
 - name: "Get network adapter interface status"
+  when: 
+    - guest_os_network_manager != "NetworkManager"
+    - guest_os_network_manager != "netif"
   block:
     - name: "Set facts for current network interface status"
       ansible.builtin.set_fact:
@@ -122,4 +131,4 @@
       when:
         - ip_show_result is defined
         - ip_show_result.stdout is defined
-  when: guest_os_network_manager != "NetworkManager"
+
