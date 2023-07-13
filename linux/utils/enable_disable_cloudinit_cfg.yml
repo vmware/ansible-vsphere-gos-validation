@@ -25,6 +25,7 @@
      - not guest_cloud_cfg_exists | bool
 
 - name: "Update cloud-init configs"
+  when: guest_cloud_cfg_exists | bool
   block:
     - name: "Set keyword for searching network config in cloud-init config files"
       ansible.builtin.set_fact:
@@ -37,13 +38,14 @@
       changed_when: false
       delegate_to: "{{ vm_guest_ip }}"
 
-    - name: "Enable Cloud-Init GOSC for cloud-init workflow"
+    - name: "Enable cloud-init GOSC for cloud-init workflow"
+      when: enable_cloudinit_gosc | bool
       block:
-        # Enable cloud-init services
-        - include_tasks: service_operation.yml
+        - name: "Enable cloud-init services but not start them"
+          include_tasks: service_operation.yml
           vars:
             service_enabled: true
-            service_state: "started"
+            service_state: "stopped"
           loop:
             - cloud-init-local
             - cloud-init
@@ -64,15 +66,17 @@
             - 'disable_vmware_customization: false'
             - 'ssh_pwauth: 1'
 
-        - name: Check cloud-init GOSC is enabled
+        - name: "Get cloud-init GOSC flag 'disable_vmware_customization'"
           ansible.builtin.command: "grep '^disable_vmware_customization' {{ guest_cloud_cfg_path }}"
-          register: result
+          register: enable_ci_gosc_result
           changed_when: false
           delegate_to: "{{ vm_guest_ip }}"
 
-        - name: "Save cloud-init GOSC enable flag"
-          ansible.builtin.set_fact:
-            cloudinit_gosc_enabled: "{{ result.stdout.split(': ')[1] | lower == 'false' }}"
+        - name: "Assert cloud-init GOSC flag 'disable_vmware_customization' is false"
+          ansible.builtin.assert:
+            that:
+              - "{{ enable_ci_gosc_result.stdout.split(':')[1].strip() | lower == 'false' }}"
+            fail_msg: "Failed to enable cloud-init GOSC by setting 'disable_vmware_customization' to true"
 
         - name: "Enable cloud-init network config"
           include_tasks: replace_or_add_line_in_file.yml
@@ -107,19 +111,13 @@
           delegate_to: "{{ vm_guest_ip }}"
           ignore_errors: true
 
-        - name: "Assert disable_vmware_customization is false"
-          ansible.builtin.assert:
-            that:
-              - cloudinit_gosc_enabled
-            fail_msg: "Failed to enable cloud-init GOSC"
-
-        - name: "Clear cloud-init.log"
-          ansible.builtin.shell: "cat /dev/null >/var/log/cloud-init.log"
+        - name: "Clean cloud-init seed and logs"
+          ansible.builtin.shell: "cloud-init clean --log --seed"
           delegate_to: "{{ vm_guest_ip }}"
           ignore_errors: true
-      when: enable_cloudinit_gosc | bool
 
-    - name: "Disable Cloud-Init GOSC for perl workflow"
+    - name: "Disable cloud-init GOSC for perl workflow"
+      when: not enable_cloudinit_gosc | bool
       block:
         - name: "Disable cloud-init GOSC in {{ guest_cloud_cfg_path }}"
           ansible.builtin.lineinfile:
@@ -178,5 +176,3 @@
             that:
               - cloudinit_gosc_disabled
             fail_msg: "Failed to disable cloud-init GOSC"
-      when: not enable_cloudinit_gosc | bool
-  when: guest_cloud_cfg_exists | bool

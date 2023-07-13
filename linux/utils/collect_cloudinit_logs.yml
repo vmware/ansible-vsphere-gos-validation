@@ -2,23 +2,48 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Collect cloud-init logs at deploying OVA or guest customization
-- name: "Initialize the cloud-init logs archive path in guest OS"
+#
+- name: "Initialize cloud-init archives in guest OS"
   ansible.builtin.set_fact:
-    cloudinit_logs_src_path: "/tmp/cloud-init_{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}.tar.gz"
+    cloudinit_logs_src_path: "/tmp/cloud-init-logs_{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.tar.gz"
+    cloudinit_cfgs_src_path: "/tmp/cloud-init-configs_{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.tar.gz"
 
-- name: "Set fact of cloud-init logs archive path at local"
+- name: "Set facts of cloud-init archives at local"
   ansible.builtin.set_fact:
     cloudinit_logs_local_path: "{{ current_test_log_folder }}/{{ cloudinit_logs_src_path | basename }}"
+    cloudinit_cfgs_local_path: "{{ current_test_log_folder }}/{{ cloudinit_cfgs_src_path | basename }}"
 
-- block:
-    # Collect cloud-init logs
-    - include_tasks: ../../common/vm_shell_in_guest.yml
+- name: "Collect cloud-init archives when VMware Tools is running"
+  when:
+    - vmtools_is_running is defined
+    - vmtools_is_running | bool
+  block:
+    - name: "Create cloud-init configs archive"
+      include_tasks: ../../common/vm_shell_in_guest.yml
+      vars:
+        vm_shell_cmd: "/usr/bin/tar"
+        vm_shell_args: "-czvf {{ cloudinit_cfgs_src_path }} --exclude /etc/cloud/templates /etc/cloud"
+        vm_shell_out: ""
+
+    - name: "Fetch cloud-init configs archive to local"
+      include_tasks: ../../common/vm_guest_file_operation.yml
+      vars:
+        operation: "fetch_file"
+        src_path: "{{ cloudinit_cfgs_src_path }}"
+        dest_path: "{{ cloudinit_cfgs_local_path }}"
+      when:
+        - vm_shell_result.exit_code is defined
+        - vm_shell_result.exit_code == 0
+
+    - name: "Create cloud-init logs archive"
+      include_tasks: ../../common/vm_shell_in_guest.yml
       vars:
         vm_shell_cmd: "/usr/bin/cloud-init"
         vm_shell_args: "collect-logs -u -t {{ cloudinit_logs_src_path }}"
         vm_shell_out: ""
 
-    - include_tasks: ../../common/vm_guest_file_operation.yml
+    - name: "Fetch cloud-init logs archive to local"
+      include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
         src_path: "{{ cloudinit_logs_src_path }}"
@@ -26,18 +51,36 @@
       when:
         - vm_shell_result.exit_code is defined
         - vm_shell_result.exit_code == 0
-  when:
-    - vmtools_is_running is defined
-    - vmtools_is_running | bool
 
-- block:
-    - name: "Collect cloud-init logs"
+- name: "Collect cloud-init archives when VMware Tools is not running"
+  when:
+    - vmtools_is_running is undefined or not (vmtools_is_running | bool)
+    - vm_guest_ip is defined
+    - vm_guest_ip in groups['target_vm']
+  block:
+    - name: "Create cloud-init configs archive"
+      ansible.builtin.shell:
+        cmd: "/usr/bin/tar -czvf {{ cloudinit_cfgs_src_path }} --exclude /etc/cloud/templates /etc/cloud"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: True
+      register: collect_cloudinit_cfgs_result
+
+    - name: "Fetch cloud-init configs archive to local"
+      include_tasks: fetch_file.yml
+      vars:
+        fetch_file_src_path: "{{ cloudinit_cfgs_src_path }}"
+        fetch_file_dst_path: "{{ cloudinit_cfgs_local_path }}"
+      when:
+        - collect_cloudinit_cfgs_result.rc is defined
+        - collect_cloudinit_cfgs_result.rc == 0
+
+    - name: "Create cloud-init logs archive"
       ansible.builtin.shell: "/usr/bin/cloud-init collect-logs -u -t {{ cloudinit_logs_src_path }}"
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: True
       register: collect_cloudinit_logs_result
 
-    - name: "Fetch cloud-init logs from guest OS"
+    - name: "Fetch cloud-init logs archive to local"
       include_tasks: fetch_file.yml
       vars:
         fetch_file_src_path: "{{ cloudinit_logs_src_path }}"
@@ -45,7 +88,3 @@
       when:
         - collect_cloudinit_logs_result.rc is defined
         - collect_cloudinit_logs_result.rc == 0
-  when:
-    - vmtools_is_running is undefined or not (vmtools_is_running | bool)
-    - vm_guest_ip is defined
-    - vm_guest_ip in groups['target_vm']

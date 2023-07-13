@@ -4,57 +4,41 @@
 # Fetch gosc log file to local and check the log content
 - name: "Set guest customization plugin log location on localhost"
   ansible.builtin.set_fact:
-    deploypkg_log_path: "{{ current_test_log_folder }}{{ gosc_deploypkg_log_file }}"
     gosc_log_success: true
 
-- include_tasks: ../../common/vm_guest_file_operation.yml
+- name: "Fetch GOSC log file {{ gosc_deploypkg_log_file }}"
+  include_tasks: ../../common/vm_guest_file_operation.yml
   vars:
     operation: "fetch_file"
     src_path: "{{ gosc_deploypkg_log_file }}"
-    dest_path: "{{ deploypkg_log_path }}"
+    dest_path: "{{ gosc_deploypkg_log_local }}"
 
-# Check perl GOSC log file
-- block:
-    # Check below message exists
-    - include_tasks: check_log_msg.yml
-      vars:
-        check_log_file: "{{ deploypkg_log_path }}"
-        check_msg_state: "present"
-      with_items:
-        - "Executing traditional GOSC workflow"
-        - "Deployment succeeded"
-        - "Ran DeployPkg_DeployPackageFromFile successfully"
-      loop_control:
-        loop_var: "check_msg_regexp"
+- name: "Check traditional GOSC log in {{ gosc_deploypkg_log_local }}"
   when: gosc_workflow == "perl"
+  include_tasks: check_log_msg.yml
+  vars:
+    check_log_file: "{{ gosc_deploypkg_log_local }}"
+    check_msg_state: "present"
+  with_items:
+    - "Executing traditional GOSC workflow"
+    - "Deployment succeeded"
+    - "Ran DeployPkg_DeployPackageFromFile successfully"
+  loop_control:
+    loop_var: "check_msg_regexp"
 
-# Check cloud-init GOSC log file
-- block:
-    # Collect /var/log/cloud-init.log and /etc/cloud/cloud.cfg
-    - include_tasks: ../../common/vm_guest_file_operation.yml
-      vars:
-        operation: "fetch_file"
-        src_path: "{{ gosc_cloudinit_log_file }}"
-        dest_path: "{{ current_test_log_folder }}{{ gosc_cloudinit_log_file }}"
-
-    # Check below message exists
-    - include_tasks: check_log_msg.yml
-      vars:
-        check_log_file: "{{ deploypkg_log_path }}"
-        check_msg_state: "present"
-      with_items:
-        - "Executing cloud-init workflow"
-        - "Deployment for cloud-init succeeded"
-        - "Ran DeployPkg_DeployPackageFromFile successfully"
-      loop_control:
-        loop_var: "check_msg_regexp"
+- name: "Check cloud-init GOSC log in {{ gosc_deploypkg_log_local }}"
   when: gosc_workflow == "cloud-init"
+  include_tasks: check_log_msg.yml
+  vars:
+    check_log_file: "{{ gosc_deploypkg_log_local }}"
+    check_msg_state: "present"
+  with_items:
+    - "Executing cloud-init workflow"
+    - "Deployment for cloud-init succeeded"
+    - "Ran DeployPkg_DeployPackageFromFile successfully"
+  loop_control:
+    loop_var: "check_msg_regexp"
 
-# Collect all cloud-init logs and userdata for cloud-init GOSC or VMware Photon OS
-- include_tasks: ../utils/collect_cloudinit_logs.yml
-  when: >
-    (gosc_workflow == "cloud-init") or
-    (guest_os_ansible_distribution == "VMware Photon OS")
-
-- name: "Print GOSC log file check result"
-  ansible.builtin.debug: var=gosc_log_success
+- name: "Print result of checking GOSC log"
+  ansible.builtin.debug:
+    msg: "Checking GOSC log success: {{ gosc_log_success }}"
