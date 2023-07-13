@@ -153,20 +153,21 @@
 - name: "Apply new netplan configuration file in FreeBSD"
   when: guest_os_ansible_distribution == "FreeBSD"
   block:
-    - name: "Restart network service {{ item }}"
-      ansible.builtin.command: service {{ item }} restart
-      with_items:
-        - "netif"
-        - "routing"
+    - name: "Restart network"
+      ansible.builtin.command: "/etc/netstart"
       delegate_to: "{{ vm_guest_ip }}"
       async: 20
       poll: 0
       ignore_errors: true
-      register: restart_service_result
+      register: restart_network_result
 
-    - name: "Sleep 20s for network taking effect"
+    - name: "Sleep 10s for restarting network"
       ansible.builtin.pause:
-        seconds: 20
+        seconds: 10
+    
+    - name: "Display the result to restart network"
+      ansible.builtin.debug: var=restart_network_result
+      when: enable_debug is defined and enable_debug
   
 - include_tasks: ../utils/set_network_adapter_status.yml
   vars:
@@ -174,7 +175,6 @@
     network_adapter_status: "up"
   when: 
     - guest_os_network_manager != "netplan"
-    - guest_os_network_manager != "netif"
 
 # Get IP address of new interface
 - name: "Set fact of searching IPv4 address"
