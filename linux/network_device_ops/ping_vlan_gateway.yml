@@ -3,11 +3,19 @@
 ---
 # Ping VLAN gateway from specific network interface
 # Parameters:
-#   ping_src_interface: The network interface used to ping VLAN gateway
+#   ping_src_interface: The network interface used to ping VLAN gateway for non-freebsd
+#   ping_src_ip: The IP address used to ping VLAN gateway for FreeBSD
 #
 - name: "Initialize the fact of ping result"
   ansible.builtin.set_fact:
     ping_success: false
+
+- name: "Set command to ping gateway"
+  ansible.builtin.set_fact:
+    cmd_ping_gateway: |-
+      {%- if guest_os_family == "FreeBSD" -%}ping -c 5 -S {{ ping_src_ip }} {{ new_nic_gateway }}
+      {%-  else -%}ping -c 5 -I {{ ping_src_interface }} {{ new_nic_gateway }}
+      {%- endif -%}
 
 - name: "Ping VLAN gateway {{ new_nic_gateway }} from interface {{ ping_src_interface }}"
   ansible.builtin.command: "ping -c 5 -I {{ ping_src_interface }} {{ new_nic_gateway }}"

@@ -184,7 +184,7 @@
 - name: "Set command to get link status for the new network adapter"
   ansible.builtin.set_fact:
     get_link_status_cmd: |-
-      {%- if guest_os_ansible_distribution == 'FreeBSD' -%}ifconfig {{ new_network_adapter }} | grep inet
+      {%- if guest_os_ansible_distribution == 'FreeBSD' -%}ifconfig {{ new_network_adapter }} | grep inet | awk '{print $2}'
       {%- else -%}ip -br addr show {{ new_network_adapter }} | awk '{print $3}'
       {%- endif -%}
 
@@ -222,3 +222,7 @@
 
 - name: "Print the new network adapter status after applying new network config"
   ansible.builtin.debug: var=new_network_adapter_status
+
+- name: "Set the new network adapter ip address after applying new network config"
+  ansible.builtin.set_fact:
+    new_network_adapter_ip: "{{ link_status.stdout }}"
