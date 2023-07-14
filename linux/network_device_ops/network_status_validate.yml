@@ -17,11 +17,6 @@
   ansible.builtin.set_fact:
     ping_success_after_ifdown: "{{ ping_success }}"
 
-- name: "Take snapshot ifdown"
-  include_tasks: ../../common/vm_take_snapshot.yml
-  vars:
-    snapshot_name: "ifdown"
-
 - name: "Bring up the new network adapter interface"
   include_tasks: ../utils/set_network_adapter_status.yml
   vars:
@@ -37,11 +32,6 @@
 - name: "Set ping result after bringing up the new network adapter"
   ansible.builtin.set_fact:
     ping_success_after_ifup: "{{ ping_success }}"
-
-- name: "Take snapshot ifup"
-  include_tasks: ../../common/vm_take_snapshot.yml
-  vars:
-    snapshot_name: "ifup"
 
 - name: "Disconnect the new network adapter from VM"
   include_tasks: ../../common/vm_configure_network_adapter.yml
@@ -59,11 +49,6 @@
   ansible.builtin.set_fact:
     ping_success_after_disconnect: "{{ ping_success }}"
 
-- name: "Take snapshot disconnect"
-  include_tasks: ../../common/vm_take_snapshot.yml
-  vars:
-    snapshot_name: "disconnect"
-
 - name: "Reconnect the new network adapter to VM"
   include_tasks: ../../common/vm_configure_network_adapter.yml
   vars:
@@ -80,11 +65,6 @@
   ansible.builtin.set_fact:
     ping_success_after_reconnect: "{{ ping_success }}"
 
-- name: "Take snapshot reconnect"
-  include_tasks: ../../common/vm_take_snapshot.yml
-  vars:
-    snapshot_name: "reconnect"
-
 - name: "Print network adapter test results"
   ansible.builtin.debug:
     msg:
@@ -93,9 +73,6 @@
       - "Ping succeeded after {{ new_network_adapter }} up: {{ ping_success_after_ifup }}"
       - "Ping succeeded after {{ new_network_adapter }} disconnect: {{ ping_success_after_disconnect }}"
       - "Ping succeeded after {{ new_network_adapter }} reconnect: {{ ping_success_after_reconnect }}"
-
-- name: "End play"
-  ansible.builtin.meta: end_play
 
 - name: "Assert network adapter ping results are as expected"
   ansible.builtin.assert:
