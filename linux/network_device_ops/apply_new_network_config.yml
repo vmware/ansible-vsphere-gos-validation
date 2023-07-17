@@ -150,24 +150,40 @@
     # Update VM's guest IP
     - include_tasks: ../../common/update_inventory.yml
 
-- name: "Apply new netplan configuration file in FreeBSD"
+- name: "Apply new network configuration file in FreeBSD"
   when: guest_os_ansible_distribution == "FreeBSD"
   block:
-    - name: "Restart network"
-      ansible.builtin.command: "/etc/netstart"
-      delegate_to: "{{ vm_guest_ip }}"
-      async: 20
-      poll: 0
-      ignore_errors: true
-      register: restart_network_result
+    - name: "Apply new vmxnet3 network configuration in FreeBSD"
+      when: adapter_type == "vmxnet3"
+      block:
+        - name: "Restart network"
+          ansible.builtin.command: "/etc/netstart"
+          delegate_to: "{{ vm_guest_ip }}"
+          async: 20
+          poll: 0
+          ignore_errors: true
+          register: restart_network_result
 
-    - name: "Sleep 10s for restarting network"
-      ansible.builtin.pause:
-        seconds: 10
+        - name: "Sleep 10s for restarting network"
+          ansible.builtin.pause:
+            seconds: 10
+        
+        - name: "Display the result to restart network"
+          ansible.builtin.debug: var=restart_network_result
+          when: enable_debug is defined and enable_debug
+
+    - name: "Reboot to apply new e1000e network configuration in FreeBSD"
+      when: adapter_type == "e1000e" 
+      block:
+        - name: "Reboot OS"
+          include_tasks: ../utils/reboot.yml
+
+        - name: "Sleep 60s for rebooting OS"
+          ansible.builtin.pause:
+            seconds: 60
     
-    - name: "Display the result to restart network"
-      ansible.builtin.debug: var=restart_network_result
-      when: enable_debug is defined and enable_debug
+    - name: "Update VM's guest IP after apply new network configuration"
+      include_tasks: ../../common/update_inventory.yml
   
 - include_tasks: ../utils/set_network_adapter_status.yml
   vars:
