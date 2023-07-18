@@ -38,21 +38,33 @@
         - new_disk_ctrl_type == 'lsilogic'
         - guest_os_ansible_distribution != 'Flatcar'
 
-    - name: "Install disk related tools for FreeBSD"
+    - name: "Get file lsblk.sh for FreeBSD"
       when: guest_os_ansible_distribution == "FreeBSD"
       block:
-        - name: "Copy script file lsblk.sh into guest for FreeBSD"
-          ansible.builtin.copy:
-            src: ../utils/scripts/freebsd_lsblk.sh
+        - name: "Download script file lsblk.sh for FreeBSD"
+          ansible.builtin.get_url:
+            url: "{{ freebsd_lsblk_download_url }}"
             dest: /tmp/lsblk.sh
-            mode: 0755
+            mode: '0755'
+            timeout: 10
           delegate_to: "{{ vm_guest_ip }}"
+          register: download_file_lsblk_result
+          until: download_file_lsblk_result.status_code == 200
+          retries: 5
+          delay: 15
+          ignore_errors: true
 
-        - name: "Install package util-linux"
-          include_tasks: ../utils/install_uninstall_package.yml
-          vars:
-            package_list: ["e2fsprogs"]
-            package_state: "present"
+        - name: Display the result of file lsblk.sh downloading
+          ansible.builtin.debug: var=download_file_lsblk_result
+
+        - name: "Check download file lsblk.sh is successful"
+          ansible.builtin.assert:
+            that:
+              - download_file_lsblk_result is defined
+              - download_file_lsblk_result.status_code is defined
+              - download_file_lsblk_result.status_code == 200
+            fail_msg: >-
+              Failed to download file lsblk.sh from url {{ freebsd_lsblk_download_url }}.
 
     - name: "Get the vHBA type for {{ new_disk_ctrl_type }} controller"
       ansible.builtin.set_fact:
