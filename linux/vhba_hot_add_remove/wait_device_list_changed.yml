@@ -148,8 +148,15 @@
     - vm_hardware_version_num | int < 19
     - guest_os_ansible_distribution != 'VMware Photon OS'
 
+- name: "Initialize the command to get device list"
+  ansible.builtin.set_fact:
+    get_device_list_cmd: |-
+      {%- if guest_os_family == 'FreeBSD' -%}/tmp/lsblk.sh -d
+      {%- else -%}lsblk -o NAME,TYPE,SIZE,FSTYPE -b --nodeps
+      {%- endif -%}
+
 - name: "Wait for device to be {{ wait_device_state | lower }}"
-  ansible.builtin.shell: "lsblk -o NAME,TYPE --nodeps| grep disk | awk '{print $1}'"
+  ansible.builtin.shell: "{{ get_device_list_cmd }}| grep disk | awk '{print $1}'"
   delegate_to: "{{ vm_guest_ip }}"
   changed_when: false
   register: lsblk_result
