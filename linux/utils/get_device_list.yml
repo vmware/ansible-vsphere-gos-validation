@@ -12,7 +12,10 @@
 - name: "Initialize the fact of device list and command"
   ansible.builtin.set_fact:
     guest_device_list: []
-    get_device_list_cmd: "lsblk -o NAME,TYPE,SIZE,FSTYPE -b --nodeps"
+    get_device_list_cmd: |-
+      {%- if guest_os_family == 'FreeBSD' -%}/tmp/lsblk.sh -d
+      {%- else -%}lsblk -o NAME,TYPE,SIZE,FSTYPE -b --nodeps
+      {%- endif -%}
 
 - name: "Update command to get device list with type of {{ guest_device_type }}"
   ansible.builtin.set_fact:
@@ -28,7 +31,7 @@
   ignore_errors: true
   register: lsblk_result
 
-- name: "Set the fact of block device list"
+- name: "Set the fact of block device list for non-freebsd"
   ansible.builtin.set_fact:
     guest_device_list: >
       {{
@@ -39,6 +42,23 @@
       }}
   with_items: "{{ lsblk_result.stdout_lines }}"
   when:
+    - guest_os_family != 'FreeBSD'
+    - lsblk_result is defined
+    - lsblk_result.stdout_lines is defined
+    - lsblk_result.stdout_lines | length > 0
+
+- name: "Set the fact of block device list for freebsd"
+  ansible.builtin.set_fact:
+    guest_device_list: >
+      {{
+         guest_device_list | union([
+             dict(['name', 'size', 'model'] |
+                  zip_longest(item.split(), fillvalue=''))
+         ])
+      }}
+  with_items: "{{ lsblk_result.stdout_lines }}"
+  when:
+    - guest_os_family == 'FreeBSD'
     - lsblk_result is defined
     - lsblk_result.stdout_lines is defined
     - lsblk_result.stdout_lines | length > 0
