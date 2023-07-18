@@ -38,13 +38,21 @@
         - new_disk_ctrl_type == 'lsilogic'
         - guest_os_ansible_distribution != 'Flatcar'
 
-    - name: "Copy script file lsblk.sh into guest for FreeBSD"
+    - name: "Install disk related tools for FreeBSD"
       when: guest_os_ansible_distribution == "FreeBSD"
-      ansible.builtin.copy:
-        src: ../utils/scripts/freebsd_lsblk.sh
-        dest: /tmp/lsblk.sh
-        mode: 0755
-      delegate_to: "{{ vm_guest_ip }}"
+      block:
+        - name: "Copy script file lsblk.sh into guest for FreeBSD"
+          ansible.builtin.copy:
+            src: ../utils/scripts/freebsd_lsblk.sh
+            dest: /tmp/lsblk.sh
+            mode: 0755
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - name: "Install package util-linux"
+          include_tasks: ../utils/install_uninstall_package.yml
+          vars:
+            package_list: ["e2fsprogs"]
+            package_state: "present"
 
     - name: "Get the vHBA type for {{ new_disk_ctrl_type }} controller"
       ansible.builtin.set_fact:
