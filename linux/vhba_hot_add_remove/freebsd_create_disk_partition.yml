@@ -18,42 +18,30 @@
 
 - name: "Set default partition filesystem to ext4"
   ansible.builtin.set_fact:
-    partition_fstype: "ext4"
+    partition_fstype: "ufs"
   when: >
     partition_fstype is undefined or
     not partition_fstype
-
-- name: "Check filesystem is supported by guest OS"
-  ansible.builtin.shell: "which mkfs.{{ partition_fstype }}"
-  ignore_errors: true
-  changed_when: false
-  delegate_to: "{{ vm_guest_ip }}"
-  register: check_fs
 
 - name: "Filesystem {{ partition_fstype }} is not supported"
   ansible.builtin.fail:
     msg: >-
       Guest OS doesn't support Filesystem {{ partition_fstype }}, so it can't
       create partition with filesystem {{ partition_fstype }} on disk {{ disk_name }}
-  when: >
-    check_fs is undefined or
-    check_fs.rc is undefined or
-    check_fs.rc != 0
+  when: partition_fstype is not in ['ufs', 'swap', 'boot']
+
+- name: "Create partition table on disk {{ disk_name }}"
+  ansible.builtin.shell: gpart create -s gpt {{ disk_name }}
+  delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Create 1 partition on disk {{ disk_name }}"
-  ansible.builtin.shell: |
-    set -o pipefail
-    (echo n; echo p; echo; echo; echo; echo w) | fdisk "/dev/{{ disk_name }}"
-  args:
-    executable: /bin/bash
+  ansible.builtin.shell: gpart add -t freebsd-{{ partition_fstype }} {{ disk_name }}
   delegate_to: "{{ vm_guest_ip }}"
   register: parted_result
 
 - name: "Set fact of partition name"
   ansible.builtin.set_fact:
-    partition_name: |-
-      {%- if disk_name is match('.*\\d$') -%}{{ disk_name }}p1
-      {%- else -%}{{ disk_name }}1{%- endif -%}
+    partition_name: "{{ disk_name }}p1"
 
 - name: "Set fact of partition device path"
   ansible.builtin.set_fact:
@@ -66,25 +54,18 @@
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Get the UUID of partition {{ partition_device_path }}"
-  ansible.builtin.shell: "blkid -o export {{ partition_device_path }}"
+  ansible.builtin.shell: "gpart list {{ disk_name }} | grep rawuuid"
   changed_when: false
   delegate_to: "{{ vm_guest_ip }}"
   register: blkid_part_result
 
-- name: "Get partition UUID from the output"
-  block:
-    - name: "Get the line contains partition UUID"
-      ansible.builtin.set_fact:
-        blkid_part_uuid_lines: "{{ blkid_part_result.stdout_lines | select('match', '^UUID=.*') }}"
-
-    - name: "Set the fact of partition {{ partition_device_path }} UUID"
-      ansible.builtin.set_fact:
-        partition_uuid: "{{ blkid_part_uuid_lines[0].split('=')[-1] }}"
-      when: blkid_part_uuid_lines | length == 1
+- name: "Set the fact of partition {{ partition_device_path }} UUID"
+  ansible.builtin.set_fact:
+    partition_uuid: "{{ blkid_part_result.stdout.split(':')[-1] }}"
   when:
     - blkid_part_result is defined
-    - blkid_part_result.stdout_lines is defined
-    - blkid_part_result.stdout_lines | length > 0
+    - blkid_part_result.stdout is defined
+    - blkid_part_result.stdout
 
 - name: "Check the UUID of partition {{ partition_device_path }}"
   ansible.builtin.assert:

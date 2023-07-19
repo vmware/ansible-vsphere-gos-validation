@@ -15,6 +15,7 @@ HAS_NVME="false"
 HAS_PVSCSI="false"
 IOZONE_PATH="/tmp/iozone"
 PART_FS="ext4"
+os_distribution=`uname`
 
 function exec_cmd()
 {
@@ -61,7 +62,11 @@ function run_iozone()
 
     iozone_file="$testdir_path/iozone.csv"
     # Get partition size
-    part_size=`lsblk -o NAME,SIZE,TYPE | grep -i part | grep -i ${part_name} | awk '{print $2}'`
+    if [[ "$os_distribution" ~= FreeBSD ]]; then
+        part_size=`gpart list ${dev_name} | head -n 15 | grep Mediasize | awk '{print $3}'`
+    else
+        part_size=`lsblk -o NAME,SIZE,TYPE | grep -i part | grep -i ${part_name} | awk '{print $2}'`
+    fi
     echo "Partition $part_path size is $part_size"
 
     if [[ "$part_size" =~ .G ]]; then
@@ -107,7 +112,7 @@ function run_iozone()
 
 function test_partitions()
 {
-    local dev_name="$1"
+    dev_name="$1"
     local dev_path="/dev/$1"
     local part_idx=1
 
@@ -159,7 +164,11 @@ function test_partitions()
 
     # Print disk's partition again
     echo "${dev_path} partitions:"
-    exec_cmd "fdisk -l ${dev_path}"
+    if [[ "$os_distribution" =~ FreeBSD ]]; then
+        exec_cmd "gpart show ${dev_path}"
+    else
+        exec_cmd "fdisk -l ${dev_path}"
+    fi
 
     exec_cmd "umount $mount_point"
 }

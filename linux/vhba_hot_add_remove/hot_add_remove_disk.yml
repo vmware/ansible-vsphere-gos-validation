@@ -75,10 +75,18 @@
     fail_msg: "The new disk '{{ new_guest_disk_info }}' has incorrect information"
 
 - name: "Create new partition on the new disk {{ new_guest_disk_info.name }}"
+  when: guest_os_family != 'FreeBSD'
   include_tasks: ../utils/create_disk_partition.yml
   vars:
     disk_name: "{{ new_guest_disk_info.name }}"
     partition_fstype: "ext4"
+
+- name: "Create new partition on the new disk {{ new_guest_disk_info.name }} for FreeBSD"
+  when: guest_os_family == 'FreeBSD'
+  include_tasks: freebsd_create_disk_partition.yml
+  vars:
+    disk_name: "{{ new_guest_disk_info.name }}"
+    partition_fstype: "ufs"
 
 - name: "Set fact of new partition name and device path"
   ansible.builtin.set_fact:
