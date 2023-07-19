@@ -40,14 +40,27 @@
     check_fs.rc is undefined or
     check_fs.rc != 0
 
-- name: "Create 1 partition on disk {{ disk_name }}"
+- name: "Create 1 partition on disk {{ disk_name }} for linux system"
+  when: guest_os_family != "FreeBSD"
   ansible.builtin.shell: |
     set -o pipefail
     (echo n; echo p; echo; echo; echo; echo w) | fdisk "/dev/{{ disk_name }}"
   args:
-    executable: "{{ '/usr/local/bin/bash' if guest_os_family == 'FreeBSD' else 'bin/bash' }}"
+    executable: bin/bash
   delegate_to: "{{ vm_guest_ip }}"
   register: parted_result
+
+- name: "Create partition for FreeBSD"
+  when: guest_os_family == "FreeBSD"
+  block:
+    - name: "Create partition table on disk {{ disk_name }}"
+      ansible.builtin.shell: gpart create -s gpt {{ disk_name }}
+      delegate_to: "{{ vm_guest_ip }}"
+    
+    - name: "Create 1 partition on disk {{ disk_name }}"
+      ansible.builtin.shell: gpart add -t freebsd-ufs {{ disk_name }}
+      delegate_to: "{{ vm_guest_ip }}"
+      register: parted_result
 
 - name: "Set fact of partition name"
   ansible.builtin.set_fact:
