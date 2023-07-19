@@ -79,7 +79,9 @@
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Get the UUID of partition {{ partition_device_path }}"
-  ansible.builtin.shell: "blkid -o export {{ partition_device_path }}"
+  ansible.builtin.shell: |-
+    {%- if guest_os_family == 'FreeBSD' -%}blkid -s UUID {{ partition_device_path }}
+    {%- else -%}blkid -o export {{ partition_device_path }}{%- endif -%}
   changed_when: false
   delegate_to: "{{ vm_guest_ip }}"
   register: blkid_part_result
