@@ -92,7 +92,7 @@ function run_iozone()
     cd "$testdir_path"
     echo "Run iozone on $part_path" || continue
     # Run iozone testing
-    if [ $part_size -gt 128 ]; then
+    if [ $(echo "$part_size > 128"|bc) -eq 1 ]; then
         ${IOZONE_PATH} -Ra -g 128M -i 0 -i 1 -b "$iozone_file"
     else
         ${IOZONE_PATH} -Ra -g ${test_size}M -i 0 -i 1 -b "$iozone_file"
