@@ -62,7 +62,7 @@ function run_iozone()
 
     iozone_file="$testdir_path/iozone.csv"
     # Get partition size
-    if [[ "$os_distribution" ~= FreeBSD ]]; then
+    if [[ "$os_distribution" =~ FreeBSD ]]; then
         part_size=`gpart list ${dev_name} | head -n 15 | grep Mediasize | awk '{print $3}'`
     else
         part_size=`lsblk -o NAME,SIZE,TYPE | grep -i part | grep -i ${part_name} | awk '{print $2}'`

@@ -30,8 +30,17 @@
 
 # Rescan SCSI bus when hot adding/removing LSILogic disk
 - name: "Handle LSILogic disk"
+  when: new_disk_ctrl_type == 'lsilogic'
   block:
     - name: "Rescan scsi devices in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+      when:
+        - guest_os_ansible_distribution != 'Flatcar'
+        - not (guest_os_ansible_distribution == "Ubuntu" and
+               guest_os_ansible_distribution_major_ver | int >= 22)
+        - not (guest_os_ansible_distribution == "Debian" and
+               guest_os_ansible_distribution_major_ver | int >= 12)
+        - guest_os_ansible_distribution != "Fedora"
+        - guest_os_ansible_distribution != "FreeBSD"
       block:
         - name: "Rescan all scsi devices"
           ansible.builtin.command: "/usr/bin/rescan-scsi-bus.sh -a -r"
@@ -43,15 +52,15 @@
           when:
             - rescan_scsi_result is defined
             - rescan_scsi_result.stdout_lines
-      when:
-        - guest_os_ansible_distribution != 'Flatcar'
-        - not (guest_os_ansible_distribution == "Ubuntu" and
-               guest_os_ansible_distribution_major_ver | int >= 22)
-        - not (guest_os_ansible_distribution == "Debian" and
-               guest_os_ansible_distribution_major_ver | int >= 12)
-        - guest_os_ansible_distribution != "Fedora"
 
     - name: "Rescan scsi devices in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+      when: >
+        (guest_os_ansible_distribution == 'Flatcar' or
+         (guest_os_ansible_distribution == "Ubuntu" and
+          guest_os_ansible_distribution_major_ver | int >= 22) or
+         (guest_os_ansible_distribution == "Debian" and
+          guest_os_ansible_distribution_major_ver | int >= 12) or
+         guest_os_ansible_distribution == "Fedora")
       block:
         - name: "Rescan all hard disks"
           ansible.builtin.shell: |
@@ -60,6 +69,7 @@
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "Rescan in guest for removed disk"
+          when: wait_device_state | lower == 'absent'
           block:
             - include_tasks: ../../common/get_system_info.yml
             - name: "Set fact of removed disk {{ wait_device_name }}"
@@ -81,17 +91,12 @@
                 - guest_ansible_device[wait_device_name] is defined
                 - guest_ansible_device[wait_device_name].size is defined
                 - guest_ansible_device[wait_device_name].size == "0.00 Bytes"
-          when: wait_device_state | lower == 'absent'
-      when: >
-        (guest_os_ansible_distribution == 'Flatcar' or
-         (guest_os_ansible_distribution == "Ubuntu" and
-          guest_os_ansible_distribution_major_ver | int >= 22) or
-         (guest_os_ansible_distribution == "Debian" and
-          guest_os_ansible_distribution_major_ver | int >= 12) or
-         guest_os_ansible_distribution == "Fedora")
-  when: new_disk_ctrl_type == 'lsilogic'
 
 - name: "Handle NVMe disk"
+  when:
+    - new_disk_ctrl_type == 'nvme'
+    - vm_hardware_version_num | int < 19
+    - guest_os_ansible_distribution not in ['VMware Photon OS', 'FreeBSD']
   block:
     - name: "WORKAROUND"
       ansible.builtin.debug:
@@ -143,20 +148,42 @@
 
         - include_tasks: ../utils/reboot.yml
       when: vm_boot_disk_ctrl_type == 'nvme'
-  when:
-    - new_disk_ctrl_type == 'nvme'
-    - vm_hardware_version_num | int < 19
-    - guest_os_ansible_distribution != 'VMware Photon OS'
+
+- name: "Handle NVMe or LSILogic disk for FreeBSD"
+  when: 
+    - guest_os_ansible_distribution == "FreeBSD"
+    - new_disk_ctrl_type in ['nvme' , 'lsilogic']
+  block:
+    - name: "Reboot VM to detect NVMe device changes for FreeBSD 13.x or older releases"
+      when: new_disk_ctrl_type == 'nvme'
+      block:
+        - name: "Known issue - workaround of detecting NVMe device changes for FreeBSD"
+          ansible.builtin.debug:
+            msg:
+              - "Guest OS can't detect hot add, remove disk attached to NVMe controller. Ignore this known issue."
+              - "Please refer to https://kb.vmware.com/s/article/2147574."
+          tags:
+            - known_issue
+
+        - include_tasks: ../utils/reboot.yml
+
+    - name: "Recan bus to detect LSILogic device changes"
+      ansible.builtin.command: "camcontrol rescan all"
+      delegate_to: "{{ vm_guest_ip }}"
+      when: new_disk_ctrl_type == 'lsilogic'
 
 - name: "Initialize the command to get device list"
   ansible.builtin.set_fact:
     get_device_list_cmd: |-
-      {%- if guest_os_family == 'FreeBSD' -%}/tmp/lsblk.sh -d
+      {%- if guest_os_family == 'FreeBSD' -%}/tmp/lsblk.sh -d | grep -v SIZE
       {%- else -%}lsblk -o NAME,TYPE,SIZE,FSTYPE -b --nodeps
       {%- endif -%}
 
 - name: "Wait for device to be {{ wait_device_state | lower }}"
-  ansible.builtin.shell: "{{ get_device_list_cmd }}| grep disk | awk '{print $1}'"
+  ansible.builtin.shell: |-
+    {%- if guest_os_family == 'FreeBSD' -%}{{ get_device_list_cmd }} | awk '{print $1}'
+    {%- else -%}{{ get_device_list_cmd }}| grep disk | awk '{print $1}'
+    {%- endif -%}
   delegate_to: "{{ vm_guest_ip }}"
   changed_when: false
   register: lsblk_result
