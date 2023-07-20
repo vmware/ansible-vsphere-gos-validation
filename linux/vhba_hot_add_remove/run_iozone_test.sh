@@ -157,6 +157,9 @@ function test_partitions()
         fi
     fi
 
+    if [[ "$os_distribution" =~ FreeBSD ]]; then
+        IOZONE_PATH="/usr/local/bin/iozone"
+    fi
     # Run iozone or check iozone file's md5sum
     if [  -e ${IOZONE_PATH} ]; then
         run_iozone "$part_name"
