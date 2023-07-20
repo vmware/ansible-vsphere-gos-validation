@@ -36,14 +36,6 @@
 - name: "Get and check service info for FreeBSD"
   when: guest_os_family == "FreeBSD"
   block:
-    - name: "Get facts of all services for FreeBSD with ansible module"
-      ansible.builtin.service_facts:
-      register: service_facts_result
-      delegate_to: "{{ vm_guest_ip }}"
-
-    - name: "Debug variable service_facts_result"
-      ansible.builtin.debug: var=service_facts_result
-
     - name: "Get facts of service {{ service_name }} for FreeBSD"
       ansible.builtin.shell: "service -r | grep '{{ service_name }}'"
       ignore_errors: true
@@ -64,7 +56,7 @@
       ansible.builtin.set_fact:
         service_info: >-
           {{
-            {} | combine({'path': service_facts_result.stdout | default(''), 'state': 'stopped', 'status': 'disabled'})
+            {} | combine({'path': service_facts_result.stdout | default(''), 'state': 'stopped', 'status': 'absent'})
           }}
       when:
         - service_facts_result.rc != 0
