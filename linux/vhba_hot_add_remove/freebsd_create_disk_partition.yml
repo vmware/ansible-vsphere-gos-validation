@@ -28,7 +28,7 @@
     msg: >-
       Guest OS doesn't support Filesystem {{ partition_fstype }}, so it can't
       create partition with filesystem {{ partition_fstype }} on disk {{ disk_name }}
-  when: partition_fstype is not in ['ufs', 'swap', 'boot']
+  when: partition_fstype is not in ['ufs', 'swap', 'boot', 'zfs']
 
 - name: "Create partition table on disk {{ disk_name }}"
   ansible.builtin.shell: gpart create -s gpt {{ disk_name }}
@@ -37,7 +37,6 @@
 - name: "Create 1 partition on disk {{ disk_name }}"
   ansible.builtin.shell: gpart add -t freebsd-{{ partition_fstype }} {{ disk_name }}
   delegate_to: "{{ vm_guest_ip }}"
-  register: parted_result
 
 - name: "Set fact of partition name"
   ansible.builtin.set_fact:
@@ -48,9 +47,7 @@
     partition_device_path: "/dev/{{ partition_name }}"
 
 - name: "Create filesystem on partition {{ partition_device_path }}"
-  community.general.filesystem:
-    fstype: "{{ partition_fstype }}"
-    dev: "{{ partition_device_path }}"
+  ansible.builtin.command: "newfs {{ partition_device_path }}"
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Get the UUID of partition {{ partition_device_path }}"
