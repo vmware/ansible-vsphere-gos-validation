@@ -28,7 +28,7 @@
     msg: >-
       Guest OS doesn't support Filesystem {{ partition_fstype }}, so it can't
       create partition with filesystem {{ partition_fstype }} on disk {{ disk_name }}
-  when: partition_fstype is not in ['ufs', 'swap', 'boot', 'zfs']
+  when: partition_fstype is not in ['ufs', 'zfs']
 
 - name: "Create partition table on disk {{ disk_name }}"
   ansible.builtin.shell: gpart create -s gpt {{ disk_name }}
@@ -46,9 +46,24 @@
   ansible.builtin.set_fact:
     partition_device_path: "/dev/{{ partition_name }}"
 
-- name: "Create filesystem on partition {{ partition_device_path }}"
-  ansible.builtin.command: "newfs {{ partition_device_path }}"
+- name: "Create {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
+  ansible.builtin.command: "newfs -U {{ partition_device_path }}"
   delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: true
+  register: partition_result
+  when: partition_fstype == "zfs"
+
+- name: "Create {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
+  community.general.filesystem:
+    fstype: "{{ partition_fstype }}"
+    dev: "{{ partition_device_path }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: partition_result
+  when: partition_fstype == "ufs"
+
+- name: Display the partiton creation result
+  ansible.builtin.debug: var=partition_result
+  when: enable_debug is defined and enable_debug
 
 - name: "Get the UUID of partition {{ partition_device_path }}"
   ansible.builtin.shell: "gpart list {{ disk_name }} | grep rawuuid"
