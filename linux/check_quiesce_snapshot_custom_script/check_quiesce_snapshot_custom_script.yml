@@ -50,7 +50,7 @@
             - pre-freeze-script
             - post-thaw-script
           delegate_to: "{{ vm_guest_ip }}"
-          when: "'Flatcar' != guest_os_ansible_distribution"
+          when: "guest_os_ansible_distribution != 'Flatcar'"
 
         # Ensure /vss.log is absent
         - name: "Remove {{ vss_log_path }} if it exists"
@@ -96,7 +96,7 @@
         - name: "{{ ansible_play_name }} failed"
           ansible.builtin.fail:
             msg: "{{ vss_log_path }} has incorrect content"
-          when: ('Flatcar' != guest_os_ansible_distribution) and
+          when: (guest_os_ansible_distribution != 'Flatcar') and
               (( not vss_content ) or
               ( vss_content.stdout_lines is undefined ) or
               ( vss_content.stdout_lines | length != 4 ) or
@@ -109,7 +109,7 @@
         - name: "{{ ansible_play_name }} failed"
           ansible.builtin.fail:
             msg: "{{ vss_log_path }} has incorrect content"
-          when: ('Flatcar' == guest_os_ansible_distribution) and
+          when: (guest_os_ansible_distribution == 'Flatcar') and
              (( not vss_content ) or
              ( vss_content.stdout_lines is undefined ) or
              ( vss_content.stdout_lines | length != 2 ) or
