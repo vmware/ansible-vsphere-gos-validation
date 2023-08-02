@@ -70,11 +70,9 @@
       ansible.builtin.set_fact:
         vm_memory_mb: |-
           {%- if guest_id is match('freebsd\\d+Guest') and boot_disk_controller in ['lsilogic', 'lsilogicsas', 'nvme'] -%}
-              {%- if memory_mb is defined and memory_mb and memory_mb | int < 4096 -%}{{ memory_mb }}
-              {%- else -%}3072
-              {%- endif -%}
-          {%- elif memory_mb is defined and memory_mb -%}{{ memory_mb }}
-          {%- else -%}4096
+          {{ [3072, memory_mb | default(4096) | int ] | min }}
+          {%- else -%}
+          {{ memory_mb | default(4096) | int  }}
           {%- endif -%}
 
     - name: "Display the memory size when create VM"
