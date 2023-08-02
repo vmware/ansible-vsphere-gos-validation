@@ -15,7 +15,7 @@ HAS_NVME="false"
 HAS_PVSCSI="false"
 IOZONE_PATH="/tmp/iozone"
 PART_FS="ext4"
-os_distribution=`uname`
+os_distribution=`uname -s`
 
 function exec_cmd()
 {
