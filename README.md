@@ -89,6 +89,8 @@ This project supports below scenarios for end-to-end guest operating system vali
 | FreeBSD 13 and later                          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Pardus 21.2 Server,XFCE Desktop and later (*) | :heavy_check_mark:               |                          |                                   |
 | openSUSE Leap 15.3 and later                  | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| BCLinux 8.x                                   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| BCLinux-for-Euler 21.10                       | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 
 **Notes**
 1. This compatible guest operating systems list is used for this project only. For guest operating system support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
