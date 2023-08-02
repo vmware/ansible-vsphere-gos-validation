@@ -6,7 +6,7 @@
     inbox_drivers_files:
       - /boot/kernel/vmci.ko
       - /boot/kernel/pvscsi.ko
-      - /boot/kernel/virtio_balloon.c
+      - /boot/kernel/virtio_balloon.ko
       - /boot/kernel/if_vmx.ko
 
 - name: "Set fact of kernel builtin drivers"
@@ -36,13 +36,13 @@
 - name: "Check all inbox drivers' files exist"
   ansible.builtin.assert:
     that:
-      - stat_driver_filename.stat is defined
-      - stat_driver_filename.stat.exists is defined
-      - stat_driver_filename.stat.exists
-    fail_msg: "Inbox driver file {{ stat_driver_filename.stat.path }} doesn't exist"
+      - stat_driver_file.stat is defined
+      - stat_driver_file.stat.exists is defined
+      - stat_driver_file.stat.exists
+    fail_msg: "Inbox driver file {{ stat_driver_file.stat.path }} doesn't exist"
   with_items: "{{ stat_drivers_files.results }}"
   loop_control:
-    loop_var: stat_driver_filename
+    loop_var: stat_driver_file
 
 - name: "Check the kernel builtin devices"
   ansible.builtin.shell: "sysctl -a | grep '^device' | grep '{{ inbox_builtin_device }}'"
