@@ -11,26 +11,48 @@
   ansible.builtin.set_fact:
     service_info: ""
 
-- name: "Get facts of all services"
-  ansible.builtin.service_facts:
-  register: service_facts_result
-  delegate_to: "{{ vm_guest_ip }}"
-
-- name: "Set the full name for service '{{ service_name }}'"
-  ansible.builtin.set_fact:
-    service_fullname: |-
-      {%- if ".service" in service_name -%}{{ service_name }}
-      {%- else -%}{{ service_name + ".service" }}{%- endif -%}
-
-- block:
+- name: "Get and check service info for {{ guest_os_ansible_distribution }}"
+  when: guest_os_family != "FreeBSD"
+  block:
+    - name: "Get facts of all services"
+      ansible.builtin.service_facts:
+      register: service_facts_result
+      delegate_to: "{{ vm_guest_ip }}"
+    
+    - name: "Set the full name for service '{{ service_name }}'"
+      ansible.builtin.set_fact:
+        service_fullname: |-
+          {%- if ".service" in service_name -%}{{ service_name }}
+          {%- else -%}{{ service_name + ".service" }}{%- endif -%}
+  
     - name: "Get service information about '{{ service_fullname }}'"
       ansible.builtin.set_fact:
         service_info: "{{ service_facts_result.ansible_facts.services[service_fullname] }}"
+      when:
+        - service_facts_result.ansible_facts is defined
+        - service_facts_result.ansible_facts.services is defined
+        - service_fullname in service_facts_result.ansible_facts.services
 
-    - name: "Print service information"
-      ansible.builtin.debug:
-        msg: "Service information: {{ service_info }}"
-  when:
-    - service_facts_result.ansible_facts is defined
-    - service_facts_result.ansible_facts.services is defined
-    - service_fullname in service_facts_result.ansible_facts.services
+- name: "Get and check service info for FreeBSD"
+  when: guest_os_family == "FreeBSD"
+  block:
+    - name: "Get facts of service {{ service_name }} for FreeBSD"
+      ansible.builtin.shell: "service -r | grep '{{ service_name }}'"
+      ignore_errors: true
+      register: service_facts_result
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Get service information about '{{ service_fullname }}'"
+      ansible.builtin.set_fact:
+        service_info: >-
+          {{
+            {'name': service_name, 'path': service_facts_result.stdout, 'state': 'running', 'status': 'enabled'}
+          }}
+      when:
+        - service_facts_result.rc == 0
+        - service_facts_result.stdout is defined
+        - service_facts_result.stdout
+
+- name: "Print service {{ service_name }} information"
+  ansible.builtin.debug:
+    msg: "Service information: {{ service_info }}"

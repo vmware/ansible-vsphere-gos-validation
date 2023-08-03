@@ -12,7 +12,7 @@
     process_list: []
 
 - name: "Get '{{ process_name }}' process information"
-  ansible.builtin.shell: "ps -ef | grep '{{ process_name }}' | grep -v grep"
+  ansible.builtin.shell: "ps -aux | grep '{{ process_name }}' | grep -v grep"
   register: ps_result
   failed_when: false
   delegate_to: "{{ vm_guest_ip }}"
@@ -20,7 +20,7 @@
 - block:
     - name: "Set the fact for process list"
       ansible.builtin.set_fact:
-        process_list: "{{ process_list | union([{'uid':item.split()[0],'pid':item.split()[1], 'cmd':' '.join(item.split()[7:])}]) }}"
+        process_list: "{{ process_list | union([{'uid':item.split()[0],'pid':item.split()[1], 'cmd':' '.join(item.split()[10:])}]) }}"
       with_items: "{{ ps_result.stdout_lines }}"
 
     - name: "Get the running process list"

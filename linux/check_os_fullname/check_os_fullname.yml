@@ -38,7 +38,7 @@
             expected_guest_id_suffix: "{% if guest_os_bit == '64-bit' %}64{% endif %}Guest"
             expected_guest_major_ver: ""
             expected_guest_fullname: ""
-            expected_guest_family: "linuxGuest"
+            expected_guest_family: "{% if guest_os_ansible_distribution == 'FreeBSD' %}otherGuestFamily{% else %}linuxGuest{% endif %}"
             guest_is_otherlinux: true
 
         - name: "Set fact of guest OS is not other Linux"
@@ -47,14 +47,14 @@
           when: >-
             guest_os_ansible_distribution in ["RedHat", "CentOS", "OracleLinux", "AlmaLinux", "Rocky",
                                               "SLES", "SLED", "VMware Photon OS", "Amazon", "Fedora",
-                                              "Ubuntu", "Debian", "openSUSE Leap"]
+                                              "Ubuntu", "Debian", "openSUSE Leap", "FreeBSD"]
 
         - name: "Set fact of expected guest id suffix"
           ansible.builtin.set_fact:
             expected_guest_id_suffix: "{{ expected_guest_id_suffix | replace('64', '_64') }}"
           when: >-
             guest_os_ansible_distribution in ["RedHat", "SLES", "SLED",
-                                             "CentOS", "OracleLinux", "Debian"]
+                                             "CentOS", "OracleLinux", "Debian", "FreeBSD"]
 
         - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
           include_tasks: rhel_fullname_map.yml
@@ -66,7 +66,7 @@
 
         - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
           include_tasks: "{{ guest_os_ansible_distribution | lower }}_fullname_map.yml"
-          when: guest_os_ansible_distribution in ["Amazon", "CentOS", "OracleLinux", "AlmaLinux", "Rocky", "Debian"]
+          when: guest_os_ansible_distribution in ["Amazon", "CentOS", "OracleLinux", "AlmaLinux", "Rocky", "Debian", "FreeBSD"]
 
         - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:

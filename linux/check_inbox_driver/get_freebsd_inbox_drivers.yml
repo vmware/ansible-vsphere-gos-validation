@@ -1,0 +1,63 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of inbox drivers' files"
+  ansible.builtin.set_fact:
+    inbox_drivers_files:
+      - /boot/kernel/vmci.ko
+      - /boot/kernel/pvscsi.ko
+      - /boot/kernel/virtio_balloon.ko
+      - /boot/kernel/if_vmx.ko
+
+- name: "Set fact of kernel builtin drivers"
+  ansible.builtin.set_fact:
+    kernel_builtin_devices:
+      - virtio_balloon
+      - pvscsi
+      - vmx
+
+- name: "Set fact of kernel auto load modules"
+  ansible.builtin.set_fact:
+    kernel_autoload_modules:
+      - vmci
+
+- name: "Update autoload modules when guest OS has open-vm-tools"
+  ansible.builtin.set_fact:
+    kernel_autoload_modules: "{{ kernel_autoload_modules + ['vmmemctl'] }}"
+  when: vmtools_is_ovt is defined and vmtools_is_ovt
+
+- name: "Check inbox driver's file exists"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  with_items: "{{ inbox_drivers_files }}"
+  register: stat_drivers_files
+
+- name: "Check all inbox drivers' files exist"
+  ansible.builtin.assert:
+    that:
+      - stat_driver_file.stat is defined
+      - stat_driver_file.stat.exists is defined
+      - stat_driver_file.stat.exists
+    fail_msg: "Inbox driver file {{ stat_driver_file.stat.path }} doesn't exist"
+  with_items: "{{ stat_drivers_files.results }}"
+  loop_control:
+    loop_var: stat_driver_file
+
+- name: "Check the kernel builtin devices"
+  ansible.builtin.shell: "sysctl -a | grep '^device' | grep '{{ inbox_builtin_device }}'"
+  register: kernel_devices_result
+  delegate_to: "{{ vm_guest_ip }}"
+  failed_when: kernel_devices_result.rc != 0
+  loop: "{{ kernel_builtin_devices }}"
+  loop_control:
+    loop_var: inbox_builtin_device
+
+- name: "Check autoload modules"
+  ansible.builtin.shell: "kldstat | grep {{ module_name }}"
+  register: check_module_result
+  delegate_to: "{{ vm_guest_ip }}"
+  failed_when: check_module_result.rc != 0
+  loop: "{{ kernel_autoload_modules }}"
+  loop_control:
+    loop_var: module_name

@@ -15,6 +15,7 @@
   when: guest_os_ansible_distribution == "Debian"
 
 - name: "Set network device manager for {{ guest_os_ansible_distribution }}"
+  when: guest_os_ansible_distribution not in ["Debian", "FreeBSD"]
   block:
     - include_tasks: get_service_info.yml
       vars:
@@ -58,4 +59,8 @@
         (not service_info or
         service_info.state is undefined or
         service_info.state not in ['active', 'running'])
-  when: guest_os_ansible_distribution != "Debian"
+
+- name: "Set network device manager for {{ guest_os_ansible_distribution }}"
+  ansible.builtin.set_fact:
+    guest_os_network_manager: "netif"
+  when: guest_os_ansible_distribution == "FreeBSD"

@@ -49,6 +49,19 @@
   ansible.builtin.set_fact:
     new_guest_disk_info: "{{ (guest_disk_list_after_hotadd | difference(guest_disk_list_before_hotadd))[0] }}"
 
+- name: "Change size with Gbytes to bytes for FreeBSD"
+  ansible.builtin.set_fact:
+    new_guest_disk_info: > 
+      {{ new_guest_disk_info | combine({
+            'size': (new_guest_disk_info.size.split('G')[0].strip() | int) * 1024 * 1024 * 1024
+        }) 
+      }}
+  when:
+    - guest_os_family == "FreeBSD"
+    - new_guest_disk_info.size is defined
+    - new_guest_disk_info.size
+    - new_guest_disk_info.size is match("\\d+(\\.\\d+)?G")
+
 - name: "Print the new disk info"
   ansible.builtin.debug: var=new_guest_disk_info
 
@@ -62,10 +75,18 @@
     fail_msg: "The new disk '{{ new_guest_disk_info }}' has incorrect information"
 
 - name: "Create new partition on the new disk {{ new_guest_disk_info.name }}"
+  when: guest_os_family != 'FreeBSD'
   include_tasks: ../utils/create_disk_partition.yml
   vars:
     disk_name: "{{ new_guest_disk_info.name }}"
     partition_fstype: "ext4"
+
+- name: "Create new partition on the new disk {{ new_guest_disk_info.name }} for FreeBSD"
+  when: guest_os_family == 'FreeBSD'
+  include_tasks: freebsd_create_disk_partition.yml
+  vars:
+    disk_name: "{{ new_guest_disk_info.name }}"
+    partition_fstype: "ufs"
 
 - name: "Set fact of new partition name and device path"
   ansible.builtin.set_fact:

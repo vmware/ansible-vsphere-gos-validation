@@ -65,8 +65,24 @@
     - name: "Compose VM CDROMs to mount OS install ISO files"
       include_tasks: ../../common/compose_vm_cdroms.yml
 
+    # Failed to install FreeBSD 32bit with lsilogic/lsilogicsas/nvme when memory >= 4G
+    - name: "Initialize the fact of memory size when create VM"
+      ansible.builtin.set_fact:
+        vm_memory_mb: |-
+          {%- if guest_id is match('freebsd\\d+Guest') and boot_disk_controller in ['lsilogic', 'lsilogicsas', 'nvme'] -%}
+          {{ [3072, memory_mb | default(4096) | int ] | min }}
+          {%- else -%}
+          {{ memory_mb | default(4096) | int  }}
+          {%- endif -%}
+
+    - name: "Display the memory size when create VM"
+      ansible.builtin.debug: var=vm_memory_mb
+      when: enable_debug is defined and enable_debug
+
     - name: "Create a new VM with {{ boot_disk_controller }} disk"
       include_tasks: ../../common/vm_create.yml
+      vars:
+        memory_mb: "{{ vm_memory_mb }}"
       when: boot_disk_controller != 'ide'
 
     - name: "Create a new VM with {{ boot_disk_controller }} disk"

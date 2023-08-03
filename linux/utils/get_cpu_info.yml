@@ -6,14 +6,42 @@
     guest_cpu_num: ""
     guest_cpu_cores: ""
 
-- include_tasks: ../../common/get_system_info.yml
-  vars:
-    filter: "ansible_processor*"
+- name: "Get CPU info for {{ guest_os_ansible_distribution }}"
+  when: guest_os_family != "FreeBSD"
+  block:
+    - name: "Get system processor information"
+      include_tasks: ../../common/get_system_info.yml
+      vars:
+        filter: "ansible_processor*"
 
-- name: "Set the fact of CPU number and cores in guest"
-  ansible.builtin.set_fact:
-    guest_cpu_num: "{{ guest_system_info.ansible_processor_vcpus }}"
-    guest_cpu_cores: "{{ guest_system_info.ansible_processor_cores }}"
+    - name: "Set the fact of CPU number and cores in guest"
+      ansible.builtin.set_fact:
+        guest_cpu_num: "{{ guest_system_info.ansible_processor_vcpus }}"
+        guest_cpu_cores: "{{ guest_system_info.ansible_processor_cores }}"
+
+- name: "Get CPU info for FreeBSD"
+  when: guest_os_family == "FreeBSD"
+  block:
+    - name: "Get number of CPUs"
+      ansible.builtin.command: "sysctl -n hw.ncpu"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: get_ncpu_results
+
+    - name: "Display the result to get number of CPUs"
+      ansible.builtin.debug: var=get_ncpu_results
+
+    - name: "Get socket(s) and core(s) info"
+      ansible.builtin.shell: "dmesg | grep SMP | grep package"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: get_cpu_cores_results
+
+    - name: "Display the result to get socket(s) and core(s) info"
+      ansible.builtin.debug: var=get_cpu_cores_results
+
+    - name: "Set the fact of CPU number and cores in guest"
+      ansible.builtin.set_fact:
+        guest_cpu_num: "{{ get_ncpu_results.stdout }}"
+        guest_cpu_cores: "{{ get_cpu_cores_results.stdout.split(':')[-1].split('core')[0].split()[-1] }}"
 
 - ansible.builtin.debug:
     msg: "Guest OS has {{ guest_cpu_num }} CPU, and {{ guest_cpu_cores }} core(s) per socket"
