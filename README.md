@@ -86,7 +86,7 @@ This project supports below scenarios for end-to-end guest operating system vali
 | UnionTech OS Server 20 1050a                  | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Fedora Server 36 and later                    | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | ProLinux Server 7.9, 8.5                      | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| FreeBSD 13 and later (*)                      | :heavy_check_mark:               |                          |                                    |
+| FreeBSD 13 and later                          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Pardus 21.2 Server,XFCE Desktop and later (*) | :heavy_check_mark:               |                          |                                   |
 | openSUSE Leap 15.3 and later                  | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 
