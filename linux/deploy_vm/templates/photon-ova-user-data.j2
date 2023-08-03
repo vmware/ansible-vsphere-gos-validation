@@ -29,13 +29,16 @@ users:
 
 # Workaround for root password setting when shadow version is 4.6-5 and earlier
 bootcmd:
-  - shadow_version=$(rpm -q shadow | grep -E -o "[0-9]+(\.[0-9]+)+-[0-9]+"); [ $(printf "$shadow_version\n4.6-6\n" | sort | head -n 1) != "4.6-6" ] && /bin/sed -E -i 's/^root:([^:]+):.*$/root:\1:17532:0:99999:0:::/' /etc/shadow
+  - echo "Running cloud-init bootcmd" >/dev/ttyS0
+  - shadow_version=$(rpm -q shadow | grep -E -o "[0-9]+(\.[0-9]+)+-[0-9]+"); echo "Shadow version is $shadow_version" >/dev/ttyS0; [ $(printf "$shadow_version\n4.6-6\n" | sort | head -n 1) != "4.6-6" ] && /bin/sed -E -i 's/^root:([^:]+):.*$/root:\1:17532:0:99999:0:::/' /etc/shadow
 
 runcmd:
+{% for cmd in cloudinit_runcmd %}
+  - {{ cmd }}
+{% endfor %}
+  - echo "Stop and disable iptables" >/dev/ttyS0
   - [systemctl, stop, iptables]
   - [systemctl, disable, iptables]
-  - [systemctl, disable, chronyd]
-  - [systemctl, disable, chrony-wait]
-  - os_version=$(grep VERSION= /etc/os-release | grep -E -o "[0-9]+\.[0-9]+"); [ $(printf "$os_version\n4.0\n" | sort | head -n 1 | cut -d '.' -f 1) -ge 4 ] && systemctl start sshd.socket
+  - os_major_ver=$(grep VERSION= /etc/os-release | grep -Eo "[0-9]+\.[0-9]+" | cut -d '.' -f 1); [ $os_major_ver -ge 4 ] && (echo "Starting sshd.socket ..." >/dev/ttyS0; systemctl start sshd.socket; systemctl status sshd.socket >/dev/ttyS0)
 
 final_message: "{{ cloudinit_final_msg }}"

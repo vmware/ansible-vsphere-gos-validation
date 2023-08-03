@@ -63,7 +63,6 @@
           delegate_to: "{{ vm_guest_ip }}"
           when: guest_os_ansible_distribution not in ['Flatcar', 'RHCOS']
 
-        # Ensure /var/vss.log is absent
         - name: "Remove {{ vss_log_path }} if it exists"
           ansible.builtin.file:
             path: "{{ vss_log_path }}"
@@ -77,11 +76,6 @@
             is_quiesce: "yes"
             dump_memory: "no"
 
-        # After snapshot is taken, check log file /var/vss.log in guest, which should have below contents:
-        # /usr/sbin/pre-freeze-script freeze
-        # /etc/vmware-tools/backupScripts.d/vss_script_sh.sh freeze
-        # /etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw
-        # /usr/sbin/post-thaw-script thaw
         - name: "Check {{ vss_log_path }} existence"
           include_tasks: ../utils/get_file_stat_info.yml
           vars:
@@ -105,6 +99,11 @@
           register: vss_content
 
         # Guest OS is not Flatcar or RHCOS
+        # After quiesce snapshot is taken, guest log file /vss.log should have below contents:
+        # /usr/sbin/pre-freeze-script freeze
+        # /etc/vmware-tools/backupScripts.d/vss_script_sh.sh freeze
+        # /etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw
+        # /usr/sbin/post-thaw-script thaw
         - name: "Check file content in {{ vss_log_path }}"
           ansible.builtin.assert:
             that:
@@ -118,6 +117,9 @@
           when: guest_os_ansible_distribution not in ['Flatcar', 'RHCOS']
 
         # Guest OS is Flatcar or RHCOS
+        # After quiesce snapshot is taken, guest log file /var/vss.log should have below contents:
+        # /etc/vmware-tools/backupScripts.d/vss_script_sh.sh freeze
+        # /etc/vmware-tools/backupScripts.d/vss_script_sh.sh thaw
         - name: "Check file content in {{ vss_log_path }}"
           ansible.builtin.assert:
             that:

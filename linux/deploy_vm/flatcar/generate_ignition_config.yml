@@ -11,23 +11,23 @@
     ignition_sshd_config: "{{ 'PermitRootLogin yes\nPasswordAuthentication yes\n' | b64encode }}"
 
 # Put SSH public key into ignition config file
-- name: "Generation ignition config file {{ ignition_config_file }}"
+- name: "Generation Ignition config file {{ ignition_config_file }}"
   ansible.builtin.template:
     src: ignition_config.j2
     dest: "{{ ignition_config_file }}"
     mode: "0644"
   register: generate_ignition
 
-- name: "Assert {{ ignition_config_file }} is generated"
+- name: "Assert Ignition config file is generated"
   ansible.builtin.assert:
     that:
       - generate_ignition.changed
     fail_msg: "Failed to generate {{ ignition_config_file }}"
     success_msg: "Successfully generated {{ ignition_config_file }}"
 
-- name: "Generate base64 encoded string for {{ ignition_config_file }}"
+- name: "Generate base64 encoded data for {{ ignition_config_file }}"
   ansible.builtin.set_fact:
     ignition_config_data: "{{ lookup('file', ignition_config_file) | b64encode }}"
 
-- name: "Display base64 encoded data"
+- name: "Display base64 encoded data of Ignition config file {{ ignition_config_file }}"
   ansible.builtin.debug: var=ignition_config_data
