@@ -20,6 +20,8 @@
 19. For FreeBSD 13 or later unattend auto-install, please use file FreeBSD/installerconfig.
 20. For Pardus 21.2 Server and XFCE Desktop or later unattend auto-install, please use file Pardus/preseed.cfg.
 21. For openSUSE Leap 15.3 or later unattend auto-install, please use file openSUSE/15/autoinst.xml.
+22. For BCLinux 8.x unattend auto-install, please use file BCLinux/8/ks.cfg.
+23. For BCLinux-for-Euler 21.10 unattend auto-install, please use file BCLinux-for-Euler/21.10/ks.cfg.
 
 # Notes
 ## For Windows
