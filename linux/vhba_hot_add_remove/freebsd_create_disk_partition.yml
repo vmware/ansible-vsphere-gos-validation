@@ -35,17 +35,17 @@
   ansible.builtin.command: gpart create -s GPT {{ disk_name }}
   delegate_to: "{{ vm_guest_ip }}"
 
+- name: "Create 1 partition on disk {{ disk_name }}"
+  ansible.builtin.shell: gpart add -t freebsd-{{ partition_fstype }} {{ disk_name }}
+  delegate_to: "{{ vm_guest_ip }}"
+
 - name: "Get partition table on disk {{ disk_name }}"
   ansible.builtin.command: gpart show {{ disk_name }}
   delegate_to: "{{ vm_guest_ip }}"
   register: partition_table_result
 
 - name: "Display partition table on disk {{ disk_name }}"
-  ansible.builtin.debug: var=partition_result.stdout
-
-- name: "Create 1 partition on disk {{ disk_name }}"
-  ansible.builtin.shell: gpart add -t freebsd-{{ partition_fstype }} {{ disk_name }}
-  delegate_to: "{{ vm_guest_ip }}"
+  ansible.builtin.debug: var=partition_table_result.stdout
 
 - name: "Set fact of partition name"
   ansible.builtin.set_fact:
