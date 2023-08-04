@@ -47,10 +47,18 @@
         - display_manager_status.rc == 0
         - display_manager_status.stdout_lines is defined
         - display_manager_status.stdout_lines | length > 0
+
+    # If systemctl status display-manager.service error code is 4, it means
+    # the service doesn't exist, so guest OS doesn't have desktop
+    - name: "Set fact of guest OS having no desktop environment"
+      ansible.builtin.set_fact:
+        guest_os_with_gui: false
+      when: >
+        (display_manager_status.rc is undefined or
+        display_manager_status.rc == 4)
   when:
     - guest_os_with_gui | bool
     - guest_os_ansible_distribution != 'Astra Linux (Orel)'
-
 
 - name: "Set fact of guest OS display manager for {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
