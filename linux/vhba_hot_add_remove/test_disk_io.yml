@@ -6,20 +6,23 @@
 # Parameters:
 #   test_disk_name: The disk name to test
 #
-- name: "Set fact of the iozone file path"
-  ansible.builtin.set_fact:
-    iozone_tools_path: |-
-      {%- if guest_os_bit == '64-bit' -%}../../tools/iozone_64bit
-      {%- else -%}../../tools/iozone_32bit
-      {%- endif -%}
+- name: "Transfer iozone tool to remote guest OS"
+  when: guest_os_family != 'FreeBSD'
+  block:
+    - name: "Set fact of the iozone file path"
+      ansible.builtin.set_fact:
+        iozone_tools_path: |-
+          {%- if guest_os_bit == '64-bit' -%}../../tools/iozone_64bit
+          {%- else -%}../../tools/iozone_32bit
+          {%- endif -%}
 
-# Transfer iozone tool to remote guest OS from local machine
-- include_tasks: ../../common/transfer_file_remote.yml
-  vars:
-    transfer_file_remote_src: "{{ iozone_tools_path }}"
-    transfer_file_remote_dest: "/tmp/iozone"
-    transfer_file_remote_server: "{{ vm_guest_ip }}"
-    transfer_file_remote_mode: "0777"
+    - name: "Transfer iozone tool to remote guest OS from local machine"
+      include_tasks: ../../common/transfer_file_remote.yml
+      vars:
+        transfer_file_remote_src: "{{ iozone_tools_path }}"
+        transfer_file_remote_dest: "/tmp/iozone"
+        transfer_file_remote_server: "{{ vm_guest_ip }}"
+        transfer_file_remote_mode: "0777"
 
 - name: "Run iozone test on new added disk {{ test_disk_name }}"
   ansible.builtin.script: "./run_iozone_test.sh {{ test_disk_name }}"
