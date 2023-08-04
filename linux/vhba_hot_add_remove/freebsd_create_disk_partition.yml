@@ -31,9 +31,21 @@
       create partition with filesystem {{ partition_fstype }} on disk {{ disk_name }}
   when: partition_fstype is not in ['ufs', 'zfs']
 
-- name: "Create partition table on disk {{ disk_name }}"
-  ansible.builtin.shell: gpart create -s gpt {{ disk_name }}
+- name: "Destroy partition table on disk {{ disk_name }}"
+  ansible.builtin.command: gpart destroy -F {{ disk_name }}
   delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Create partition table on disk {{ disk_name }}"
+  ansible.builtin.command: gpart create -s gpt {{ disk_name }}
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Get partition table on disk {{ disk_name }}"
+  ansible.builtin.command: gpart show {{ disk_name }}
+  delegate_to: "{{ vm_guest_ip }}"
+  register: partition_table_result
+
+- name: "Display partition table on disk {{ disk_name }}"
+  ansible.builtin.debug: var=partition_result.stdout
 
 - name: "Create 1 partition on disk {{ disk_name }}"
   ansible.builtin.shell: gpart add -t freebsd-{{ partition_fstype }} {{ disk_name }}
@@ -52,7 +64,7 @@
   delegate_to: "{{ vm_guest_ip }}"
   register: partition_result
  
-- name: "Display the result to Create {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
+- name: "Display the result to create {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
   ansible.builtin.debug: var=partition_result
 
 - name: "Get disk partition info"
