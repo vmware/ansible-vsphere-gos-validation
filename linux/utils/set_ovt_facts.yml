@@ -25,13 +25,16 @@
     ovt_packages: "{{ ovt_packages | union(['libvmtools0']) }}"
   when: guest_os_family == "Suse"
 
-- name: "Update the fact of open-vm-tools packages for {{ guest_os_family }}"
-  ansible.builtin.set_fact:
-    ovt_packages: "{{ ovt_packages | union(['open-vm-tools-desktop']) }}"
-  when: guest_os_family != "FreeBSD"
+- name: "Update facts of open-vm-tools packages and processes"
+  when:
+    - guest_os_with_gui is defined
+    - guest_os_with_gui
+  block:
+    - name: "Update the fact of open-vm-tools packages for {{ guest_os_family }}"
+      ansible.builtin.set_fact:
+        ovt_packages: "{{ ovt_packages | union(['open-vm-tools-desktop']) }}"
+      when: guest_os_family != "FreeBSD"
 
-- name: "Update the fact of open-vm-tools processes with desktop"
-  ansible.builtin.set_fact:
-    ovt_processes: "{{ ovt_processes | union([{'uid':'vmware', 'cmd':'vmtoolsd -n vmusr'}]) }}"
-  when: guest_os_with_gui is defined and guest_os_with_gui
-
+    - name: "Update the fact of open-vm-tools processes for guest OS with desktop"
+      ansible.builtin.set_fact:
+        ovt_processes: "{{ ovt_processes | union([{'uid':'vmware', 'cmd':'vmtoolsd -n vmusr'}]) }}"
