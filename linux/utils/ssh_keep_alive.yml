@@ -58,6 +58,10 @@
           - sshd_service_info
         fail_msg: "Failed to find sshd or ssh service in guest OS"
 
+    - name: "Test code: check sshd service"
+      ansible.builtin.command: "ps -aux | grep ssh"
+      delegate_to: "{{ vm_guest_ip }}"
+
     - name: "Restart {{ sshd_service_info.name }}"
       ansible.builtin.service:
         name: "{{ sshd_service_info.name }}"
@@ -67,4 +71,9 @@
 
     - name: "Print {{ sshd_service_info.name }} restart result"
       ansible.builtin.debug: var=restart_sshd_result
+
+    - name: "Test code: check sshd service after restarted"
+      ansible.builtin.command: "ps -aux | grep ssh"
+      delegate_to: "{{ vm_guest_ip }}"
+  
   when: sshd_config_file_exists | bool
