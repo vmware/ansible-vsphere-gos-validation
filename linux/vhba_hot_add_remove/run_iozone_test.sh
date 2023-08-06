@@ -147,6 +147,11 @@ function test_partitions()
                 echo "Retry mount without option \"${mount_ops}\": "
                 exec_cmd "mount $part_path $mount_point && echo 'SUCCEED' || echo 'FAIL'"
             fi
+            # Fix issue when mount $part_path on FreeBSD 32bit: Invalid argument
+            if [[ "$os_distribution" =~ FreeBSD ]]; then
+                exec_cmd "newfs -EU $part_path >/dev/null 2>&1"
+                exec_cmd "mount $part_path $mount_point >/dev/null 2>&1"
+            fi
             if [ $ret -ne 0 ] ; then
                 echo "FAIL"
                 echo "Could not mount $part_path to $mount_point"
