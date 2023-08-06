@@ -149,7 +149,7 @@ function test_partitions()
             fi
             # Fix issue when mount $part_path on FreeBSD 32bit: Invalid argument
             if [[ "$os_distribution" =~ FreeBSD ]]; then
-                exec_cmd "fsck -fp $part_path >/dev/null 2>&1"
+                exec_cmd "newfs -EU $part_path >/dev/null 2>&1"
                 exec_cmd "mount $part_path $mount_point >/dev/null 2>&1"
             fi
             if [ $ret -ne 0 ] ; then
