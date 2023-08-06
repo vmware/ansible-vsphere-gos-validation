@@ -52,7 +52,7 @@ function run_iozone()
         rm -rf $testdir_path
     fi
     printf "Create folder $testdir_path:  "
-    exec_cmd "mkdir $testdir_path"
+    exec_cmd "mkdir -m 777 $testdir_path"
     if [ $ret -eq 0 ]; then
         echo "SUCCEED"
     else
@@ -134,7 +134,7 @@ function test_partitions()
     mount_point="/mnt/${part_name}"
     if [ ! -e "$mount_point" ]; then
         echo "Create mount point $mount_point"
-        exec_cmd "mkdir -p $mount_point"
+        exec_cmd "mkdir -p -m 777 $mount_point"
     fi
 
     mount | grep -i "$part_name" >/dev/null
