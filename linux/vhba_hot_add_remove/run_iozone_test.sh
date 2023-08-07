@@ -201,15 +201,6 @@ function freebsd_test_partitions()
         fi
     fi
 
-    echo "Zero the disk $part_path : "
-    exec_cmd "dd if=/dev/zero of=$part_path bs=1m count=100 >/dev/null 2>&1"
-    if [ $ret -ne 0 ] ; then
-        echo "FAIL"
-        exit $ret
-    else
-        echo "SUCCEED"
-    fi
-
     echo "Format the disk $part_path : "
     exec_cmd "newfs -EU $part_path >/dev/null 2>&1"
     if [ $ret -ne 0 ] ; then
