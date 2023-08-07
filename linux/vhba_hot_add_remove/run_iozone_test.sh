@@ -184,14 +184,14 @@ function freebsd_test_partitions()
     mount_point="/mnt/${part_name}"
     try_count=1
    
-    until [ $try_count -gt 4 ]
+    until [ $try_count -gt 10 ]
     do
         echo "Prepare for iozone test (try $try_count time) ..."
         try_count=$((try_count+1))
 
         mount | grep -i "$part_name" >/dev/null
         if [ $? -eq 0 ]; then
-            echo "umount ${mount_ops} : "
+            echo "umount ${part_path} : "
             exec_cmd "umount $mount_point >/dev/null 2>&1"
             if [ $ret -ne 0 ] ; then
                 echo "FAIL"
@@ -221,7 +221,7 @@ function freebsd_test_partitions()
         mount | grep -i "$part_name" >/dev/null
         if [ $? -ne 0 ]; then
             printf "Mount $part_path to $mount_point : "
-            exec_cmd "mount ${mount_ops} $part_path $mount_point >/dev/null 2>&1"
+            exec_cmd "mount $part_path $mount_point >/dev/null 2>&1"
             if [ $ret -ne 0 ] ; then
                 echo "FAIL"
                 continue
