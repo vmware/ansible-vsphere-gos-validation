@@ -18,6 +18,18 @@
     - cpu_number is undefined or not cpu_number
     - cpu_cores_per_socket is defined and cpu_cores_per_socket
 
+# Installing FreeBSD 32bit on lsilogic/lsilogicsas/nvme disk will
+# fail when memory size >= 4 GB
+- name: "Set the fact of memory size for the new VM"
+  ansible.builtin.set_fact:
+    vm_memory_mb: |-
+      {%- if guest_id is match('freebsd\\d+Guest') and
+       boot_disk_controller in ['lsilogic', 'lsilogicsas', 'nvme'] -%}
+      {{ [3072, memory_mb | default(4096) | int ] | min }}
+      {%- else -%}
+      {{ memory_mb | default(4096) | int  }}
+      {%- endif -%}
+
 - name: "Update test case name for deploying VM from ISO image"
   ansible.builtin.set_fact:
     current_testcase_name: "deploy_vm_{{ firmware }}_{{ boot_disk_controller }}_{{ network_adapter_type }}"
@@ -33,9 +45,10 @@
 
     - name: "Prepare for Ubuntu installation"
       include_tasks: ubuntu/prepare_ubuntu_iso_install.yml
-      when: "'ubuntu' in guest_id"
+      when: guest_id is match('ubuntu.*')
 
     - name: "Set default unattend install conf file"
+      when: unattend_install_conf is undefined or not unattend_install_conf
       block:
         - name: "Set default unattend install conf file for VMware Photon OS"
           ansible.builtin.set_fact:
@@ -50,8 +63,7 @@
         - name: "Set default unattend install conf file for FreeBSD"
           ansible.builtin.set_fact:
             unattend_install_conf: "FreeBSD/installerconfig"
-          when: "'freebsd' in guest_id"
-      when: unattend_install_conf is undefined or not unattend_install_conf
+          when: guest_id is match('freebsd.*')
 
     - name: "Display warning message about undefined unattend_install_conf"
       ansible.builtin.debug:
@@ -65,20 +77,6 @@
     - name: "Compose VM CDROMs to mount OS install ISO files"
       include_tasks: ../../common/compose_vm_cdroms.yml
 
-    # Failed to install FreeBSD 32bit with lsilogic/lsilogicsas/nvme when memory >= 4G
-    - name: "Initialize the fact of memory size when create VM"
-      ansible.builtin.set_fact:
-        vm_memory_mb: |-
-          {%- if guest_id is match('freebsd\\d+Guest') and boot_disk_controller in ['lsilogic', 'lsilogicsas', 'nvme'] -%}
-          {{ [3072, memory_mb | default(4096) | int ] | min }}
-          {%- else -%}
-          {{ memory_mb | default(4096) | int  }}
-          {%- endif -%}
-
-    - name: "Display the memory size when create VM"
-      ansible.builtin.debug: var=vm_memory_mb
-      when: enable_debug is defined and enable_debug
-
     - name: "Create a new VM with {{ boot_disk_controller }} disk"
       include_tasks: ../../common/vm_create.yml
       vars:
@@ -87,6 +85,8 @@
 
     - name: "Create a new VM with {{ boot_disk_controller }} disk"
       include_tasks: ../../common/vm_create_with_ide_disk.yml
+      vars:
+        memory_mb: "{{ vm_memory_mb }}"
       when: boot_disk_controller == 'ide'
 
     - name: "Get VM info"
@@ -100,6 +100,7 @@
       include_tasks: ../../common/vm_add_serial_port.yml
 
     - name: "Set video memory size"
+      when: install_guest_with_desktop
       block:
         - name: "Get VM's video card info"
           include_tasks: ../../common/vm_get_video_card.yml
@@ -113,7 +114,6 @@
           vars:
             video_memory_mb: 8
           when: vm_default_video_memory_mb | int < 8
-      when: install_guest_with_desktop
 
     - name: "Enable secure boot on VM"
       include_tasks: ../../common/vm_set_boot_options.yml
@@ -154,7 +154,7 @@
 
     - name: "Install Ubuntu OS"
       include_tasks: ubuntu/ubuntu_install_os.yml
-      when: "'ubuntu' in guest_id"
+      when: guest_id is match('ubuntu.*')
 
     # For SLES, OS installation with BIOS firmware, send key to boot
     # screen to start new installation instead of booting from local
@@ -195,16 +195,6 @@
         - unattend_install_conf is defined
         - ('UOS' in unattend_install_conf)
 
-    # We can get the text "ubuntu login:" from the serial output when the installer begin to run
-    # but get this text again after finish installation and reboot
-    # When we get text "gdm.service", We are so close to the state "system is up" after rebooting.
-    - name: "Set autoinstall complete message for Ubuntu Desktop 20.04 ~ 22.10"
-      ansible.builtin.set_fact:
-        autoinstall_complete_msg: "gdm.service"
-      when:
-        - unattend_install_conf is defined
-        - unattend_install_conf is match('Ubuntu/Desktop/Ubiquity')
-
     - name: "Wait autoinstall complete message appear in serial port output file"
       include_tasks: ../../common/vm_wait_log_msg.yml
       vars:
@@ -213,86 +203,21 @@
         vm_wait_log_delay: 30
         vm_wait_log_retries: 120
 
-    - name: "Wait 60s for OS rebooting"
-      ansible.builtin.pause:
-        seconds: 60
-
-    - name: "Wait for guest full name is collected"
-      include_tasks: ../../common/vm_wait_guest_fullname.yml
-      when:
-        - unattend_install_conf is defined
-        - unattend_install_conf | lower is not match('.*(minimal|server_without_gui|bclinux-for-euler).*')
-
-    - name: "Get VM guest IPv4 address and add to in-memory inventory"
-      include_tasks: ../../common/update_inventory.yml
+    - name: "Wait for OS shutting down after auto install being completed"
+      include_tasks: ../../common/vm_wait_power_state.yml
       vars:
-        update_inventory_timeout: 600
+        expected_power_status: 'poweredOff'
+        wait_power_state_timeout: 300
 
-    - name: "Get Linux system info"
-      include_tasks: ../utils/get_linux_system_info.yml
-
-    - name: "Wait for guest OS service is ready"
-      block:
-        # For SLE, RHEL8/CentOS8/OracleLinux8 with desktop: display-manager
-        # service running at the end of installation to wait user login.
-        # Otherwise, systemd-logind service running at the end of installaiton
-        # to wait user login
-        - name: "Set fact of service name for waiting at first time of OS boot"
-          ansible.builtin.set_fact:
-            wait_service_name: |-
-              {%- if guest_os_with_gui -%}display-manager
-              {%- else -%}systemd-logind
-              {%- endif -%}
-
-        - name: "Wait for service {{ wait_service_name }} is running"
-          include_tasks: ../utils/wait_for_service_status.yml
-          vars:
-            service_name: "{{ wait_service_name }}"
-            wait_service_status: "running"
-      when:
-        - guest_os_with_gui is defined
-        - (guest_os_family in ["RedHat", "Suse"] or
-           guest_os_ansible_distribution in ["Ubuntu", "Debian"])
-
+    # Delete unattend install ISO
     - name: "Eject unattend/seed ISO and delete it from datastore"
       include_tasks: eject_del_unattend_install_iso.yml
       when:
         - transferred_unattend_iso is defined
         - transferred_unattend_iso
-
-    - name: "Upgrade Oracle Linux 9.0 kernel from UEK R7 GA to latest UEK R7"
-      block:
-        - include_tasks: ../../common/vm_take_snapshot.yml
-          vars:
-            snapshot_name: "OL_9.0GA_UEK"
-
-        - name: "Get Oracle Linux 9.0 UEK R7 version before upgrading"
-          ansible.builtin.set_fact:
-            ol9_uekr7_is_upgraded: false
-            ol9_uekr7_before_upgrade: "{{ guest_os_ansible_kernel }}"
-
-        - include_tasks: ../utils/add_official_online_repo.yml
-        - name: "Update Oracle Linux 9.0 to latest UEK R7"
-          ansible.builtin.shell: "yum update --nogpgcheck -y"
-          register: ol9_uekr7_upgrade_result
-          delegate_to: "{{ vm_guest_ip }}"
-
-        - name: "Set the fact of that Oracle Linux 9.0 UEK R7 is upgraded"
-          ansible.builtin.set_fact:
-            ol9_uekr7_is_upgraded: true
-          when:
-            - ol9_uekr7_upgrade_result is defined
-            - ol9_uekr7_upgrade_result.rc is defined
-            - ol9_uekr7_upgrade_result.rc == 0
-      when:
-        - guest_os_ansible_distribution == "OracleLinux"
-        - guest_os_ansible_distribution_ver == "9.0"
-        - "'uek' in guest_os_ansible_kernel"
-
-    - name: "Shutdown guest OS"
-      include_tasks: ../utils/shutdown.yml
     
     - name: "Change CD/DVD to client device and set disk as first boot device for Ubuntu"
+      when: guest_id is match('ubuntu.*')
       block:
         - name: "Change VM's CD/DVD Drive 1 to client device"
           include_tasks: ../../common/vm_configure_cdrom.yml
@@ -307,7 +232,6 @@
           vars:
             boot_order_list:
               - disk
-      when: guest_os_ansible_distribution == "Ubuntu"
 
     - name: "Download serial output file before removing serial port"
       include_tasks: ../../common/esxi_download_datastore_file.yml
@@ -333,34 +257,105 @@
         remove_serial_port.changed is undefined or
         not remove_serial_port.changed
 
-    - name: "Power on VM"
+    - name: "OS auto install is completed. Power on VM now"
       include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: 'powered-on'
 
-    - name: "Check Oracle Linux 9.0 kernel UEK R7 is upgraded"
-      block:
-        - name: "Update VM guest IPv4 address in in-memory inventory"
-          include_tasks: ../../common/update_inventory.yml
-
-        - name: "Refresh Linux system info"
-          include_tasks: ../utils/get_linux_system_info.yml
-
-        - name: "Get Oracle Linux 9.0 UEK R7 version after upgrading"
-          ansible.builtin.set_fact:
-            ol9_uekr7_after_upgrade: "{{ guest_os_ansible_kernel }}"
-
-        - name: "Check Oracle Linux 9.0 kernel UEK R7 is upgraded successfully"
-          ansible.builtin.assert:
-            that:
-              - ol9_uekr7_after_upgrade is version(ol9_uekr7_before_upgrade, '>')
-            fail_msg: >-
-              Oracle Linux 9.0 UEK R7 upgrading failed. Before upgrade, the UEK R7
-              version is '{{ ol9_uekr7_before_upgrade }}', after upgrade the UEK R7
-              version is '{{ ol9_uekr7_after_upgrade }}'.
+    - name: "Wait for guest full name is collected"
+      include_tasks: ../../common/vm_wait_guest_fullname.yml
+      vars:
+        vm_get_fullname_timeout: 600
       when:
-        - ol9_uekr7_is_upgraded is defined
-        - ol9_uekr7_is_upgraded
+        - unattend_install_conf is defined
+        - unattend_install_conf | lower is not match('.*(minimal|server_without_gui|bclinux-for-euler).*')
+
+    - name: "Get VM guest IPv4 address and add to in-memory inventory"
+      include_tasks: ../../common/update_inventory.yml
+      vars:
+        update_inventory_timeout: 600
+
+    - name: "Get Linux system info"
+      include_tasks: ../utils/get_linux_system_info.yml
+
+    - name: "Wait for guest OS service is ready"
+      when:
+        - guest_os_with_gui is defined
+        - (guest_os_family in ["RedHat", "Suse"] or
+           guest_os_ansible_distribution in ["Ubuntu", "Debian"])
+      block:
+        # For SLE, RHEL8/CentOS8/OracleLinux8 with desktop: display-manager
+        # service running at the end of installation to wait user login.
+        # Otherwise, systemd-logind service running at the end of installaiton
+        # to wait user login
+        - name: "Set fact of service name for waiting at first time of OS boot"
+          ansible.builtin.set_fact:
+            wait_service_name: |-
+              {%- if guest_os_with_gui -%}display-manager
+              {%- else -%}systemd-logind
+              {%- endif -%}
+
+        - name: "Wait for service {{ wait_service_name }} is running"
+          include_tasks: ../utils/wait_for_service_status.yml
+          vars:
+            service_name: "{{ wait_service_name }}"
+            wait_service_status: "running"
+
+    - name: "Upgrade Oracle Linux 9.0 kernel from UEK R7 GA to latest UEK R7"
+      when:
+        - guest_os_ansible_distribution == "OracleLinux"
+        - guest_os_ansible_distribution_ver == "9.0"
+        - "'uek' in guest_os_ansible_kernel"
+      block:
+        - include_tasks: ../../common/vm_take_snapshot.yml
+          vars:
+            snapshot_name: "OL_9.0GA_UEK"
+
+        - name: "Get Oracle Linux 9.0 UEK R7 version before upgrading"
+          ansible.builtin.set_fact:
+            ol9_uekr7_is_upgraded: false
+            ol9_uekr7_before_upgrade: "{{ guest_os_ansible_kernel }}"
+
+        - name: "Add Oracle Linux online repos for upgrading kernel"
+          include_tasks: ../utils/add_official_online_repo.yml
+
+        - name: "Update Oracle Linux 9.0 to latest UEK R7"
+          ansible.builtin.shell: "yum update --nogpgcheck -y"
+          register: ol9_uekr7_upgrade_result
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - name: "Set the fact of that Oracle Linux 9.0 UEK R7 is upgraded"
+          ansible.builtin.set_fact:
+            ol9_uekr7_is_upgraded: true
+          when:
+            - ol9_uekr7_upgrade_result is defined
+            - ol9_uekr7_upgrade_result.rc is defined
+            - ol9_uekr7_upgrade_result.rc == 0
+
+        - name: "Check Oracle Linux 9.0 kernel UEK R7 is upgraded"
+          when: ol9_uekr7_is_upgraded
+          block:
+            - name: "Reboot Oracle Linux"
+              include_tasks: ../utils/reboot.yml
+    
+            - name: "Update VM guest IPv4 address in in-memory inventory"
+              include_tasks: ../../common/update_inventory.yml
+    
+            - name: "Refresh Linux system info"
+              include_tasks: ../utils/get_linux_system_info.yml
+    
+            - name: "Get Oracle Linux 9.0 UEK R7 version after upgrading"
+              ansible.builtin.set_fact:
+                ol9_uekr7_after_upgrade: "{{ guest_os_ansible_kernel }}"
+    
+            - name: "Check Oracle Linux 9.0 kernel UEK R7 is upgraded successfully"
+              ansible.builtin.assert:
+                that:
+                  - ol9_uekr7_after_upgrade is version(ol9_uekr7_before_upgrade, '>')
+                fail_msg: >-
+                  Oracle Linux 9.0 UEK R7 upgrading failed. Before upgrade, the UEK R7
+                  version is '{{ ol9_uekr7_before_upgrade }}', after upgrade the UEK R7
+                  version is '{{ ol9_uekr7_after_upgrade }}'.
 
   rescue:
     - name: "Test case failure"
