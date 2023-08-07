@@ -107,6 +107,9 @@
           reconfiguration. Please add it if needed or the following tests might fail.
       when: ova_guest_os_type == 'unknown'
 
+    - name: "Collect VM deployment logs"
+      include_tasks: collect_vm_logs.yml
+
     - name: "Shutdown guest OS"
       include_tasks: ../utils/shutdown.yml
 
@@ -138,6 +141,12 @@
       vars:
         vm_power_state_set: 'powered-on'
   rescue:
+    # If test case failed before collecting VM cloud-init logs,
+    # the logs need to be collected at rescue
+    - name: "Collect VM deployment logs"
+      include_tasks: collect_vm_logs.yml
+      when: cloudinit_logs_local_path is undefined
+
     - name: "Collect serial port log at test failure"
       include_tasks: collect_serial_port_log.yml
 
@@ -161,6 +170,3 @@
           vars:
             local_path: "{{ nfs_mount_dir }}"
             del_local_file_ignore_errors: true
-
-    - name: "Collect VM deployment logs"
-      include_tasks: collect_vm_logs.yml

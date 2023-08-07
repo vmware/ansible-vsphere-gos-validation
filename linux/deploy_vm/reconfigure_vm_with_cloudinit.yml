@@ -3,16 +3,16 @@
 ---
 - name: "Set fact of cloud-init final message"
   ansible.builtin.set_fact:
-    cloudinit_final_msg: "The system is finally up, after $UPTIME seconds"
+    cloudinit_final_msg: "OVA deployment with cloud-init config is completed"
     cloudinit_runcmd:
-      - "echo 'Get OS release info' >/dev/ttyS0"
-      - "cat /etc/os-release >/dev/ttyS0"
-      - "echo 'Update sshd settings in cloud-init config' >/dev/ttyS0"
-      - "sed -i 's/^disable_root:.*/disable_root: false/' /etc/cloud/cloud.cfg"
-      - "sed -i 's/^ssh_pwauth:.*/ssh_pwauth: true/' /etc/cloud/cloud.cfg"
-      - "echo 'Update sshd config to permit root login and password authentication' >/dev/ttyS0"
-      - "sed -i 's/^#*PermitRootLogin .*/PermitRootLogin yes/' /etc/ssh/sshd_config"
-      - "sed -i 's/^#*PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config"
+      - echo 'Get OS release info' >/dev/ttyS0
+      - cat /etc/os-release >/dev/ttyS0
+      - echo 'Update sshd settings in cloud-init config' >/dev/ttyS0
+      - [sed, -i, 's/^disable_root:.*/disable_root: false/', /etc/cloud/cloud.cfg]
+      - [sed, -i, 's/^ssh_pwauth:.*/ssh_pwauth: true/', /etc/cloud/cloud.cfg]
+      - echo 'Update sshd config to permit root login and password authentication' >/dev/ttyS0
+      - [sed, -i, 's/^#*PermitRootLogin .*/PermitRootLogin yes/', /etc/ssh/sshd_config]
+      - [sed, -i, 's/^#*PasswordAuthentication .*/PasswordAuthentication yes/', /etc/ssh/sshd_config]
 
 - name: "Update cloud-init runcmd for {{ ova_guest_os_type | capitalize }}"
   ansible.builtin.set_fact:
@@ -32,7 +32,6 @@
   vars:
     user_data_template: "{{ ova_guest_os_type }}-ova-user-data.j2"
     local_hostname: "{{ ova_guest_os_type }}-ova-{{ hostname_timestamp }}"
-    mode: '0644'
 
 - name: "Upload cloud-init seed ISO to ESXi server datastore"
   include_tasks: ../../common/esxi_upload_datastore_file.yml
