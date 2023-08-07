@@ -183,7 +183,7 @@ function freebsd_test_partitions()
     iozone_prepared=0
     mount_point="/mnt/${part_name}"
     try_count=1
-    until [ $try_count -bt 10 ]
+    until [ $try_count -gt 10 ]
     do
         echo "Prepare for iozone test (try $try_count time) ..."
         try_count=$((try_count+1))
