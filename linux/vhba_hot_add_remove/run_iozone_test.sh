@@ -132,14 +132,6 @@ function test_partitions()
     fi
 
     part_path="/dev/${part_name}"
-    # FreeBSD won't setup partition table but take the whole disk"
-    if [[ "$os_distribution" =~ FreeBSD ]]; then
-        part_name="${dev_name}"
-        part_path="/dev/${part_name}"
-        exec_cmd "dd if=/dev/zero of=$part_path bs=1m count=1024 >/dev/null 2>&1"
-        exec_cmd "newfs -EU $part_path >/dev/null 2>&1"
-    fi
-
     mount_point="/mnt/${part_name}"
     if [ ! -e "$mount_point" ]; then
         echo "Create mount point $mount_point"
@@ -167,9 +159,6 @@ function test_partitions()
         fi
     fi
 
-    if [[ "$os_distribution" =~ FreeBSD ]]; then
-        IOZONE_PATH="/usr/local/bin/iozone"
-    fi
     # Run iozone or check iozone file's md5sum
     if [  -e ${IOZONE_PATH} ]; then
         run_iozone "$part_name"
@@ -177,19 +166,120 @@ function test_partitions()
 
     # Print disk's partition again
     echo "${dev_path} partitions:"
-    if [[ "$os_distribution" =~ FreeBSD ]]; then
-        exec_cmd "geom disk list ${dev_path}"
-    else
-        exec_cmd "fdisk -l ${dev_path}"
-    fi
+    exec_cmd "fdisk -l ${dev_path}"
 
     exec_cmd "umount $mount_point"
 }
 
+function freebsd_test_partitions()
+{
+    dev_name="$1"
+    local dev_path="/dev/$1"
+
+    part_name="${dev_name}p1"
+    part_path="/dev/${part_name}"
+
+    # FreeBSD won't setup partition table but take the whole disk"
+    iozone_prepared=0
+    mount_point="/mnt/${part_name}"
+    try_count=1
+    until [ $try_count -bt 10 ]
+    do
+        echo "Prepare for iozone test (try $try_count time) ..."
+        try_count=$((try_count+1))
+
+        mount | grep -i "$part_name" >/dev/null
+        if [ $? -eq 0 ]; then
+            echo "umount ${mount_ops} : "
+            exec_cmd "umount $mount_point >/dev/null 2>&1"
+            if [ $ret -ne 0 ] ; then
+                echo "FAIL"
+                echo "Could not umount $part_path"
+                exit $ret
+            else
+                echo "SUCCEED"
+            fi
+        fi
+
+        echo "Zero the disk $part_path : "
+        exec_cmd "dd if=/dev/zero of=$part_path bs=1m count=1024 >/dev/null 2>&1"
+        if [ $ret -ne 0 ] ; then
+            echo "FAIL"
+            continue
+        else
+            echo "SUCCEED"
+        fi
+
+        echo "Format the disk $part_path : "
+        exec_cmd "newfs -EU $part_path >/dev/null 2>&1"
+        if [ $ret -ne 0 ] ; then
+            echo "FAIL"
+            continue
+        else
+            echo "SUCCEED"
+        fi
+
+        echo "Check the dir $part_path"
+        mount_point="/mnt/${part_name}"
+        if [ ! -e "$mount_point" ]; then
+            echo "Create mount point $mount_point : "
+            exec_cmd "mkdir -p -m 777 $mount_point"
+            if [ $ret -ne 0 ] ; then
+                echo "FAIL"
+                continue
+            else
+                echo "SUCCEED"
+            fi
+        fi
+
+        mount | grep -i "$part_name" >/dev/null
+        if [ $? -ne 0 ]; then
+            printf "Mount $part_path to $mount_point : "
+            exec_cmd "mount ${mount_ops} $part_path $mount_point >/dev/null 2>&1"
+            if [ $ret -ne 0 ] ; then
+                echo "FAIL"
+                continue
+            else
+                echo "SUCCEED"
+            fi
+        fi
+
+        printf "Create folder ${mount_point}/testdir : "
+        exec_cmd "mkdir -m 777 ${mount_point}/testdir"
+        if [ $ret -nq 0 ]; then
+            echo "FAIL"
+            continue
+        else
+            echo "SUCCEED"
+            iozone_prepared=1
+            break
+        fi
+    done
+
+    if [ $iozone_prepared -eq 0 ] ; then
+        echo "Failed to Prepare for iozone test after try $try_count times"
+        exit $ret
+    fi
+
+    IOZONE_PATH="/usr/local/bin/iozone"
+    # Run iozone or check iozone file's md5sum
+    if [  -e ${IOZONE_PATH} ]; then
+        run_iozone "$part_name"
+    fi
+
+    # Print disk's partition again
+    echo "${dev_path} partitions:"
+    exec_cmd "geom disk list ${dev_path}"
+    exec_cmd "umount $mount_point"
+}
 
 for dev_name in $1; do
     echo -e "\n>>>>>>>>>>>>>Start to test /dev/$dev_name<<<<<<<<<<<<<<<<<<\n"
-    test_partitions "$dev_name"
+    if [[ "$os_distribution" =~ FreeBSD ]]; then
+        freebsd_test_partitions "$dev_name"
+    else
+        test_partitions "$dev_name"
+    fi
     echo -e "\n>>>>>>>>>>>>>End of testing /dev/$dev_name<<<<<<<<<<<<<<<<<<\n"
 done
 
