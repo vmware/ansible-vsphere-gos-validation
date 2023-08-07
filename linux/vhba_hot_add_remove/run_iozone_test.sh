@@ -211,7 +211,7 @@ function freebsd_test_partitions()
         mount_point="/mnt/${part_name}"
         if [ ! -e "$mount_point" ]; then
             echo "Create mount point $mount_point : "
-            exec_cmd "mkdir -p -m 777 $mount_point"
+            exec_cmd "mkdir -p -m 777 $mount_point >/dev/null 2>&1"
             if [ $ret -ne 0 ] ; then
                 echo "FAIL"
                 continue
@@ -229,8 +229,8 @@ function freebsd_test_partitions()
         fi
 
         printf "Create folder ${mount_point}/testdir : "
-        exec_cmd "mkdir -m 777 ${mount_point}/testdir"
-        if [ $ret -nq 0 ]; then
+        exec_cmd "mkdir -m 777 ${mount_point}/testdir >/dev/null 2>&1"
+        if [ $ret -nq 0 ] ; then
             echo "FAIL"
             continue
         else
