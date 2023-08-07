@@ -135,6 +135,7 @@ function test_partitions()
     # FreeBSD won't setup partition table but take the whole disk"
     if [[ "$os_distribution" =~ FreeBSD ]]; then
         part_name="${dev_name}"
+        part_path="/dev/${part_name}"
         exec_cmd "newfs -EU $part_path >/dev/null 2>&1"
     fi
 
