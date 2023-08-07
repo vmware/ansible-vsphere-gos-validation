@@ -131,13 +131,13 @@ function test_partitions()
         part_name="${dev_name}p${part_idx}"
     fi
 
+    part_path="/dev/${part_name}"
     # FreeBSD won't setup partition table but take the whole disk"
     if [[ "$os_distribution" =~ FreeBSD ]]; then
         part_name="${dev_name}"
         exec_cmd "newfs -EU $part_path >/dev/null 2>&1"
     fi
 
-    part_path="/dev/${part_name}"
     mount_point="/mnt/${part_name}"
     if [ ! -e "$mount_point" ]; then
         echo "Create mount point $mount_point"
