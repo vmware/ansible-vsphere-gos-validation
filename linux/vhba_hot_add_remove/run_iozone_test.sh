@@ -61,9 +61,9 @@ function run_iozone()
     fi
 
     iozone_file="$testdir_path/iozone.csv"
-    # Get partition size
+    # Get disk size
     if [[ "$os_distribution" =~ FreeBSD ]]; then
-        part_size=`gpart list ${dev_name} | head -n 15 | grep Mediasize | awk '{print $3}' | cut -d '(' -f2 | cut -d ')' -f1`
+        part_size=`geom disk list ${dev_name} | head -n 10 | grep Mediasize | awk '{print $3}' | cut -d '(' -f2 | cut -d ')' -f1`
     else
         part_size=`lsblk -o NAME,SIZE,TYPE | grep -i part | grep -i ${part_name} | awk '{print $2}'`
     fi
@@ -130,6 +130,13 @@ function test_partitions()
     else
         part_name="${dev_name}p${part_idx}"
     fi
+
+    # FreeBSD won't setup partition table but take the whole disk"
+    if [[ "$os_distribution" =~ FreeBSD ]]; then
+        part_name="${dev_name}"
+        exec_cmd "newfs -EU $part_path >/dev/null 2>&1"
+    fi
+
     part_path="/dev/${part_name}"
     mount_point="/mnt/${part_name}"
     if [ ! -e "$mount_point" ]; then
@@ -147,11 +154,7 @@ function test_partitions()
                 echo "Retry mount without option \"${mount_ops}\": "
                 exec_cmd "mount $part_path $mount_point && echo 'SUCCEED' || echo 'FAIL'"
             fi
-            # Fix issue when mount $part_path on FreeBSD 32bit: Invalid argument
-            if [[ "$os_distribution" =~ FreeBSD ]]; then
-                exec_cmd "newfs -EU $part_path >/dev/null 2>&1"
-                exec_cmd "mount $part_path $mount_point >/dev/null 2>&1"
-            fi
+
             if [ $ret -ne 0 ] ; then
                 echo "FAIL"
                 echo "Could not mount $part_path to $mount_point"
@@ -173,7 +176,7 @@ function test_partitions()
     # Print disk's partition again
     echo "${dev_path} partitions:"
     if [[ "$os_distribution" =~ FreeBSD ]]; then
-        exec_cmd "gpart show ${dev_path}"
+        exec_cmd "geom disk list ${dev_path}"
     else
         exec_cmd "fdisk -l ${dev_path}"
     fi
