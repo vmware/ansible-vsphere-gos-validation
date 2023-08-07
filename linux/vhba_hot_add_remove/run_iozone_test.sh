@@ -136,6 +136,7 @@ function test_partitions()
     if [[ "$os_distribution" =~ FreeBSD ]]; then
         part_name="${dev_name}"
         part_path="/dev/${part_name}"
+        exec_cmd "dd if=/dev/zero of=$part_path bs=1m count=1024 >/dev/null 2>&1"
         exec_cmd "newfs -EU $part_path >/dev/null 2>&1"
     fi
 
