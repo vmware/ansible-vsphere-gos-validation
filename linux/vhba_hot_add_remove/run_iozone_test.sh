@@ -196,8 +196,6 @@ function freebsd_test_partitions()
             echo "FAIL"
             echo "Could not umount $part_path"
             exit $ret
-        else
-            echo "SUCCEED"
         fi
     fi
 
@@ -206,8 +204,6 @@ function freebsd_test_partitions()
     if [ $ret -ne 0 ] ; then
         echo "FAIL"
         exit $ret
-    else
-        echo "SUCCEED"
     fi
 
     echo "Check the dir $part_path"
@@ -218,8 +214,6 @@ function freebsd_test_partitions()
         if [ $ret -ne 0 ] ; then
             echo "FAIL"
             exit $ret
-        else
-            echo "SUCCEED"
         fi
     fi
 
@@ -230,8 +224,6 @@ function freebsd_test_partitions()
         if [ $ret -ne 0 ] ; then
             echo "FAIL"
             exit $ret
-        else
-            echo "SUCCEED"
         fi
     fi
 
@@ -241,7 +233,6 @@ function freebsd_test_partitions()
         echo "FAIL"
         exit $ret
     else
-        echo "SUCCEED"
         iozone_prepared=1
         # break
     fi
