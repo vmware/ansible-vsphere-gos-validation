@@ -184,65 +184,36 @@ function freebsd_test_partitions()
     mount_point="/mnt/${part_name}"
     try_count=1
    
-    until [ $try_count -gt 10 ]
-    do
-        echo "Prepare for iozone test (try $try_count time) ..."
-        try_count=$((try_count+1))
-
-        mount | grep -i "$part_name" >/dev/null
-        if [ $? -eq 0 ]; then
-            echo "umount ${part_path} : "
-            exec_cmd "umount $mount_point >/dev/null 2>&1"
-            if [ $ret -ne 0 ] ; then
-                echo "FAIL"
-                echo "Could not umount $part_path"
-                exit $ret
-            fi
-        fi
-
-        echo "Format the disk $part_path : "
-        exec_cmd "newfs -EU $part_path >/dev/null 2>&1"
+    #until [ $try_count -gt 10 ]
+    #do
+    echo "Check the dir $part_path"
+    mount_point="/mnt/${part_name}"
+    if [ ! -e "$mount_point" ]; then
+        echo "Create mount point $mount_point : "
+        exec_cmd "mkdir -p -m 777 $mount_point >/dev/null 2>&1"
         if [ $ret -ne 0 ] ; then
             echo "FAIL"
-            continue
+            exit $ret
         fi
+    fi
 
-        echo "Check the dir $part_path"
-        mount_point="/mnt/${part_name}"
-        if [ ! -e "$mount_point" ]; then
-            echo "Create mount point $mount_point : "
-            exec_cmd "mkdir -p -m 777 $mount_point >/dev/null 2>&1"
-            if [ $ret -ne 0 ] ; then
-                echo "FAIL"
-                continue
-            fi
-        fi
-
-        mount | grep -i "$part_name" >/dev/null
-        if [ $? -ne 0 ]; then
-            printf "Mount $part_path to $mount_point : "
-            exec_cmd "mount $part_path $mount_point >/dev/null 2>&1"
-            if [ $ret -ne 0 ] ; then
-                echo "FAIL"
-                continue
-            fi
-        fi
-
-        printf "Create folder ${mount_point}/testdir : "
-        exec_cmd "mkdir -m 777 ${mount_point}/testdir >/dev/null 2>&1"
+    mount | grep -i "$part_name" >/dev/null
+    if [ $? -ne 0 ]; then
+        printf "Mount $part_path to $mount_point : "
+        exec_cmd "mount $part_path $mount_point >/dev/null 2>&1"
         if [ $ret -ne 0 ] ; then
             echo "FAIL"
-            continue
-        else
-            iozone_prepared=1
-            break
+            exit $ret
         fi
-    done
+    fi
 
-    if [ $iozone_prepared -eq 0 ] ; then
-        echo "Failed to Prepare for iozone test after try $try_count times"
+    printf "Create folder ${mount_point}/testdir : "
+    exec_cmd "mkdir -m 777 ${mount_point}/testdir >/dev/null 2>&1"
+    if [ $ret -ne 0 ] ; then
+        echo "FAIL"
         exit $ret
     fi
+    #done
 
     IOZONE_PATH="/usr/local/bin/iozone"
     # Run iozone or check iozone file's md5sum
