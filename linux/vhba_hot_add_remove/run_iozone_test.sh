@@ -190,7 +190,7 @@ function freebsd_test_partitions()
     mount_point="/mnt/${part_name}"
     if [ ! -e "$mount_point" ]; then
         echo "Create mount point $mount_point : "
-        exec_cmd "mkdir -p -m 777 $mount_point >/dev/null 2>&1"
+        exec_cmd "mkdir -p -m 777 $mount_point"
         if [ $ret -ne 0 ] ; then
             echo "FAIL"
             exit $ret
@@ -200,20 +200,12 @@ function freebsd_test_partitions()
     mount | grep -i "$part_name" >/dev/null
     if [ $? -ne 0 ]; then
         printf "Mount $part_path to $mount_point : "
-        exec_cmd "mount $part_path $mount_point >/dev/null 2>&1"
+        exec_cmd "mount $part_path $mount_point"
         if [ $ret -ne 0 ] ; then
             echo "FAIL"
             exit $ret
         fi
     fi
-
-    printf "Create folder ${mount_point}/testdir : "
-    exec_cmd "mkdir -m 777 ${mount_point}/testdir >/dev/null 2>&1"
-    if [ $ret -ne 0 ] ; then
-        echo "FAIL"
-        exit $ret
-    fi
-    #done
 
     IOZONE_PATH="/usr/local/bin/iozone"
     # Run iozone or check iozone file's md5sum
