@@ -71,7 +71,8 @@ function run_iozone()
 
     if [[ "$part_size" =~ .G ]]; then
         part_size=`echo $part_size | tr -d 'G'`
-        size_unit="G"
+        part_size=$(($part_size * 1024))
+        size_unit="M"
         test_size=128
     else
         part_size=`echo $part_size | tr -d 'M'`
@@ -92,7 +93,9 @@ function run_iozone()
     cd "$testdir_path"
     echo "Run iozone on $part_path" || continue
     # Run iozone testing
-    if [ $(echo "$part_size > 128"|bc) -eq 1 ]; then
+    if [[ "$os_distribution" =~ FreeBSD ]]; then
+        ${IOZONE_PATH} -Ra -g 128K -i 0 -i 1 -b "$iozone_file"
+    elif [ $(echo "$part_size > 128"|bc) -eq 1 ]; then
         ${IOZONE_PATH} -Ra -g 128M -i 0 -i 1 -b "$iozone_file"
     else
         ${IOZONE_PATH} -Ra -g ${test_size}M -i 0 -i 1 -b "$iozone_file"
