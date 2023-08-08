@@ -203,35 +203,28 @@
         vm_wait_log_delay: 30
         vm_wait_log_retries: 120
 
+    - name: "Take a screenshot when autoinstall complete message is received"
+      include_tasks: ../../common/vm_take_screenshot.yml
+      vars:
+        vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
+
     - name: "Wait for OS shutting down after auto install being completed"
       include_tasks: ../../common/vm_wait_power_state.yml
       vars:
         expected_power_status: 'poweredOff'
-        wait_power_state_timeout: 300
+        wait_power_state_timeout: 600
 
-    # Delete unattend install ISO
-    - name: "Eject unattend/seed ISO and delete it from datastore"
-      include_tasks: eject_del_unattend_install_iso.yml
+    - name: "Delete unattend install ISO"
+      include_tasks: delete_unattend_install_iso.yml
       when:
         - transferred_unattend_iso is defined
         - transferred_unattend_iso
     
-    - name: "Change CD/DVD to client device and set disk as first boot device for Ubuntu"
+    - name: "Change the boot disk to be first boot device in boot order"
+      include_tasks: ../../common/vm_set_boot_options.yml
+      vars:
+        boot_order_list: ['disk']
       when: guest_id is match('ubuntu.*')
-      block:
-        - name: "Change VM's CD/DVD Drive 1 to client device"
-          include_tasks: ../../common/vm_configure_cdrom.yml
-          vars:
-            cdrom_state: present
-            cdrom_type: client
-            cdrom_controller_num: "{{ vm_cdroms[0].controller_number | int }}"
-            cdrom_unit_num: "{{ vm_cdroms[0].unit_number | int }}"
-
-        - name: "Change the boot disk to be first in boot order"
-          include_tasks: ../../common/vm_set_boot_options.yml
-          vars:
-            boot_order_list:
-              - disk
 
     - name: "Download serial output file before removing serial port"
       include_tasks: ../../common/esxi_download_datastore_file.yml
