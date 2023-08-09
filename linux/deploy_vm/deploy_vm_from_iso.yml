@@ -195,6 +195,14 @@
         - unattend_install_conf is defined
         - ('UOS' in unattend_install_conf)
 
+    # When there is "reboot: Power down" in serial port log, it means the auto install is completed
+    - name: "Set autoinstall complete message for Ubuntu Desktop 20.04 ~ 22.10"
+      ansible.builtin.set_fact:
+        autoinstall_complete_msg: "reboot: Power down"
+      when:
+        - unattend_install_conf is defined
+        - unattend_install_conf is match('Ubuntu/Desktop/Ubiquity')
+
     - name: "Wait autoinstall complete message appear in serial port output file"
       include_tasks: ../../common/vm_wait_log_msg.yml
       vars:
@@ -208,7 +216,25 @@
       vars:
         vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
 
-    - name: "Wait for OS shutting down after auto install being completed"
+    # VMware Photon OS kickstart file can't add shutdown action, so here
+    # needs to shutdown it separately
+    - name: "Shutdown VMware Photon OS VM after auto install completes"
+      when:
+        - unattend_install_conf is defined
+        - unattend_install_conf is match('Photon')
+      block:
+        - name: "Wait for guest full name on VMware Photon OS VM"
+          include_tasks: ../../common/vm_wait_guest_fullname.yml
+
+        - name: "Get guest IP address"
+          include_tasks: ../../common/update_inventory.yml
+          vars:
+            update_inventory_timeout: 300
+
+        - name: "Shutdown guest OS to remove serial port"
+          include_tasks: ../utils/shutdown.yml
+
+    - name: "Wait for OS shutting down after auto install completes"
       include_tasks: ../../common/vm_wait_power_state.yml
       vars:
         expected_power_status: 'poweredOff'
