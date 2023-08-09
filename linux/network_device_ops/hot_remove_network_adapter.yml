@@ -7,6 +7,39 @@
   include_tasks: ../../common/vm_remove_network_adapter.yml
   vars:
     netadapter_mac_addr: "{{ new_network_adapter_mac_addr }}"
+    vm_remove_adapter_ignore_errors: True
+
+- name: "Network adapter hot-remove succeeded"
+  ansible.builtin.debug:
+    msg: "Successfully hot removed new {{ adapter_type }} network adapter {{ new_network_adapter }}"
+  when:
+    - remove_adapter.changed is defined
+    - remove_adapter.changed
+
+- name: "Network adapter hot-remove failed"
+  when: >-
+    (remove_adapter.changed is undefined or
+     not remove_adapter.changed)
+  block:
+    - name: "Known issue - PVRDMA network adapter hot-remove caused kernel crash on Oracle Linux 8.8"
+      ansible.builtin.debug:
+        msg:
+          - "Hot removing PVRDMA network adapter could cause kernel crash on Oracle Linux 8.8."
+          - "Please refer to https://kb.vmware.com/s/article/93131 for details."
+      tags:
+        - known_issue
+      when:
+        - remove_adapter.rc is defined
+        - remove_adapter.rc == 1
+        - adapter_type == "pvrdma"
+        - esxi_version is version('7.0.0', '>=')
+        - esxi_version is version('8.0.0', '<')
+        - guest_os_ansible_distribution == "OracleLinux"
+        - guest_os_ansible_distribution_ver == '8.8'
+
+    - name: "Failed to hot remove new {{ adapter_type }} network adapter {{ new_network_adapter }}"
+      ansible.builtin.fail:
+        msg: "{{ remove_adapter }}"
 
 - name: "Check VM connection is not broken after hot-remove"
   include_tasks: ../../common/vm_wait_connection.yml
