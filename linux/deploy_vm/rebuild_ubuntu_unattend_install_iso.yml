@@ -103,7 +103,7 @@
       ansible.builtin.replace:
         path: "{{ unattend_iso_cache }}/grub.cfg"
         regexp: '(.*vmlinuz)(.*)'
-        replace: "\\1 autoinstall \\2"
+        replace: "\\1 autoinstall console=ttyS0,115200n8 \\2"
 
     - name: "Set timeout to 5 seconds at boot menu"
       ansible.builtin.replace:
@@ -144,7 +144,7 @@
           ansible.builtin.replace:
             path: "{{ unattend_iso_cache }}/txt.cfg"
             regexp: '(.*initrd)(.*)'
-            replace: "\\1 autoinstall \\2"
+            replace: "\\1 autoinstall console=ttyS0,115200n8 \\2"
 
         - name: "Update md5sum for BIOS boot config file"
           ansible.builtin.shell: |
@@ -176,4 +176,6 @@
           - src_file: "{{ src_iso_file_dir }}/md5sum.txt"
             dest_file: "md5sum.txt"
       when: not ubuntu_bios_cfg_exist
-  when: unattend_install_conf is match('Ubuntu/Server') or unattend_install_conf is match('Ubuntu/Desktop/Subiquity')
+  when: >-
+    (unattend_install_conf is match('Ubuntu/Server') or
+     unattend_install_conf is match('Ubuntu/Desktop/Subiquity'))
