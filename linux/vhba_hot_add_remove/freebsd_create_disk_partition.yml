@@ -31,9 +31,12 @@
       create partition with filesystem {{ partition_fstype }} on disk {{ disk_name }}
   when: partition_fstype is not in ['ufs', 'zfs']
 
-- name: "Zero the disk"
-  ansible.builtin.shell: dd if=/dev/zero of={{ disk_name }} bs=1m count=1024
-  delegate_to: "{{ vm_guest_ip }}"
+# Hit issue for command 'newfs' in FreeBSD 32bit. rebooting will be workaround.
+- name: "Reboot guest OS to check file content again"
+  include_tasks: ../utils/reboot.yml
+  when:
+    - guest_os_family == "FreeBSD"
+    - guest_os_bit == "32-bit"
 
 - name: "Create partition table on disk {{ disk_name }}"
   ansible.builtin.command: gpart create -s GPT {{ disk_name }}

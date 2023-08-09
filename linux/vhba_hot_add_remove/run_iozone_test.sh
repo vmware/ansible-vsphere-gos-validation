@@ -182,13 +182,7 @@ function freebsd_test_partitions()
     part_name="${dev_name}p1"
     part_path="/dev/${part_name}"
 
-    # FreeBSD won't setup partition table but take the whole disk"
-    iozone_prepared=0
-    mount_point="/mnt/${part_name}"
-    try_count=1
-   
-    #until [ $try_count -gt 10 ]
-    #do
+    mount_point="/mnt/${part_name}"    
     echo "Check the dir $part_path"
     mount_point="/mnt/${part_name}"
     if [ ! -e "$mount_point" ]; then
