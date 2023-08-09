@@ -71,7 +71,8 @@ function run_iozone()
 
     if [[ "$part_size" =~ .G ]]; then
         part_size=`echo $part_size | tr -d 'G'`
-        part_size=$(($part_size * 1024))
+        part_size=$(echo "$part_size*1024"|bc)
+        part_size=$(printf "%.0f" $part_size)
         size_unit="M"
         test_size=128
     else
