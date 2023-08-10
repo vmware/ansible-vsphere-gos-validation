@@ -31,13 +31,6 @@
       create partition with filesystem {{ partition_fstype }} on disk {{ disk_name }}
   when: partition_fstype is not in ['ufs', 'zfs']
 
-# Hit issue for command 'newfs' in FreeBSD 32bit. rebooting will be workaround.
-- name: "Reboot guest OS to check file content again"
-  include_tasks: ../utils/reboot.yml
-  when:
-    - guest_os_family == "FreeBSD"
-    - guest_os_bit == "32-bit"
-
 - name: "Create partition table on disk {{ disk_name }}"
   ansible.builtin.command: gpart create -s GPT {{ disk_name }}
   delegate_to: "{{ vm_guest_ip }}"
@@ -57,6 +50,11 @@
 - name: "Set fact of partition device path"
   ansible.builtin.set_fact:
     partition_device_path: "/dev/{{ partition_name }}"
+
+# Hit issue for command 'newfs' in FreeBSD 32bit. rebooting will be workaround.
+- name: "Reboot guest OS to check file content again"
+  include_tasks: ../utils/reboot.yml
+  when: guest_os_bit == "32-bit"
 
 - name: "Create {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
   ansible.builtin.command: "newfs -EU {{ partition_device_path }}"
