@@ -52,7 +52,7 @@ function run_iozone()
         rm -rf $testdir_path
     fi
     printf "Create folder $testdir_path:  "
-    exec_cmd "mkdir -m 777 $testdir_path"
+    exec_cmd "mkdir $testdir_path"
     if [ $ret -eq 0 ]; then
         echo "SUCCEED"
     else
@@ -61,9 +61,9 @@ function run_iozone()
     fi
 
     iozone_file="$testdir_path/iozone.csv"
-    # Get disk size
+    # Get partition size
     if [[ "$os_distribution" =~ FreeBSD ]]; then
-        part_size=`geom disk list ${dev_name} | head -n 10 | grep Mediasize | awk '{print $3}' | cut -d '(' -f2 | cut -d ')' -f1`
+        part_size=`gpart list ${dev_name} | head -n 15 | grep Mediasize | awk '{print $3}' | cut -d '(' -f2 | cut -d ')' -f1`
     else
         part_size=`lsblk -o NAME,SIZE,TYPE | grep -i part | grep -i ${part_name} | awk '{print $2}'`
     fi
@@ -139,7 +139,7 @@ function test_partitions()
     mount_point="/mnt/${part_name}"
     if [ ! -e "$mount_point" ]; then
         echo "Create mount point $mount_point"
-        exec_cmd "mkdir -p -m 777 $mount_point"
+        exec_cmd "mkdir -p $mount_point"
     fi
 
     mount | grep -i "$part_name" >/dev/null
