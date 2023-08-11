@@ -121,9 +121,29 @@
     - name: "Set fact of changed disks list after reboot"
       ansible.builtin.set_fact:
         guest_disk_changed_list: "{{ guest_device_list_before_reboot | difference(guest_device_list_after_reboot) }}"
-    
-    - name: "Print changed device list in guest OS"
-      ansible.builtin.debug: var=guest_disk_changed_list
+
+    - name: "Exchange disk name between boot disk and new disk if it's changed after reboot"
+      when: guest_disk_changed_list | length == 2
+      block:
+        - name: "Change new disk name"
+          ansible.builtin.set_fact:
+            new_guest_disk_info.name: |-
+              {%- if item.model == new_guest_disk_info.model and item.size == new_guest_disk_info.size -%}{{ item.name }}
+              {%- endif -%}
+          with_items: guest_device_list_after_reboot
+
+        - name: "Print new disk in guest OS after it'changed"
+          ansible.builtin.debug: var=new_guest_disk_info
+        
+        - name: "Set fact of new boot disk name after it'changed"
+          ansible.builtin.set_fact:
+            boot_disk_new_name: |-
+              {%- if item.size == new_guest_disk_info.size -%}{{ item.name }}
+              {%- endif -%}
+          with_items: guest_disk_changed_list
+
+        - name: "Print disks in guest OS after it'changed"
+          ansible.builtin.debug: var=boot_disk_new_name
 
 - name: "Create {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
   ansible.builtin.command: "newfs -EU {{ partition_device_path }}"
