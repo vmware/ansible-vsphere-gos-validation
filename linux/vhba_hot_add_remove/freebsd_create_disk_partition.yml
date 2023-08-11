@@ -127,8 +127,9 @@
       block:
         - name: "Change new disk name"
           ansible.builtin.set_fact:
-            new_guest_disk_info.name: |-
-              {%- if item.model == new_guest_disk_info.model and item.size == '1.0G' -%}{{ item.name }}
+            new_guest_disk_info: >
+              {%- if item.model == new_guest_disk_info.model and item.size == '1.0G' -%}
+              {{ new_guest_disk_info | combine({ 'name': item.name, 'size': '1.0G' }) }}
               {%- endif -%}
           with_items: "{{ guest_device_list_after_reboot }}"
 
@@ -137,13 +138,18 @@
         
         - name: "Set fact of new boot disk name after it'changed"
           ansible.builtin.set_fact:
-            boot_disk_new_name: |-
-              {%- if item.size == new_guest_disk_info.size -%}{{ item.name }}
-              {%- endif -%}
-          with_items: guest_disk_changed_list
+            changed_boot_disk_info: "{{ guest_device_list_after_reboot | difference(new_guest_disk_info) }}"
 
-        - name: "Print disks in guest OS after it'changed"
-          ansible.builtin.debug: var=boot_disk_new_name
+        - name: "Change boot disk info"
+          ansible.builtin.set_fact:
+            guest_disk_list_before_hotadd: >
+              {%- if item.model == changed_boot_disk_info.model and item.size == changed_boot_disk_info.size -%}
+              {{ guest_disk_list_before_hotadd | combine({ 'name': item.name }) }}
+              {%- endif -%}
+          with_items: "{{ guest_disk_list_before_hotadd }}"
+        
+        - name: "Print new disk info before hotadd"
+          ansible.builtin.debug: var=guest_disk_list_before_hotadd
 
 - name: "Create {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
   ansible.builtin.command: "newfs -EU {{ partition_device_path }}"
