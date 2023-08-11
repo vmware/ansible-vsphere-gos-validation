@@ -58,6 +58,11 @@
     - guest_os_bit == "32-bit"
     - add_new_controller is defined and add_new_controller
   block:
+    - name: "Initialize the fact of device list and command"
+      ansible.builtin.set_fact:
+        guest_device_list_before_reboot: []
+        guest_device_list_after_reboot: []
+
     - name: "Get block device list before reboot"
       ansible.builtin.shell: "/tmp/lsblk.sh -d | grep -v SIZE"
       delegate_to: "{{ vm_guest_ip }}"
@@ -67,9 +72,11 @@
     - name: "Set the fact of block device list for FreeBSD"
       ansible.builtin.set_fact:
         guest_device_list_before_reboot: >
-          {{
-              dict(['name', 'size', 'model'] |
-                    zip_longest(item.split(None, maxsplit=2), fillvalue=''))
+          {{  
+              guest_device_list_before_reboot | union([
+                dict(['name', 'size', 'model'] |
+                      zip_longest(item.split(None, maxsplit=2), fillvalue=''))
+              ])
           }}
       with_items: "{{ lsblk_result.stdout_lines }}"
 
@@ -100,9 +107,11 @@
     - name: "Set the fact of block device list for FreeBSD"
       ansible.builtin.set_fact:
         guest_device_list_after_reboot: >
-          {{
-              dict(['name', 'size', 'model'] |
-                    zip_longest(item.split(None, maxsplit=2), fillvalue=''))
+          {{  
+              guest_device_list_after_reboot | union([
+                dict(['name', 'size', 'model'] |
+                      zip_longest(item.split(None, maxsplit=2), fillvalue=''))
+              ])
           }}
       with_items: "{{ lsblk_result.stdout_lines }}"
     
@@ -111,7 +120,7 @@
 
     - name: "Set fact of changed disks list after reboot"
       ansible.builtin.set_fact:
-        guest_disk_changed_list: guest_device_list_before_reboot | difference(guest_device_list_after_reboot)
+        guest_disk_changed_list: "{{ guest_device_list_before_reboot | difference(guest_device_list_after_reboot) }}"
     
     - name: "Print changed device list in guest OS"
       ansible.builtin.debug: var=guest_disk_changed_list
