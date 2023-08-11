@@ -57,6 +57,14 @@
     - guest_os_bit == "32-bit"
     - add_new_controller is defined and add_new_controller
   block:
+    - name: "Show partition table on disks before reboot"
+      ansible.builtin.command: gpart show
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Show all disks before reboot"
+      ansible.builtin.shell: /tmp/lsblk.sh -d | grep -v SIZE
+      delegate_to: "{{ vm_guest_ip }}"
+
     - name: "Boot order may be changed after hot-add disk to new controller for OS with BIOS firmware"
       ansible.builtin.debug:
         msg:
@@ -71,6 +79,14 @@
 
     - name: "Reboot guest OS to check file content again"
       include_tasks: ../utils/reboot.yml
+
+    - name: "Show partition table on disks after reboot"
+      ansible.builtin.command: gpart show
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Show all disks after reboot"
+      ansible.builtin.shell: /tmp/lsblk.sh -d | grep -v SIZE
+      delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Create {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
   ansible.builtin.command: "newfs -EU {{ partition_device_path }}"
