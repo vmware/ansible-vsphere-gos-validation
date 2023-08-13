@@ -64,7 +64,7 @@
         guest_device_list_after_reboot: []
 
     - name: "Get block device list before reboot"
-      ansible.builtin.shell: "/tmp/lsblk.sh -d | grep -v SIZE"
+      ansible.builtin.shell: "/tmp/lsblk.sh -d | grep -v SIZE | grep -v cd0"
       delegate_to: "{{ vm_guest_ip }}"
       changed_when: false
       register: lsblk_result
@@ -99,7 +99,7 @@
       include_tasks: ../utils/reboot.yml
 
     - name: "Get block device list after reboot"
-      ansible.builtin.shell: "/tmp/lsblk.sh -d | grep -v SIZE"
+      ansible.builtin.shell: "/tmp/lsblk.sh -d | grep -v SIZE | grep -v cd0"
       delegate_to: "{{ vm_guest_ip }}"
       changed_when: false
       register: lsblk_result
@@ -125,11 +125,10 @@
     - name: "Exchange disk name between boot disk and new disk if it's changed after reboot"
       when: guest_disk_changed_list | length == 2
       block:
-        - name: "Change new disk name"
+        - name: "Set fact of new disk info after it's changed"
           ansible.builtin.set_fact:
             new_guest_disk_info: >
-              {%- if item.model == new_guest_disk_info.model and item.size == '1.0G' -%}
-              {{ new_guest_disk_info | combine({ 'name': item.name, 'size': '1.0G' }) }}
+              {%- if item.size == '1.0G' -%}{{ item }}
               {%- endif -%}
           with_items: "{{ guest_device_list_after_reboot }}"
 
@@ -140,14 +139,10 @@
           ansible.builtin.set_fact:
             changed_boot_disk_info: "{{ guest_device_list_after_reboot | difference(new_guest_disk_info) }}"
 
-        - name: "Change boot disk info"
+        - name: "Change fact of boot disk info before hot add"
           ansible.builtin.set_fact:
-            guest_disk_list_before_hotadd: >
-              {%- if item.model == changed_boot_disk_info.model and item.size == changed_boot_disk_info.size -%}
-              {{ guest_disk_list_before_hotadd | combine({ 'name': item.name }) }}
-              {%- endif -%}
-          with_items: "{{ guest_disk_list_before_hotadd }}"
-        
+            guest_disk_list_before_hotadd: "[ {{ changed_boot_disk_info }} ]"
+
         - name: "Print new disk info before hotadd"
           ansible.builtin.debug: var=guest_disk_list_before_hotadd
 
