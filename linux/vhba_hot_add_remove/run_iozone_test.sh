@@ -185,7 +185,7 @@ function freebsd_test_partitions()
 
     echo "Check partition filesystem"
     exec_cmd "fstyp $part_path"
-    if [ $? -ne 0 ]; then
+    if [ $ret -ne 0 ]; then
         printf "Format partition : "
         exec_cmd "newfs -EU $part_path"
         if [ $ret -ne 0 ] ; then
