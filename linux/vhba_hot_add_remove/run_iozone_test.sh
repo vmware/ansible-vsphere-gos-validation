@@ -183,7 +183,17 @@ function freebsd_test_partitions()
     part_name="${dev_name}p1"
     part_path="/dev/${part_name}"
 
-    mount_point="/mnt/${part_name}"    
+    echo "Check partition filesystem"
+    exec_cmd "fstyp $part_name"
+    if [ $? -ne 0 ]; then
+        printf "Format partition : "
+        exec_cmd "newfs -EU $part_path"
+        if [ $ret -ne 0 ] ; then
+            echo "FAIL"
+            exit $ret
+        fi
+    fi
+
     echo "Check the dir $part_path"
     mount_point="/mnt/${part_name}"
     if [ ! -e "$mount_point" ]; then
