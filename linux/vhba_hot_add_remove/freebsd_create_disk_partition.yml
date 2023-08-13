@@ -129,19 +129,20 @@
           ansible.builtin.set_fact:
             new_guest_disk_info: >
               {%- if item.size == '1.0G' -%}{{ item }}
+              {%- else -%}{{ new_guest_disk_info }}
               {%- endif -%}
-          with_items: "{{ guest_device_list_after_reboot }}"
+          with_list: "{{ guest_device_list_after_reboot }}"
 
         - name: "Print new disk in guest OS after it'changed"
           ansible.builtin.debug: var=new_guest_disk_info
         
         - name: "Set fact of new boot disk name after it'changed"
           ansible.builtin.set_fact:
-            changed_boot_disk_info: "{{ guest_device_list_after_reboot | difference(new_guest_disk_info) }}"
+            changed_boot_disk_info: "{{ guest_device_list_after_reboot | difference([new_guest_disk_info]) }}"
 
         - name: "Change fact of boot disk info before hot add"
           ansible.builtin.set_fact:
-            guest_disk_list_before_hotadd: "[ {{ changed_boot_disk_info }} ]"
+            guest_disk_list_before_hotadd: "{{ changed_boot_disk_info }}"
 
         - name: "Print new disk info before hotadd"
           ansible.builtin.debug: var=guest_disk_list_before_hotadd
