@@ -80,9 +80,6 @@
           }}
       with_items: "{{ lsblk_result.stdout_lines }}"
 
-    - name: "Print device list in guest OS"
-      ansible.builtin.debug: var=guest_device_list_before_reboot
-
     - name: "Boot order may be changed after hot-add disk to new controller for OS with BIOS firmware"
       ansible.builtin.debug:
         msg:
@@ -114,9 +111,6 @@
               ])
           }}
       with_items: "{{ lsblk_result.stdout_lines }}"
-    
-    - name: "Print device list in guest OS"
-      ansible.builtin.debug: var=guest_device_list_after_reboot
 
     - name: "Set fact of changed disks list after reboot"
       ansible.builtin.set_fact:
@@ -136,16 +130,9 @@
         - name: "Print new disk in guest OS after it'changed"
           ansible.builtin.debug: var=new_guest_disk_info
         
-        - name: "Set fact of new boot disk name after it'changed"
-          ansible.builtin.set_fact:
-            changed_boot_disk_info: "{{ guest_device_list_after_reboot | difference([new_guest_disk_info]) }}"
-
         - name: "Change fact of boot disk info before hot add"
           ansible.builtin.set_fact:
-            guest_disk_list_before_hotadd: "{{ changed_boot_disk_info }}"
-
-        - name: "Print new disk info before hotadd"
-          ansible.builtin.debug: var=guest_disk_list_before_hotadd
+            guest_disk_list_before_hotadd: "{{ guest_device_list_after_reboot | difference([new_guest_disk_info]) }}"
 
 - name: "Create {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
   ansible.builtin.command: "newfs -EU {{ partition_device_path }}"
