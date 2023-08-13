@@ -142,24 +142,16 @@
           ansible.builtin.set_fact:
             partition_device_path: "/dev/{{ partition_name }}"
 
-- name: "Create and check filesystem on partition"
-  block:
-    - name: "Create {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
-      ansible.builtin.command: "newfs -EU {{ partition_device_path }}"
-      delegate_to: "{{ vm_guest_ip }}"
-      ignore_errors: true
-
-    - name: "Check partition's filesystem"
-      ansible.builtin.command: "fstyp {{ partition_device_path }}"
-      delegate_to: "{{ vm_guest_ip }}"
-      ignore_errors: true
-      register: check_partition_result
-  retries: 10
-  delay: 5
-  until: 
-    - check_partition_result is defined
-    - check_partition_result.rc is defined
-    - check_partition_result.rc == 0
+- name: "Create and check {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
+  ansible.builtin.shell: "newfs -EU {{ partition_device_path }} && sleep 5 && fstyp {{ partition_device_path }}"
+  ignore_errors: true
+  register: partition_result
+  retries: 5
+  delay: 2
+  until:
+    - partition_result is defined
+    - partition_result.rc is defined
+    - partition_result.rc == 0
 
 - name: "Get disk partition info"
   include_tasks: ../utils/freebsd_get_partition_info.yml
