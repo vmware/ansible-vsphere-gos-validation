@@ -134,13 +134,11 @@
           ansible.builtin.set_fact:
             guest_disk_list_before_hotadd: "{{ guest_device_list_after_reboot | difference([new_guest_disk_info]) }}"
 
-        - name: "Reset fact of partition name"
+        - name: "Reset fact of disk name, partition name and device path"
           ansible.builtin.set_fact:
-            partition_name: "{{ disk_name }}p1"
-
-        - name: "Reset fact of partition device path"
-          ansible.builtin.set_fact:
-            partition_device_path: "/dev/{{ partition_name }}"
+            disk_name: "{{ new_guest_disk_info.name }}"
+            partition_name: "{{ new_guest_disk_info.name }}p1"
+            partition_device_path: "/dev/{{ new_guest_disk_info.name }}p1"
 
 - name: "Create and check {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
   ansible.builtin.shell: "newfs -EU {{ partition_device_path }} && sleep 5 && fstyp {{ partition_device_path }}"
