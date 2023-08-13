@@ -17,7 +17,7 @@
     partition_device_path: ""
     partition_uuid: ""
 
-- name: "Set default partition filesystem to ext4"
+- name: "Set default partition filesystem to ufs"
   ansible.builtin.set_fact:
     partition_fstype: "ufs"
   when: >
@@ -58,7 +58,7 @@
     - guest_os_bit == "32-bit"
     - add_new_controller is defined and add_new_controller
   block:
-    - name: "Initialize the fact of device list and command"
+    - name: "Initialize the fact of device list before reboot and after reboot"
       ansible.builtin.set_fact:
         guest_device_list_before_reboot: []
         guest_device_list_after_reboot: []
@@ -69,7 +69,7 @@
       changed_when: false
       register: lsblk_result
 
-    - name: "Set the fact of block device list for FreeBSD"
+    - name: "Set the fact of block device list before reboot"
       ansible.builtin.set_fact:
         guest_device_list_before_reboot: >
           {{  
@@ -101,7 +101,7 @@
       changed_when: false
       register: lsblk_result
 
-    - name: "Set the fact of block device list for FreeBSD"
+    - name: "Set the fact of block device list after reboot"
       ansible.builtin.set_fact:
         guest_device_list_after_reboot: >
           {{  
@@ -112,7 +112,7 @@
           }}
       with_items: "{{ lsblk_result.stdout_lines }}"
 
-    - name: "Set fact of changed disks list after reboot"
+    - name: "Set fact of changed disk list after reboot"
       ansible.builtin.set_fact:
         guest_disk_changed_list: "{{ guest_device_list_before_reboot | difference(guest_device_list_after_reboot) }}"
 
@@ -134,14 +134,29 @@
           ansible.builtin.set_fact:
             guest_disk_list_before_hotadd: "{{ guest_device_list_after_reboot | difference([new_guest_disk_info]) }}"
 
-- name: "Create {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
-  ansible.builtin.command: "newfs -EU {{ partition_device_path }}"
-  delegate_to: "{{ vm_guest_ip }}"
-  ignore_errors: true
-  register: partition_result
+        - name: "Reset fact of partition name"
+          ansible.builtin.set_fact:
+            partition_name: "{{ disk_name }}p1"
 
-- name: "Display the result to create {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
-  ansible.builtin.debug: var=partition_result
+        - name: "Reset fact of partition device path"
+          ansible.builtin.set_fact:
+            partition_device_path: "/dev/{{ partition_name }}"
+
+- name: "Create and check filesystem on partition {{ partition_device_path }}"
+  block:
+    - name: "Create {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
+      ansible.builtin.command: "newfs -EU {{ partition_device_path }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+
+    - name: "Check partition's filesystem"
+      ansible.builtin.command: "fstyp {{ partition_device_path }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      register: check_partition_result
+  retries: 10
+  delay: 5
+  until: check_partition_result.rc == 0
 
 - name: "Get disk partition info"
   include_tasks: ../utils/freebsd_get_partition_info.yml
