@@ -31,27 +31,7 @@
       create partition with filesystem {{ partition_fstype }} on disk {{ disk_name }}
   when: partition_fstype is not in ['ufs', 'zfs']
 
-- name: "Create partition table on disk {{ disk_name }}"
-  ansible.builtin.command: gpart create -s GPT {{ disk_name }}
-  delegate_to: "{{ vm_guest_ip }}"
-
-- name: "Create 1 partition on disk {{ disk_name }}"
-  ansible.builtin.shell: gpart add -t freebsd-{{ partition_fstype }} {{ disk_name }}
-  delegate_to: "{{ vm_guest_ip }}"
-
-- name: "Show partition table on disk {{ disk_name }}"
-  ansible.builtin.command: gpart show {{ disk_name }}
-  delegate_to: "{{ vm_guest_ip }}"
-
-- name: "Set fact of partition name"
-  ansible.builtin.set_fact:
-    partition_name: "{{ disk_name }}p1"
-
-- name: "Set fact of partition device path"
-  ansible.builtin.set_fact:
-    partition_device_path: "/dev/{{ partition_name }}"
-
-# Hit issue for command 'newfs' in FreeBSD 32bit. rebooting will be workaround.
+# Hit different issues to create and format partition in FreeBSD 32bit. rebooting will be workaround.
 # The disks maybe exchanged after reboot
 - name: "Set boot disk for FreeBSD 32 bit"
   when:
@@ -134,11 +114,29 @@
           ansible.builtin.set_fact:
             guest_disk_list_before_hotadd: "{{ guest_device_list_after_reboot | difference([new_guest_disk_info]) }}"
 
-        - name: "Reset fact of disk name, partition name and device path"
+        - name: "Set fact of disk name"
           ansible.builtin.set_fact:
             disk_name: "{{ new_guest_disk_info.name }}"
-            partition_name: "{{ new_guest_disk_info.name }}p1"
-            partition_device_path: "/dev/{{ new_guest_disk_info.name }}p1"
+
+- name: "Create partition table on disk {{ disk_name }}"
+  ansible.builtin.command: gpart create -s GPT {{ disk_name }}
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Create 1 partition on disk {{ disk_name }}"
+  ansible.builtin.shell: gpart add -t freebsd-{{ partition_fstype }} {{ disk_name }}
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Show partition table on disk {{ disk_name }}"
+  ansible.builtin.command: gpart show {{ disk_name }}
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Set fact of partition name"
+  ansible.builtin.set_fact:
+    partition_name: "{{ disk_name }}p1"
+
+- name: "Set fact of partition device path"
+  ansible.builtin.set_fact:
+    partition_device_path: "/dev/{{ partition_name }}"
 
 - name: "Create and check {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
   ansible.builtin.shell: "newfs -EU {{ partition_device_path }} && sleep 5 && fstyp {{ partition_device_path }}"
