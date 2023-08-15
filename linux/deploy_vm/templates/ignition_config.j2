@@ -1,0 +1,65 @@
+{
+    "ignition": {
+{% if ova_guest_os_type is defined and ova_guest_os_type == 'flatcar' %}
+        "version": "2.1.0"
+{% else %}
+        "version": "3.3.0"
+{% endif %}
+    },
+    "passwd": {
+        "users": [
+            {
+                "name": "core",
+                "passwordHash": "{{ vm_password_hash }}",
+                "sshAuthorizedKeys": [
+                  "{{ ssh_public_key }}"
+                ]
+             },
+             {
+                "name": "{{ vm_username }}",
+                "passwordHash": "{{ vm_password_hash }}",
+                "sshAuthorizedKeys": [
+                  "{{ ssh_public_key }}"
+                ]
+             }
+             {% if new_user is defined and new_user != 'root' and new_user != 'core' %}
+             ,{
+                "name": "{{ new_user }}",
+                "passwordHash": "{{ vm_password_hash }}",
+                "sshAuthorizedKeys": [
+                  "{{ ssh_public_key }}"
+                ]
+             }
+             {% endif %}
+        ]
+    },
+{% if ova_guest_os_type is defined and ova_guest_os_type == 'flatcar' %}
+    "systemd": {
+        "units": [
+            {
+              "name": "update-engine.service",
+              "enabled": false,
+              "mask": true
+            },
+            {
+              "name": "locksmithd.service",
+              "enabled": false,
+              "mask": true
+            }
+        ]
+    },
+{% endif %}
+   "storage": {
+{% if ova_guest_os_type is defined and ova_guest_os_type == 'rhcos' %}
+       "files": [
+            {
+                "contents": {
+                    "source": "data:text/plain;charset=utf-8;base64,{{ ignition_sshd_config }}"
+                },
+                "mode": 644,
+                "path": "/etc/ssh/sshd_config.d/00_permit_root.conf"
+            }
+        ]
+{% endif %}
+   }
+}

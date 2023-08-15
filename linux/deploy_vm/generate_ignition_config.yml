@@ -1,0 +1,33 @@
+# Copyright 2021-2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Generate ignition_config.json file and its base64 encoding
+# Return:
+#   ignition_config_data: The Ignition config data encoded in base64
+#
+- name: "Set fact of Ignition config file path"
+  ansible.builtin.set_fact:
+    ignition_config_file: "{{ current_test_log_folder }}/ignition.json"
+    ignition_sshd_config: "{{ 'PermitRootLogin yes\nPasswordAuthentication yes\n' | b64encode }}"
+
+# Put SSH public key into ignition config file
+- name: "Generation Ignition config file {{ ignition_config_file }}"
+  ansible.builtin.template:
+    src: "templates/ignition_config.j2"
+    dest: "{{ ignition_config_file }}"
+    mode: "0644"
+  register: generate_ignition
+
+- name: "Assert Ignition config file is generated"
+  ansible.builtin.assert:
+    that:
+      - generate_ignition.changed
+    fail_msg: "Failed to generate {{ ignition_config_file }}"
+    success_msg: "Successfully generated {{ ignition_config_file }}"
+
+- name: "Generate base64 encoded data for {{ ignition_config_file }}"
+  ansible.builtin.set_fact:
+    ignition_config_data: "{{ lookup('file', ignition_config_file) | b64encode }}"
+
+- name: "Display base64 encoded data of Ignition config file {{ ignition_config_file }}"
+  ansible.builtin.debug: var=ignition_config_data

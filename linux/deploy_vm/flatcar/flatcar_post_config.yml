@@ -15,32 +15,16 @@
   vars:
     guest_file_path: "/etc/ssh/sshd_config"
 
-# If /etc/ssh/sshd_config is a symbolic link
-# it means the file has not been changed
-- name: "Permit root login through ssh"
-  block:
-    - name: "Convert /etc/ssh/sshd_config from symbolic link to regular file"
-      ansible.builtin.shell: sed -i '' /etc/ssh/sshd_config
-      become: true
-      delegate_to: "{{ vm_guest_ip }}"
-
-    - include_tasks: ../../utils/replace_or_add_line_in_file.yml
-      vars:
-        file: "/etc/ssh/sshd_config"
-        reg_exp: "^#?PermitRootLogin"
-        line_content: "PermitRootLogin yes"
+# The original /etc/ssh/sshd_config on Flatcar is a symbolic link
+- name: "Convert /etc/ssh/sshd_config from symbolic link to regular file"
+  ansible.builtin.shell: sed -i '' /etc/ssh/sshd_config
+  become: true
+  delegate_to: "{{ vm_guest_ip }}"
   when: guest_file_stat.islnk | default(false)
 
-# Change user password
-- name: "Get user names for password changing"
-  ansible.builtin.set_fact:
-    usernames: "{{ [vm_username] | union(['core']) }}"
-
-- name: "Change password for user {{ vm_username }}"
-  ansible.builtin.user:
-    name: "{{ username }}"
-    password: "{{ vm_password | password_hash('sha512') }}"
-  delegate_to: "{{ vm_guest_ip }}"
-  with_items: "{{ usernames }}"
-  loop_control:
-    loop_var: username
+- name: "Permit root login through ssh"
+  include_tasks: ../../utils/replace_or_add_line_in_file.yml
+  vars:
+    file: "/etc/ssh/sshd_config"
+    reg_exp: "^#?PermitRootLogin"
+    line_content: "PermitRootLogin yes"

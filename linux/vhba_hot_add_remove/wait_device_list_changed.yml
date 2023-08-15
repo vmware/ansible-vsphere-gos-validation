@@ -34,7 +34,7 @@
   block:
     - name: "Rescan scsi devices in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       when:
-        - guest_os_ansible_distribution not in ['Flatcar', 'Fedora', 'FreeBSD']
+        - guest_os_ansible_distribution not in ['Flatcar', 'Fedora', 'FreeBSD', 'RHCOS']
         - not (guest_os_ansible_distribution == "Ubuntu" and
                guest_os_ansible_distribution_major_ver | int >= 22)
         - not (guest_os_ansible_distribution == "Debian" and
@@ -53,12 +53,11 @@
 
     - name: "Rescan scsi devices in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       when: >
-        (guest_os_ansible_distribution == 'Flatcar' or
+        (guest_os_ansible_distribution in ['Flatcar', 'Fedora', 'RHCOS'] or
          (guest_os_ansible_distribution == "Ubuntu" and
           guest_os_ansible_distribution_major_ver | int >= 22) or
          (guest_os_ansible_distribution == "Debian" and
-          guest_os_ansible_distribution_major_ver | int >= 12) or
-         guest_os_ansible_distribution == "Fedora")
+          guest_os_ansible_distribution_major_ver | int >= 12))
       block:
         - name: "Rescan all hard disks"
           ansible.builtin.shell: |
