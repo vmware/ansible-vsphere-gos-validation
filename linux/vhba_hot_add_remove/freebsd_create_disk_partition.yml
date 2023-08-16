@@ -38,35 +38,22 @@
     - guest_os_bit == "32-bit"
     - add_new_controller is defined and add_new_controller
   block:
-    - name: "Initialize the fact of device list before reboot and after reboot"
+    - name: "Initialize the fact of disk list before reboot and after reboot"
       ansible.builtin.set_fact:
-        guest_device_list_before_reboot: []
-        guest_device_list_after_reboot: []
+        guest_disk_list_before_reboot: []
+        guest_disk_list_after_reboot: []
 
-    - name: "Get block device list before reboot"
-      ansible.builtin.shell: "/tmp/lsblk.sh -d | grep -v SIZE | grep -v cd0"
-      delegate_to: "{{ vm_guest_ip }}"
-      changed_when: false
-      register: lsblk_result
+    - name: "Get guest disk list before reboot"
+      include_tasks: ../utils/get_device_list.yml
+      vars:
+        guest_device_type: "disk"
 
-    - name: "Set the fact of block device list before reboot"
+    - name: "Set the fact of guest disk list after hot add"
       ansible.builtin.set_fact:
-        guest_device_list_before_reboot: >
-          {{  
-              guest_device_list_before_reboot | union([
-                dict(['name', 'size', 'model'] |
-                      zip_longest(item.split(None, maxsplit=2), fillvalue=''))
-              ])
-          }}
-      with_items: "{{ lsblk_result.stdout_lines }}"
+        guest_disk_list_before_reboot: "{{ guest_device_list }}"
 
-    - name: "Boot order may be changed after hot-add disk to new controller for OS with BIOS firmware"
-      ansible.builtin.debug:
-        msg:
-          - "The disk boot order may be changed after hot-add new disk which causes failure of powering on VM."
-          - "Specify the boot disk as workaround. "
-
-    - include_tasks: ../../common/vm_set_boot_options.yml
+    - name: "Set VM boot order in case new disk changes boot order"
+      include_tasks: ../../common/vm_set_boot_options.yml
       vars:
         boot_hdd_name: "Hard disk 1"
         boot_order_list:
@@ -75,26 +62,18 @@
     - name: "Reboot guest OS to check file content again"
       include_tasks: ../utils/reboot.yml
 
-    - name: "Get block device list after reboot"
-      ansible.builtin.shell: "/tmp/lsblk.sh -d | grep -v SIZE | grep -v cd0"
-      delegate_to: "{{ vm_guest_ip }}"
-      changed_when: false
-      register: lsblk_result
+    - name: "Get guest disk list after reboot"
+      include_tasks: ../utils/get_device_list.yml
+      vars:
+        guest_device_type: "disk"
 
-    - name: "Set the fact of block device list after reboot"
+    - name: "Set the fact of guest disk list after hot add"
       ansible.builtin.set_fact:
-        guest_device_list_after_reboot: >
-          {{  
-              guest_device_list_after_reboot | union([
-                dict(['name', 'size', 'model'] |
-                      zip_longest(item.split(None, maxsplit=2), fillvalue=''))
-              ])
-          }}
-      with_items: "{{ lsblk_result.stdout_lines }}"
+        guest_disk_list_after_reboot: "{{ guest_device_list }}"
 
     - name: "Set fact of changed disk list after reboot"
       ansible.builtin.set_fact:
-        guest_disk_changed_list: "{{ guest_device_list_before_reboot | difference(guest_device_list_after_reboot) }}"
+        guest_disk_changed_list: "{{ guest_disk_list_before_reboot | difference(guest_disk_list_after_reboot) }}"
 
     - name: "Exchange disk name between boot disk and new disk if it's changed after reboot"
       when: guest_disk_changed_list | length == 2
@@ -105,14 +84,14 @@
               {%- if item.size == '1.0G' -%}{{ item }}
               {%- else -%}{{ new_guest_disk_info }}
               {%- endif -%}
-          with_list: "{{ guest_device_list_after_reboot }}"
+          with_list: "{{ guest_disk_list_after_reboot }}"
 
         - name: "Print new disk in guest OS after it'changed"
           ansible.builtin.debug: var=new_guest_disk_info
         
         - name: "Change fact of boot disk info before hot add"
           ansible.builtin.set_fact:
-            guest_disk_list_before_hotadd: "{{ guest_device_list_after_reboot | difference([new_guest_disk_info]) }}"
+            guest_disk_list_before_hotadd: "{{ guest_disk_list_after_reboot | difference([new_guest_disk_info]) }}"
 
         - name: "Set fact of disk name"
           ansible.builtin.set_fact:
