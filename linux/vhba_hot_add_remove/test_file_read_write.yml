@@ -55,24 +55,49 @@
 - name: "Reboot guest OS to check file content again"
   include_tasks: ../utils/reboot.yml
 
-- name: "Get new partition path with UUID {{ new_partition_uuid }} after reboot"
-  ansible.builtin.shell: "blkid -U {{ new_partition_uuid }}"
-  changed_when: false
-  delegate_to: "{{ vm_guest_ip }}"
-  register: blkid_uuid_result
+- name: "Get new partition device path and mount path after reboot on {{ guest_os_ansible_distribution }}"
+  when: guest_os_family != 'FreeBSD'
+  block:
+    - name: "Get new partition path with UUID {{ new_partition_uuid }} after reboot"
+      ansible.builtin.shell: "blkid -U {{ new_partition_uuid }}"
+      changed_when: false
+      delegate_to: "{{ vm_guest_ip }}"
+      register: blkid_uuid_result
 
-- name: "Check guest device with UUID {{ new_partition_uuid }} exists"
-  ansible.builtin.assert:
-    that:
-      - blkid_uuid_result is defined
-      - blkid_uuid_result.stdout is defined
-      - blkid_uuid_result.stdout
-    fail_msg: "Failed to find guest device with UUID {{ new_partition_uuid }}"
+    - name: "Check partition with UUID {{ new_partition_uuid }} existing on {{ guest_os_ansible_distribution }}"
+      ansible.builtin.assert:
+        that:
+          - blkid_uuid_result is defined
+          - blkid_uuid_result.stdout is defined
+          - blkid_uuid_result.stdout
+        fail_msg: "Failed to find partition with UUID {{ new_partition_uuid }} on {{ guest_os_ansible_distribution }}"
 
-- name: "Set facts of test partition path and mount path after reboot"
-  ansible.builtin.set_fact:
-    new_partition_device_path: "{{ blkid_uuid_result.stdout }}"
-    new_partition_mount_path: "/mnt/{{ blkid_uuid_result.stdout.split('/')[-1] }}"
+    - name: "Set facts of test partition path and mount path after reboot"
+      ansible.builtin.set_fact:
+        new_partition_device_path: "{{ blkid_uuid_result.stdout }}"
+        new_partition_mount_path: "/mnt/{{ blkid_uuid_result.stdout.split('/')[-1] }}"
+
+- name: "Get new partition device path and mount path after reboot on FreeBSD"
+  when: guest_os_family == 'FreeBSD'
+  block:
+    - name: "Get disk partition info by UUID on FreeBSD"
+      include_tasks: ../utils/freebsd_get_partition_info.yml
+      vars:
+        disk_partition_uuid: "{{ new_partition_uuid }}"
+
+    - name: "Check partition with UUID {{ new_partition_uuid }} existing on FreeBSD"
+      ansible.builtin.assert:
+        that:
+          - disk_partition_info.name is defined
+          - disk_partition_info.name
+          - disk_partition_info.config.rawuuid is defined
+          - disk_partition_info.config.rawuuid == new_partition_uuid
+        fail_msg: "Failed to get partition by UUID {{ new_partition_uuid }} on FreeBSD"
+
+    - name: "Set facts of test partition path and mount path after reboot"
+      ansible.builtin.set_fact:
+        new_partition_device_path: "/dev/{{ disk_partition_info.name }}"
+        new_partition_mount_path: "/mnt/{{ disk_partition_info.name }}"
 
 - name: "Set fact of test file path after reboot"
   ansible.builtin.set_fact:
