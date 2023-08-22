@@ -10,25 +10,31 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - name: Set fact of the network adapter type
+    - name: "Test case block"
+      block:
+        - name: "Set fact of the network adapter type"
           ansible.builtin.set_fact:
             nic_type: 'VMXNET3'
-            skip_vmxnet3_no_vmtools: true
-        - name: "Set fact of skip test to False when there is vmxnet3 inbox driver"
-          ansible.builtin.set_fact:
-            skip_vmxnet3_no_vmtools: false
-          when:
-            - guest_os_with_inbox_drivers
 
-        - include_tasks: ../setup/test_setup.yml
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_test_no_vmtools: "{{ skip_vmxnet3_no_vmtools }}"
+            skip_msg: "Skip this test case due to OS does not have inboxed {{ nic_type }} driver and VMware Tools is not installed."
+            skip_reason: "Blocked"
+          when:
+            - not (guest_os_with_inbox_drivers | bool)
+            - not (vmtools_is_installed | bool)
 
         # Prepare router VM, vSwitch and portgroup
-        - include_tasks: ../../common/network_testbed_setup.yml
+        - name: "Prepare network environment"
+          include_tasks: ../../common/network_testbed_setup.yml
           when: router_vm_deployed is undefined or not router_vm_deployed | bool
 
-        - include_tasks: network_adapter_deviceops.yml
+        - name: "Start testing network operations"
+          include_tasks: network_adapter_deviceops.yml
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
