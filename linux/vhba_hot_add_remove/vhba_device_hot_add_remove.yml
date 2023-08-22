@@ -42,6 +42,26 @@
             package_list: ["{{ sg3_utils_pkg }}"]
             package_state: "present"
 
+    - name: "Get VM boot info"
+      include_tasks: ../../common/vm_get_boot_info.yml
+
+    - name: "Set VM boot order for BIOS firmware"
+      when: vm_firmware == 'bios'
+      block:
+        - name: "Get VM disks info"
+          include_tasks: ../../common/vm_get_disk_facts.yml
+
+        - name: "Set fact of VM boot disk info"
+          ansible.builtin.set_fact:
+            vm_boot_disk_info: "{{ vm_guest_disk_facts.guest_disk_info['0'] }}"
+
+        - name: "Set VM boot order in case hot added new controller disk changes the boot order"
+          include_tasks: ../../common/vm_set_boot_options.yml
+          vars:
+            boot_hdd_name: "{{ vm_boot_disk_info.label }}"
+            boot_order_list:
+              - disk
+
     - name: "Get the vHBA type for {{ new_disk_ctrl_type }} controller"
       ansible.builtin.set_fact:
         new_vhba_type: "{{ new_disk_ctrl_type if new_disk_ctrl_type in ['sata', 'nvme'] else 'scsi' }}"
