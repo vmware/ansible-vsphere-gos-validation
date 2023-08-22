@@ -27,6 +27,15 @@
 #   vm_network_name (optional): the name of network to connect, default is 'VM Network',
 #     and type of of IP assignment is set to 'dhcp'.
 #
+# VM with IDE boot disk can not be created directly. To create a VM with IDE boot disk,
+# here needs to create a VM with PVSCSI boot disk firstly and then remove the PVSCSI
+# disk and controller, then add an IDE disk to the VM as boot disk
+- name: "Initialize the fact of VM's boot disk controller type"
+  ansible.builtin.set_fact:
+    vm_boot_disk_controller: >-
+      {%- if boot_disk_controller | default('paravirtual') in ['paravirtual', 'ide'] -%}paravirtual
+      {%- else -%}{{ boot_disk_controller }}{%- endif -%}
+
 - name: "Create a new VM '{{ vm_name }}' on server '{{ vsphere_host_name }}'"
   community.vmware.vmware_guest:
     hostname: "{{ vsphere_host_name }}"
@@ -49,7 +58,7 @@
       - size_gb: "{{ boot_disk_size_gb | default(40) }}"
         type: thin
         datastore: "{{ datastore }}"
-        controller_type: "{{ boot_disk_controller | default('paravirtual') }}"
+        controller_type: "{{ vm_boot_disk_controller }}"
         controller_number: 0
         unit_number: 0
     cdrom: "{{ vm_cdroms | default(omit) }}"
@@ -59,12 +68,58 @@
         type: "dhcp"
   register: vm_create_result
 
-- name: Display the result of new VM creation
+- name: "Display the result of new VM creation"
   ansible.builtin.debug: var=vm_create_result
   when: enable_debug is defined and enable_debug
 
-- name: Check the result of new VM creation
+- name: "Check the result of new VM creation"
   ansible.builtin.assert:
     that:
       - vm_create_result is changed
     fail_msg: "New VM '{{ vm_name }}' is not created since 'vm_create_result.changed' is False."
+
+- name: "Change VM's boot disk to IDE disk"
+  when:
+    - boot_disk_controller is defined
+    - boot_disk_controller == "ide"
+  block:
+    - name: "Update VM's boot disk controller to {{ boot_disk_controller }}"
+      ansible.builtin.set_fact:
+        vm_boot_disk_controller: "{{ boot_disk_controller }}"
+
+    - name: "Remove pre-added PVSCSI boot disk from VM"
+      include_tasks: vm_hot_add_remove_disk.yml
+      vars:
+        disk_operation: "absent"
+        disk_controller_type: "paravirtual"
+        ctrl_number: 0
+        unit_number: 0
+
+    - name: "Remove pre-added PVSCSI controller from VM"
+      include_tasks: vm_hot_add_remove_disk_ctrl.yml
+      vars:
+        disk_controller_ops: "absent"
+        disk_controller_type: "paravirtual"
+        disk_controller_number: 0
+
+    - name: "Add IDE boot disk to VM"
+      community.vmware.vmware_guest_disk:
+        hostname: "{{ vsphere_host_name }}"
+        username: "{{ vsphere_host_user }}"
+        password: "{{ vsphere_host_user_password }}"
+        validate_certs: "{{ validate_certs | default(false) }}"
+        datacenter: "{{ vsphere_host_datacenter }}"
+        folder: "{{ vm_folder }}"
+        name: "{{ vm_name }}"
+        disk:
+          - size_gb: "{{ boot_disk_size_gb | default(40) }}"
+            type: "thin"
+            datastore: "{{ datastore }}"
+            controller_type: "{{ vm_boot_disk_controller }}"
+            controller_number: 0
+            unit_number: 0
+      register: add_ide_disk_result
+
+    - name: "Print the result of adding IDE boot disk"
+      ansible.builtin.debug: var=add_ide_disk_result
+      when: enable_debug
