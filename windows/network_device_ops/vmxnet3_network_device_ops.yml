@@ -15,26 +15,18 @@
         - name: "Set fact of the network adapter type"
           ansible.builtin.set_fact:
             nic_type: 'VMXNET3'
-            skip_vmxnet3_no_vmtools: true
-
-        - name: "Update in-memory inventory after getting IP"
-          include_tasks: ../utils/win_update_inventory.yml
-          when: (vm_guest_ip is undefined or not vm_guest_ip)
-
-        - name: "Get guest OS system info"
-          include_tasks: ../utils/get_windows_system_info.yml
-          when: guest_os_system_info_retrieved is undefined or not guest_os_system_info_retrieved
-
-        - name: "Set fact of skip test to False when there is vmxnet3 inbox driver"
-          ansible.builtin.set_fact:
-            skip_vmxnet3_no_vmtools: false
-          when:
-            - guest_os_with_inbox_drivers
 
         - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_test_no_vmtools: "{{ skip_vmxnet3_no_vmtools }}"
+            skip_msg: "Skip this test case due to OS does not have inboxed {{ nic_type }} driver and VMware tools is not running ."
+            skip_reason: "Blocked"
+          when:
+            - not guest_os_with_inbox_drivers
+            - not (vmtools_is_running is defined and vmtools_is_running | bool)
 
         # Prepare router VM, vSwitch and portgroup
         - name: "Prepare network environment"
