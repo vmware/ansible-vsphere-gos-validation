@@ -15,6 +15,7 @@
   ansible.builtin.set_fact:
     partition_name: ""
     partition_device_path: ""
+    partition_uuid: ""
 
 - name: "Set default partition filesystem to ext4"
   ansible.builtin.set_fact:
@@ -61,19 +62,15 @@
   register: partition_result
   when: partition_fstype == "ufs"
 
-- name: "Get the UUID of partition {{ partition_device_path }}"
-  ansible.builtin.shell: "gpart list {{ disk_name }} | grep rawuuid"
-  changed_when: false
-  delegate_to: "{{ vm_guest_ip }}"
-  register: blkid_part_result
+- name: "Get disk partition info"
+  include_tasks: ../utils/freebsd_get_partition_info.yml
+  vars:
+    disk_partition_name: "{{ partition_name }}"
 
 - name: "Set the fact of partition {{ partition_device_path }} UUID"
   ansible.builtin.set_fact:
-    partition_uuid: "{{ blkid_part_result.stdout.split(':')[-1] }}"
-  when:
-    - blkid_part_result is defined
-    - blkid_part_result.stdout is defined
-    - blkid_part_result.stdout
+    partition_uuid: "{{ disk_partition_info.config.rawuuid }}"
+  when: disk_partition_info.config.rawuuid | default('')
 
 - name: "Check the UUID of partition {{ partition_device_path }}"
   ansible.builtin.assert:
