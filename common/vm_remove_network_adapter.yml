@@ -1,6 +1,12 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+# Remove network adapter from VM
+# Parameters:
+#   adapter_label: The network adapter label. For example, Network adapter 1.
+#   netadapter_mac_addr: The network adapter MAC address.
+#   vm_remove_adapter_ignore_errors: Ignore errors at removeing network adapter. Default is False.
+#
 - name: "Remove a network adapter from VM '{{ vm_name }}'"
   community.vmware.vmware_guest_network:
     hostname: "{{ vsphere_host_name }}"
@@ -14,8 +20,9 @@
     label: "{{ adapter_label | default(omit) }}"
     mac_address: "{{ netadapter_mac_addr | default(omit) }}"
     state: absent
-  register: remove_result
+  register: remove_adapter
+  ignore_errors: "{{ vm_remove_adapter_ignore_errors | default(False) }}"
 
-- name: Display the result of removing network adapter
-  ansible.builtin.debug: var=remove_result
+- name: "Display the result of removing network adapter"
+  ansible.builtin.debug: var=remove_adapter
   when: enable_debug is defined and enable_debug
