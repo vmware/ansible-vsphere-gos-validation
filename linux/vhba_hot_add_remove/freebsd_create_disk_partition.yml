@@ -51,6 +51,22 @@
   ansible.builtin.set_fact:
     partition_device_path: "/dev/{{ partition_name }}"
 
+- name: "Get disk partition info"
+  include_tasks: ../utils/freebsd_get_partition_info.yml
+  vars:
+    disk_partition_name: "{{ partition_name }}"
+
+- name: "Set the fact of partition {{ partition_device_path }} UUID"
+  ansible.builtin.set_fact:
+    partition_uuid: "{{ disk_partition_info.config.rawuuid }}"
+  when: disk_partition_info.config.rawuuid | default('')
+
+- name: "Check the UUID of partition {{ partition_device_path }}"
+  ansible.builtin.assert:
+    that:
+      - partition_uuid
+    fail_msg: "Failed to get UUID of partition {{ partition_device_path }}"
+
 # Hit different issues to create and format partition in FreeBSD 32bit. rebooting will be workaround.
 # The disks maybe exchanged after reboot
 - name: "Set boot disk for FreeBSD 32 bit"
@@ -63,21 +79,9 @@
         guest_disk_list_before_reboot: []
         guest_disk_list_after_reboot: []
 
-    - name: "Get test disk partition info"
-      include_tasks: ../utils/freebsd_get_partition_info.yml
-      vars:
-        disk_partition_name: "{{ partition_name }}"
-
     - name: "Set the fact of partition {{ partition_device_path }} UUID"
       ansible.builtin.set_fact:
-        test_disk_partition_uuid: "{{ disk_partition_info.config.rawuuid }}"
-      when: disk_partition_info.config.rawuuid | default('')
-    
-    - name: "Check the UUID of partition {{ partition_device_path }}"
-      ansible.builtin.assert:
-        that:
-          - test_disk_partition_uuid
-        fail_msg: "Failed to get UUID of partition {{ partition_device_path }}"
+        test_disk_partition_uuid: "{{ partition_uuid }}"
 
     - name: "Get guest disk list before reboot"
       include_tasks: ../utils/get_device_list.yml
@@ -105,41 +109,40 @@
         guest_disk_changed_list: "{{ guest_disk_list_before_reboot | difference(guest_disk_list_after_reboot) }}"
 
     - name: "Set the fact of test disk if it's changed after reboot"
-      when: guest_disk_changed_list
+      when: guest_disk_changed_list | length > 0
       block:
-        - name: "Get the test disk info after it's changed"
-          when: item.size == "1.0G"
-          block:
-            - name: "Get disk partition info"
-              include_tasks: ../utils/freebsd_get_partition_info.yml
-              vars:
-                disk_partition_name: "{{ item.name }}p1"
+        - name: "Get disk partition info by UUID on FreeBSD"
+          include_tasks: ../utils/freebsd_get_partition_info.yml
+          vars:
+            disk_partition_uuid: "{{ test_disk_partition_uuid }}"
 
-            - name: "Set the fact of partition {{ partition_device_path }} UUID"
-              ansible.builtin.set_fact:
-                partition_uuid: "{{ disk_partition_info.config.rawuuid }}"
-              when: disk_partition_info.config.rawuuid | default('')
-    
-            - name: "Check the UUID of partition {{ partition_device_path }}"
-              ansible.builtin.assert:
-                that:
-                  - partition_uuid
-                fail_msg: "Failed to get UUID of partition {{ partition_device_path }}"
+        - name: "Check partition with UUID {{ new_partition_uuid }} existing on FreeBSD"
+          ansible.builtin.assert:
+            that:
+              - disk_partition_info.name is defined
+              - disk_partition_info.name
+              - disk_partition_info.config.rawuuid is defined
+              - disk_partition_info.config.rawuuid == test_disk_partition_uuid
+            fail_msg: "Failed to get partition by UUID {{ test_disk_partition_uuid }} on FreeBSD"
 
-            - name: "Set fact of test disk info"
-              ansible.builtin.set_fact:
-                new_guest_disk_info: >
-                  {%- if partition_uuid == test_disk_partition_uuid -%}{{ item }}
-                  {%- else -%}{{ new_guest_disk_info }}
-                  {%- endif -%}
-          with_list: "{{ guest_disk_list_after_reboot }}"
+        - name: "Print test disk partition info in guest OS after it'changed"
+          ansible.builtin.debug: var=disk_partition_info
 
-        - name: "Print new disk in guest OS after it'changed"
-          ansible.builtin.debug: var=new_guest_disk_info
-
-        - name: "Set fact of disk name"
+        - name: "Change name of test disk after it's changed"
           ansible.builtin.set_fact:
-            disk_name: "{{ new_guest_disk_info.name }}"
+            new_guest_disk_info: > 
+              {{ new_guest_disk_info | combine({
+                    'name': disk_partition_info.name[0:-2]
+                }) 
+              }}
+        
+        - name: "Change partition name and path of test disk after it's changed"
+          ansible.builtin.set_fact:
+            partition_name: "{{ disk_partition_info.name }}"
+            partition_device_path: "/dev/{{ disk_partition_info.name }}"
+
+        - name: "Print test disk info in guest OS after it'changed"
+          ansible.builtin.debug: var=new_guest_disk_info
 
 - name: "Create and check {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
   ansible.builtin.shell: "newfs -EU {{ partition_device_path }} && sleep 5 && fstyp {{ partition_device_path }}"
@@ -153,21 +156,13 @@
     - partition_result.rc is defined
     - partition_result.rc == 0
 
-- name: "Get disk partition info"
-  include_tasks: ../utils/freebsd_get_partition_info.yml
-  vars:
-    disk_partition_name: "{{ partition_name }}"
-
-- name: "Set the fact of partition {{ partition_device_path }} UUID"
-  ansible.builtin.set_fact:
-    partition_uuid: "{{ disk_partition_info.config.rawuuid }}"
-  when: disk_partition_info.config.rawuuid | default('')
-
-- name: "Check the UUID of partition {{ partition_device_path }}"
+- name: "Check {{ partition_fstype }} filesystem on partition {{ partition_device_path }} is expected"
   ansible.builtin.assert:
     that:
-      - partition_uuid
-    fail_msg: "Failed to get UUID of partition {{ partition_device_path }}"
+      - partition_result is defined
+      - partition_result.rc is defined
+      - partition_result.rc == 0
+    fail_msg: "Failed to format partition {{ partition_device_path }} with {{ partition_fstype }} filesystem"
 
 - name: "Print the new disk partition name, UUID, device path, and filesystem"
   ansible.builtin.debug:
