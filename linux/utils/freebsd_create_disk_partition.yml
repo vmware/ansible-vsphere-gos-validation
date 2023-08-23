@@ -1,0 +1,128 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Create and format 1 new partition on a disk
+# Parameters:
+#   disk_name: The disk name to be formatted and create partition
+#   partition_fstype: Create filesystem on new partition, which could be ext4, xfs
+#                         or btrfs, etc. The default filesystem is ext4.
+# Return:
+#   partition_name: The disk partition name
+#   partition_device_path: The disk partition device path
+#
+- name: "Initialize disk partition name and device path"
+  ansible.builtin.set_fact:
+    partition_name: ""
+    partition_device_path: ""
+    partition_uuid: ""
+
+- name: "Set default partition filesystem to ufs"
+  ansible.builtin.set_fact:
+    partition_fstype: "ufs"
+  when: >
+    partition_fstype is undefined or
+    not partition_fstype
+
+- name: "Filesystem {{ partition_fstype }} is not supported"
+  ansible.builtin.fail:
+    msg: >-
+      Guest OS doesn't support filesystem {{ partition_fstype }}, so it can't
+      create partition with filesystem {{ partition_fstype }} on disk {{ disk_name }}
+  when: partition_fstype is not in ['ufs', 'zfs']
+
+- name: "Create partition table on disk {{ disk_name }}"
+  ansible.builtin.shell: |
+    gpart create -s GPT {{ disk_name }}
+    gpart add -t freebsd-{{ partition_fstype }} {{ disk_name }}
+    gpart show {{ disk_name }}
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Set fact of partition name and path"
+  ansible.builtin.set_fact:
+    partition_name: "{{ disk_name }}p1"
+    partition_device_path: "/dev/{{ partition_name }}"
+
+- name: "Get disk partition info"
+  include_tasks: freebsd_get_partition_info.yml
+  vars:
+    disk_partition_name: "{{ partition_name }}"
+
+- name: "Set the fact of partition {{ partition_device_path }} UUID"
+  ansible.builtin.set_fact:
+    partition_uuid: "{{ disk_partition_info.config.rawuuid }}"
+  when: disk_partition_info.config.rawuuid | default('')
+
+- name: "Check the UUID of partition {{ partition_device_path }}"
+  ansible.builtin.assert:
+    that:
+      - partition_uuid
+    fail_msg: "Failed to get UUID of partition {{ partition_device_path }}"
+
+# Hit different issues to create and format partition in FreeBSD 32bit. rebooting will be workaround.
+# The disks maybe exchanged after reboot
+- name: "Set boot disk for FreeBSD 32 bit"
+  when:
+    - guest_os_bit == "32-bit"
+    - add_new_controller is defined and add_new_controller
+  block:
+    - name: "Reboot guest OS to check file content again"
+      include_tasks: reboot.yml
+
+    - name: "Get disk partition info by UUID on FreeBSD"
+      include_tasks: freebsd_get_partition_info.yml
+      vars:
+        disk_partition_uuid: "{{ partition_uuid }}"
+
+    - name: "Check partition with UUID {{ partition_uuid }} existing on FreeBSD"
+      ansible.builtin.assert:
+        that:
+          - disk_partition_info.name is defined
+          - disk_partition_info.name
+          - disk_partition_info.config.rawuuid is defined
+          - disk_partition_info.config.rawuuid == partition_uuid
+        fail_msg: "Failed to get partition by UUID {{ partition_uuid }} on FreeBSD"
+
+    - name: "Print test disk partition info in guest OS after it'changed"
+      ansible.builtin.debug: var=disk_partition_info
+
+    - name: "Change facts of the test disk in case it's changed"
+      ansible.builtin.set_fact:
+        partition_name: "{{ disk_partition_info.name }}"
+        partition_device_path: "/dev/{{ disk_partition_info.name }}"
+        new_guest_disk_info: > 
+          {{ new_guest_disk_info | combine({
+                'name': disk_partition_info.name[0:-2]
+            }) 
+          }}
+
+    - name: "Print test disk info in guest OS in case it'changed"
+      ansible.builtin.debug: var=new_guest_disk_info
+
+- name: "Create and check {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
+  ansible.builtin.shell: "newfs -EU {{ partition_device_path }} && sleep 5 && fstyp {{ partition_device_path }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: true
+  register: freebsd_newfs_result
+  retries: 5
+  delay: 2
+  until:
+    - freebsd_newfs_result is defined
+    - freebsd_newfs_result.rc is defined
+    - freebsd_newfs_result.rc == 0
+
+- name: "Check {{ partition_fstype }} filesystem on partition {{ partition_device_path }} is expected"
+  ansible.builtin.assert:
+    that:
+      - freebsd_newfs_result is defined
+      - freebsd_newfs_result.rc is defined
+      - freebsd_newfs_result.rc == 0
+    fail_msg: "Failed to format partition {{ partition_device_path }} with {{ partition_fstype }} filesystem"
+
+- name: "Print the new disk partition name, UUID, device path, and filesystem"
+  ansible.builtin.debug:
+    msg:
+      - "The new disk partition name: {{ partition_name }}"
+      - "The new disk partition UUID: {{ partition_uuid }}"
+      - "The new disk partition device path: {{ partition_device_path }}"
+      - "The new disk partition filesystem: {{ partition_fstype }}"

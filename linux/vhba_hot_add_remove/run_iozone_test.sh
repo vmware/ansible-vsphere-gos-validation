@@ -94,9 +94,7 @@ function run_iozone()
     cd "$testdir_path"
     echo "Run iozone on $part_path" || continue
     # Run iozone testing
-    if [[ "$os_distribution" =~ FreeBSD ]]; then
-        ${IOZONE_PATH} -Ra -g 128K -i 0 -i 1 -b "$iozone_file"
-    elif [ $(echo "$part_size > 128"|bc) -eq 1 ]; then
+    if [ $(echo "$part_size > 128"|bc) -eq 1 ]; then
         ${IOZONE_PATH} -Ra -g 128M -i 0 -i 1 -b "$iozone_file"
     else
         ${IOZONE_PATH} -Ra -g ${test_size}M -i 0 -i 1 -b "$iozone_file"
@@ -186,7 +184,7 @@ function freebsd_test_partitions()
     echo "Check partition filesystem : "
     exec_cmd "fstyp $part_path"
     if [ $ret -ne 0 ]; then
-        echo "FAIL"
+        echo "Failed to check partition filesystem on $part_path"
         exit $ret
     fi
 
@@ -196,7 +194,7 @@ function freebsd_test_partitions()
         echo "Create mount point $mount_point : "
         exec_cmd "mkdir -p -m 777 $mount_point"
         if [ $ret -ne 0 ] ; then
-            echo "FAIL"
+            echo "Failed to create mount point $mount_point"
             exit $ret
         fi
     fi
@@ -206,7 +204,7 @@ function freebsd_test_partitions()
         printf "Mount $part_path to $mount_point : "
         exec_cmd "mount $part_path $mount_point"
         if [ $ret -ne 0 ] ; then
-            echo "FAIL"
+            echo "Failed to mount $part_path to $mount_point"
             exit $ret
         fi
     fi
