@@ -61,12 +61,12 @@
 
 # Hit different issues to create and format partition in FreeBSD 32bit. rebooting will be workaround.
 # The disks maybe exchanged after reboot
-- name: "Set boot disk for FreeBSD 32 bit"
+- name: "Reboot OS and update facts of the test disk for FreeBSD 32bit"
   when:
     - guest_os_bit == "32-bit"
     - add_new_controller is defined and add_new_controller
   block:
-    - name: "Reboot guest OS to check file content again"
+    - name: "Reboot guest OS"
       include_tasks: reboot.yml
 
     - name: "Get disk partition info by UUID on FreeBSD"
@@ -83,10 +83,10 @@
           - disk_partition_info.config.rawuuid == partition_uuid
         fail_msg: "Failed to get partition by UUID {{ partition_uuid }} on FreeBSD"
 
-    - name: "Print test disk partition info in guest OS after it'changed"
+    - name: "Print test disk partition info in guest OS after rebooting"
       ansible.builtin.debug: var=disk_partition_info
 
-    - name: "Change facts of the test disk in case it's changed"
+    - name: "Update facts of new disk and partition after rebooting"
       ansible.builtin.set_fact:
         partition_name: "{{ disk_partition_info.name }}"
         partition_device_path: "/dev/{{ disk_partition_info.name }}"
@@ -96,7 +96,7 @@
             }) 
           }}
 
-    - name: "Print test disk info in guest OS in case it'changed"
+    - name: "Print test disk info in guest OS after rebooting"
       ansible.builtin.debug: var=new_guest_disk_info
 
 - name: "Create and check {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
