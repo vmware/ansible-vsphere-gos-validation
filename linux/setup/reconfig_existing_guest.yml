@@ -3,20 +3,24 @@
 ---
 # Reconfigure guest OS on existing VM to prepare for GOS validation testing
 #
-# For Ubuntu or Debian , modify sshd config to keep connection alive
-- include_tasks: ../utils/ssh_keep_alive.yml
+# For Ubuntu, Debian and FreeBSD, modify sshd config to keep connection alive
+- name: "Keep SSH connection alive"
+  include_tasks: ../utils/ssh_keep_alive.yml
   when: guest_os_family in ["Debian", "FreeBSD"]
 
-# Diable auto update for Ubuntu
-- include_tasks: ../utils/disable_auto_update.yml
+- name: "Diable auto update for Ubuntu"
+  include_tasks: ../utils/disable_auto_update.yml
   when: guest_os_ansible_distribution in ["Ubuntu"]
 
 - name: "Reconfigure VMware Photon OS"
+  when: guest_os_ansible_distribution == "VMware Photon OS"
   block:
-    - include_tasks: ../../common/vm_get_vmtools_status.yml
+    - name: "Get VMware Tools status"
+      include_tasks: ../../common/vm_get_vmtools_status.yml
       when: vmtools_is_running is undefined or not vmtools_is_running
 
-    - include_tasks: ../utils/disable_iptables.yml
+    - name: "Disable iptables to allow ping"
+      include_tasks: ../utils/disable_iptables.yml
       when:
         - (new_vm is undefined) or (not new_vm | bool)
         - vmtools_is_running
@@ -35,9 +39,9 @@
       vars:
         package_list: ["gawk", "python3-rpm", "tar"]
         package_state: "present"
-  when: guest_os_ansible_distribution == "VMware Photon OS"
 
 - name: "Reconfigure SLED"
+  when: guest_os_ansible_distribution == "SLED"
   block:
     - name: "Check 'PackageKit' service state"
       include_tasks: ../utils/get_service_info.yml
@@ -45,6 +49,10 @@
         service_name: "packagekit.service"
 
     - name: "Stop and disable 'PackageKit' service"
+      when:
+        - service_info
+        - service_info.state is defined
+        - service_info.state in ['active', 'running']
       block:
         - name: "Stop and disable 'PackageKit' service"
           ansible.builtin.service:
@@ -53,16 +61,15 @@
             enabled: false
           delegate_to: "{{ vm_guest_ip }}"
 
-        # Reboot VM to make sure packagekit.service is disabled and stopped
-        - include_tasks: ../utils/reboot.yml
-      when:
-        - service_info
-        - service_info.state is defined
-        - service_info.state in ['active', 'running']
+        - name: "Reboot VM to make sure packagekit.service is disabled and stopped"
+          include_tasks: ../utils/reboot.yml
 
     - name: "Remove 'PackageKit' package from SLED"
       include_tasks: ../utils/install_uninstall_package.yml
       vars:
         package_list: ["PackageKit"]
         package_state: "absent"
-  when: guest_os_ansible_distribution == "SLED"
+
+- name: "Set FreeBSD kernel state"
+  include_tasks: ../utils/freebsd_set_kernel_state.yml
+  when: guest_os_family == "FreeBSD"

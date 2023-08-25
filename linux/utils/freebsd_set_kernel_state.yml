@@ -1,0 +1,26 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Set kernel state with sysctl and boot loader on FreeBSD
+#
+- name: "Set facts of kernel state properties"
+  ansible.builtin.set_fact:
+    freebsd_kernel_state: {
+        'kern.geom.label.disk_ident.enable': 1,
+        'kern.geom.label.gptid.enable': 1,
+        'kern.geom.label.gpt.enable': 1
+      }
+
+- name: "Set kernel state with sysctl on FreeBSD"
+  ansible.builtin.shell: "sysctl {{ item.key }}={{ item.value }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  with_dict: "{{ freebsd_kernel_state }}"
+
+- name: "Set kernel state in boot loader"
+  include_tasks: replace_or_add_line_in_file.yml
+  vars:
+    file: '/boot/loader.conf'
+    reg_exp: '{{ item.key }}=.*'
+    line_content: '{{ item.key }}="{{ item.value }}"'
+  with_dict: "{{ freebsd_kernel_state }}"

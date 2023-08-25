@@ -34,17 +34,14 @@
 - name: "Create partition table on disk {{ disk_name }}"
   ansible.builtin.shell: |
     gpart create -s GPT {{ disk_name }}
-    gpart add -t freebsd-{{ partition_fstype }} {{ disk_name }}
+    gpart add -t freebsd-{{ partition_fstype }} -a 1M {{ disk_name }}
     gpart show {{ disk_name }}
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Set fact of partition name"
+- name: "Set fact of partition name and device path"
   ansible.builtin.set_fact:
     partition_name: "{{ disk_name }}p1"
-
-- name: "Set fact of partition path"
-  ansible.builtin.set_fact:
-    partition_device_path: "/dev/{{ partition_name }}"
+    partition_device_path: "/dev/{{ disk_name }}p1"
 
 - name: "Get disk partition info"
   include_tasks: freebsd_get_partition_info.yml
@@ -62,53 +59,13 @@
       - partition_uuid
     fail_msg: "Failed to get UUID of partition {{ partition_device_path }}"
 
-# Hit different issues to create and format partition in FreeBSD 32bit. rebooting will be workaround.
-# The disks maybe exchanged after reboot
-- name: "Reboot OS and update facts of the test disk for FreeBSD 32bit"
-  when:
-    - guest_os_bit == "32-bit"
-    - add_new_controller is defined and add_new_controller
-  block:
-    - name: "Reboot guest OS"
-      include_tasks: reboot.yml
-
-    - name: "Get disk partition info by UUID on FreeBSD"
-      include_tasks: freebsd_get_partition_info.yml
-      vars:
-        disk_partition_uuid: "{{ partition_uuid }}"
-
-    - name: "Check partition with UUID {{ partition_uuid }} existing on FreeBSD"
-      ansible.builtin.assert:
-        that:
-          - disk_partition_info.name is defined
-          - disk_partition_info.name
-          - disk_partition_info.config.rawuuid is defined
-          - disk_partition_info.config.rawuuid == partition_uuid
-        fail_msg: "Failed to get partition by UUID {{ partition_uuid }} on FreeBSD"
-
-    - name: "Print test disk partition info in guest OS after rebooting"
-      ansible.builtin.debug: var=disk_partition_info
-
-    - name: "Update facts of new disk and partition after rebooting"
-      ansible.builtin.set_fact:
-        partition_name: "{{ disk_partition_info.name }}"
-        partition_device_path: "/dev/{{ disk_partition_info.name }}"
-        new_guest_disk_info: > 
-          {{ new_guest_disk_info | combine({
-                'name': disk_partition_info.name[0:-2]
-            }) 
-          }}
-
-    - name: "Print test disk info in guest OS after rebooting"
-      ansible.builtin.debug: var=new_guest_disk_info
-
 - name: "Create and check {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
-  ansible.builtin.shell: "newfs -EU {{ partition_device_path }} && sleep 5 && fstyp {{ partition_device_path }}"
+  ansible.builtin.shell: "newfs -EU {{ partition_device_path }} && sleep 5 && fsck_ffs -y {{ partition_device_path }}"
   delegate_to: "{{ vm_guest_ip }}"
   ignore_errors: true
   register: freebsd_newfs_result
-  retries: 5
-  delay: 2
+  retries: 30
+  delay: 10
   until:
     - freebsd_newfs_result is defined
     - freebsd_newfs_result.rc is defined

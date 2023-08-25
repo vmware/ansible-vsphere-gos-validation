@@ -52,7 +52,7 @@ function run_iozone()
         rm -rf $testdir_path
     fi
     printf "Create folder $testdir_path:  "
-    exec_cmd "mkdir $testdir_path"
+    exec_cmd "mkdir -p $testdir_path"
     if [ $ret -eq 0 ]; then
         echo "SUCCEED"
     else
