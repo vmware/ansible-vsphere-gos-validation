@@ -1,0 +1,52 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Update disk partition name in /etc/fstab with label (e.g. gptid/xxxx)
+#
+- name: "Get FreeBSD devices mount facts"
+  include_tasks: ../../common/get_system_info.yml
+  vars:
+    filter: ["ansible_mounts"]
+
+- name: "Set fact of FreeBSD mounted devices"
+  ansible.builtin.set_fact:
+    freebsd_mounted_partitions: >-
+      {{ 
+        guest_system_info.ansible_mounts | 
+        selectattr('device', 'defined') |
+        map(attribute='device') |
+        select('match', "^/dev/\w+$") |
+        map('regex_replace', '/dev/', '')
+      }}
+
+- name: "Update /etc/fstab with partition label"
+  when: freebsd_mounted_partitions | length > 0
+  block:
+    - name: "Get GEOM label list on FreeBSD"
+      include_tasks: freebsd_get_geom_list.yml
+      vars:
+        freebsd_geom_class: "PART"
+
+    - name: "Update /etc/fstab with partition UUID"
+      when: freebsd_geom_list | length > 0
+      block:
+        - name: "Set facts of the map between mounted device and its label"
+          ansible.builtin.set_fact:
+            freebsd_partitions_dict: >-
+              {{ 
+                freebsd_geom_list | map(attribute='provider') | flatten | 
+                items2dict(key_name='name', value_name='config')
+              }}
+        
+        - name: "Update mounted device with UUID in /etc/fstab"
+          ansible.builtin.shell: "sed -i '' 's#/dev/{{ part_name }}#/dev/gptid/{{ freebsd_partitions_dict[part_name].rawuuid }}#' /etc/fstab"
+          delegate_to: "{{ vm_guest_ip }}"
+          ignore_errors: True
+          when:
+            - freebsd_partitions_dict[part_name] is defined
+            - freebsd_partitions_dict[part_name].rawuuid is defined
+            - freebsd_partitions_dict[part_name].rawuuid
+          with_items: "{{ freebsd_mounted_partitions }}"
+          loop_control:
+            loop_var: part_name

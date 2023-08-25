@@ -99,6 +99,19 @@
       ansible.builtin.set_fact:
         add_new_controller: true
 
+    - name: "Update /etc/fstab on FreeBSD"
+      when: guest_os_family == 'FreeBSD'
+      block:
+        - name: "Get GEOM label list on FreeBSD"
+          include_tasks: ../utils/freebsd_get_geom_list.yml
+          vars:
+            freebsd_geom_class: "PART"
+
+        - name: "Update disk partitions /etc/fstab with partition labels"
+          include_tasks: ../utils/freebsd_update_fstab_with_uuid.yml
+          vars:
+            freebsd_geom_label_list: "{{ geom_list }}"
+
     - name: "Hot add a new controller and disk at the same time, test disk I/O and then remove it"
       include_tasks: hot_add_remove_disk.yml
 
