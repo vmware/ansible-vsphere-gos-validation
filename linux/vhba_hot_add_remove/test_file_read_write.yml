@@ -53,7 +53,7 @@
   include_tasks: ../utils/set_mount_point.yml
   vars:
     mount_point_path: "{{ new_partition_mount_path }}"
-    mount_state: "absent"
+    mount_state: "unmounted"
 
 - name: "Reboot guest OS to check file content again"
   include_tasks: ../utils/reboot.yml
@@ -102,6 +102,19 @@
         new_partition_name: "{{ disk_partition_info.name }}"
         new_partition_device_path: "/dev/{{ disk_partition_info.name }}"
 
+- name: "Get guest OS mount facts"
+  include_tasks: ../../common/get_system_info.yml
+  vars:
+    filter: "ansible_mounts"
+
+- name: "Set fact of guest OS mount info on device {{ new_partition_mount_src }}"
+  ansible.builtin.set_fact:
+    new_partition_mount: >-
+      {{
+        guest_system_info.ansible_mounts |
+        selectattr('device', 'equalto', new_partition_mount_src) | first
+      }}
+
 - name: "Mount {{ new_partition_mount_src }} to {{ new_partition_mount_path }}"
   include_tasks: ../utils/set_mount_point.yml
   vars:
@@ -109,6 +122,10 @@
     mount_point_src: "{{ new_partition_mount_src }}"
     mount_fstype: "{{ new_partition_fstype }}"
     mount_state: "mounted"
+  when: >-
+    (not new_partition_mount or
+     new_partition_mount.mount is undefined or
+     new_partition_mount.mount != new_partition_mount_path)
 
 - name: "Read content of file {{ test_file_path }} after guest OS reboot"
   include_tasks: ../utils/read_file.yml

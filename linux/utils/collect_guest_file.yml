@@ -1,0 +1,38 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Collect guest OS log file to local test case log directory
+# Parameter:
+#   guest_file_src: The log file path in guest OS
+# Return:
+#   guest_file_dest: The log file path at localhost
+#
+- name: "Initialize the fact of collected guest log file path at localhost"
+  ansible.builtin.set_fact:
+    guest_file_dest: ""
+    guest_log_file_exists: False
+
+- name: "Get stat info of guest log file {{ guest_file_src }}"
+  include_tasks: get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ vgauth_log_file_src }}"
+
+- name: "Set fact of guest log file exists or not"
+  ansible.builtin.set_fact:
+    guest_log_file_exists: "{{ guest_file_exists }}"
+
+- name: "Collect guest log file {{ guest_file_src }}"
+  block:
+    - name: "Collect guest log to test case log dir"
+      include_tasks: fetch_file.yml
+      vars:
+        fetch_file_src_path: "{{ vgauth_log_file_src }}"
+        fetch_file_dst_path: "{{ current_test_log_folder }}/"
+
+    - name: "Set facts of VGAuthService file collected at localhost"
+      ansible.builtin.set_fact:
+        guest_file_dest: "{{ fetch_file_local_path }}"
+      when:
+        - fetch_file_local_path is defined
+        - fetch_file_local_path
+  when: guest_log_file_exists | bool

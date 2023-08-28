@@ -158,5 +158,14 @@
           VM disk controllers before hot-add are {{ disk_controllers_before_hotadd }},
           VM disk controllers after hot-remove are {{ disk_controllers_after_hotremove }}.
   rescue:
+    - name: "Collect guest logs"
+      include_tasks: ../utils/collect_guest_file.yml
+      with_items:
+        - "/etc/fstab"
+        - "/vars/log/bsdisks.log"
+      loop_control:
+        loop_var: guest_log_file_src
+      when: guest_os_family == "FreeBSD"
+
     - name: "Test case failure"
       include_tasks: ../../common/test_rescue.yml
