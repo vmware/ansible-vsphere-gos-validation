@@ -78,11 +78,12 @@
         network_config_template: rhel_network_conf.j2
       when: guest_os_family == "RedHat"
 
-    - name: "Set fact of the network config template for Ubuntu desktop"
+    - name: "Set fact of the network config template for {{ guest_os_ansible_distribution }}"
       ansible.builtin.set_fact:
         network_config_template: debian_network_conf.j2
       when: >
         (guest_os_ansible_distribution == "Debian") or
+        (guest_os_ansible_distribution == "Pardus GNU/Linux") or
         (guest_os_ansible_distribution == "Ubuntu" and
          guest_os_with_gui is defined and guest_os_with_gui)
 
@@ -109,6 +110,9 @@
       when: guest_os_family == "FreeBSD"
 
     - name: "Create or update network config file for new network interface"
+      when:
+        - network_config_template
+        - network_config_path
       block:
         - name: "Create or update network config file '{{ network_config_path }}'"
           ansible.builtin.template:
@@ -125,9 +129,6 @@
     
         - name: "Print content of network config file '{{ network_config_path }}'"
           ansible.builtin.debug: var=network_config.stdout_lines
-      when:
-        - network_config_template
-        - network_config_path
 
 - name: "Apply new netplan configuration file in Ubuntu server"
   when:
