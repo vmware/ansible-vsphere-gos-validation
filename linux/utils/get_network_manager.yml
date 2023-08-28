@@ -15,7 +15,7 @@
   when: guest_os_ansible_distribution in ["Debian", "Pardus GNU/Linux"]
 
 - name: "Set network device manager for {{ guest_os_ansible_distribution }}"
-  when: guest_os_ansible_distribution not in ["Debian", "FreeBSD"]
+  when: guest_os_ansible_distribution not in ["Debian", "FreeBSD", "Pardus GNU/Linux"]
   block:
     - include_tasks: get_service_info.yml
       vars:
@@ -31,6 +31,10 @@
         - service_info.state in ['active', 'running']
 
     - name: "Set network device manager for guest OS which doesn't have NetworkManager"
+      when: >
+        (not service_info or
+        service_info.state is undefined or
+        service_info.state not in ['active', 'running'])
       block:
         # SLES uses netplan to manage network interfaces
         - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is wicked"
@@ -54,11 +58,7 @@
         - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is systemd-networkd"
           ansible.builtin.set_fact:
             guest_os_network_manager: "systemd-networkd"
-          when: guest_os_ansible_distribution in ['VMware Photon OS', 'Flatcar'] 
-      when: >
-        (not service_info or
-        service_info.state is undefined or
-        service_info.state not in ['active', 'running'])
+          when: guest_os_ansible_distribution in ['VMware Photon OS', 'Flatcar']
 
 - name: "Set network device manager for {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:

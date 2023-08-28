@@ -49,10 +49,14 @@
         network_config_path: "/etc/network/interfaces"
       when: >
         (guest_os_ansible_distribution == "Debian") or
+        (guest_os_ansible_distribution == "Pardus GNU/Linux") or
         (guest_os_ansible_distribution == "Ubuntu" and
          guest_os_with_gui is defined and guest_os_with_gui)
 
     - name: "Set fact of network config file in Ubuntu server"
+      when:
+        - guest_os_ansible_distribution == "Ubuntu"
+        - guest_os_with_gui is defined and not guest_os_with_gui
       block:
         - name: "Get netplan config file in Ubuntu server"
           include_tasks: ../utils/get_netplan_config_file.yml
@@ -61,9 +65,6 @@
           ansible.builtin.set_fact:
             network_config_path: "{{ netplan_config_file }}"
           when: netplan_config_file is defined
-      when:
-        - guest_os_ansible_distribution == "Ubuntu"
-        - guest_os_with_gui is defined and not guest_os_with_gui
 
     - name: "Set fact of network config file for '{{ network_adapter_name }}' on SLE"
       ansible.builtin.set_fact:
