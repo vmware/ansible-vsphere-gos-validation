@@ -67,10 +67,10 @@
 
 - name: "Change size from Gbytes to bytes for FreeBSD"
   ansible.builtin.set_fact:
-    new_guest_disk_info: > 
+    new_guest_disk_info: >
       {{ new_guest_disk_info | combine({
             'size': (new_guest_disk_info.size.split('G')[0].strip() | int) * 1024 * 1024 * 1024
-        }) 
+        })
       }}
   when:
     - guest_os_family == "FreeBSD"
@@ -110,14 +110,33 @@
     new_partition_device_path: "{{ partition_device_path }}"
     new_partition_fstype: "{{ 'ext4' if guest_os_family != 'FreeBSD' else 'ufs' }}"
     new_partition_uuid: "{{ partition_uuid }}"
+    new_partition_mount_path: "/mnt/{{ partition_uuid }}"
+    new_partition_mount_src: |-
+      {%- if guest_os_family == 'FreeBSD' -%}/dev/gptid/{{ partition_uuid }}
+      {%- else -%}UUID={{ partition_uuid }}
+      {%- endif -%}
+
+- name: "Mount {{ new_partition_mount_src }} to {{ new_partition_mount_path }}"
+  include_tasks: ../utils/set_mount_point.yml
+  vars:
+    mount_point_path: "{{ new_partition_mount_path }}"
+    mount_point_src: "{{ new_partition_mount_src }}"
+    mount_fstype: "{{ new_partition_fstype }}"
+    mount_state: "mounted"
+
+- name: "Test file read and write on new partition {{ new_partition_device_path }}"
+  include_tasks: test_file_read_write.yml
 
 - name: "Test disk I/O on new disk {{ new_guest_disk_info.name }}"
   include_tasks: test_disk_io.yml
   vars:
     test_disk_name: "{{ new_guest_disk_info.name }}"
 
-- name: "Test file read and write on new partition {{ new_partition_device_path }}"
-  include_tasks: test_file_read_write.yml
+- name: "Unmount device {{ new_partition_mount_src }}"
+  include_tasks: ../utils/set_mount_point.yml
+  vars:
+    mount_point_path: "{{ new_partition_mount_path }}"
+    mount_state: "absent"
 
 # Disk hot-remove
 - name: "Get guest disk list before hot-remove"
