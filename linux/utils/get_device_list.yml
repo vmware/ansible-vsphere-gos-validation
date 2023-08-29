@@ -9,102 +9,60 @@
 #   guest_device_list: A list of all guest devices or a list of guest devices with given type
 #                      and attributes of name, type, size in bytes and filesystem type
 #
-- name: "Initialize the fact of device list"
+- name: "Initialize the fact of device list and command"
   ansible.builtin.set_fact:
     guest_device_list: []
+    get_device_list_cmd: |-
+      {%- if guest_os_family == 'FreeBSD' -%}lsblk -d | grep -v SIZE | grep -v cd0
+      {%- else -%}lsblk -o NAME,TYPE,SIZE,FSTYPE -b --nodeps
+      {%- endif -%}
 
-- name: "Get guest device list on {{ guest_os_ansible_distribution }}"
-  when: guest_os_family != "FreeBSD"
-  block:
-    - name: "Check guest_device_type is valid"
-      ansible.builtin.assert:
-        that:
-          - (guest_device_type is undefined or
-             not guest_device_type or
-             guest_device_type in ['disk', 'pmem', 'rom'])
-        fail_msg: >-
-          Parameter 'guest_device_type' can only be set to 'disk', 'pmem' or 'rom'
-          on {{ guest_os_ansible_distribution }}.
+- name: "Update command to get device list with type of {{ guest_device_type }}"
+  ansible.builtin.set_fact:
+    get_device_list_cmd: "{{ get_device_list_cmd ~ ' | grep ' ~ guest_device_type }}"
+  when:
+    - guest_device_type is defined
+    - guest_device_type
+    - guest_os_family != "FreeBSD"
 
-    - name: "Set command to get device list with type of {{ guest_device_type }}"
-      ansible.builtin.set_fact:
-        get_device_list_cmd: "lsblk -o NAME,TYPE,SIZE,FSTYPE -b --nodeps"
+- name: "Get block device list"
+  ansible.builtin.shell: "{{ get_device_list_cmd }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  changed_when: false
+  ignore_errors: true
+  register: lsblk_result
 
-    - name: "Update command to get device list with type of {{ guest_device_type }}"
-      ansible.builtin.set_fact:
-        get_device_list_cmd: "{{ get_device_list_cmd ~ ' | grep ' ~ guest_device_type }}"
-      when:
-        - guest_device_type is defined
-        - guest_device_type
+- name: "Set the fact of block device list for {{ guest_os_ansible_distribution }}"
+  ansible.builtin.set_fact:
+    guest_device_list: >
+      {{
+         guest_device_list | union([
+             dict(['name', 'type', 'size', 'fstype'] |
+                  zip_longest(item.split(), fillvalue=''))
+         ])
+      }}
+  with_items: "{{ lsblk_result.stdout_lines }}"
+  when:
+    - guest_os_family != 'FreeBSD'
+    - lsblk_result is defined
+    - lsblk_result.stdout_lines is defined
+    - lsblk_result.stdout_lines | length > 0
 
-    - name: "Get block device list"
-      ansible.builtin.shell: "{{ get_device_list_cmd }}"
-      delegate_to: "{{ vm_guest_ip }}"
-      changed_when: false
-      ignore_errors: true
-      register: lsblk_result
-
-    - name: "Set the fact of block device list"
-      ansible.builtin.set_fact:
-        guest_device_list: >
-          {{
-             guest_device_list | union([
-                 dict(['name', 'type', 'size', 'fstype'] |
-                      zip_longest(item.split(), fillvalue=''))
-             ])
-          }}
-      with_items: "{{ lsblk_result.stdout_lines }}"
-      when:
-        - lsblk_result is defined
-        - lsblk_result.stdout_lines is defined
-        - lsblk_result.stdout_lines | length > 0
-
-- name: "Get guest device list on FreeBSD"
-  when: guest_os_family == "FreeBSD"
-  block:
-    - name: "Check guest_device_type is valid"
-      ansible.builtin.assert:
-        that:
-          - (guest_device_type is undefined or
-             not guest_device_type or
-             guest_device_type in ['disk', 'cd'])
-        fail_msg: "Parameter 'guest_device_type' can only be set to 'disk', or 'cd' on FreeBSD"
-
-    - name: "Get FreeBSD GEOM disk list"
-      include_tasks: freebsd_get_disk_list.yml
-
-    - name: "Set fact of FreeBSD block device list"
-      ansible.builtin.set_fact:
-        freebsd_device_list: "{{ freebsd_geom_disk_list }}"
-      when: guest_device_type is undefined or not guest_device_type
-
-    - name: "Set fact of FreeBSD device list of type {{ guest_device_type }}"
-      ansible.builtin.set_fact:
-        freebsd_device_list: "{{ freebsd_geom_disk_list | selectattr('name', 'match', 'cd.*') }}"
-      when:
-        - guest_device_type is defined
-        - guest_device_type == 'cd'
-
-    - name: "Set fact of FreeBSD device list of type {{ guest_device_type }}"
-      ansible.builtin.set_fact:
-        freebsd_device_list: "{{ freebsd_geom_disk_list | rejectattr('name', 'match', 'cd.*') }}"
-      when:
-        - guest_device_type is defined
-        - guest_device_type == 'disk'
-
-    - name: "Set the fact of guest device list on FreeBSD"
-      ansible.builtin.set_fact:
-        guest_device_list: >-
-          {{
-            guest_device_list +
-            [
-             freebsd_device_info |
-             combine({'size': freebsd_device_info.mediasize | default(0)})
-            ]
-          }}
-      with_items: "{{ freebsd_device_list }}"
-      loop_control:
-        loop_var: freebsd_device_info
+- name: "Set the fact of block device list for FreeBSD"
+  ansible.builtin.set_fact:
+    guest_device_list: >
+      {{
+         guest_device_list | union([
+             dict(['name', 'size', 'model'] |
+                  zip_longest(item.split(None, maxsplit=2), fillvalue=''))
+         ])
+      }}
+  with_items: "{{ lsblk_result.stdout_lines }}"
+  when:
+    - guest_os_family == 'FreeBSD'
+    - lsblk_result is defined
+    - lsblk_result.stdout_lines is defined
+    - lsblk_result.stdout_lines | length > 0
 
 - name: "Print device list in guest OS"
   ansible.builtin.debug: var=guest_device_list
