@@ -2,8 +2,37 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   Run iozone test on the disk
+#   I/O test on new disk
+# Parameters:
+#   partition_name: The partition name
+#   partition_device_path: The partition device path
+#   partition_uuid: The partition UUID
 #
+- name: "Set facts about the new partition"
+  ansible.builtin.set_fact:
+    new_partition_name: "{{ partition_name }}"
+    new_partition_device_path: "{{ partition_device_path }}"
+    new_partition_fstype: "{{ 'ext4' if guest_os_family != 'FreeBSD' else 'ufs' }}"
+    new_partition_uuid: "{{ partition_uuid }}"
+    new_partition_mount_path: "/mnt/{{ partition_uuid }}"
+    new_partition_mount_src: |-
+      {%- if guest_os_family == 'FreeBSD' -%}/dev/gptid/{{ partition_uuid }}
+      {%- else -%}UUID={{ partition_uuid }}
+      {%- endif -%}
+
+# Mount new disk partition
+- name: "Mount {{ new_partition_mount_src }} to {{ new_partition_mount_path }}"
+  include_tasks: ../utils/set_mount_point.yml
+  vars:
+    mount_point_path: "{{ new_partition_mount_path }}"
+    mount_point_src: "{{ new_partition_mount_src }}"
+    mount_fstype: "{{ new_partition_fstype }}"
+    mount_state: "mounted"
+
+- name: "Test file read and write on new partition {{ new_partition_device_path }}"
+  include_tasks: test_file_read_write.yml
+
+# Run iozone test
 - name: "Transfer iozone tool to remote guest OS"
   when: guest_os_family != 'FreeBSD'
   block:
@@ -32,3 +61,10 @@
 - name: "Display the iozone test result"
   ansible.builtin.debug: var=iozone_result.stdout_lines
   when: enable_debug is defined and enable_debug
+
+# Unmount new disk partition
+- name: "Unmount device {{ new_partition_mount_src }}"
+  include_tasks: ../utils/set_mount_point.yml
+  vars:
+    mount_point_path: "{{ new_partition_mount_path }}"
+    mount_state: "absent"
