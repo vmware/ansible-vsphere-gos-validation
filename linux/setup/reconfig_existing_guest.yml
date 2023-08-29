@@ -70,6 +70,12 @@
         package_list: ["PackageKit"]
         package_state: "absent"
 
-- name: "Set FreeBSD kernel state"
-  include_tasks: ../utils/freebsd_set_kernel_state.yml
+- name: "Reconfigure FreeBSD"
   when: guest_os_family == "FreeBSD"
+  block:
+    - name: "Set FreeBSD kernel state"
+      include_tasks: ../utils/freebsd_set_kernel_state.yml
+      when: new_vm is undefined or not new_vm
+
+    - name: "Update /etc/fstab with partition UUID"
+      include_tasks: ../utils/freebsd_update_fstab_with_uuid.yml

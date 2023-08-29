@@ -1,0 +1,27 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Get disk geom list on FreeBSD
+# Return:
+#   freebsd_geom_disk_list: The GEOM disk list on FreeBSD
+#
+- name: "Initialize facts of FreeBSD disk list"
+  ansible.builtin.set_fact:
+    guest_disk_list: []
+
+- name: "Get FreeBSD GEOM disk list"
+  include_tasks: freebsd_get_geom_list.yml
+  vars:
+    freebsd_geom_class: "DISK"
+
+- name: "Set fact of GEOM disk list on FreeBSD"
+  ansible.builtin.set_fact:
+    freebsd_geom_disk_list: >-
+      {{
+        freebsd_geom_list |
+        map(attribute='provider') | flatten
+      }}
+
+- name: "Print GEOM disk list on FreeBSD"
+  ansible.builtin.debug: var=freebsd_geom_disk_list

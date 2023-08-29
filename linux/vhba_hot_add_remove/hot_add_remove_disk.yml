@@ -1,9 +1,10 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Set new disk size in GB"
+- name: "Set new disk size in GB and bytes"
   ansible.builtin.set_fact:
     new_disk_size_gb: 1
+    new_disk_size_bytes: 1073741824
 
 # Disk hot-add
 - name: "Get guest disk list before hot-add"
@@ -52,42 +53,29 @@
   ansible.builtin.set_fact:
     guest_disk_list_after_hotadd: "{{ guest_device_list }}"
 
+- name: "Print guest disk list after hot-add"
+  ansible.builtin.debug: var=guest_disk_list_after_hotadd
+
 - name: "Check new disk is recognized by guest OS"
   ansible.builtin.assert:
     that:
       - guest_disk_list_after_hotadd | difference(guest_disk_list_before_hotadd) | length == 1
     fail_msg: "Guest OS failed to recognize the new hot-added {{ new_disk_ctrl_type }} disk"
 
-- name: "Print guest disk list after hot-add"
-  ansible.builtin.debug: var=guest_disk_list_after_hotadd
-
 - name: "Set fact of the new guest disk info"
   ansible.builtin.set_fact:
     new_guest_disk_info: "{{ (guest_disk_list_after_hotadd | difference(guest_disk_list_before_hotadd))[0] }}"
 
-- name: "Change size from Gbytes to bytes for FreeBSD"
-  ansible.builtin.set_fact:
-    new_guest_disk_info: >
-      {{ new_guest_disk_info | combine({
-            'size': (new_guest_disk_info.size.split('G')[0].strip() | int) * 1024 * 1024 * 1024
-        })
-      }}
-  when:
-    - guest_os_family == "FreeBSD"
-    - new_guest_disk_info.size is defined
-    - new_guest_disk_info.size
-    - new_guest_disk_info.size is match("\\d+(\\.\\d+)?G")
-
 - name: "Print the new disk info"
   ansible.builtin.debug: var=new_guest_disk_info
 
-- name: "Check the new disk name, size and UUID"
+- name: "Check the new disk name and size"
   ansible.builtin.assert:
     that:
       - new_guest_disk_info.name is defined
       - new_guest_disk_info.name
       - new_guest_disk_info.size is defined
-      - (new_guest_disk_info.size | int) / 1024 / 1024 / 1024 == new_disk_size_gb
+      - new_guest_disk_info.size | int == new_disk_size_bytes
     fail_msg: "The new disk '{{ new_guest_disk_info }}' has incorrect information"
 
 - name: "Create new partition on the new disk {{ new_guest_disk_info.name }}"
@@ -104,7 +92,7 @@
     disk_name: "{{ new_guest_disk_info.name }}"
     partition_fstype: "ufs"
 
-- name: "Set fact of new partition name and device path"
+- name: "Set facts about the new partition"
   ansible.builtin.set_fact:
     new_partition_name: "{{ partition_name }}"
     new_partition_device_path: "{{ partition_device_path }}"
@@ -129,8 +117,6 @@
 
 - name: "Test disk I/O on new disk {{ new_guest_disk_info.name }}"
   include_tasks: test_disk_io.yml
-  vars:
-    test_disk_name: "{{ new_guest_disk_info.name }}"
 
 - name: "Unmount device {{ new_partition_mount_src }}"
   include_tasks: ../utils/set_mount_point.yml
@@ -144,9 +130,12 @@
   vars:
     guest_device_type: "disk"
 
-- name: "Set the fact of guest device before hot-remove"
+- name: "Set the fact of guest disk list before hot-remove"
   ansible.builtin.set_fact:
     guest_disk_list_before_hotremove: "{{ guest_device_list }}"
+
+- name: "Print guest disk list before hot-remove"
+  ansible.builtin.debug: var=guest_disk_list_before_hotremove
 
 - name: "Hot remove the new disk from VM"
   include_tasks: ../../common/vm_hot_add_remove_disk.yml
@@ -171,6 +160,9 @@
 - name: "Set the fact of guest disk list after hot-remove"
   ansible.builtin.set_fact:
     guest_disk_list_after_hotremove: "{{ guest_device_list }}"
+
+- name: "Print guest disk list after hot-remove"
+  ansible.builtin.debug: var=guest_disk_list_after_hotremove
 
 - name: "Check new disk is removed from guest OS"
   ansible.builtin.assert:

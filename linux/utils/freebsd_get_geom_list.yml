@@ -17,7 +17,6 @@
 
 - name: "Set facts to get FreeBSD GEOM list of a class"
   ansible.builtin.set_fact:
-    freebsd_geom_json_file: "{{ current_test_log_folder }}/geom_{{ freebsd_geom_class | lower }}_{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.json"
     freebsd_geom_conf: {}
     freebsd_geom_list: []
 
@@ -30,40 +29,14 @@
   ansible.builtin.set_fact:
     freebsd_geom_conf: "{{ geom_in_xml_result.stdout | ansible.utils.from_xml }}"
 
-- name: "Set fact of GEOM list within class {{ freebsd_geom_class }}"
+- name: "Set fact of GEOM list of class {{ freebsd_geom_class }}"
   ansible.builtin.set_fact:
     freebsd_geom_list: >-
-      {{ 
-        freebsd_geom_conf.mesh.class | 
+      {{
+        freebsd_geom_conf.mesh.class |
         selectattr('name', 'equalto', (freebsd_geom_class | upper)) |
         map(attribute='geom') | flatten
       }}
 
-# Save GEOM class list to a json file
-- name: "Check exitence of current test case log folder"
-  ansible.builtin.stat:
-    path: "{{ current_test_log_folder }}"
-  register: test_log_folder_stat
-
-- name: "Create log folder for current test case"
-  include_tasks: ../../common/create_directory.yml
-  vars:
-    dir_path: "{{ current_test_log_folder }}"
-    dir_mode: "0777"
-  when: not (test_log_folder_stat.exists | default(False))
-
-- name: "Create local file to save FreeBSD GEOM config info"
-  ansible.builtin.file:
-    path: "{{ freebsd_geom_json_file }}"
-    state: touch
-    mode: "0666"
-
-- name: "Save FreeBSD GEOM list within class {{ freebsd_geom_class }}"
-  ansible.builtin.copy:
-    content: "{{ freebsd_geom_list | to_nice_json }}"
-    dest: "{{ freebsd_geom_json_file }}"
-
-- name: "Print the file path of saved FreeBSD GEOM list within class {{ freebsd_geom_class }}"
-  ansible.builtin.debug:
-    msg: "FreeBSD GEOM {{ freebsd_geom_class }} list are saved into file {{ freebsd_geom_json_file }}"
-  when: enable_debug
+- name: "Print GEOM list of class {{ freebsd_geom_class }}"
+  ansible.builtin.debug: var=freebsd_geom_list

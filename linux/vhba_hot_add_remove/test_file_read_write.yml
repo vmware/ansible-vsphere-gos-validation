@@ -11,7 +11,7 @@
 #
 - name: "Set facts for testing read and write file on new partition"
   ansible.builtin.set_fact:
-    test_file_path: "/mnt/{{ new_partition_uuid }}/test_file.txt"
+    test_file_path: "{{ new_partition_mount_path }}/test_file.txt"
     test_file_content: "This is a test file to test new disk partition with UUID {{ new_partition_uuid }}"
 
 - name: "Create new file {{ test_file_path }}"
@@ -37,13 +37,11 @@
       - read_file_content == test_file_content
     fail_msg: "{{ test_file_path }} file content is {{ read_file_content }}, not expected {{ test_file_content }}"
 
-- name: "Pause 60 seconds for 32bit FreeBSD to avoid immediate reboot breaks the filesystem"
-  ansible.builtin.pause:
-    seconds: 60
-  when:
-    - guest_os_family == "FreeBSD"
-    - guest_os_bit == '32-bit'
-    - new_disk_ctrl_type in ['lsilogic', 'lsilogicsas']
+- name: "Unmount {{ new_partition_mount_path }}"
+  include_tasks: ../utils/set_mount_point.yml
+  vars:
+    mount_point_path: "{{ new_partition_mount_path }}"
+    mount_state: "absent"
 
 - name: "Reboot guest OS to check file content again"
   include_tasks: ../utils/reboot.yml
@@ -92,19 +90,6 @@
         new_partition_name: "{{ disk_partition_info.name }}"
         new_partition_device_path: "/dev/{{ disk_partition_info.name }}"
 
-- name: "Get guest OS mount facts"
-  include_tasks: ../../common/get_system_info.yml
-  vars:
-    filter: "ansible_mounts"
-
-- name: "Set fact of guest OS mount info on device {{ new_partition_mount_src }}"
-  ansible.builtin.set_fact:
-    new_partition_mount: >-
-      {{
-        guest_system_info.ansible_mounts |
-        selectattr('mount', 'equalto', new_partition_mount_path)
-      }}
-
 - name: "Mount {{ new_partition_mount_src }} to {{ new_partition_mount_path }}"
   include_tasks: ../utils/set_mount_point.yml
   vars:
@@ -112,11 +97,6 @@
     mount_point_src: "{{ new_partition_mount_src }}"
     mount_fstype: "{{ new_partition_fstype }}"
     mount_state: "mounted"
-  when: >-
-    (not new_partition_mount or
-     new_partition_mount | length == 0 or
-     new_partition_mount[0].device is undefined or
-     new_partition_mount[0].device not in [new_partition_mount_src, new_partition_device_path])
 
 - name: "Read content of file {{ test_file_path }} after guest OS reboot"
   include_tasks: ../utils/read_file.yml

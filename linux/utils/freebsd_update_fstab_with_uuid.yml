@@ -12,8 +12,8 @@
 - name: "Set fact of FreeBSD mounted devices"
   ansible.builtin.set_fact:
     freebsd_mounted_partitions: >-
-      {{ 
-        guest_system_info.ansible_mounts | 
+      {{
+        guest_system_info.ansible_mounts |
         selectattr('device', 'defined') |
         map(attribute='device') |
         select('match', "^/dev/\w+$") |
@@ -34,11 +34,11 @@
         - name: "Set facts of the map between mounted device and its label"
           ansible.builtin.set_fact:
             freebsd_partitions_dict: >-
-              {{ 
-                freebsd_geom_list | map(attribute='provider') | flatten | 
+              {{
+                freebsd_geom_list | map(attribute='provider') | flatten |
                 items2dict(key_name='name', value_name='config')
               }}
-        
+
         - name: "Update mounted device with UUID in /etc/fstab"
           ansible.builtin.shell: "sed -i '' 's#/dev/{{ part_name }}#/dev/gptid/{{ freebsd_partitions_dict[part_name].rawuuid }}#' /etc/fstab"
           delegate_to: "{{ vm_guest_ip }}"

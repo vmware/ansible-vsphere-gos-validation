@@ -59,45 +59,6 @@
       - partition_uuid
     fail_msg: "Failed to get UUID of partition {{ partition_device_path }}"
 
-- name: "Reboot guest OS for new disk on existing {{ new_disk_ctrl_type }} controller"
-  when:
-    - guest_os_bit == "32-bit"
-    - add_new_controller is undefined or not add_new_controller
-    - new_disk_ctrl_type in ['lsilogic', 'lsilogicsas']
-  block:
-    - name: "Reboot guest OS"
-      include_tasks: reboot.yml
-
-    - name: "Get disk partition info by UUID on FreeBSD"
-      include_tasks: freebsd_get_partition_info.yml
-      vars:
-        disk_partition_uuid: "{{ partition_uuid }}"
-
-    - name: "Check partition with UUID {{ partition_uuid }} existing on FreeBSD"
-      ansible.builtin.assert:
-        that:
-          - disk_partition_info.name is defined
-          - disk_partition_info.name
-          - disk_partition_info.config.rawuuid is defined
-          - disk_partition_info.config.rawuuid == partition_uuid
-        fail_msg: "Failed to get partition by UUID {{ partition_uuid }} on FreeBSD"
-
-    - name: "Print new disk partition info after rebooting"
-      ansible.builtin.debug: var=disk_partition_info
-
-    - name: "Update facts of new disk and partition after rebooting"
-      ansible.builtin.set_fact:
-        partition_name: "{{ disk_partition_info.name }}"
-        partition_device_path: "/dev/{{ disk_partition_info.name }}"
-        new_guest_disk_info: >
-          {{ new_guest_disk_info | combine({
-                'name': disk_partition_info.name[0:-2]
-            })
-          }}
-
-    - name: "Print new disk info after rebooting"
-      ansible.builtin.debug: var=new_guest_disk_info
-
 - name: "Create and check {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
   ansible.builtin.shell: "newfs -EU {{ partition_device_path }} && sleep 5 && fsck_ffs -y {{ partition_device_path }}"
   delegate_to: "{{ vm_guest_ip }}"
