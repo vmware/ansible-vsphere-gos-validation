@@ -1,0 +1,28 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Collect dmesg and save output to a local file
+# Parameters:
+#   dmesg_opts: The dmesg command options
+#   dmesg_output_file_src: Save dmesg output file on guest OS
+# Return:
+#   dmesg_output_file_local: The dmesg output file at localhost
+#
+- name: "Print dmesg ring buffer to {{ dmesg_output_file_src }}"
+  ansible.builtin.shell: "dmesg {{ dmesg_opts | default('') }} >{{ dmesg_output_file_src }}"
+  changed_when: false
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Fetch dmesg output to test case log folder"
+  include_tasks: fetch_file.yml
+  vars:
+    fetch_file_src_path: "{{ dmesg_output_file_src }}"
+    fetch_file_dst_path: "{{ current_test_log_folder }}/"
+
+- name: "Set facts of dmesg output file at localhost"
+  ansible.builtin.set_fact:
+    dmesg_output_file_local: "{{ fetch_file_local_path }}"
+  when:
+    - fetch_file_local_path is defined
+    - fetch_file_local_path

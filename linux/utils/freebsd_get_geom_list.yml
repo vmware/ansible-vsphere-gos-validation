@@ -1,0 +1,42 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Get GEOM list within a class on FreeBSD, like DISK, PART, LABEL
+# Parameters:
+#   freebsd_geom_class: GEOM class name, like DISK, PART, LABEL
+# Return:
+#   freebsd_geom_list: A list of GEOM within given class
+#
+- name: "Check GEOM class is set"
+  ansible.builtin.assert:
+    that:
+      - freebsd_geom_class is defined
+      - freebsd_geom_class | upper in ['DISK', 'PART', 'LABEL']
+    fail_msg: "Parameter 'freebsd_geom_class' must be set to DISK, PART, or LABEL."
+
+- name: "Set facts to get FreeBSD GEOM list of a class"
+  ansible.builtin.set_fact:
+    freebsd_geom_conf: {}
+    freebsd_geom_list: []
+
+- name: "Get FreeBSD GEOM config info"
+  ansible.builtin.shell: "sysctl -n kern.geom.confxml"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: geom_in_xml_result
+
+- name: "Set fact of FreeBSD GEOM config info"
+  ansible.builtin.set_fact:
+    freebsd_geom_conf: "{{ geom_in_xml_result.stdout | ansible.utils.from_xml }}"
+
+- name: "Set fact of GEOM list of class {{ freebsd_geom_class }}"
+  ansible.builtin.set_fact:
+    freebsd_geom_list: >-
+      {{
+        freebsd_geom_conf.mesh.class |
+        selectattr('name', 'equalto', (freebsd_geom_class | upper)) |
+        map(attribute='geom') | flatten
+      }}
+
+- name: "Print GEOM list of class {{ freebsd_geom_class }}"
+  ansible.builtin.debug: var=freebsd_geom_list

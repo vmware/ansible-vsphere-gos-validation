@@ -4,24 +4,14 @@
 # Description:
 #   Test file read/write on new disk partition
 # Parameters:
-#   new_partition_name: The partition name
-#   new_partition_device_path: The partition device path
+#   new_partition_mount_path: The mount path for the partition
 #   new_partition_uuid: The partition UUID
 #   new_partition_fstype: The filesystem type of the partition
 #
 - name: "Set facts for testing read and write file on new partition"
   ansible.builtin.set_fact:
-    new_partition_mount_path: "/mnt/{{ new_partition_name }}"
-    test_file_path: "/mnt/{{ new_partition_name }}/test_{{ new_partition_uuid }}.txt"
+    test_file_path: "{{ new_partition_mount_path }}/test_file.txt"
     test_file_content: "This is a test file to test new disk partition with UUID {{ new_partition_uuid }}"
-
-- name: "Mount {{ new_partition_device_path }} to {{ new_partition_mount_path }}"
-  include_tasks: ../utils/set_mount_point.yml
-  vars:
-    mount_point_path: "{{ new_partition_mount_path }}"
-    mount_point_src: "{{ new_partition_device_path }}"
-    mount_fstype: "{{ new_partition_fstype }}"
-    mount_state: "mounted"
 
 - name: "Create new file {{ test_file_path }}"
   include_tasks: ../utils/create_file.yml
@@ -46,7 +36,7 @@
       - read_file_content == test_file_content
     fail_msg: "{{ test_file_path }} file content is {{ read_file_content }}, not expected {{ test_file_content }}"
 
-- name: "Unmount device {{ new_partition_device_path }}"
+- name: "Unmount {{ new_partition_mount_path }}"
   include_tasks: ../utils/set_mount_point.yml
   vars:
     mount_point_path: "{{ new_partition_mount_path }}"
@@ -74,8 +64,8 @@
 
     - name: "Set facts of test partition path and mount path after reboot"
       ansible.builtin.set_fact:
+        new_partition_name: "{{ blkid_uuid_result.stdout.split('/')[-1] }}"
         new_partition_device_path: "{{ blkid_uuid_result.stdout }}"
-        new_partition_mount_path: "/mnt/{{ blkid_uuid_result.stdout.split('/')[-1] }}"
 
 - name: "Get new partition device path and mount path after reboot on FreeBSD"
   when: guest_os_family == 'FreeBSD'
@@ -96,18 +86,14 @@
 
     - name: "Set facts of test partition path and mount path after reboot"
       ansible.builtin.set_fact:
+        new_partition_name: "{{ disk_partition_info.name }}"
         new_partition_device_path: "/dev/{{ disk_partition_info.name }}"
-        new_partition_mount_path: "/mnt/{{ disk_partition_info.name }}"
 
-- name: "Set fact of test file path after reboot"
-  ansible.builtin.set_fact:
-    test_file_path: "{{ new_partition_mount_path }}/test_{{ new_partition_uuid }}.txt"
-
-- name: "Mount {{ new_partition_device_path }} to {{ new_partition_mount_path }}"
+- name: "Mount {{ new_partition_mount_src }} to {{ new_partition_mount_path }}"
   include_tasks: ../utils/set_mount_point.yml
   vars:
     mount_point_path: "{{ new_partition_mount_path }}"
-    mount_point_src: "{{ new_partition_device_path }}"
+    mount_point_src: "{{ new_partition_mount_src }}"
     mount_fstype: "{{ new_partition_fstype }}"
     mount_state: "mounted"
 
@@ -128,9 +114,3 @@
     path: "{{ test_file_path }}"
     state: absent
   delegate_to: "{{ vm_guest_ip }}"
-
-- name: "Unmount device {{ new_partition_device_path }}"
-  include_tasks: ../utils/set_mount_point.yml
-  vars:
-    mount_point_path: "{{ new_partition_mount_path }}"
-    mount_state: "absent"

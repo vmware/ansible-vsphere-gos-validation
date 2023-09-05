@@ -1,0 +1,44 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Collect GEOM config info to local on FreeBSD
+#
+- name: "Set facts to get FreeBSD GEOM list of a class"
+  ansible.builtin.set_fact:
+    freebsd_geom_file_path: "{{ current_test_log_folder }}/kern_geom_conf.xml"
+    freebsd_geom_conf: {}
+    freebsd_geom_list: []
+
+- name: "Get FreeBSD GEOM config info"
+  ansible.builtin.shell: "sysctl -n kern.geom.confxml"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: geom_in_xml_result
+
+- name: "Check exitence of current test case log folder"
+  ansible.builtin.stat:
+    path: "{{ current_test_log_folder }}"
+  register: test_log_folder_stat
+
+- name: "Create log folder for current test case"
+  include_tasks: ../../common/create_directory.yml
+  vars:
+    dir_path: "{{ current_test_log_folder }}"
+    dir_mode: "0777"
+  when: not (test_log_folder_stat.exists | default(False))
+
+- name: "Create local file to save FreeBSD GEOM config info"
+  ansible.builtin.file:
+    path: "{{ freebsd_geom_file_path }}"
+    state: touch
+    mode: "0666"
+
+- name: "Save FreeBSD GEOM list within class {{ freebsd_geom_class }}"
+  ansible.builtin.copy:
+    content: "{{ geom_in_xml_result.stdout }}"
+    dest: "{{ freebsd_geom_file_path }}"
+
+- name: "Print the file path of saved FreeBSD GEOM config info"
+  ansible.builtin.debug:
+    msg: "FreeBSD GEOM config info are saved into file {{ freebsd_geom_file_path }}"
+  when: enable_debug

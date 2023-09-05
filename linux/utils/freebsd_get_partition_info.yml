@@ -22,68 +22,34 @@
     disk_partition_info: {}
     disk_partition_config_info: {}
 
-- name: "Get FreeBSD GEOM config file in XML"
-  include_tasks: freebsd_get_geom_conf_xml.yml
+- name: "Get FreeBSD GEOM partition list"
+  include_tasks: freebsd_get_geom_list.yml
+  vars:
+    freebsd_geom_class: "PART"
 
-- name: "Set facts of XPATHs for geting disk partition info"
+- name: "Set fact of disk partition info"
   ansible.builtin.set_fact:
-    xpath_of_disk_part: "/mesh/class[name='PART']/geom/provider[name='{{ disk_partition_name }}']/*"
-    xpath_of_disk_part_config: "/mesh/class[name='PART']/geom/provider[name='{{ disk_partition_name }}']/config/*"
+    freebsd_geom_part_list: "{{ freebsd_geom_list | map(attribute='provider') | flatten }}"
+
+- name: "Set fact of disk partition info by name"
+  ansible.builtin.set_fact:
+    disk_partition_info: "{{ freebsd_geom_part_list | selectattr('name', 'equalto', disk_partition_name) | first }}"
   when:
     - disk_partition_name is defined
     - disk_partition_name
 
-- name: "Set facts of XPATHs for geting disk partition info"
-  ansible.builtin.set_fact:
-    xpath_of_disk_part: "/mesh/class[name='PART']/geom/provider/*[../config[rawuuid='{{ disk_partition_uuid }}']]"
-    xpath_of_disk_part_config:  "/mesh/class[name='PART']/geom/provider/config[rawuuid='{{ disk_partition_uuid }}']/*"
+- name: "Set fact of disk partition info by UUID"
   when:
     - disk_partition_uuid is defined
     - disk_partition_uuid
-
-- name: "Get disk partition"
-  community.general.xml:
-    path: "{{ freebsd_geom_xml_file }}"
-    xpath: "{{ xpath_of_disk_part }}"
-    content: text
-  register: geom_part_xml
-
-- name: "Set fact of disk partition info"
-  ansible.builtin.set_fact:
-    disk_partition_info: >-
-      {{ 
-        disk_partition_info | combine({'config': ''}) if geom_item['config'] is defined
-        else disk_partition_info | combine(geom_item)
-      }}
-  with_items: "{{ geom_part_xml.matches }}"
-  loop_control:
-    loop_var: geom_item
-  when:
-    - geom_part_xml.matches is defined
-    - geom_part_xml.matches | length > 0
-
-- debug: var=disk_partition_info
-- name: "Get disk partition config"
-  community.general.xml:
-    path: "{{ freebsd_geom_xml_file }}"
-    xpath: "{{ xpath_of_disk_part_config }}"
-    content: text
-  register: geom_conf_xml
-
-- name: "Set fact of disk partition info"
-  ansible.builtin.set_fact:
-    disk_partition_config_info: "{{ disk_partition_config_info | combine(geom_item) }}"
-  with_items: "{{ geom_conf_xml.matches }}"
-  loop_control:
-    loop_var: geom_item
-  when:
-    - geom_conf_xml.matches is defined
-    - geom_conf_xml.matches | length > 0
-
-- debug: var=disk_partition_config_info
-- name: "Update fact of disk partition with config info"
-  ansible.builtin.set_fact:
-    disk_partition_info: "{{ disk_partition_info | combine({'config': disk_partition_config_info}) }}"
+  block:
+    - name: "Set fact of disk partition info by UUID"
+      ansible.builtin.set_fact:
+        disk_partition_info: "{{ item }}"
+      when:
+        - item.config.rawuuid is defined
+        - item.config.rawuuid == disk_partition_uuid
+      with_items: "{{ freebsd_geom_part_list }}"
 
 - name: "Print disk partition info on FreeBSD"
   ansible.builtin.debug: var=disk_partition_info

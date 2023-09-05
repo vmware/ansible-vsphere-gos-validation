@@ -17,7 +17,7 @@
     partition_device_path: ""
     partition_uuid: ""
 
-- name: "Set default partition filesystem to ext4"
+- name: "Set default partition filesystem to ufs"
   ansible.builtin.set_fact:
     partition_fstype: "ufs"
   when: >
@@ -32,38 +32,19 @@
   when: partition_fstype is not in ['ufs', 'zfs']
 
 - name: "Create partition table on disk {{ disk_name }}"
-  ansible.builtin.shell: gpart create -s gpt {{ disk_name }}
+  ansible.builtin.shell: |
+    gpart create -s GPT {{ disk_name }}
+    gpart add -t freebsd-{{ partition_fstype }} -a 1M {{ disk_name }}
+    gpart show {{ disk_name }}
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Create 1 partition on disk {{ disk_name }}"
-  ansible.builtin.shell: gpart add -t freebsd-{{ partition_fstype }} {{ disk_name }}
-  delegate_to: "{{ vm_guest_ip }}"
-
-- name: "Set fact of partition name"
+- name: "Set fact of partition name and device path"
   ansible.builtin.set_fact:
     partition_name: "{{ disk_name }}p1"
-
-- name: "Set fact of partition device path"
-  ansible.builtin.set_fact:
-    partition_device_path: "/dev/{{ partition_name }}"
-
-- name: "Create {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
-  ansible.builtin.command: "newfs -U {{ partition_device_path }}"
-  delegate_to: "{{ vm_guest_ip }}"
-  ignore_errors: true
-  register: partition_result
-  when: partition_fstype == "zfs"
-
-- name: "Create {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
-  community.general.filesystem:
-    fstype: "{{ partition_fstype }}"
-    dev: "{{ partition_device_path }}"
-  delegate_to: "{{ vm_guest_ip }}"
-  register: partition_result
-  when: partition_fstype == "ufs"
+    partition_device_path: "/dev/{{ disk_name }}p1"
 
 - name: "Get disk partition info"
-  include_tasks: ../utils/freebsd_get_partition_info.yml
+  include_tasks: freebsd_get_partition_info.yml
   vars:
     disk_partition_name: "{{ partition_name }}"
 
@@ -77,6 +58,26 @@
     that:
       - partition_uuid
     fail_msg: "Failed to get UUID of partition {{ partition_device_path }}"
+
+- name: "Create and check {{ partition_fstype }} filesystem on partition {{ partition_device_path }}"
+  ansible.builtin.shell: "newfs -EU {{ partition_device_path }} && sleep 5 && fsck_ffs -y {{ partition_device_path }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: true
+  register: freebsd_newfs_result
+  retries: 30
+  delay: 10
+  until:
+    - freebsd_newfs_result is defined
+    - freebsd_newfs_result.rc is defined
+    - freebsd_newfs_result.rc == 0
+
+- name: "Check {{ partition_fstype }} filesystem on partition {{ partition_device_path }} is expected"
+  ansible.builtin.assert:
+    that:
+      - freebsd_newfs_result is defined
+      - freebsd_newfs_result.rc is defined
+      - freebsd_newfs_result.rc == 0
+    fail_msg: "Failed to format partition {{ partition_device_path }} with {{ partition_fstype }} filesystem"
 
 - name: "Print the new disk partition name, UUID, device path, and filesystem"
   ansible.builtin.debug:

@@ -30,18 +30,26 @@
     fail_msg: "Either mount_point_src or mount_fstype is not set for mounting"
   when: mount_state in ['mounted', 'present', 'remounted']
 
-- name: "Check mount point {{ mount_point_path }} exists"
-  block:
-    - name: "Check {{ mount_point_path }} exists"
-      include_tasks: get_file_stat_info.yml
-      vars:
-        guest_file_path: "{{ mount_point_path }}"
+- name: "Check {{ mount_point_path }} exists"
+  include_tasks: get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ mount_point_path }}"
 
-    - name: "Mount point doesn't exists"
+- name: "Mount point {{ mount_point_path }} doesn't exist"
+  when: not (guest_file_exists | bool)
+  block:
+    - name: "Create mount point path {{ mount_point_path }}"
+      ansible.builtin.file:
+        path: "{{ mount_point_path }}"
+        state: directory
+        mode: "0755"
+      delegate_to: "{{ vm_guest_ip }}"
+      when: mount_state in ['mounted', 'present', 'remounted']
+
+    - name: "Can't unmount not existing mount point {{ mount_point_path }}"
       ansible.builtin.fail:
         msg: "The mount point path {{ mount_point_path }} doesn't exist, which can't be unmounted"
-      when: not (guest_file_exists | bool)
-  when: mount_state in ['absent', 'unmounted']
+      when: mount_state in ['absent', 'unmounted']
 
 - name: "Set mount point {{ mount_point_path }} to {{ mount_state }}"
   ansible.posix.mount:
