@@ -924,16 +924,18 @@ class CallbackModule(CallbackBase):
                     self._last_test_id in self.test_runs):
                     # Update deploy_vm test case name
                     self.test_runs[self._last_test_id].name = non_empty_facts['current_testcase_name']
-                elif task_file == "vm_get_guest_info.yml":
+
+                if (self._ansible_gosv_facts.get('esxi_build','') and
+                    self._ansible_gosv_facts.get('vm_hardware_version','') and
+                    self._ansible_gosv_facts.get('guestinfo_vmtools_info', '')):
                     # Save guest info
                     vm_guest_info = VmGuestInfo(self._ansible_gosv_facts)
-                    if vm_guest_info.VMTools_Version:
-                        guestinfo_hash = str(hash("{}{}{}".format(vm_guest_info.ESXi_Build,
-                                                                  vm_guest_info.VMTools_Version,
-                                                                  vm_guest_info.Hardware_Version)))
+                    guestinfo_hash = str(hash("{}{}{}".format(vm_guest_info.ESXi_Build,
+                                                              vm_guest_info.VMTools_Version,
+                                                              vm_guest_info.Hardware_Version)))
 
-                        if guestinfo_hash not in self.collected_guest_info:
-                            self.collected_guest_info[guestinfo_hash] = vm_guest_info
+                    if guestinfo_hash not in self.collected_guest_info:
+                        self.collected_guest_info[guestinfo_hash] = vm_guest_info
 
         elif (task_file in ["deploy_vm.yml", "test_setup.yml"] and
               str(task.action) == "ansible.builtin.debug"):
