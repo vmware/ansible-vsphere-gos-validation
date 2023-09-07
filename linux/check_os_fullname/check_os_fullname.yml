@@ -102,29 +102,34 @@
         - name: "Test rescue"
           include_tasks: ../../common/test_rescue.yml
       always:
-        - name: "Get VMware Tools log directory stat info"
-          include_tasks: ../utils/get_file_stat_info.yml
-          vars:
-            guest_file_path: "{{ vmtools_log_dir }}"
-
         - name: "Collect VMware Tools logs"
+          when:
+            - vmtools_log_dir is defined
+            - vmtools_log_dir
           block:
-            - name: "Archive VMware Tools debug logs"
-              community.general.archive:
-                path: "{{ vmtools_log_dir }}"
-                dest: "{{ vmtools_log_dir }}.tgz"
-                mode: "0644"
-              delegate_to: "{{ vm_guest_ip }}"
-              register: archive_vmtools_logs
-
-            - name: "Fetch VMware Tools debug logs"
-              include_tasks: ../utils/fetch_file.yml
+            - name: "Get VMware Tools log directory stat info"
+              include_tasks: ../utils/get_file_stat_info.yml
               vars:
-                fetch_file_src_path: "{{ vmtools_log_dir }}.tgz"
-                fetch_file_dst_path: "{{ current_test_log_folder }}/"
-                fetch_file_ignore_errors: true
-              when:
-                - archive_vmtools_logs is defined
-                - archive_vmtools_logs.changed is defined
-                - archive_vmtools_logs.changed
-          when: guest_file_exists
+                guest_file_path: "{{ vmtools_log_dir }}"
+    
+            - name: "Collect VMware Tools logs"
+              block:
+                - name: "Archive VMware Tools debug logs"
+                  community.general.archive:
+                    path: "{{ vmtools_log_dir }}"
+                    dest: "{{ vmtools_log_dir }}.tgz"
+                    mode: "0644"
+                  delegate_to: "{{ vm_guest_ip }}"
+                  register: archive_vmtools_logs
+    
+                - name: "Fetch VMware Tools debug logs"
+                  include_tasks: ../utils/fetch_file.yml
+                  vars:
+                    fetch_file_src_path: "{{ vmtools_log_dir }}.tgz"
+                    fetch_file_dst_path: "{{ current_test_log_folder }}/"
+                    fetch_file_ignore_errors: true
+                  when:
+                    - archive_vmtools_logs is defined
+                    - archive_vmtools_logs.changed is defined
+                    - archive_vmtools_logs.changed
+              when: guest_file_exists
