@@ -7,7 +7,15 @@ export ZFSBOOT_SWAP_SIZE=2g
 export nonInteractive="YES"
 export ZFSBOOT_CONFIRM_LAYOUT=0
 
-{% if boot_disk_controller == 'nvme' %}
+{% if guest_os_type is defined and guest_os_type %}
+freebsd_major_version=`echo $guest_os_type | cut -d- -f2 | cut -d. -f1`
+{% else %}
+freebsd_major_version=14
+{% endif %}
+
+{% if boot_disk_controller == 'nvme' and freebsd_major_version >= 14 %}
+export ZFSBOOT_DISKS=nda0
+{% elif boot_disk_controller == 'nvme' %}
 export ZFSBOOT_DISKS=nvd0
 {% elif boot_disk_controller == 'sata' or boot_disk_controller == 'ide' %}
 export ZFSBOOT_DISKS=ada0
