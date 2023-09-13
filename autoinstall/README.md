@@ -17,11 +17,12 @@
 16. For UnionTech OS Server 20 1050a unattend auto-install, please use file UOS/Server/20/1050a/ks.cfg.
 17. For UnionTech OS Server 20 1050e unattend auto-install, please use file UOS/Server/20/1050e/ks.cfg.
 18. For Fedora Server 36 or later unattend auto-install, please use file Fedora/36/Server/ks.cfg.
-19. For FreeBSD 13 or later unattend auto-install, please use file FreeBSD/installerconfig.
-20. For Pardus 21.2 Server and XFCE Desktop or later unattend auto-install, please use file Pardus/preseed.cfg.
-21. For openSUSE Leap 15.3 or later unattend auto-install, please use file openSUSE/15/autoinst.xml.
-22. For BCLinux 8.x unattend auto-install, please use file BCLinux/8/ks.cfg.
-23. For BCLinux-for-Euler 21.10 unattend auto-install, please use file BCLinux-for-Euler/21.10/ks.cfg.
+19. For FreeBSD 13 unattend auto-install, please use file FreeBSD/13/installerconfig.
+20. For FreeBSD 14 or later unattend auto-install, please use file FreeBSD/14/installerconfig.
+21. For Pardus 21.2 Server and XFCE Desktop or later unattend auto-install, please use file Pardus/preseed.cfg.
+22. For openSUSE Leap 15.3 or later unattend auto-install, please use file openSUSE/15/autoinst.xml.
+23. For BCLinux 8.x unattend auto-install, please use file BCLinux/8/ks.cfg.
+24. For BCLinux-for-Euler 21.10 unattend auto-install, please use file BCLinux-for-Euler/21.10/ks.cfg.
 
 # Notes
 ## For Windows
