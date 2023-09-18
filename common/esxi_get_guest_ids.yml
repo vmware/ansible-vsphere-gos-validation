@@ -39,7 +39,11 @@
     - get_guest_os_ids_result.instance is defined
     - get_guest_os_ids_result.instance | length > 0
 
-- block:
+- name: "Get ESXi supported guest IDs from config options file"
+  when: >
+    get_guest_os_ids_result.instance is undefined or
+    get_guest_os_ids_result.failed
+  block:
     - name: "Initialize variables for getting hardware version supported guest IDs"
       ansible.builtin.set_fact:
         vm_config_option_esx_hw: "/etc/vmware/hostd/env/vmconfigoption-esx-hw{{ esxi_hardware_version }}.xml"
@@ -57,9 +61,6 @@
     - name: "Set fact of ESXi supported guest IDs for hardware version {{ esxi_hardware_version }}"
       ansible.builtin.set_fact:
         esxi_guest_ids: "{{ guest_os_desc_ids_result.matches | map(attribute='id') | list }}"
-  when: >
-    get_guest_os_ids_result is undefined or
-    get_guest_os_ids_result.failed
 
 - name: "Print ESXi server supported guest IDs on hardware version {{ esxi_hardware_version }}"
   ansible.builtin.debug: var=esxi_guest_ids
