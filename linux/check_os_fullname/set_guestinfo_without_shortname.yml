@@ -1,0 +1,69 @@
+# Copyright 2021-2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Set expected guest id, full name and family without short-name setting in tools.conf
+#
+- name: "Initialize facts for checking guest id and guest full name"
+  ansible.builtin.set_fact:
+    expected_guest_id: ""
+    expected_guest_id_suffix: "{% if guest_os_bit == '64-bit' %}64{% endif %}Guest"
+    expected_guest_major_ver: ""
+    expected_guest_fullname: ""
+    expected_guest_family: |-
+      {%- if guest_os_ansible_distribution == 'FreeBSD' -%}otherGuestFamily
+      {%- else -%}linuxGuest{%- endif -%}
+    guest_is_otherlinux: true
+
+- name: "Set fact of guest OS is not other Linux"
+  ansible.builtin.set_fact:
+    guest_is_otherlinux: false
+  when: guest_os_ansible_distribution in ["RedHat", "CentOS", "OracleLinux", "AlmaLinux", "Rocky",
+                                          "SLES", "SLED", "VMware Photon OS", "Amazon", "Fedora",
+                                          "Ubuntu", "Debian", "openSUSE Leap", "FreeBSD"]
+
+- name: "Set fact of expected guest id suffix"
+  ansible.builtin.set_fact:
+    expected_guest_id_suffix: "{{ expected_guest_id_suffix | replace('64', '_64') }}"
+  when: >-
+    guest_os_ansible_distribution in ["RedHat", "SLES", "SLED",
+                                     "CentOS", "OracleLinux", "Debian", "FreeBSD"]
+
+- name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+  include_tasks: rhel_fullname_map.yml
+  when: guest_os_ansible_distribution == "RedHat"
+
+- name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+  include_tasks: sles_fullname_map.yml
+  when: guest_os_ansible_distribution in ["SLES", "SLED"]
+
+- name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+  include_tasks: "{{ guest_os_ansible_distribution | lower }}_fullname_map.yml"
+  when: guest_os_ansible_distribution in ["Amazon", "CentOS", "OracleLinux", "AlmaLinux", "Rocky", "Debian", "FreeBSD"]
+
+- name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    expected_guest_id: "ubuntu{{ expected_guest_id_suffix }}"
+    expected_guest_fullname: "Ubuntu Linux ({{ guest_os_bit }})"
+  when: guest_os_ansible_distribution == "Ubuntu"
+
+- name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    expected_guest_id: "vmwarePhoton64Guest"
+    expected_guest_fullname: "VMware Photon OS (64-bit)"
+  when: guest_os_ansible_distribution == "VMware Photon OS"
+
+- name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    expected_guest_id: "fedora{{ expected_guest_id_suffix }}"
+    expected_guest_fullname: "Red Hat Fedora ({{ guest_os_bit }})"
+  when: guest_os_ansible_distribution == "Fedora"
+
+- name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    expected_guest_id: "opensuse{{ expected_guest_id_suffix }}"
+    expected_guest_fullname: "SUSE openSUSE ({{ guest_os_bit }})"
+  when: guest_os_ansible_distribution == "openSUSE Leap"
+
+- name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+  include_tasks: otherlinux_fullname_map.yml
+  when: guest_is_otherlinux
