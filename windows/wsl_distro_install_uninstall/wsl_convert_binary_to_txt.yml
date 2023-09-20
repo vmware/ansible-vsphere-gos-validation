@@ -14,13 +14,20 @@
     win_get_file_src_path: "{{ source_path }}"
     win_get_file_dst_path: "{{ current_test_log_folder }}"
 
-- name: "Set the fact of file"
-  ansible.builtin.set_fact:
-    src_file: "{{ fetch_file.dest }}"
-    wsl_new_file: "{{ current_test_log_folder }}/{{ file_name }}"
+- name: "Convert the binary file to text format"
+  when:
+    - fetch_file.failed is defined
+    - not fetch_file.failed
+    - fetch_file.dest is defined
+    - fetch_file.dest
+  block:
+    - name: "Set the fact of file"
+      ansible.builtin.set_fact:
+        src_file: "{{ fetch_file.dest }}"
+        wsl_new_file: "{{ current_test_log_folder }}/{{ file_name }}"
 
-- name: "Covert the binary file to text file"
-  ansible.builtin.shell: "tr -d -c '[:print:]\n' < {{ src_file }} > {{ wsl_new_file }} "
+    - name: "Covert the binary file to text file"
+      ansible.builtin.shell: "tr -d -c '[:print:]\n' < {{ src_file }} > {{ wsl_new_file }} "
 
-- name: "Display the new file content"
-  ansible.builtin.shell: "cat {{ wsl_new_file }}"
+    - name: "Display the new file content"
+      ansible.builtin.shell: "cat {{ wsl_new_file }}"
