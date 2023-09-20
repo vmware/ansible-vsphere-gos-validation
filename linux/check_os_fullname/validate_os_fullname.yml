@@ -74,19 +74,14 @@
     success_msg: >-
       VM's guest full name is '{{ guestinfo_guest_full_name }}',
       which is as expected '{{ expected_guest_fullname }}'.
-  when: 
-    - not (expected_guest_fullname is match('Other \\d+.x .*Linux.*'))
-    - not (expected_guest_fullname is match('FreeBSD.*'))
+  when: not expected_guest_fullname | regex_search('or later')
 
 - name: "Check guest full name in VM's guest info"
-  when: >
-    expected_guest_fullname is match('Other \\d+.x .*Linux.*') or
-    expected_guest_fullname is match('FreeBSD.*')
+  when: expected_guest_fullname | regex_search('or later')
   block:
     - name: "Set alternative for the expected guest full name"
       ansible.builtin.set_fact:
-        expected_guest_fullname_alternative: "{{ expected_guest_fullname | replace('or later ', '') }}"
-      when: expected_guest_fullname is match('Other \\d+.x .*Linux.*')
+        expected_guest_fullname_alternative: "{{ expected_guest_fullname | regex_replace('or later( versions)? ', '') }}"
 
     - name: "Check guest full name in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
       ansible.builtin.assert:
