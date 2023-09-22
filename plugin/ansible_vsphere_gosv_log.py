@@ -229,6 +229,7 @@ class VmGuestInfo(object):
         self.Hardware_Version = ansible_gosv_facts.get('vm_hardware_version','')
         self.VMTools_Version = ansible_gosv_facts.get('guestinfo_vmtools_info', '')
         self.Config_Guest_Id = ansible_gosv_facts.get('vm_guest_id', '')
+        self.Guest_Short_Name = ansible_gosv_facts.get('guest_short_name', None)
         self.GuestInfo_Guest_Id = ansible_gosv_facts.get('guestinfo_guest_id', '')
         self.GuestInfo_Guest_Full_Name = ansible_gosv_facts.get('guestinfo_guest_full_name', '')
         self.GuestInfo_Guest_Family = ansible_gosv_facts.get('guestinfo_guest_family', '')
@@ -911,7 +912,8 @@ class CallbackModule(CallbackBase):
                            "get_guest_ovt_version_build.yml",
                            "get_windows_system_info.yml",
                            "win_get_vmtools_version_build.yml",
-                           "check_inbox_driver.yml"] or
+                           "check_inbox_driver.yml",
+                           "check_os_fullname.yml"] or
              "deploy_vm_from" in task_file) and
                 str(task.action) == "ansible.builtin.set_fact"):
             ansible_facts = task_result.get('ansible_facts', None)
