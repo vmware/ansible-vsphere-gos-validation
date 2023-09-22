@@ -24,23 +24,25 @@
     get_hardware_versions: true
   register: get_hardware_versions_result
 
-- block:
+- name: "Set facts of ESXi server supported hardware versions"
+  when:
+    - get_hardware_versions_result is defined
+    - get_hardware_versions_result.instance is defined
+    - get_hardware_versions_result.instance.supported_hardware_versions is defined
+    - get_hardware_versions_result.instance.default_hardware_version is defined
+  block:
     - name: "Set fact of ESXi server supported hardware versions and default hardware version"
       ansible.builtin.set_fact:
-        esxi_hardware_versions: "{{ get_hardware_versions_result.instance['Supported hardware versions'] | map('regex_replace', 'vmx-0?', '') | map('int') }}"
-        esxi_default_hardware_version: "{{ get_hardware_versions_result.instance['Default hardware version'] | regex_replace('vmx-0?', '') }}"
+        esxi_hardware_versions: "{{ get_hardware_versions_result.instance.supported_hardware_versions | map('regex_replace', 'vmx-0?', '') | map('int') }}"
+        esxi_default_hardware_version: "{{ get_hardware_versions_result.instance.default_hardware_version | regex_replace('vmx-0?', '') }}"
 
     - name: "Set fact of ESXi server latest hardware version"
       ansible.builtin.set_fact:
         esxi_latest_hardware_version: "{{ esxi_hardware_versions | max }}"
       when: esxi_hardware_versions | length > 0
-  when:
-    - get_hardware_versions_result is defined
-    - get_hardware_versions_result.instance is defined
-    - get_hardware_versions_result.instance['Supported hardware versions'] is defined
-    - get_hardware_versions_result.instance['Default hardware version'] is defined
 
-- ansible.builtin.debug:
+- name: "Display ESXi server supported hardware versions"
+  ansible.builtin.debug:
     msg:
       - "ESXi server supported hardware versions: {{ esxi_hardware_versions }}"
       - "ESXi server latest hardware version: {{ esxi_latest_hardware_version }}"
