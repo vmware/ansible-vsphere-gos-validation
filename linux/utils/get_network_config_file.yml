@@ -18,7 +18,9 @@
 - name: "Get network config file from NetworkManager"
   block:
     - name: "Get network connections"
-      ansible.builtin.shell: "nmcli -t -f NAME,ACTIVE,FILENAME connection show --active | grep '^{{ network_adapter_name }}:'"
+      ansible.builtin.shell: |
+        conn_name=$(nmcli -t -f GENERAL.CONNECTION device show {{ network_adapter_name }} | cut -d ':' -f 2);
+        nmcli -t -f NAME,ACTIVE,FILENAME connection show --active | grep "$conn_name:"
       delegate_to: "{{ vm_guest_ip }}"
       register: "network_conn_result"
       ignore_errors: true

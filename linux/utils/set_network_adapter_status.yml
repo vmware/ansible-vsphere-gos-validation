@@ -19,6 +19,12 @@
         - name: "Connect network interface '{{ network_adapter_name }}'"
           ansible.builtin.shell: "nmcli device connect {{ network_adapter_name }}"
           delegate_to: "{{ vm_guest_ip }}"
+          register: nmcli_connect_result
+          retries: 5
+          delay: 5
+          until:
+            - nmcli_connect_result.rc is defined
+            - nmcli_connect_result.rc == 0
 
         - name: "Set expected network interface status to 'connected'"
           ansible.builtin.set_fact:
