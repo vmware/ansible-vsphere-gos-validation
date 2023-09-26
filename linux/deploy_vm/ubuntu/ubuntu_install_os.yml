@@ -6,10 +6,29 @@
   when: ubuntu_install_method is defined and ubuntu_install_method == "simulation"
 
 # Wait for autoinstall start message in serial port output file
-- include_tasks: ../../../common/vm_wait_log_msg.yml
-  vars:
-    vm_wait_log_name: "{{ vm_serial_port_output_file | basename }}"
-    vm_wait_log_msg: "{{ autoinstall_start_msg }}"
-    vm_wait_log_retries: 150
-    vm_wait_log_delay: 5
+- name: "Wait for Ubuntu autoinstall is started successfully"
   when: ubuntu_install_method is defined and ubuntu_install_method == "cloud-init"
+  block:
+    - name: "Wait for autoinstall start message"
+      include_tasks: ../../../common/vm_wait_log_msg.yml
+      vars:
+        vm_wait_log_name: "{{ vm_serial_port_output_file | basename }}"
+        vm_wait_log_msg: "{{ autoinstall_start_msg }}[^\\r\\n]*"
+        vm_wait_log_retries: 150
+        vm_wait_log_delay: 5
+
+    # Ubuntu autoinstall with cloud configs requires network connection.
+    # When autoinstall start message is detected, its must be followed with an IPv4
+    # address get at early-commands in the unattend install config file.
+    # Otherwise, we can stop autoinstall immediately.
+    - name: "Get the line content including Ubuntu autoinstall start message"
+      ansible.builtin.set_fact:
+        autoinstall_start_msg_line: "{{ vm_wait_log_msg_list[0] | default('') }}"
+
+    - name: "Check VM obtains IPv4 address"
+      ansible.builtin.assert:
+        that:
+          - autoinstall_start_msg_line
+          - autoinstall_start_msg_line | split(':') | ansible.utils.ipv4 | length > 0
+        fail_msg: "Ubuntu autoinstall failed to start due to no IPv4 address obtained."
+        success_msg: "{{ autoinstall_start_msg_line }}"
