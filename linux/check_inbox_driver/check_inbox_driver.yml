@@ -10,16 +10,16 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - name: "Initialized inbox drivers' versions dict"
-      ansible.builtin.set_fact:
-        inbox_drivers_versions: {}
-
     - name: "Test case block"
       block:
         - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: false
+
+        - name: "Initialized inbox drivers' versions dict"
+          ansible.builtin.set_fact:
+            inbox_drivers_versions: {}
 
         - name: "Get OS release"
           include_tasks: get_os_release.yml
@@ -59,31 +59,37 @@
         - name: "Get Linux inbox drivers"
           include_tasks: get_inbox_drivers.yml
           when: guest_os_ansible_distribution != "FreeBSD"
-        
+
         - name: "Get FreeBSD inbox drivers"
           include_tasks: get_freebsd_inbox_drivers.yml
           when: guest_os_ansible_distribution == "FreeBSD"
 
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
       always:
-        - name: "Print inbox drivers versions"
-          ansible.builtin.debug: var=inbox_drivers_versions
+        - name: "Dump inbox drivers versions into a json file"
+          when:
+            - inbox_drivers_versions is defined
+            - inbox_drivers_versions | length > 0
+          block:
+            - name: "Print inbox drivers versions"
+              ansible.builtin.debug: var=inbox_drivers_versions
 
-        - name: "Create test case log direcotry"
-          include_tasks: ../../common/create_directory.yml
-          vars:
-            dir_path: "{{ current_test_log_folder }}"
+            - name: "Create test case log direcotry"
+              include_tasks: ../../common/create_directory.yml
+              vars:
+                dir_path: "{{ current_test_log_folder }}"
 
-        - name: "Set fact of the output file path"
-          ansible.builtin.set_fact:
-            os_release_info_file_path: "{{ current_test_log_folder }}/{{ inbox_drivers_versions['Release'].replace('/','-').replace(' ','-') | lower }}.json"
+            - name: "Set fact of the output file path"
+              ansible.builtin.set_fact:
+                os_release_info_file_path: "{{ current_test_log_folder }}/{{ inbox_drivers_versions['Release'].replace('/','-').replace(' ','-') | lower }}.json"
 
-        - name: "The inbox drivers versions will be dump to a json file"
-          ansible.builtin.debug: var=os_release_info_file_path
+            - name: "The inbox drivers versions will be dump to a json file"
+              ansible.builtin.debug: var=os_release_info_file_path
 
-        - name: "Dump inbox drivers versions"
-          ansible.builtin.copy:
-            dest: "{{ os_release_info_file_path }}"
-            content: "{{ [inbox_drivers_versions] | to_nice_json }}"
-            mode: '0644'
+            - name: "Dump inbox drivers versions"
+              ansible.builtin.copy:
+                dest: "{{ os_release_info_file_path }}"
+                content: "{{ [inbox_drivers_versions] | to_nice_json }}"
+                mode: '0644'
