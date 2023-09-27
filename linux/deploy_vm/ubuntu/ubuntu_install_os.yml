@@ -21,14 +21,21 @@
     # When autoinstall start message is detected, its must be followed with an IPv4
     # address get at early-commands in the unattend install config file.
     # Otherwise, we can stop autoinstall immediately.
-    - name: "Get the line content including Ubuntu autoinstall start message"
+    - name: "Get the IPv4 address when Ubuntu autoinstall started"
       ansible.builtin.set_fact:
-        autoinstall_start_msg_line: "{{ vm_wait_log_msg_list[0] | default('') }}"
+        ubuntu_autoinstall_start_ipv4: >-
+          {{
+            vm_wait_log_msg_list |
+            map('replace', autoinstall_start_msg, '') |
+            map('trim') |
+            ansible.utils.ipaddr('address')
+          }}
 
     - name: "Check VM obtains IPv4 address"
       ansible.builtin.assert:
         that:
-          - autoinstall_start_msg_line
-          - autoinstall_start_msg_line | split(':') | ansible.utils.ipv4 | length > 0
+          - ubuntu_autoinstall_start_ipv4
+          - ubuntu_autoinstall_start_ipv4 | length > 0
+          - ubuntu_autoinstall_start_ipv4[0] is ansible.utils.ipv4
         fail_msg: "Ubuntu autoinstall failed to start due to no IPv4 address obtained."
-        success_msg: "{{ autoinstall_start_msg_line }}"
+        success_msg: "Ubuntu autoinstall is started with IPv4 address {{ ubuntu_autoinstall_start_ipv4 }}"
