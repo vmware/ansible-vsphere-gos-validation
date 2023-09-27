@@ -98,10 +98,10 @@ This project supports below scenarios for end-to-end guest operating system vali
 2. Guest OS marked with (*) only supports autoinstall and doesn't support end-to-end tests for now.
 
 ### Docker images
-* Latest (Release v2.3):
+* Latest (Release v3.0):
   * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
-* Release v2.3:
-  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v2.3
+* Release v3.0:
+  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v3.0
 
 Launch testing using Docker image
 1. Execute below commands in your machine

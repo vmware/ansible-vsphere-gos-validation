@@ -1,6 +1,6 @@
 # ansible-vsphere-gos-validation
 # For users launch guest OS validation test on vSphere
-# version: 2.3
+# version: 3.0
 
 # Use latest Photon OS 4.0 docker image as parent image
 FROM photon:4.0
@@ -9,9 +9,9 @@ WORKDIR /root/ansible-vsphere-gos-validation
 # Install the required packages
 RUN tdnf makecache && \
     tdnf install -y python3 zip vim wget python3-pip \
-    sshpass gawk nfs-utils iana-etc python3-lxml \
-    python3-setuptools python3-jmespath python3-netaddr && \
-    pip3 install wheel pycdlib pywinrm pyvmomi pypsrp
+    sshpass gawk nfs-utils iana-etc python3-lxml python3-setuptools \
+    python3-wheel  python3-jmespath python3-netaddr && \
+    pip3 install pycdlib pywinrm pyvmomi pypsrp passlib
 
 # Install ansible-core (starts from Ansible 2.11)
 RUN pip3 install ansible-core
@@ -19,7 +19,7 @@ RUN pip3 install ansible-core
 # Install Ansible collections
 # You can set https proxy if collections are failed to install from Galaxy server, e.g.,
 # ENV HTTPS_PROXY="https://proxy.xxxx.com:xxxx"
-# Ansible 2.14.0 requires the locale encoding to be UTF-8
+# Ansible 2.14.0 or later requires the locale encoding to be UTF-8
 ENV LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
 RUN ansible-galaxy collection install ansible.netcommon ansible.posix community.general community.vmware community.windows community.crypto
 
