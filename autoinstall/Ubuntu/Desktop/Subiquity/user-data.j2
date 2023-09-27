@@ -2,7 +2,8 @@
 autoinstall:
   version: 1
   early-commands:
-    - echo '{{ autoinstall_start_msg }}' >/dev/ttyS0
+    - echo 'The network interface name is' $(ip -br link show | grep -v lo | awk '{print $1}') >/dev/ttyS0
+    - echo '{{ autoinstall_start_msg }}' $(ip -br -4 addr show | grep -v lo | awk '{print $3}') >/dev/ttyS0
   locale: en_US.UTF-8
   keyboard:
     layout: us
@@ -17,6 +18,20 @@ autoinstall:
     realname: ubuntu
     username: {{ vm_username }}
     password: {{ vm_password_hash }}
+  ssh:
+    install-server: yes
+    allow-pw: yes
+    authorized-keys:
+      - {{ ssh_public_key }}
+  packages:
+    - open-vm-tools
+    - open-vm-tools-desktop
+    - build-essential
+    - sg3-utils
+    - ndctl
+    - rdma-core
+    - rdmacm-utils
+    - ibverbs-utils
   user-data:
     users:
       - name: root
@@ -36,12 +51,8 @@ autoinstall:
     preserve_sources_list: false
     geoip: true
   late-commands:
-    - echo "# apt-get update" >> /dev/ttyS0
-    - curtin in-target --target=/target -- apt-get update -y >> /dev/ttyS0
-    - echo "# apt-get install build-essential openssh-server open-vm-tools open-vm-tools-desktop cloud-init rdma-core rdmacm-utils ibverbs-utils" >> /dev/ttyS0
-    - curtin in-target --target=/target -- apt-get install -y --force-yes build-essential openssh-server open-vm-tools open-vm-tools-desktop cloud-init rdma-core rdmacm-utils ibverbs-utils >> /dev/ttyS0
     - rm -f /etc/cloud/cloud.cfg.d/*-installer.cfg 2>/dev/null
     - sed -i 's/^#PermitRootLogin .*/PermitRootLogin yes/' /target/etc/ssh/sshd_config
     - sed -i 's/^#PasswordAuthentication .*/PasswordAuthentication yes/' /target/etc/ssh/sshd_config
-    - echo "{{ autoinstall_complete_msg }}" >> /dev/ttyS0
+    - echo "{{ autoinstall_complete_msg }}" > /dev/ttyS0
   shutdown: 'poweroff'
