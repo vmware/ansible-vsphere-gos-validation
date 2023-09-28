@@ -61,7 +61,7 @@ This project supports below scenarios for end-to-end guest operating system vali
   * SSH and Python are installed and enabled.
   * The vm_python variable in vars/test.yml must be set with correct python path. Or user can set PATH in /etc/environment in guest operating system to include the binary directory path to python.
   * The root user should be enabled and permitted to log in through SSH in Linux guest operating system.
-  * Execute [ConfigureRemotingForAnsible.ps1](https://github.com/ansible/ansible/blob/devel/examples/scripts/ConfigureRemotingForAnsible.ps1) script in Windows guest operating system in advance.
+  * Execute [ConfigureRemotingForAnsible.ps1](https://github.com/ansible/ansible-documentation/blob/devel/examples/scripts/ConfigureRemotingForAnsible.ps1) script in Windows guest operating system in advance.
 
 ### Compatible Guest Operating Systems
 
@@ -94,14 +94,13 @@ This project supports below scenarios for end-to-end guest operating system vali
 | Red Hat Enterprise Linux CoreOS (RHCOS) 4.13 and later                    |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
 
 **Notes**
-1. This compatible guest operating systems list is used for this project only. For guest operating system support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
-2. Guest OS marked with (*) only supports autoinstall and doesn't support end-to-end tests for now.
+This compatible guest operating systems list is used for this project only. For guest operating system support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
 
 ### Docker images
-* Latest (Release v2.3):
+* Latest (Release v3.0):
   * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
-* Release v2.3:
-  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v2.3
+* Release v3.0:
+  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v3.0
 
 Launch testing using Docker image
 1. Execute below commands in your machine
