@@ -25,13 +25,8 @@
   block:
     # The unmapped guest full name which at least includes Linux kernel version, OS pretty name
     # For VM with newer VMware Tools, the unmapped guest full name also includes OS name, version id and build id
-    # Here we only check linux kernel version and OS pretty name
-    - name: "Set unmapped guest full name for {{ vm_guest_os_distribution }} on ESXi {{ esxi_version }}"
-      ansible.builtin.set_fact:
-        unmapped_guest_fullname: "Linux {{ guest_os_ansible_kernel }} {{ guest_os_release.PRETTY_NAME }}"
-      when: guest_os_release.PRETTY_NAME | default('')
-
-    - name: "Test passed"
+    # Here we only check linux kernel version, OS pretty name or distro name
+    - name: "Test passed with unmapped guest full name on ESXi {{ esxi_version }}"
       block:
         - name: "Guest OS full name is unmapped"
           ansible.builtin.debug:
@@ -45,8 +40,11 @@
         - name: "Test passed on ESXi {{ esxi_version }}"
           ansible.builtin.meta: end_host
       when:
-        - unmapped_guest_fullname is defined and unmapped_guest_fullname
-        - unmapped_guest_fullname in guestinfo_guest_full_name
+        - guest_os_ansible_kernel and guest_os_ansible_kernel in guestinfo_guest_full_name
+        - ((guest_os_release.PRETTY_NAME is defined and guest_os_release.PRETTY_NAME and
+            guest_os_release.PRETTY_NAME in guestinfo_guest_full_name) or
+           (guest_os_release.NAME is defined and guest_os_release.NAME and
+            guest_os_release.NAME in guestinfo_guest_full_name))
   when:
     - not guestinfo_guest_id
     - ((esxi_version is version('6.7.0', '==') and
