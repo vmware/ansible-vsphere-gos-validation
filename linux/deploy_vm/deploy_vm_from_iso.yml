@@ -153,8 +153,8 @@
           - DOWNARROW
           - ENTER
       when:
-        - unattend_install_conf is defined
-        - ('SLE' in unattend_install_conf or 'openSUSE' in unattend_install_conf)
+        - unattend_installer is defined
+        - unattend_installer in ['SLE', 'openSUSE']
         - firmware is defined and firmware|lower == "bios"
 
     # For RHEL, CentOS, RockyLinux, OracleLinux, send key to boot screen to not do
@@ -167,12 +167,8 @@
           - UPARROW
           - ENTER
       when:
-        - unattend_install_conf is defined
-        - (('RHEL' in unattend_install_conf) or
-           ('CentOS' in unattend_install_conf) or
-           ('Fedora' in unattend_install_conf) or
-           ('FusionOS' in unattend_install_conf) or
-           ('BCLinux' in unattend_install_conf))
+        - unattend_installer is defined
+        - unattend_installer in ['RHEL', 'CentOS', 'Fedora', 'BCLinux', 'BCLinux-for-Euler', 'FusionOS']
 
     # For UnionTech OS, send key to boot screen
     - name: "Select boot menu for UnionTech OS"
@@ -181,8 +177,8 @@
         keys_send:
           - ENTER
       when:
-        - unattend_install_conf is defined
-        - ('UOS' in unattend_install_conf)
+        - unattend_installer is defined
+        - unattend_installer == 'UOS'
 
     - name: "Wait autoinstall complete message appear in serial port output file"
       include_tasks: ../../common/vm_wait_log_msg.yml
@@ -201,8 +197,8 @@
     # so here needs to shutdown it separately
     - name: "Shutdown VMware Photon OS VM after auto install completes"
       when:
-        - unattend_install_conf is defined
-        - unattend_install_conf is match('Photon')
+        - unattend_installer is defined
+        - unattend_installer == 'Photon'
       block:
         - name: "Wait for guest full name on VMware Photon OS VM"
           include_tasks: ../../common/vm_wait_guest_fullname.yml
@@ -224,8 +220,8 @@
     - name: "Delete unattend install ISO"
       include_tasks: delete_unattend_install_iso.yml
       when:
-        - transferred_unattend_iso is defined
-        - transferred_unattend_iso
+        - transferred_unattend_iso_list is defined
+        - transferred_unattend_iso_list
 
     - name: "Change the boot disk to be first boot device in boot order"
       include_tasks: ../../common/vm_set_boot_options.yml
@@ -338,6 +334,11 @@
                   Oracle Linux 9.0 UEK R7 upgrading failed. Before upgrade, the UEK R7
                   version is '{{ ol9_uekr7_before_upgrade }}', after upgrade the UEK R7
                   version is '{{ ol9_uekr7_after_upgrade }}'.
+
+    - name: "Take a screenshot when OS deployment finishes"
+      include_tasks: ../../common/vm_take_screenshot.yml
+      vars:
+        vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
   rescue:
     - name: "Collect serial port log at test failure"
       include_tasks: collect_serial_port_log.yml

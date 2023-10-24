@@ -1,0 +1,39 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Create unattend install config file, and pre-install, post-install scripts
+# Parameters:
+#   extractor_log_path: The local log file path to extract call trace
+# Return:
+#   extractor_call_trace: The call trace extracted from the image file
+#
+- name: "Set facts of pre-install and post-install script files"
+  ansible.builtin.set_fact:
+    autoinstall_start_msg: "Autoinstall is started"
+    pre_install_script_file: "preseed_early_command.sh"
+    post_install_script_file: "preseed_late_command.sh"
+  when: unattend_installer in ['Ubuntu-Ubiquity', "Debian", "Pardus"]
+
+- name: "Create OS pre-install script"
+  ansible.builtin.template:
+    src: "templates/pre_install_scripts/{{ pre_install_script_file }}"
+    dest: "{{ unattend_iso_cache }}/{{ pre_install_script_file }}"
+    mode: "0755"
+  when:
+    - pre_install_script_file is defined
+    - pre_install_script_file
+
+- name: "Create OS post-install script"
+  ansible.builtin.template:
+    src: "templates/post_install_scripts/{{ post_install_script_file }}"
+    dest: "{{ unattend_iso_cache }}/{{ post_install_script_file }}"
+    mode: "0755"
+  when:
+    - post_install_script_file is defined
+    - post_install_script_file
+
+- name: "Create OS unattend install config file"
+  ansible.builtin.template:
+    src: "{{ unattend_install_template }}"
+    dest: "{{ new_unattend_install_conf }}"
+    mode: "0644"

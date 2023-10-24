@@ -27,6 +27,17 @@
       }}
   when: ova_guest_os_type in ['amazon', 'ubuntu']
 
+- name: "Create a temporary folder for caching cloud-init seed data and ISO files"
+  include_tasks: ../../common/create_temp_file_dir.yml
+  vars:
+    tmp_dir: "{{ local_cache }}"
+    tmp_state: "directory"
+    tmp_prefix: "seed_iso_"
+
+- name: "Set fact of cloud-init seed ISO directory path"
+  ansible.builtin.set_fact:
+    seed_iso_dir_path: "{{ tmp_path }}"
+
 - name: "Create cloud-init seed ISO to configure guest OS"
   include_tasks: ../utils/create_seed_iso.yml
   vars:
@@ -38,6 +49,21 @@
   vars:
     src_file_path: "{{  seed_iso_path }}"
     dest_file_path: "{{ vm_dir_name }}/{{ seed_iso_path | basename }}"
+
+- name: "Remove cloud-init seed ISO from local cache folder {{ seed_iso_dir_path }}"
+  include_tasks: ../../common/delete_local_file.yml
+  vars:
+    local_path: "{{ seed_iso_path }}"
+
+- name: "Copy cloud-init seed data files to test log folder"
+  ansible.builtin.copy:
+    src: "{{ seed_iso_dir_path }}/"
+    dest: "{{ current_test_log_folder }}/"
+
+- name: "Remove local cache folder {{ seed_iso_dir_path }}"
+  include_tasks: ../../common/delete_local_file.yml
+  vars:
+    local_path: "{{ seed_iso_dir_path }}"
 
 - name: "Initialize CDROM device for attaching cloud-init seed ISO"
   ansible.builtin.set_fact:
@@ -115,10 +141,13 @@
 - name: "Eject CDROM devices from guest OS"
   include_tasks: ../utils/eject_cdrom_in_guest.yml
 
-- name: "Remove local temporary directory {{ tmp_seed_dir }}"
-  include_tasks: ../../common/delete_local_file.yml
+- name: "Delete uploaded cloud-init seed ISO from ESXi datastore"
+  include_tasks: ../../common/esxi_check_delete_datastore_file.yml
   vars:
-    local_path: "{{ tmp_seed_dir }}"
+    file_in_datastore: "{{ datastore }}"
+    file_in_datastore_path: "{{ vm_dir_name }}/{{ seed_iso_path | basename }}"
+    file_in_datastore_ops: "absent"
+    file_in_datastore_ignore_failed: true
 
 - name: "Get all CDROM devices on VM"
   include_tasks: ../../common/vm_get_cdrom_devices.yml
