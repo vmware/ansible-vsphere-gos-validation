@@ -1,17 +1,24 @@
 # Copyright 2022-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# This task is used for adding or removing virtual TPM
-# device from VM.
+# This task is used for adding or removing virtual TPM (vTPM)
+# device from VM, and then check device existence status.
 # Parameters:
 #   vtpm_operation: add or remove virtual TPM device, valid
 #     values are 'present', 'absent'.
 #
-- name: Set fact of virtual TPM operation
+- name: "Check the value of parameter 'vtpm_operation'"
+  ansible.builtin.assert:
+    that:
+      - vtpm_operation is defined
+      - vtpm_operation | lower in ['present', 'absent']
+    fail_msg: "Parameter 'vtpm_operation' is not set or its value not in ['present', 'absent']."
+
+- name: "Set fact of vTPM device operation"
   ansible.builtin.set_fact:
     vtpm_ops: "{{ 'Add' if vtpm_operation | lower == 'present' else 'Remove' }}"
 
-- name: "{{ vtpm_ops }} virtual TPM device to VM"
+- name: "{{ vtpm_ops }} VM vTPM device"
   community.vmware.vmware_guest_tpm:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -22,7 +29,27 @@
     name: "{{ vm_name }}"
     state: "{{ vtpm_operation }}"
   register: vtpm_ops_result
-
-- name: Display the result of virtual TPM device operation
+- name: "Display the result of vTPM device operation"
   ansible.builtin.debug: var=vtpm_ops_result
   when: enable_debug
+
+- name: "Get VM vTPM device using device label"
+  include_tasks: vm_get_device_with_label.yml
+  vars:
+    device_label: 'Virtual TPM'
+
+- name: "Check VM vTPM device exists"
+  ansible.builtin.assert:
+    that:
+      - device_info_with_label is defined
+      - device_info_with_label != ""
+    fail_msg: "Not get VM vTPM device info: {{ device_info_with_label }} after '{{ vtpm_ops }}' operation."
+  when: vtpm_operation | lower == 'present'
+
+- name: "Check VM vTPM device does not exist"
+  ansible.builtin.assert:
+    that:
+      - device_info_with_label is defined
+      - device_info_with_label == ""
+    fail_msg: "Get VM vTPM device info: {{ device_info_with_label }} after '{{ vtpm_ops }}' operation."
+  when: vtpm_operation | lower == 'absent'

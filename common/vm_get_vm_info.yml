@@ -1,7 +1,7 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Get VM's configs about VM paths, guest and hardware version"
+- name: "Get VM's basic information"
   include_tasks: vm_get_config.yml
   vars:
     property_list:
@@ -10,8 +10,9 @@
       - 'config.guestId'
       - 'config.guestFullName'
       - 'config.version'
+      - 'config.firmware'
 
-- name: "Set facts about VM's configs about VM paths, guest and hardware version"
+- name: "Set facts of VM's basic information"
   ansible.builtin.set_fact:
     vm_files_path: "{{ vm_config.config.files.logDirectory | replace('[', '/vmfs/volumes/') | replace('] ', '/') }}"
     vm_files_path_ds: "{{ vm_config.config.files.logDirectory }}"
@@ -22,11 +23,12 @@
     vm_guest_os_version: "{{ vm_config.config.guestFullName }}"
     vm_hardware_version: "{{ vm_config.config.version }}"
     vm_hardware_version_num: "{{ vm_config.config.version.split('-')[-1] }}"
+    vm_firmware: "{{ vm_config.config.firmware }}"
 
 - name: "Wait for mac address is available"
   include_tasks: vm_wait_primary_nic_mac.yml
 
-- name: "Display VM's information"
+- name: "Display VM's basic information"
   ansible.builtin.debug:
     msg:
       - "VM datastore: {{ datastore }}"
@@ -37,3 +39,4 @@
       - "VM guest ID: {{ vm_guest_id }}"
       - "VM hardware version: {{ vm_hardware_version }}"
       - "VM hardware version number: {{ vm_hardware_version_num }}"
+      - "VM firmware: {{ vm_firmware }}"

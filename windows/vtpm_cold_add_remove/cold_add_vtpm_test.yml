@@ -1,0 +1,86 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check if VM has vTPM device already
+- name: "Get vTPM device on VM"
+  include_tasks: ../../common/vm_get_device_with_label.yml
+  vars:
+    device_label: 'Virtual TPM'
+
+- name: "vTPM device exists"
+  ansible.builtin.debug:
+    msg: "VM has vTPM device already, no need to add one."
+  when: device_info_with_label
+
+# Clone a new VM without snapshot and add vTPM device to cloned VM
+- name: "vTPM device does not exist"
+  block:
+    - name: "Save current VM name and primary NIC MAC address"
+      ansible.builtin.set_fact:
+        vm_name_clone_from: "{{ vm_name }}"
+        vm_nic_mac_clone_from: "{{ vm_primary_nic_mac }}"
+        test_on_cloned_vm: true
+
+    - name: "Set fact of the name of cloned VM"
+      ansible.builtin.set_fact:
+        vm_name: "{{ vm_name_clone_from }}_clone_{{ testrun_timestamp }}"
+    - name: "Clone a new VM from current VM"
+      include_tasks: ../../common/vm_instant_clone.yml
+      vars:
+        parent_vm_name: "{{ vm_name_clone_from }}"
+        cloned_vm_name: "{{ vm_name }}"
+    - name: "Add key provider on vCenter server"
+      include_tasks: ../../common/vcenter_add_key_provider.yml
+      vars:
+        vc_cert_path: "{{ current_test_log_folder }}"
+      when:
+        - key_provider_type is defined and key_provider_type
+        - not (key_provider_added is defined and key_provider_added)
+    - name: "Add vTPM device to cloned VM"
+      include_tasks: ../../common/vm_add_remove_vtpm.yml
+      vars:
+        vtpm_operation: 'present'
+    - name: "Pause 10 seconds after adding vTPM device"
+      ansible.builtin.pause:
+        seconds: 10
+    - name: "Power on cloned VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-on'
+    - name: "Get cloned VM MAC address"
+      include_tasks: ../../common/vm_wait_primary_nic_mac.yml
+    - name: "Get cloned VM IP address"
+      include_tasks: ../../common/vm_get_ip.yml
+      vars:
+        vm_get_ip_timeout: 600
+    - name: "Print cloned VM IP address"
+      ansible.builtin.debug:
+        msg: "Get cloned VM IP address: {{ vm_guest_ip }}"
+    - name: "Check Windows winrm is connectable"
+      include_tasks: ../utils/win_check_winrm.yml
+    - name: "Add Windows host to in-memory inventory"
+      include_tasks: ../utils/add_windows_host.yml
+  when: not device_info_with_label
+
+- name: "Get VM extra config"
+  include_tasks: ../../common/vm_get_extra_config.yml
+- name: "Make sure 'encryption.bundle' in VM extra config"
+  ansible.builtin.assert:
+    that:
+      - vm_extra_config
+      - "'encryption.bundle' in vm_extra_config"
+      - vm_extra_config['encryption.bundle']
+    fail_msg: "Key 'encryption.bundle' is not found or it has no corresponding value in VM extra configs."
+
+- name: "Check TPM device in guest OS"
+  include_tasks: ../utils/win_get_tpm_status.yml
+- name: "Make sure TPM device is present and ready"
+  ansible.builtin.assert:
+    that:
+      - win_tpm_info
+      - win_tpm_info['TpmPresent']
+      - win_tpm_info['TpmReady']
+      - win_tpm_info['TpmEnabled']
+      - win_tpm_info['TpmActivated']
+      - win_tpm_info['ManufacturerIdTxt'] | trim == 'VMW'
+    fail_msg: "TPM device status got in Windows guest OS: {{ win_tpm_info }}, which contains not expected values."

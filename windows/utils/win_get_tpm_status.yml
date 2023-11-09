@@ -1,0 +1,27 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get TPM device info in Windows guest OS
+#
+- name: "Initialize the TPM device status"
+  ansible.builtin.set_fact:
+    win_tpm_info: {}
+
+- name: "Get TPM device info"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-Tpm | select TpmPresent,TpmReady,TpmEnabled,TpmActivated,ManufacturerIdTxt,ManufacturerVersion | fl"
+
+- name: "Set TPM device info dict"
+  block:
+    - name: "Set fact of TPM device info"
+      ansible.builtin.set_fact:
+        win_tpm_info: "{{ win_tpm_info | combine(item | from_yaml)}"
+      when: item | length != 0
+      with_items: "{{ win_powershell_cmd_output.stdout_lines }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length > 0
+
+- name: "Display the TPM device info"
+  ansible.builtin.debug: var=win_tpm_info

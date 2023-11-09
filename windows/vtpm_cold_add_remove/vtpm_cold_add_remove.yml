@@ -1,10 +1,11 @@
-# Copyright 2022-2023 VMware, Inc.
+# Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# This test case is testing Virtualization Based Security (VBS)
-# enable/disable on VM and in guest OS.
+# Description:
+#   This test case is used for checking VM is encrypted when adding
+# TPM device to VM, VM is not encrypted after removing TPM device.
 #
-- name: vbs_enable_disable
+- name: vtpm_cold_add_remove
   hosts: localhost
   gather_facts: false
   tasks:
@@ -12,8 +13,6 @@
       block:
         - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
-          vars:
-            skip_test_no_vmtools: false
 
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
@@ -29,10 +28,18 @@
             skip_reason: "Not Applicable"
           when: vm_firmware | lower != 'efi'
 
-        - name: "VBS enable test"
-          include_tasks: vbs_enable_test.yml
-        - name: "VBS disable test"
-          include_tasks: vbs_disable_test.yml
+        - name: "Cold add VM vTPM device test"
+          include_tasks: cold_add_vtpm_test.yml
+        - name: "Cold remove VM vTPM device test"
+          include_tasks: cold_remove_vtpm_test.yml
       rescue:
-        - "Test case failure"
+        - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
+      always:
+        - name: "Revert back VM name and VM primary MAC"
+          ansible.builtin.set_fact:
+            vm_name: "{{ vm_name_clone_from }}"
+            vm_primary_nic_mac: "{{ vm_nic_mac_clone_from }}"
+          when:
+            - vm_name_clone_from is defined
+            - vm_name_clone_from
