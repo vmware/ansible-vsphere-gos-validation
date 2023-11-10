@@ -19,14 +19,14 @@
     guest_is_otherlinux: false
   when: guest_os_ansible_distribution in ["RedHat", "CentOS", "OracleLinux", "AlmaLinux", "Rocky",
                                           "SLES", "SLED", "VMware Photon OS", "Amazon", "Fedora",
-                                          "Ubuntu", "Debian", "openSUSE Leap", "FreeBSD"]
+                                          "Ubuntu", "Debian", "openSUSE Leap", "FreeBSD", "MIRACLE"]
 
 - name: "Set fact of expected guest id suffix"
   ansible.builtin.set_fact:
     expected_guest_id_suffix: "{{ expected_guest_id_suffix | replace('64', '_64') }}"
   when: >-
     guest_os_ansible_distribution in ["RedHat", "SLES", "SLED",
-                                     "CentOS", "OracleLinux", "Debian", "FreeBSD"]
+                                     "CentOS", "OracleLinux", "Debian", "FreeBSD", "MIRACLE"]
 
 - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
   include_tasks: rhel_fullname_map.yml
@@ -63,6 +63,12 @@
     expected_guest_id: "opensuse{{ expected_guest_id_suffix }}"
     expected_guest_fullname: "SUSE openSUSE ({{ guest_os_bit }})"
   when: guest_os_ansible_distribution == "openSUSE Leap"
+
+- name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    expected_guest_id: "asianux{{ guest_os_ansible_distribution_major_ver }}{{ expected_guest_id_suffix }}"
+    expected_guest_fullname: "MIRACLE LINUX {{ guest_os_ansible_distribution_major_ver }} ({{ guest_os_bit }})"
+  when: guest_os_ansible_distribution == "MIRACLE"
 
 - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
   include_tasks: otherlinux_fullname_map.yml
