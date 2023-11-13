@@ -21,7 +21,38 @@
 - name: "Update in-memory inventory after VM power on"
   include_tasks: ../utils/win_update_inventory.yml
 
-# check VM is not encrypted
-# power on VM
-# check no TPM deive in guest OS
-# clear cloned VM
+- name: "Get keyId in VM config"
+  include_tasks: ../../common/vm_get_config.yml
+  vars:
+    property_list: ['config.keyId']
+- name: "Check keyId is unset in VM config"
+  ansible.builtin.assert:
+    that:
+      - vm_config.config
+      - "'keyId' in vm_config.config"
+      - not vm_config.config.keyId
+    fail_msg: "Key 'keyId' is not found in VM config or it's not None: {{ vm_config.config.keyId }}"
+
+- name: "Get TPM device info in guest OS"
+  include_tasks: ../utils/win_get_tpm_status.yml
+- name: "Check TPM device is not present"
+  ansible.builtin.assert:
+    that:
+      - win_tpm_info
+      - not win_tpm_info['TpmPresent'] | bool
+      - not win_tpm_info['TpmReady'] | bool
+      - not win_tpm_info['TpmEnabled'] | bool
+      - not win_tpm_info['TpmActivated'] | bool
+    fail_msg: "TPM device status got in Windows guest OS: {{ win_tpm_info }}, which contains not expected values."
+
+- name: "Handle cloned VM"
+  block:
+    - name: "Power off VM before removing it"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-off'
+    - name: "Remove cloned VM"
+      include_tasks: ../../common/vm_remove.yml
+  when:
+    - test_on_cloned_vm is defined
+    - test_on_cloned_vm
