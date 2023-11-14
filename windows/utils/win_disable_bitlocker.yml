@@ -1,0 +1,58 @@
+# Copyright 2022-2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Disable BitLocker service and decrypt the volumes
+# Parameters:
+#   decrypt_wait_time: the time in seconds to wait for the volume decryption.
+
+- name: "Initialize the decryption wait time"
+  ansible.builtin.set_fact:
+    decrypt_wait_time: 900
+  when: decrypt_wait_time is undefined or not decrypt_wait_time
+
+- name: "Stop and disable BitLocker service in guest OS"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Set-Service -Name BDESVC -Status stopped -StartupType disabled"
+
+- name: "Check BitLocker service status"
+  include_tasks: ../utils/win_get_service_status.yml
+  vars:
+    win_service_name: "BDESVC"
+
+- name: "Set BitLocker service status"
+  ansible.builtin.set_fact:
+    bitlocker_service_status: "{{ service_status }}"
+
+- name: "Decrypt the BitLocker volumes"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      $BLV = Get-BitLockerVolume;
+      Disable-BitLocker -MountPoint $BLV
+
+- name: "Check if Decryption is completed"
+  ansible.windows.win_shell: "(Get-BitLockerVolume | Where-Object { $_.EncryptionPercentage -GT 0 } | measure).Count"
+  register: win_powershell_cmd_output
+  delegate_to: "{{ vm_guest_ip }}"
+  until:
+    - win_powershell_cmd_output.stdout_lines[0] | int == 0
+  retries: "{{ (decrypt_wait_time | int / 60) | int }}"
+  delay: 60
+
+- name: "Get BitLocker encrypted volumes"
+  include_tasks: ../utils/win_get_bitlocker_volume.yml
+
+- name: "Display the bitlocker disablement result"
+  ansible.builtin.assert:
+    that:
+      - bitlocker_service_status == "Stopped"
+      - bitlocker_volume_list | length == 0
+    fail_msg: >-
+      BitLocker is not disabled either due to the service is not stopped or the OS volumes are not decrypted. 
+      BitLocker service status: '{{ bitlocker_service_status }}'.
+      BitLocker encrypted volumes list: '{{ bitlocker_volume_list }}'.
+    success_msg: >-
+      BitLocker service is disabled and the OS volumes are decrypted. 
+      
+      
