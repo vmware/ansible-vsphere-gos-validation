@@ -21,27 +21,100 @@
         skip_reason: "Skipped"
       when: new_vm is undefined or (not new_vm | bool)
 
-    # Change vm_username to root if it is not. And add a new user after VM deployment
-    - name: "Set user account for new VM"
-      include_tasks: set_new_vm_user_account.yml
+    - name: "Test case block"
+      block:
+        # Change vm_username to root if it is not. And add a new user after VM deployment
+        - name: "Set user account for new VM"
+          include_tasks: set_new_vm_user_account.yml
 
-    - name: "Set fact of timestamp for VM hostname"
-      ansible.builtin.set_fact:
-        hostname_timestamp: "{{ timestamp }}"
+        - name: "Set fact of timestamp for VM hostname"
+          ansible.builtin.set_fact:
+            hostname_timestamp: "{{ timestamp }}"
 
-    - name: "Get SSH public key from localhost"
-      include_tasks: ../utils/get_local_ssh_public_key.yml
+        - name: "Get SSH public key from localhost"
+          include_tasks: ../utils/get_local_ssh_public_key.yml
 
-    - name: "Deploy VM by creating a new VM and install OS from ISO image on it"
-      include_tasks: deploy_vm_from_iso.yml
-      when: (vm_deploy_method is undefined) or (vm_deploy_method == "iso")
+        - name: "Create temp folder for generating unattend install ISO file"
+          include_tasks: ../../common/create_temp_file_dir.yml
+          vars:
+            tmp_dir: "{{ local_cache }}"
+            tmp_state: "directory"
+            tmp_prefix: "unattend_iso_"
 
-    # OVA deployment is applicable for OS releases which have OVA deliverables, e.g.
-    # VMware Photon OS, Ubuntu cloud image, Flatcar, or Amazon Linux, etc
-    - name: "Deploy VM from an OVA template"
-      include_tasks: deploy_vm_from_ova.yml
-      when: (vm_deploy_method is defined) and (vm_deploy_method == "ova")
+        - name: "Initialize fact of unattend install cache folder"
+          ansible.builtin.set_fact:
+            unattend_iso_cache: "{{ tmp_path }}"
 
-    - name: "Print VM guest IP address"
-      ansible.builtin.debug: var=vm_guest_ip
-      when: vm_guest_ip is defined and vm_guest_ip
+        - name: "Deploy VM by creating a new VM and install OS from ISO image on it"
+          include_tasks: deploy_vm_from_iso.yml
+          when: (vm_deploy_method is undefined) or (vm_deploy_method == "iso")
+
+        # OVA deployment is applicable for OS releases which have OVA deliverables, e.g.
+        # VMware Photon OS, Ubuntu cloud image, Flatcar, or Amazon Linux, etc
+        - name: "Deploy VM from an OVA template"
+          include_tasks: deploy_vm_from_ova.yml
+          when: (vm_deploy_method is defined) and (vm_deploy_method == "ova")
+
+        - name: "Take a screenshot when VM deployment succeeds"
+          include_tasks: ../../common/vm_take_screenshot.yml
+          vars:
+            vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
+
+        - name: "Print VM guest IP address"
+          ansible.builtin.debug: var=vm_guest_ip
+          when: vm_guest_ip is defined and vm_guest_ip
+      rescue:
+        - name: "Collect serial port log at test failure"
+          include_tasks: collect_serial_port_log.yml
+
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true
+      always:
+        - name: "Collect VM deployment logs"
+          include_tasks: collect_vm_logs.yml
+
+        - name: "Clean up local cache"
+          when:
+            - unattend_iso_cache is defined
+            - unattend_iso_cache
+          block:
+            - name: "Remove ISO files from local cache folder {{ unattend_iso_cache }}"
+              include_tasks: ../../common/delete_local_file.yml
+              vars:
+                local_path: "{{ unattend_iso_cache }}/{{ item }}"
+              with_items: "{{ transferred_unattend_iso_list }}"
+              when:
+                - transferred_unattend_iso_list is defined
+                - transferred_unattend_iso_list
+
+            - name: "Copy unattend install config files in cache folder to test log folder"
+              ansible.builtin.copy:
+                src: "{{ unattend_iso_cache }}/"
+                dest: "{{ current_test_log_folder }}/"
+
+            - name: "Remove local cache folder {{ unattend_iso_cache }}"
+              include_tasks: ../../common/delete_local_file.yml
+              vars:
+                local_path: "{{ unattend_iso_cache }}"
+
+        - name: "Unmount NFS share folder and remove mount folder"
+          when:
+            - nfs_mount_dir is defined
+            - nfs_mount_dir
+          block:
+            - name: "Umount NFS share points"
+              include_tasks: ../../common/local_unmount.yml
+              vars:
+                mount_path: "{{ nfs_mount_dir }}"
+                local_unmount_ignore_errors: true
+              when:
+                - nfs_mounted is defined
+                - nfs_mounted | bool
+
+            - name: "Remove the mount folder"
+              include_tasks: ../../common/delete_local_file.yml
+              vars:
+                local_path: "{{ nfs_mount_dir }}"
+                del_local_file_ignore_errors: true

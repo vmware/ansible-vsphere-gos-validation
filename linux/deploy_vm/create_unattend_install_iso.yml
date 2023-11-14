@@ -14,14 +14,6 @@
   ansible.builtin.debug:
     msg: "The unattend install config file template is {{ unattend_install_template }}"
 
-- name: "Create temp folder for generating unattend install ISO file"
-  include_tasks: ../../common/create_temp_file_dir.yml
-  vars:
-    tmp_dir: "{{ local_cache }}"
-    tmp_state: "directory"
-    tmp_prefix: "unattend_iso_"
-
-# unattend_iso_cache is the local cache for creating unattend config files and ISOs
 # new_unattend_install_conf is the local file name of unattend install config file created from template
 # unattend_iso_file_name and unattend_iso_file_path are the new generated unattend install ISO file name and path,
 #   which is used by OS in RHEL family, SUSE family, etc and Ubuntu Desktop or Server using Subiquity installer.
@@ -33,7 +25,6 @@
 #   and no separate unattend install ISO needed.
 - name: "Initialize facts for unattend install config files and ISO files"
   ansible.builtin.set_fact:
-    unattend_iso_cache: "{{ tmp_path }}"
     new_unattend_install_conf: "{{ tmp_path }}/{{ unattend_install_template | basename }}"
     unattend_iso_file_name: ""
     unattend_iso_file_path: ""
@@ -161,20 +152,3 @@
     os_installation_iso_list: "{{ os_installation_iso_list + ['[' ~ datastore ~ '] ' ~ unattend_iso_file_name] }}"
     os_install_iso_list_len: "{{ os_install_iso_list_len | int + 1 }}"
   when: unattend_iso_file_name
-
-- name: "Remove ISO files from local cache folder {{ unattend_iso_cache }}"
-  include_tasks: ../../common/delete_local_file.yml
-  vars:
-    local_path: "{{ unattend_iso_cache }}/{{ item }}"
-  with_items: "{{ transferred_unattend_iso_list }}"
-
-- name: "Copy unattend install config files in cache folder to test log folder"
-  ansible.builtin.copy:
-    src: "{{ unattend_iso_cache }}/"
-    dest: "{{ current_test_log_folder }}/"
-  when: unattend_install_conf is not match('Ubuntu/Server/')
-
-- name: "Remove local cache folder {{ unattend_iso_cache }}"
-  include_tasks: ../../common/delete_local_file.yml
-  vars:
-    local_path: "{{ unattend_iso_cache }}"

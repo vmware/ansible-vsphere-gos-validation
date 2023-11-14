@@ -27,43 +27,26 @@
       }}
   when: ova_guest_os_type in ['amazon', 'ubuntu']
 
-- name: "Create a temporary folder for caching cloud-init seed data and ISO files"
-  include_tasks: ../../common/create_temp_file_dir.yml
-  vars:
-    tmp_dir: "{{ local_cache }}"
-    tmp_state: "directory"
-    tmp_prefix: "seed_iso_"
-
-- name: "Set fact of cloud-init seed ISO directory path"
-  ansible.builtin.set_fact:
-    seed_iso_dir_path: "{{ tmp_path }}"
-
 - name: "Create cloud-init seed ISO to configure guest OS"
   include_tasks: ../utils/create_seed_iso.yml
   vars:
+    seed_iso_dir_path: "{{ unattend_iso_cache }}"
     user_data_template: "{{ ova_guest_os_type }}-ova-user-data.j2"
     local_hostname: "{{ ova_guest_os_type }}-ova-{{ hostname_timestamp }}"
+
+- name: "Set fact of cloud-init seed ISO to be uploaded to ESXi datastore"
+  ansible.builtin.set_fact:
+    transferred_unattend_iso_list: ["{{ seed_iso_path | basename }}"]
+
+- name: "Display cloud-init seed ISO to be uploaded to ESXi datastore"
+  ansible.builtin.debug:
+    msg: "The cloud-init seed ISO to be uploaded to ESXi datastore {{ datastore }}: {{ transferred_unattend_iso_list }}"
 
 - name: "Upload cloud-init seed ISO to ESXi server datastore"
   include_tasks: ../../common/esxi_upload_datastore_file.yml
   vars:
     src_file_path: "{{  seed_iso_path }}"
     dest_file_path: "{{ vm_dir_name }}/{{ seed_iso_path | basename }}"
-
-- name: "Remove cloud-init seed ISO from local cache folder {{ seed_iso_dir_path }}"
-  include_tasks: ../../common/delete_local_file.yml
-  vars:
-    local_path: "{{ seed_iso_path }}"
-
-- name: "Copy cloud-init seed data files to test log folder"
-  ansible.builtin.copy:
-    src: "{{ seed_iso_dir_path }}/"
-    dest: "{{ current_test_log_folder }}/"
-
-- name: "Remove local cache folder {{ seed_iso_dir_path }}"
-  include_tasks: ../../common/delete_local_file.yml
-  vars:
-    local_path: "{{ seed_iso_dir_path }}"
 
 - name: "Initialize CDROM device for attaching cloud-init seed ISO"
   ansible.builtin.set_fact:
