@@ -28,18 +28,9 @@
             skip_reason: "Not Applicable"
           when: vm_firmware | lower != 'efi'
 
-        - name: "Cold add VM vTPM device test"
-          include_tasks: cold_add_vtpm_test.yml
-        - name: "Cold remove VM vTPM device test"
-          include_tasks: cold_remove_vtpm_test.yml
+        - name: "Cold add and remove VM vTPM device test"
+          include_tasks: vtpm_add_remove_test.yml
       rescue:
-        - name: "Test case failure when testing on cloned VM"
-          include_tasks: ../../common/test_rescue.yml
-          vars:
-            take_fail_snapshot: false
-          when:
-            - test_on_cloned_vm is defined
-            - test_on_cloned_vm
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
       always:
@@ -48,5 +39,5 @@
             vm_name: "{{ vm_name_clone_from }}"
             vm_primary_nic_mac: "{{ vm_nic_mac_clone_from }}"
           when:
-            - test_on_cloned_vm is defined
-            - test_on_cloned_vm
+            - vm_name_clone_from is defined
+            - vm_nic_mac_clone_from is defined

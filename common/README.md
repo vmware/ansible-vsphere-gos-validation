@@ -22,6 +22,7 @@
 * ovf_export.yml: Export VM to OVF template
 * vm_remove.yml: Delete VM from ESXi host
 * vm_instant_clone.yml: Create an instant clone of VM
+* vm_clone.yml: Create a cloned VM from existing VM or template
 
 ### Tasks for VM basic settings
 * vm_set_guest_id.yml: Set VM's guest id

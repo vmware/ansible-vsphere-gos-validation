@@ -1,26 +1,12 @@
 # Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Check if VM has vTPM device already
-- name: "Get vTPM device on VM"
-  include_tasks: ../../common/vm_get_device_with_label.yml
-  vars:
-    device_label: 'Virtual TPM'
-
-- name: "vTPM device exists"
-  ansible.builtin.debug:
-    msg: "VM has vTPM device already, no need to add one."
-  when: device_info_with_label
-
-# Clone a new VM without snapshot and add vTPM device to cloned VM
-- name: "vTPM device does not exist"
-  include_tasks: vtpm_test_cloned_vm.yml
-  when: not device_info_with_label
-
 - name: "Get keyId in VM config"
   include_tasks: ../../common/vm_get_config.yml
   vars:
     property_list: ['config.keyId']
+
+# Check VM is encrypted with vTPM device
 - name: "Make sure keyId is set in VM config"
   ansible.builtin.assert:
     that:
@@ -30,9 +16,22 @@
       - "'keyId' in vm_config.config.keyId"
       - vm_config.config.keyId.keyId
     fail_msg: "Key 'keyId' is not found in VM config or it has no 'keyId' key value pair: {{ vm_config.config.keyId | default('') }}"
+  when: vtpm_test_operation == 'add'
 
-- name: "Check TPM device in guest OS"
+# Check VM is not encrypted without vTPM device
+- name: "Check keyId is unset in VM config"
+  ansible.builtin.assert:
+    that:
+      - vm_config.config
+      - "'keyId' in vm_config.config"
+      - not vm_config.config.keyId
+    fail_msg: "Key 'keyId' is not found in VM config or it's not None: {{ vm_config.config.keyId }}"
+  when: vtpm_test_operation == 'remove'
+
+- name: "Get TPM device info in guest OS"
   include_tasks: ../utils/win_get_tpm_status.yml
+
+# Check vTPM device exists in guest OS
 - name: "Make sure TPM device is present and ready"
   ansible.builtin.assert:
     that:
@@ -43,3 +42,16 @@
       - win_tpm_info['TpmActivated'] | bool
       - win_tpm_info['ManufacturerIdTxt'] | trim == 'VMW'
     fail_msg: "TPM device status got in Windows guest OS: {{ win_tpm_info }}, which contains not expected values."
+  when: vtpm_test_operation == 'add'
+
+# Check vTPM device does not exist in guest OS
+- name: "Check TPM device is not present"
+  ansible.builtin.assert:
+    that:
+      - win_tpm_info
+      - not win_tpm_info['TpmPresent'] | bool
+      - not win_tpm_info['TpmReady'] | bool
+      - not win_tpm_info['TpmEnabled'] | bool
+      - not win_tpm_info['TpmActivated'] | bool
+    fail_msg: "TPM device status got in Windows guest OS: {{ win_tpm_info }}, which contains not expected values."
+  when: vtpm_test_operation == 'remove'

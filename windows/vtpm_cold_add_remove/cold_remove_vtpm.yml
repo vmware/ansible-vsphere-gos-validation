@@ -1,0 +1,27 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Shutdown guest OS before removing vTPM device"
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "shutdown"
+
+- name: "Remove vTPM device from VM"
+  include_tasks: ../../common/vm_add_remove_vtpm.yml
+  vars:
+    vtpm_operation: 'absent'
+- name: "Pause 10 seconds after removing vTPM device"
+  ansible.builtin.pause:
+    seconds: 10
+
+- name: "Power on VM after removing vTPM device"
+  include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+- name: "Update in-memory inventory after VM power on"
+  include_tasks: ../utils/win_update_inventory.yml
+
+- name: "Check vTPM device removed"
+  include_tasks: vtpm_add_remove_check.yml
+  vars:
+    vtpm_test_operation: "remove"
