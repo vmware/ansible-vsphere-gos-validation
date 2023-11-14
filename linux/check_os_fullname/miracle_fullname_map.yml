@@ -1,19 +1,27 @@
 # Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Guest id "asianux8_64Guest" and full name "MIRACLE LINUX 8 (64-bit)" is available on ESXi 6.7 or later
-# When Miracle Linux 9.x is available, its expected guest id and guest full name is same as Miracle Linux 8.x on ESXi 8.x, 
-# as there is no Miracle Linux 9 (64-bit) selection in vSphere UI
+# Guest id "asianux8_64Guest" and full name "MIRACLE LINUX 8 (64-bit)" is available on ESXi 6.7P06 or later
 
 - name: "Set fact of expected guest id on ESXi {{ esxi_version }}"
   ansible.builtin.set_fact:
     expected_guest_major_ver: "{{ [guest_os_ansible_distribution_major_ver | int, 8 ] | min }}"
 
-- name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
-  ansible.builtin.set_fact:
-    expected_guest_id: "asianux{{ expected_guest_major_ver }}{{ expected_guest_id_suffix }}"
-    expected_guest_fullname: "MIRACLE LINUX {{ expected_guest_major_ver }} ({{ guest_os_bit }})"
-  when: 
+- name: "Set facts when vmtools_version is larger than 12.3.5"
+  when:
     - vmtools_version is defined
     - vmtools_version is version('12.3.5', '>')
+  block:
+    - name: "Set fact of guest OS is not other Linux"
+      ansible.builtin.set_fact:
+        guest_is_otherlinux: false
+
+    - name: "Set fact of expected guest id suffix"
+      ansible.builtin.set_fact:
+        expected_guest_id_suffix: "{{ expected_guest_id_suffix | replace('64', '_64') }}"
+
+    - name: "Set expected guest id and full name for {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        expected_guest_id: "asianux{{ expected_guest_major_ver }}{{ expected_guest_id_suffix }}"
+        expected_guest_fullname: "MIRACLE LINUX {{ expected_guest_major_ver }} ({{ guest_os_bit }})"
 
