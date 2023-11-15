@@ -24,13 +24,20 @@
 
 - name: "Check if Decryption is completed"
   ansible.windows.win_shell: "(Get-BitLockerVolume | Where-Object { $_.EncryptionPercentage -GT 0 } | measure).Count"
-  register: win_powershell_cmd_output
+  register: decrypt_volume_result
   delegate_to: "{{ vm_guest_ip }}"
   ignore_errors: true
   until:
-    - win_powershell_cmd_output.stdout_lines[0] | int == 0
+    - decrypt_volume_result.stdout_lines[0] | int == 0
   retries: "{{ (decrypt_wait_time | int / 60) | int }}"
   delay: 60
+
+- name: "Volume decryption failed"
+  ansible.builtin.fail:
+    msg: "Failed to decrypt the OS volumes in {{ decrypt_wait_time }} seconds."
+  when:
+    - decrypt_volume_result.failed is defined
+    - decrypt_volume_result.failed
 
 - name: "Get BitLocker encrypted volumes"
   include_tasks: ../utils/win_get_bitlocker_volume.yml
