@@ -23,7 +23,7 @@
 22. For openSUSE Leap 15.3 or later unattend auto-install, please use file openSUSE/15/autoinst.xml.
 23. For BCLinux 8.x unattend auto-install, please use file BCLinux/8/ks.cfg.
 24. For BCLinux-for-Euler 21.10 unattend auto-install, please use file BCLinux-for-Euler/21.10/ks.cfg.
-25. For FusionOS unattend auto-install, please use files under Fusion.
+25. For FusionOS 22 and 23 unattend auto-install, please use files under Fusion.
 
 # Notes
 ## For Windows
