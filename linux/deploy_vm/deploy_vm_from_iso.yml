@@ -93,7 +93,7 @@
 
     - name: "Get VM default video memory size"
       ansible.builtin.set_fact:
-        vm_default_video_memory_mb: "{{ (vm_video_cart_facts.instance.video_memory | int) / 1024 }}"
+        vm_default_video_memory_mb: "{{ (vm_video_card_facts.instance.video_memory | int) / 1024 }}"
 
     - name: "Increase VM's video card memory to 8 MB in case desktop can't be loaded"
       include_tasks: ../../common/vm_set_video_card.yml
@@ -142,19 +142,6 @@
   include_tasks: ubuntu/ubuntu_install_os.yml
   when: guest_id is match('ubuntu.*')
 
-# For RHEL, CentOS, RockyLinux, OracleLinux, send key to boot screen to not do
-# disk check and start installation directly. RockyLinux is using Other 4.x or
-# later Linux (64-bit) as guest OS type.
-- name: "Select boot menu for RHEL or Fedora family OS"
-  include_tasks: ../../common/vm_guest_send_key.yml
-  vars:
-    keys_send:
-      - UPARROW
-      - ENTER
-  when:
-    - unattend_installer is defined
-    - unattend_installer in ['RHEL', 'CentOS', 'Fedora', 'BCLinux', 'BCLinux-for-Euler', 'FusionOS']
-
 # For SLES, OS installation with BIOS firmware, send key to boot
 # screen to start new installation instead of booting from local
 - name: "Select boot menu for SLES/SLED"
@@ -167,11 +154,9 @@
     - unattend_installer is defined
     - unattend_installer in ['SLE', 'openSUSE']
     - firmware is defined and firmware|lower == "bios"
->>>>>>> 78670e7 (Move block-rescue-always to deploy_vm.yml)
 
-# For RHEL, CentOS, RockyLinux, OracleLinux, send key to boot screen to not do
-# disk check and start installation directly. RockyLinux is using Other 4.x or
-# later Linux (64-bit) as guest OS type.
+# For RHEL, Fedora or RHEL-like OS, send key to boot screen to skip 
+# disk check and start installation directly.
 - name: "Select boot menu for RHEL or Fedora family OS"
   include_tasks: ../../common/vm_guest_send_key.yml
   vars:
@@ -180,7 +165,7 @@
       - ENTER
   when:
     - unattend_installer is defined
-    - unattend_installer in ['RHEL', 'CentOS', 'Fedora', 'BCLinux', 'BCLinux-for-Euler']
+    - unattend_installer in ['RHEL', 'CentOS', 'Fedora', 'BCLinux', 'BCLinux-for-Euler', 'FusionOS']
 
 # For UnionTech OS, send key to boot screen
 - name: "Select boot menu for UnionTech OS"
@@ -214,14 +199,8 @@
   block:
     - name: "Wait for guest full name on VMware Photon OS VM"
       include_tasks: ../../common/vm_wait_guest_fullname.yml
-<<<<<<< HEAD
       vars:
         vm_get_fullname_timeout: 600
-      when:
-        - unattend_install_conf is defined
-        - unattend_install_conf | lower is not match('.*(minimal|server_without_gui|bclinux-for-euler|fusionos).*')
-=======
->>>>>>> 78670e7 (Move block-rescue-always to deploy_vm.yml)
 
     - name: "Get guest IP address"
       include_tasks: ../../common/update_inventory.yml
@@ -266,7 +245,7 @@
     vm_get_fullname_timeout: 600
   when:
     - unattend_install_conf is defined
-    - unattend_install_conf | lower is not match('.*(minimal|server_without_gui|bclinux-for-euler).*')
+    - unattend_install_conf | lower is not match('.*(minimal|server_without_gui|bclinux-for-euler|fusionos).*')
 
 - name: "Get VM guest IPv4 address and add to in-memory inventory"
   include_tasks: ../../common/update_inventory.yml

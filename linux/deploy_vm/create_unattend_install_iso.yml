@@ -12,17 +12,22 @@
 
 - name: "Display unattend install config file template"
   ansible.builtin.debug:
-    msg: "The unattend install config file template is {{ unattend_install_template }}"
+    msg:
+      - "The unattend install config file template is {{ unattend_install_template }}"
+      - "The unattend installer is {{ unattend_installer }}"
 
-# new_unattend_install_conf is the local file name of unattend install config file created from template
-# unattend_iso_file_name and unattend_iso_file_path are the new generated unattend install ISO file name and path,
-#   which is used by OS in RHEL family, SUSE family, etc and Ubuntu Desktop or Server using Subiquity installer.
-#   Their automatic install needs 2 ISOs: one is the OS image ISO, and the other is the new generated unattend install
-#   ISO with unattend install config file in
-# new_os_installation_iso and new_os_installation_iso_path are the rebuilt OS ISO image file and path
-#   which is used by OS like Photon, Debian, Pardus, FreeBSD, Ubuntu Desktop using Ubiquity installer, etc.
-#   Their automatic install needs to rebuild OS image from original one by packing unattend install config file in it,
-#   and no separate unattend install ISO needed.
+# 1. new_unattend_install_conf is the local file name of unattend install config file created from template.
+# 2. unattend_iso_file_name and unattend_iso_file_path are the new generated unattend install ISO file name
+# and path, which is used by OS in RHEL family, SUSE family, etc. Their automatic install just needs to pack
+# unattend install config file into a separate unattend install ISO, and then make this ISO be connected to
+# the 2nd CDROM of the VM.
+# 3. new_os_installation_iso and new_os_installation_iso_path are the rebuilt OS ISO image file and path,
+# which is used by OS like Photon, Debian, Pardus, FreeBSD, Ubuntu Desktop using Ubiquity installer, etc.
+# Their automatic install needs to rebuild OS image from original one by packing unattend install config file
+# into it, and no separate unattend install ISO needed. VM only needs to connect its 1st CDROM with the
+# rebuilt ISO.
+# 4. For Ubuntu Desktop or Server using Subiquity installer, their fully automatic install needs to rebuild
+# OS ISO image for changing boot command, and generate unattend install ISO with unattend install config file.
 - name: "Initialize facts for unattend install config files and ISO files"
   ansible.builtin.set_fact:
     new_unattend_install_conf: "{{ tmp_path }}/{{ unattend_install_template | basename }}"
