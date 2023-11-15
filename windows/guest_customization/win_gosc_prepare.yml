@@ -63,34 +63,23 @@
     - guest_os_ansible_distribution_ver is version('10.0.22000.0', '>=')
     - guest_os_product_type | lower == 'client'
 
-- name: "Initialize BitLocker vars"
-  ansible.builtin.set_fact:
-    need_disable_bitlocker: false
+- name: "Check if there are encrypted volumes in guest OS"
+  include_tasks: ../utils/win_get_bitlocker_volume.yml
 
-- name: "Check if need to disable BitLocker"
-  block:
-    - name: "Check if there are encrypted volumes in guest OS"
-      include_tasks: ../utils/win_get_bitlocker_volume.yml
-
-    - name: "Get BitLocker service status"
-      include_tasks: ../utils/win_get_service_status.yml
-      vars:
-        win_service_name: "BDESVC"
-
-    - name: "Set the value for BitLocker var"
-      ansible.builtin.set_fact:
-        need_disable_bitlocker: true
-      when: >-
-        (bitlocker_volume_list | length > 0) or
-        service_status == "Running"
+- name: "Get BitLocker service status"
+  include_tasks: ../utils/win_get_service_status.yml
+  vars:
+    win_service_name: "BDESVC"
 
 # Disable BitLocker which will cause sysprep failure.
 - name: "Disable Bitlocker"
   include_tasks: ../utils/win_disable_bitlocker.yml
-  when: need_disable_bitlocker | bool
+  when: >-
+    (bitlocker_volume_list | length > 0) or
+    service_status == "Running"
 
 # Shutdown guest OS before execute guest customization
-- name: "Shut down OS"
+- name: "Shutdown OS"
   include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "shutdown"
