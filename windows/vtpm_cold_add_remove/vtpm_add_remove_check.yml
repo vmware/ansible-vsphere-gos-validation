@@ -1,32 +1,28 @@
 # Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Get keyId in VM config"
-  include_tasks: ../../common/vm_get_config.yml
-  vars:
-    property_list: ['config.keyId']
+- name: "Get keyId info in VM config"
+  include_tasks: ../../common/vm_get_cryptokey_id.yml
 
-# Check VM is encrypted with vTPM device
+# Check VM is encrypted after adding vTPM device
 - name: "Make sure keyId is set in VM config"
   ansible.builtin.assert:
     that:
-      - vm_config.config
-      - "'keyId' in vm_config.config"
-      - vm_config.config.keyId
-      - "'keyId' in vm_config.config.keyId"
-      - vm_config.config.keyId.keyId
-    fail_msg: "Key 'keyId' is not found in VM config or it has no 'keyId' key value pair: {{ vm_config.config.keyId | default('') }}"
+      - vm_cryptokey_id_info
+      - vm_cryptokey_id_info.keyId
+      - vm_cryptokey_id_info.providerId.id
+    fail_msg: "'keyId' is not set in VM config: {{ vm_cryptokey_id_info }}, which should be set after adding vTPM device."
   when: vtpm_test_operation == 'add'
 
-# Check VM is not encrypted without vTPM device
+# Check VM is not encrypted after removing vTPM device
 - name: "Check keyId is unset in VM config"
   ansible.builtin.assert:
     that:
-      - vm_config.config
-      - "'keyId' in vm_config.config"
-      - not vm_config.config.keyId
-    fail_msg: "Key 'keyId' is not found in VM config or it's not None: {{ vm_config.config.keyId }}"
-  when: vtpm_test_operation == 'remove'
+      - not vm_cryptokey_id_info
+    fail_msg: "'keyId' is set in VM config: {{ vm_cryptokey_id_info }}, which should be unset after removing vTPM device."
+  when:
+    - vtpm_test_operation == 'remove'
+    - vm_encrypt_state_before != "encrypt"
 
 - name: "Get TPM device info in guest OS"
   include_tasks: ../utils/win_get_tpm_status.yml

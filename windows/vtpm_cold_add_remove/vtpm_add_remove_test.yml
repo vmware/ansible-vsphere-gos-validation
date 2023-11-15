@@ -6,15 +6,31 @@
 # "Cannot change encryption state with virtual machine snapshots present.".
 # So here clone a new VM without snapshot to do vTPM test.
 #
+- name: "Initialize the fact of VM encryption state"
+  ansible.builtin.set_fact:
+    vm_encrypt_state_before: ""
+
 # Check if current VM has vTPM device
 - name: "Get vTPM device on current VM"
   include_tasks: ../../common/vm_get_device_with_label.yml
   vars:
     device_label: 'Virtual TPM'
-- name: "vTPM device exists"
-  ansible.builtin.debug:
-    msg: "Current VM has vTPM device already."
+
+- name: "Set fact of VM encryption state when VM with vTPM device"
+  ansible.builtin.set_fact:
+    vm_encrypt_state_before: "tpm"
   when: device_info_with_label
+
+# Check if current VM is encrypted when no vTPM device
+- name: "VM without vTPM device"
+  block:
+    - name: "Get VM key ID info"
+      include_tasks: ../../common/vm_get_cryptokey_id.yml
+    - name: "Set fact of VM encryption state when VM without vTPM device"
+      ansible.builtin.set_fact:
+        vm_encrypt_state_before: "encrypt"
+      when: vm_cryptokey_id_info
+  when: not device_info_with_label
 
 - name: "Set facts of cloned VM name and save current VM info"
   ansible.builtin.set_fact:
@@ -22,6 +38,7 @@
     vm_name_clone_from: "{{ vm_name }}"
     vm_nic_mac_clone_from: "{{ vm_primary_nic_mac }}"
     vm_ip_clone_from: "{{ vm_guest_ip }}"
+    vm_dir_name_clone_from: "{{ vm_dir_name }}"
 
 # Instant Clone is not supported when VM with vTPM device
 - name: "Instant Clone a new VM from current VM"
@@ -29,7 +46,7 @@
   vars:
     parent_vm_name: "{{ vm_name }}"
     cloned_vm_name: "{{ vm_name_clone_to }}"
-  when: not device_info_with_label
+  when: vm_encrypt_state_before != "tpm"
 
 # Clone a new VM when VM with vTPM device
 - name: "Clone a new VM from current VM"
@@ -37,11 +54,21 @@
   vars:
     parent_vm_name: "{{ vm_name }}"
     cloned_vm_name: "{{ vm_name_clone_to }}"
-  when: device_info_with_label
+  when: vm_encrypt_state_before == "tpm"
 
 - name: "Switch to cloned VM for testing"
   ansible.builtin.set_fact:
     vm_name: "{{ vm_name_clone_to }}"
+
+- name: "Get cloned VM file path"
+  include_tasks: ../../common/vm_get_config.yml
+  vars:
+    property_list: ['config.files.logDirectory']
+- name: "Set fact of the cloned VM file path"
+  ansible.builtin.set_fact:
+    vm_dir_name: "{{ vm_config.config.files.logDirectory.split(']')[-1].strip(' \\/') }}"
+- name: "Print the cloned VM file path"
+  ansible.builtin.debug: var=vm_dir_name
 
 - name: "Do cold add vTPM device test"
   include_tasks: cold_add_vtpm.yml
@@ -49,7 +76,7 @@
 - name: "Do cold remove vTPM device test"
   include_tasks: cold_remove_vtpm.yml
 
-- name: "Power off cloned VM before removing it"
+- name: "Power off cloned VM"
   include_tasks: ../../common/vm_set_power_state.yml
   vars:
     vm_power_state_set: 'powered-off'

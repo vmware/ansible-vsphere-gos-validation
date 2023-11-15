@@ -1,0 +1,27 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get CryptoKeyId info in VM config
+#
+- name: "Initialize the fact of 'keyId' info in VM config"
+  ansible.builtin.set_fact:
+    vm_cryptokey_id_info: ""
+
+- name: "Get 'keyId' info in VM config"
+  include_tasks: vm_get_config.yml
+  vars:
+    property_list: ['config.keyId']
+
+- name: "Set fact of 'keyId' info in VM config"
+  ansible.builtin.set_fact:
+    vm_cryptokey_id_info: "{{ vm_config.config.keyId }}"
+  when:
+    - vm_config.config
+    - "'keyId' in vm_config.config"
+    - vm_config.config.keyId
+
+- name: "Display the VM 'keyId' info"
+  ansible.builtin.debug:
+    msg:
+      - "The key ID is: {{ vm_cryptokey_id_info.keyId | default('') }}"
+      - "The key provider ID is: {{ vm_cryptokey_id_info.providerId.id | default('') }}"

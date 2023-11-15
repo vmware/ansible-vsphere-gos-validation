@@ -14,6 +14,7 @@
 * vm_get_cdrom_devices.yml: Get VM CDROM devices info list
 * vm_get_vbs_status.yml: Get Windows VM VBS enablement status
 * collect_ovf_vm_config.yml: Collect VM hardware configurations and save to a json file
+* vm_get_cryptokey_id.yml: Get cryptographic key ID info in VM config
 
 ### Tasks for VM deploy or remove
 * vm_create.yml: Create a new VM on ESXi host
