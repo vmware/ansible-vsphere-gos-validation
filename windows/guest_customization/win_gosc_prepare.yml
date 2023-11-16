@@ -64,19 +64,23 @@
     - guest_os_product_type | lower == 'client'
 
 # Disable BitLocker which will cause sysprep failure.
-- name: "Get BitLocker service status"
-  include_tasks: ../utils/win_get_service_status.yml
-  vars:
-    win_service_name: "BDESVC"
+# BitLocker is not installed by default on Windows Server.
+- name: "Disable BitLocker"
+  when: guest_os_product_type | lower == 'client'
+  block:
+    - name: "Get BitLocker service status"
+      include_tasks: ../utils/win_get_service_status.yml
+      vars:
+        win_service_name: "BDESVC"
 
-- name: "Stop and disable BitLocker service in guest OS"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "Set-Service -Name BDESVC -Status stopped -StartupType disabled"
-  when: service_status == "Running"
+    - name: "Stop and disable BitLocker service in guest OS"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "Set-Service -Name BDESVC -Status stopped -StartupType disabled"
+      when: service_status == "Running"
 
-- name: "Decrypt Bitlocker volumes"
-  include_tasks: ../utils/win_decrypt_bitlocker_volume.yml
+    - name: "Decrypt Bitlocker volumes"
+      include_tasks: ../utils/win_decrypt_bitlocker_volume.yml
 
 # Shutdown guest OS before execute guest customization
 - name: "Shutdown OS"
