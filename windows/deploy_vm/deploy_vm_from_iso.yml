@@ -44,16 +44,16 @@
   ansible.builtin.set_fact:
     vm_exists: true
 
-- name: "Enable secure boot"
-  include_tasks: ../../common/vm_set_boot_options.yml
-  vars:
-    secure_boot_enabled_set: "{{ secureboot_enabled | default(false) }}"
-    enter_bios_setup: true
+- name: "Handle VM with EFI firmware"
   when: firmware is defined and firmware | lower == "efi"
-
-- name: "Handle 64 bit VM with EFI firmware"
   block:
+    - name: "Enable secure boot"
+      include_tasks: ../../common/vm_set_boot_options.yml
+      vars:
+        secure_boot_enabled_set: "{{ secureboot_enabled | default(false) }}"
+        enter_bios_setup: true
     - name: "Handle virtual TPM device"
+      when: virtual_tpm is defined and virtual_tpm | bool
       block:
         - name: "Add key provider on vCenter server"
           include_tasks: ../../common/vcenter_add_key_provider.yml
@@ -64,14 +64,13 @@
           include_tasks: ../../common/vm_add_remove_vtpm.yml
           vars:
             vtpm_operation: 'present'
-      when: virtual_tpm is defined and virtual_tpm | bool
 
-    - name: "Enable VBS on VM"
-      include_tasks: ../utils/win_enable_vbs_vm.yml
-      vars:
-        win_enable_vbs: true
-      when: enable_vbs is defined and enable_vbs | bool
+- name: "Enable VBS on VM"
+  include_tasks: ../utils/win_enable_vbs_vm.yml
+  vars:
+    win_enable_vbs: true
   when:
+    - enable_vbs is defined and enable_vbs | bool
     - guest_id is defined and "'64' in guest_id"
     - firmware is defined and firmware | lower == "efi"
 
@@ -128,7 +127,11 @@
 - name: "Add Windows host to in-memory inventory"
   include_tasks: ../utils/add_windows_host.yml
 
-- name: "Enable VBS"
+- name: "Enable VBS in guest OS"
+  when:
+    - enable_vbs is defined and enable_vbs | bool
+    - guest_id is defined and "'64' in guest_id"
+    - firmware is defined and firmware | lower == "efi"
   block:
     - name: "Get guest OS system info"
       include_tasks: ../utils/get_windows_system_info.yml
@@ -142,7 +145,6 @@
           - win_vbs_status_guest | int == 2
           - "'2' in win_vbs_running_service"
         fail_msg: "VBS is not running '{{ win_vbs_status_guest }}', or HVCI is not running '{{ win_vbs_running_service }}'."
-  when: enable_vbs is defined and enable_vbs | bool
 
 - name: "Detach ISO image from VM CDROMs"
   include_tasks: detach_cdrom_iso.yml

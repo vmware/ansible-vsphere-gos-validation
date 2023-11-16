@@ -9,7 +9,10 @@
   ansible.builtin.assert:
     that:
       - vm_cryptokey_id_info
+      - vm_cryptokey_id_info.keyId is defined
       - vm_cryptokey_id_info.keyId
+      - vm_cryptokey_id_info.providerId is defined
+      - vm_cryptokey_id_info.providerId.id is defined
       - vm_cryptokey_id_info.providerId.id
     fail_msg: "'keyId' is not set in VM config: {{ vm_cryptokey_id_info }}, which should be set after adding vTPM device."
   when: vtpm_test_operation == 'add'
@@ -31,7 +34,6 @@
 - name: "Make sure TPM device is present and ready"
   ansible.builtin.assert:
     that:
-      - win_tpm_info
       - win_tpm_info['TpmPresent'] | bool
       - win_tpm_info['TpmReady'] | bool
       - win_tpm_info['TpmEnabled'] | bool
@@ -44,7 +46,6 @@
 - name: "Check TPM device is not present"
   ansible.builtin.assert:
     that:
-      - win_tpm_info
       - not win_tpm_info['TpmPresent'] | bool
       - not win_tpm_info['TpmReady'] | bool
       - not win_tpm_info['TpmEnabled'] | bool

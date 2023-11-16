@@ -5,7 +5,14 @@
 #
 - name: "Initialize the TPM device status"
   ansible.builtin.set_fact:
-    win_tpm_info: {}
+    win_tpm_info: {
+      'TpmPresent': false,
+      'TpmReady': false,
+      'TpmEnabled': false,
+      'TpmActivated': false,
+      'ManufacturerIdTxt': '',
+      'ManufacturerVersion': ''
+    }
 
 - name: "Get TPM device info"
   include_tasks: win_execute_cmd.yml
@@ -13,15 +20,15 @@
     win_powershell_cmd: "Get-Tpm | select TpmPresent,TpmReady,TpmEnabled,TpmActivated,ManufacturerIdTxt,ManufacturerVersion | fl"
 
 - name: "Set TPM device info dict"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length > 0
   block:
     - name: "Set fact of TPM device info"
       ansible.builtin.set_fact:
         win_tpm_info: "{{ win_tpm_info | combine({item.split(':')[0].strip(): item.split(':')[1].strip() | replace('\u0000', '')}) }}"
       when: item | length != 0
       with_items: "{{ win_powershell_cmd_output.stdout_lines }}"
-  when:
-    - win_powershell_cmd_output.stdout_lines is defined
-    - win_powershell_cmd_output.stdout_lines | length > 0
 
 - name: "Display the TPM device info"
   ansible.builtin.debug: var=win_tpm_info

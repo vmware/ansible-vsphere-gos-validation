@@ -23,6 +23,7 @@
 
 # Check if current VM is encrypted when no vTPM device
 - name: "VM without vTPM device"
+  when: not device_info_with_label
   block:
     - name: "Get VM key ID info"
       include_tasks: ../../common/vm_get_cryptokey_id.yml
@@ -30,7 +31,6 @@
       ansible.builtin.set_fact:
         vm_encrypt_state_before: "encrypt"
       when: vm_cryptokey_id_info
-  when: not device_info_with_label
 
 - name: "Set facts of cloned VM name and save current VM info"
   ansible.builtin.set_fact:
@@ -70,10 +70,10 @@
 - name: "Print the cloned VM file path"
   ansible.builtin.debug: var=vm_dir_name
 
-- name: "Do cold add vTPM device test"
+- name: "Perform cold add vTPM device test"
   include_tasks: cold_add_vtpm.yml
 
-- name: "Do cold remove vTPM device test"
+- name: "Perform cold remove vTPM device test"
   include_tasks: cold_remove_vtpm.yml
 
 - name: "Power off cloned VM"
