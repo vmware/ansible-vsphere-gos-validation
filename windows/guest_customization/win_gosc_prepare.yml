@@ -6,7 +6,7 @@
 # Note: refer to this page to set time zone id and name:
 # https://msdn.microsoft.com/en-us/library/ms912391.aspx
 #
-- name: Set fact of the common parameters in static and dhcp GOSC spec
+- name: "Set fact of the common parameters in static and dhcp GOSC spec"
   ansible.builtin.set_fact:
     customize_gos_hostname: 'gosc-test-win'
     customize_domain: "autotest.com"
@@ -17,32 +17,37 @@
     customize_timezone_name: "Hawaiian Standard Time"
     gosc_dns_servers: ['192.168.0.1', '192.168.0.2']
     customize_runonce_echo_string: 'Windows gosc automation test'
-- name: Set fact of the run once command
+
+- name: "Set fact of the run once command"
   ansible.builtin.set_fact:
     customize_runonce: "cmd.exe /c echo {{ customize_runonce_echo_string }} > C:\\gosc_runonce.txt"
 
-- name: Set fact of the VM guest IP before GOSC
+- name: "Set fact of the VM guest IP before GOSC"
   ansible.builtin.set_fact:
     guest_ip_before_gosc: "{{ vm_guest_ip }}"
 
-# Get guest OS hostname from VM guestinfo
-- include_tasks: ../../common/vm_get_config.yml
+- name: "Get guest OS hostname from VM guestinfo"
+  include_tasks: ../../common/vm_get_config.yml
   vars:
     property_list: ['guest.hostName']
 
-- name: Set fact of the hostname before GOSC
+- name: "Set fact of the hostname before GOSC"
   ansible.builtin.set_fact:
     hostname_before_gosc: "{{ vm_config.guest.hostName }}"
+
 - ansible.builtin.debug:
     msg: "Get guest OS hostname/IP before customization: {{ hostname_before_gosc }}/{{ guest_ip_before_gosc }}"
 
-- name: Set fact of default Windows dir
+- name: "Set fact of default Windows dir"
   ansible.builtin.set_fact:
     win_dir: '$env:windir'
-- include_tasks: ../utils/win_get_path.yml
+
+- name: "Get OS directory"
+  include_tasks: ../utils/win_get_path.yml
   vars:
     win_get_path_specified: "{{ win_dir }}"
-- name: Set fact of the absolute path of Windows dir
+
+- name: "Set fact of the absolute path of Windows dir"
   ansible.builtin.set_fact:
     win_dir: "{{ win_get_path_absolute }}"
 - ansible.builtin.debug:
@@ -50,14 +55,35 @@
 
 # Uninstall OneDrive in Windows 11 for the known 3rd-party issue
 # Paramter 'uninstall_onedrive' is used for internal testing only
-- include_tasks: uninstall_onedrive.yml
+- name: "Uninstall OneDrive"
+  include_tasks: uninstall_onedrive.yml
   when:
     - uninstall_onedrive is defined
     - uninstall_onedrive | bool
     - guest_os_ansible_distribution_ver is version('10.0.22000.0', '>=')
     - guest_os_product_type | lower == 'client'
 
+# Disable BitLocker which will cause sysprep failure.
+# BitLocker is not installed by default on Windows Server.
+- name: "Disable BitLocker"
+  when: guest_os_product_type | lower == 'client'
+  block:
+    - name: "Get BitLocker service status"
+      include_tasks: ../utils/win_get_service_status.yml
+      vars:
+        win_service_name: "BDESVC"
+
+    - name: "Stop and disable BitLocker service in guest OS"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "Set-Service -Name BDESVC -Status stopped -StartupType disabled"
+      when: service_status == "Running"
+
+    - name: "Decrypt Bitlocker volumes"
+      include_tasks: ../utils/win_decrypt_bitlocker_volume.yml
+
 # Shutdown guest OS before execute guest customization
-- include_tasks: ../utils/win_shutdown_restart.yml
+- name: "Shutdown OS"
+  include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "shutdown"
