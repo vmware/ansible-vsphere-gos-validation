@@ -52,6 +52,13 @@
       vars:
         secure_boot_enabled_set: "{{ secureboot_enabled | default(false) }}"
         enter_bios_setup: true
+    - name: "Enable VBS on VM"
+      include_tasks: ../utils/win_enable_vbs_vm.yml
+      vars:
+        win_enable_vbs: true
+      when:
+        - enable_vbs is defined and enable_vbs | bool
+        - guest_id is defined and "'64' in guest_id"
     - name: "Handle virtual TPM device"
       when: virtual_tpm is defined and virtual_tpm | bool
       block:
@@ -64,15 +71,6 @@
           include_tasks: ../../common/vm_add_remove_vtpm.yml
           vars:
             vtpm_operation: 'present'
-
-- name: "Enable VBS on VM"
-  include_tasks: ../utils/win_enable_vbs_vm.yml
-  vars:
-    win_enable_vbs: true
-  when:
-    - enable_vbs is defined and enable_vbs | bool
-    - guest_id is defined and "'64' in guest_id"
-    - firmware is defined and firmware | lower == "efi"
 
 - name: "Power on VM"
   include_tasks: ../../common/vm_set_power_state.yml
