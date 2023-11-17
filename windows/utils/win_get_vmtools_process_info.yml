@@ -1,0 +1,28 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VMware Tools processes in Windows guest OS
+#
+- name: "Initialize the fact of VMware Tools processes info"
+  ansible.builtin.set_fact:
+    vmtools_process_dict: {}
+
+- name: "Get VMware Tools processes info"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-Process vmtoolsd -IncludeUserName | select UserName, ProcessName, Id | fl"
+
+- name: "Set VMware Tools processes info"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+  block:
+    - name: "Set fact of VMware Tools processes info dict"
+      ansible.builtin.set_fact:
+        vmtools_process_dict: "{{ vmtools_process_dict | combine({item.split()[0].strip(): item.split()[1].strip()}) }}"
+      when: item | length != 0
+      with_items: "{{ win_powershell_cmd_output.stdout_lines }}"
+
+- name: "Print VMware Tools processes info dict"
+  ansible.builtin.debug:
+    msg: "Get VMware Tools processes in guest OS: {{ vmtools_process_dict }}"
