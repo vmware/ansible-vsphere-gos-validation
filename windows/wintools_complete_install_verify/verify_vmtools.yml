@@ -41,19 +41,26 @@
     msg: "Service '{{ item.key }}' status is: {{ item.value }}"
   with_dict: "{{ vmtools_service_dict }}"
 
-- name: "Get the user names of VMware Tools processes"
+- name: "Set fact of expected usernames of VMware Tools processes"
+  ansible.builtin.set_fact:
+    win_vmtoolsd_username_list: ["NT AUTHORITY\SYSTEM", "{{ guest_os_hostname }}\\{{ vm_username }}"]
+- name: "Get usernames of VMware Tools processes in guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "(Get-Process vmtoolsd -IncludeUserName).UserName"
-- name: "Check the user names of VMware Tools processes"
+- name: "Check usernames of VMware Tools processes"
   ansible.builtin.assert:
     that:
       - win_powershell_cmd_output.stdout_lines is defined
       - win_powershell_cmd_output.stdout_lines | length == 2
-      - win_powershell_cmd_output.stdout_lines[0] is match("*\SYSTEM")
-      - win_powershell_cmd_output.stdout_lines[1] is match("*\vm_username")
-    fail_msg: "Get user names '{{ win_powershell_cmd_output.stdout_lines | default('') }}', which are not expected '*\SYSTEM' and '*\{{ vm_username }}'."
-    success_msg: "Get user names '*\SYSTEM' and '*\{{ vm_username }}' of VMware Tools processes."
+      - win_powershell_cmd_output.stdout_lines | sort == win_vmtoolsd_username_list | sort
+    fail_msg: >-
+      Get usernames of 'vmtoolsd' processes:
+      {{ win_powershell_cmd_output.stdout_lines | default('') }},
+      expected ones are {{ win_vmtoolsd_username_list }}.
+    success_msg: >-
+      Get usernames of 'vmtoolsd' processes:
+      {{ win_powershell_cmd_output.stdout_lines }}.
 
 - name: "Get problem device after VMware Tools install"
   include_tasks: ../utils/win_get_problem_device.yml
