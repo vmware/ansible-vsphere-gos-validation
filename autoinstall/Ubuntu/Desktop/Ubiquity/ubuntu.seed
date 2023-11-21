@@ -1,5 +1,6 @@
 ### Step 1 : Localization
-d-i debian-installer/locale string en_US
+#d-i debian-installer/locale string en_US
+d-i debian-installer/language string en
 ubiquity languagechooser/language-name select English (US)
 ubiquity countrychooser/shortlist select US
 ubiquity localechooser/supported-locales multiselect en_US.UTF8
@@ -42,6 +43,7 @@ d-i passwd/root-login boolean true
 d-i passwd/root-password-crypted password {{ vm_password_md5 }}
 d-i user-setup/allow-password-weak boolean true
 
+# Package selection
 d-i pkgsel/language-packs multiselect en, zh
 d-i pkgsel/update-policy select none
 d-i pkgsel/upgrade select none
@@ -52,30 +54,26 @@ d-i pkgsel/upgrade select none
 d-i pkgsel/updatedb boolean false
 
 d-i finish-install/keep-consoles boolean true
-
 # Bootloader
 # This is fairly safe to set, it makes grub install automatically to the MBR
 # if no other operating system is detected on the machine.
 d-i grub-installer/only_debian boolean true
 
-# Install package
+# This first command is run as early as possible, just after
+# preseeding is read.
+d-i preseed/early_command string \
+    echo "Executing early command" >/dev/ttyS0; \
+    cp -a /cdrom/preseed/{{ pre_install_script_file }} /root/{{ pre_install_script_file }}; \
+    /bin/sh /root/{{ pre_install_script_file }} >/dev/ttyS0;
+
+# Execute post install script on success
 ubiquity ubiquity/success_command \
-    in-target apt-get update -y; \
-    in-target apt-get install -y --force-yes build-essential vim locales cloud-init openssh-server open-vm-tools open-vm-tools-desktop rdma-core rdmacm-utils ibverbs-utils; \
-{% if new_user is defined and new_user != 'root' %}
-    in-target su root; \
-    in-target echo "{{ vm_password }}"; \
-    echo '{{ new_user }} ALL=(ALL) NOPASSWD:ALL' >/target/etc/sudoers.d/{{ new_user }}; \
-    mkdir -p -m 700 /target/home/{{ new_user }}/.ssh; \
-    echo "{{ ssh_public_key }}" > /target/home/{{ new_user }}/.ssh/authorized_keys; \
-{% endif %}
-    mkdir -p -m 700 /target/root/.ssh; \
-    echo "{{ ssh_public_key }}" > /target/root/.ssh/authorized_keys; \
-    in-target chown --recursive root:root /root/.ssh; \
-    in-target chmod 0644 /root/.ssh/authorized_keys; \
-    in-target sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config; \
-    in-target sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config; \
-    echo "{{ autoinstall_complete_msg }}" >/dev/ttyS0
+    echo "Executing Ubiquity success command" >/dev/ttyS0; \
+    cp -a /cdrom/preseed/{{ post_install_script_file }} /target/root/{{ post_install_script_file }}; \
+    in-target /bin/bash /root/{{ post_install_script_file }}; \
+    echo "Dump installer log:" >/dev/ttyS0; \
+    cat /var/log/syslog >/dev/ttyS0; \
+    echo "{{ autoinstall_complete_msg }}" >/dev/ttyS0;
 
 d-i finish-install/reboot_in_progress note
 d-i cdrom-detect/eject boolean true

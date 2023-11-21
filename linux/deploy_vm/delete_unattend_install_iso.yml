@@ -1,38 +1,27 @@
 # Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Delete unattend install ISO file
+# Delete unattend install ISO file from ESXi datastore
 #
-# By default, it's attached to the last CDROM in composed VM CDROMs list
-- name: "Set fact of the controller and unit number of CDROM attaching unattend install ISO"
-  ansible.builtin.set_fact:
-    unattend_iso_cdrom_ctl_num: "{{ vm_cdroms[os_install_iso_list_len | int - 1].controller_number }}"
-    unattend_iso_cdrom_unit_num: "{{ vm_cdroms[os_install_iso_list_len | int - 1].unit_number }}"
-
-# Change CDROM type from iso to client
-- include_tasks: ../../common/vm_configure_cdrom.yml
+- name: "Reconfigure CDROM to client device"
+  include_tasks: ../../common/vm_configure_cdrom.yml
   vars:
     cdrom_type: client
-    cdrom_controller_num: "{{ unattend_iso_cdrom_ctl_num | int }}"
-    cdrom_unit_num: "{{ unattend_iso_cdrom_unit_num | int }}"
+    cdrom_controller_num: "{{ vm_cdrom.controller_number | int }}"
+    cdrom_unit_num: "{{ vm_cdrom.unit_number | int }}"
     cdrom_state: present
+  with_items: "{{ vm_cdroms }}"
+  loop_control:
+    loop_var: vm_cdrom
 
-# Delete unattend install iso on ESXi datastore
 # It could fail but doesn't affect tests, see https://kb.vmware.com/s/article/78653
-- include_tasks: ../../common/esxi_check_delete_datastore_file.yml
+- name: "Delete uploaded unattend install ISO from ESXi datastore"
+  include_tasks: ../../common/esxi_check_delete_datastore_file.yml
   vars:
     file_in_datastore: "{{ datastore }}"
-    file_in_datastore_path: "{{ unattend_iso_file_name }}"
+    file_in_datastore_path: "{{ unattend_iso }}"
     file_in_datastore_ops: "absent"
     file_in_datastore_ignore_failed: true
-
-- include_tasks: ../../common/esxi_check_delete_datastore_file.yml
-  vars:
-    file_in_datastore: "{{ datastore }}"
-    file_in_datastore_path: "{{ new_os_installation_iso }}"
-    file_in_datastore_ops: "absent"
-    file_in_datastore_ignore_failed: true
-  when:
-    - unattend_install_conf is match('Ubuntu/Server') or unattend_install_conf is match('Ubuntu/Desktop/Subiquity')
-    - new_os_installation_iso is defined
-    - new_os_installation_iso
+  with_items: "{{ transferred_unattend_iso_list }}"
+  loop_control:
+    loop_var: unattend_iso

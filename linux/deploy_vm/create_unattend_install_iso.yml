@@ -1,28 +1,45 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Set fact of the absolute path to unattend install config file template"
+- name: "Set facts of the absolute path to unattend install config file template and installer type"
   ansible.builtin.set_fact:
     unattend_install_template: "{{ main_playbook_path }}/autoinstall/{{ unattend_install_conf }}"
+    unattend_installer: |-
+      {%- if unattend_install_conf is match('Ubuntu/Desktop/Ubiquity') -%}Ubuntu-Ubiquity
+      {%- elif unattend_install_conf is match('(Ubuntu/Server)|(Ubuntu/Desktop/Subiquity)') -%}Ubuntu-Subiquity
+      {%- else -%}{{ unattend_install_conf.split('/')[0] }}
+      {%- endif -%}
 
-- ansible.builtin.debug:
+- name: "Display unattend install config file template"
+  ansible.builtin.debug:
     msg:
-      - "The unattend install config file is {{ unattend_install_template }}"
+      - "The unattend install config file template is {{ unattend_install_template }}"
+      - "The unattend installer is {{ unattend_installer }}"
+
+# 1. new_unattend_install_conf is the local file name of unattend install config file created from template.
+# 2. unattend_iso_file_name and unattend_iso_file_path are the new generated unattend install ISO file name
+# and path, which is used by OS in RHEL family, SUSE family, etc. Their automatic install just needs to pack
+# unattend install config file into a separate unattend install ISO, and then make this ISO be connected to
+# the 2nd CDROM of the VM.
+# 3. new_os_installation_iso and new_os_installation_iso_path are the rebuilt OS ISO image file and path,
+# which is used by OS like Photon, Debian, Pardus, FreeBSD, Ubuntu Desktop using Ubiquity installer, etc.
+# Their automatic install needs to rebuild OS image from original one by packing unattend install config file
+# into it, and no separate unattend install ISO needed. VM only needs to connect its 1st CDROM with the
+# rebuilt ISO.
+# 4. For Ubuntu Desktop or Server using Subiquity installer, their fully automatic install needs to rebuild
+# OS ISO image for changing boot command, and generate unattend install ISO with unattend install config file.
+- name: "Initialize facts for unattend install config files and ISO files"
+  ansible.builtin.set_fact:
+    new_unattend_install_conf: "{{ unattend_iso_cache }}/{{ unattend_install_template | basename }}"
+    unattend_iso_file_name: ""
+    unattend_iso_file_path: ""
+    new_os_installation_iso: ""
+    new_os_installation_iso_path: ""
 
 # unattend_install_conf is not for Ubuntu Server, Ubuntu Desktop 23.04 and later
-- block:
-    - name: "Create temp folder for generating unattend install ISO file"
-      include_tasks: ../../common/create_temp_file_dir.yml
-      vars:
-        tmp_dir: "{{ local_cache }}"
-        tmp_state: "directory"
-        tmp_prefix: "unattend_iso_"
-
-    - name: "Set facts of unattend install cache and file names"
-      ansible.builtin.set_fact:
-        unattend_iso_cache: "{{ tmp_path }}"
-        unattend_iso_file_name: "{{ guest_id }}{{ '_'.join(''.join(unattend_install_conf.split('.')[:-1]).split('/')) }}-{{ lookup('pipe','date +%s') }}.iso"
-
+- name: "Create unattend install ISO for {{ unattend_installer }}"
+  when: unattend_installer != "Ubuntu-Subiquity"
+  block:
     - name: "Set fact about installing desktop"
       ansible.builtin.set_fact:
         install_guest_with_desktop: true
@@ -30,141 +47,113 @@
         - guest_id in ['rhel8_64Guest', 'rhel9_64Guest']
         - unattend_install_conf is match('RHEL/8/server_with_GUI/')
 
-    - name: "Set fact of the absolute path of unattend install config file and ISO"
-      ansible.builtin.set_fact:
-        new_unattend_install_conf: "{{ unattend_iso_cache }}/{{ unattend_install_template.split('/')[-1] }}"
-        generated_unattend_iso: "{{ unattend_iso_cache }}/{{ unattend_iso_file_name }}"
-
-    - ansible.builtin.debug:
-        msg:
-          - "The unattend install config file to be generated is {{ new_unattend_install_conf }}"
-
     # For nvme boot disk, boot device name shoule be nvme0n1 instead of sda
     - name: "Set boot disk name"
       ansible.builtin.set_fact:
         boot_disk_name: "{{ 'nvme0n1' if boot_disk_controller == 'nvme' else 'sda' }}"
 
-    - name: "Create unattend config file from template"
-      ansible.builtin.template:
-        src: "{{ unattend_install_template }}"
-        dest: "{{ new_unattend_install_conf }}"
-        mode: "0644"
+    - name: "Create unattend install config file"
+      include_tasks: create_unattend_install_conf_file.yml
 
-    - name: "Print the content of unattend install config file"
-      ansible.builtin.debug:
-        msg: "{{ lookup('file', new_unattend_install_conf) | split('\n') }}"
+    - name: "Create unattend install ISO file for {{ unattend_installer }}"
+      when: unattend_installer not in ['Ubuntu-Ubiquity', 'Photon', 'Debian', 'FreeBSD', 'Pardus']
+      block:
+        - name: "Set fact of generated unattend install ISO file name"
+          ansible.builtin.set_fact:
+            unattend_iso_file_name: "{{ guest_id }}{{ '_'.join(''.join(unattend_install_conf.split('.')[:-1]).split('/')) }}-{{ timestamp }}.iso"
 
-    - name: "Create a guest OS unattend install ISO file"
-      include_tasks: ../../common/create_iso.yml
-      vars:
-        create_iso_src: ["{{ new_unattend_install_conf }}"]
-        create_iso_dest: "{{ generated_unattend_iso }}"
-        create_iso_vol_ident: 'OEMDRV'
-      when:
-        - unattend_install_conf is not match('Photon')
-        - unattend_install_conf is not match('Debian')
-        - unattend_install_conf is not match('Ubuntu/Desktop/Ubiquity')
-        - unattend_install_conf is not match('FreeBSD')
-        - unattend_install_conf is not match('Pardus')
+        - name: "Set fact of the local path to new generated unattend install ISO"
+          ansible.builtin.set_fact:
+            unattend_iso_file_path: "{{ unattend_iso_cache }}/{{ unattend_iso_file_name }}"
 
-    - name: "Build unattend install config file into OS ISO image"
-      include_tasks: rebuild_unattend_install_iso.yml
-      vars:
-        rebuilt_unattend_iso_path: "{{ generated_unattend_iso }}"
-      when: >
-        unattend_install_conf is match('Photon') or
-        unattend_install_conf is match('Debian') or
-        unattend_install_conf is match('Ubuntu/Desktop/Ubiquity') or
-        unattend_install_conf is match('FreeBSD') or
-        unattend_install_conf is match('Pardus')
-  when:
-    - unattend_install_conf is not match('Ubuntu/Server/')
-    - unattend_install_conf is not match('Ubuntu/Desktop/Subiquity')
+        - name: "Create unattend install ISO file for {{ unattend_installer }}"
+          include_tasks: ../../common/create_iso.yml
+          vars:
+            create_iso_src: ["{{ new_unattend_install_conf }}"]
+            create_iso_dest: "{{ unattend_iso_file_path }}"
+            create_iso_vol_ident: 'OEMDRV'
+
+    - name: "Rebuild OS installation ISO for {{ unattend_installer }}"
+      when: unattend_installer in ['Ubuntu-Ubiquity', 'Photon', 'Debian', 'FreeBSD', 'Pardus']
+      block:
+        - name: "Set fact of the rebuilt new OS installation ISO file name"
+          ansible.builtin.set_fact:
+            new_os_installation_iso: "{{ (os_installation_iso_list[0] | basename | splitext)[0] }}-{{ timestamp }}.iso"
+
+        - name: "Set fact of the local path to the rebuilt OS installation ISO file"
+          ansible.builtin.set_fact:
+            new_os_installation_iso_path: "{{ unattend_iso_cache }}/{{ new_os_installation_iso }}"
+
+        - name: "Rebuild OS ISO image with unattend install config file built-in for {{ unattend_installer }}"
+          include_tasks: rebuild_unattend_install_iso.yml
+          vars:
+            rebuilt_unattend_iso_path: "{{ new_os_installation_iso_path }}"
 
 # unattend_install_conf is for Ubuntu Server / Ubuntu desktop 23.04 or later
-- block:
+- name: "Create unattend install ISO for Ubuntu Server, Ubuntu desktop 23.04 or later"
+  when: unattend_installer == "Ubuntu-Subiquity"
+  block:
     - name: "Set fact for autoinstall start message to be printed to VM serial port"
       ansible.builtin.set_fact:
         autoinstall_start_msg: "Ubuntu autoinstall is started with IPv4 address:"
 
-    # Create the Ubuntu seed ISO to modify login information
-    - include_tasks: ../utils/create_seed_iso.yml
+    - name: "Create the Ubuntu seed ISO to modify login information"
+      include_tasks: ../utils/create_seed_iso.yml
       vars:
+        seed_iso_dir_path: "{{ unattend_iso_cache }}"
         user_data_template: "{{ unattend_install_template }}"
         local_hostname: "ubuntu-{{ hostname_timestamp }}"
 
-    - name: "Set fact of generated unattend install config file and seed ISO"
+    - name: "Set facts for generated unattend install ISO, config file and rebuilt OS installation ISO"
       ansible.builtin.set_fact:
         new_unattend_install_conf: "{{ user_data_path }}"
-        unattend_iso_cache: "{{ tmp_seed_dir }}"
-        generated_unattend_iso: "{{ seed_iso_path }}"
-        unattend_iso_file_name: "{{ lookup('pipe','date +%s') }}-{{ seed_iso_path | basename }}"
-        new_os_installation_iso: "{{ lookup('pipe','date +%s') }}_{{ os_installation_iso_list[0].split()[1] | basename }}"
+        unattend_iso_file_path: "{{ seed_iso_path }}"
+        unattend_iso_file_name: "{{ seed_iso_path | basename }}"
+        new_os_installation_iso: "{{ (os_installation_iso_list[0] | basename | splitext)[0] }}-{{ timestamp }}.iso"
 
-    - include_tasks: rebuild_unattend_install_iso.yml
-      vars:
-        rebuilt_unattend_iso_path: "{{ unattend_iso_cache }}/{{ new_os_installation_iso }}"
-
-    # Upload Ubuntu fully automated install ISO to ESXi datastore
-    - include_tasks: ../../common/esxi_upload_datastore_file.yml
-      vars:
-        src_file_path: "{{ unattend_iso_cache }}/{{ new_os_installation_iso }}"
-        dest_file_path: "{{ new_os_installation_iso }}"
-        upload_file_timeout: 600
-
-    - name: "Replace original install ISO file with fully automated install ISO file"
+    - name: "Set fact of the local path to the rebuilt OS installation ISO file"
       ansible.builtin.set_fact:
-        os_installation_iso_list: ["[{{ datastore }}] {{ new_os_installation_iso }}"]
-        os_install_iso_list_len: 1
-  when: >
-    unattend_install_conf is match('Ubuntu/Server/') or
-    unattend_install_conf is match('Ubuntu/Desktop/Subiquity')
+        new_os_installation_iso_path: "{{ unattend_iso_cache }}/{{ new_os_installation_iso }}"
 
-- name: "Set fact of unattended install ISO path on datastore {{ datastore }}"
-  ansible.builtin.set_fact:
-    transferred_unattend_iso: "[{{ datastore }}] {{ unattend_iso_file_name }}"
+    - name: "Rebuild Ubuntu ISO for fully automated install"
+      include_tasks: rebuild_unattend_install_iso.yml
+      vars:
+        rebuilt_unattend_iso_path: "{{ new_os_installation_iso_path }}"
 
-- ansible.builtin.debug:
+- name: "Display facts of unattend install config file and ISOs"
+  ansible.builtin.debug:
     msg:
-      - "The unattend install ISO generated is {{ generated_unattend_iso }}"
-      - "The unattend install ISO will be uploaded to '{{ transferred_unattend_iso }}' on ESXi host"
+      - "The unattend install config file path is {{ new_unattend_install_conf }}"
+      - "The unattend install ISO file name is {{ unattend_iso_file_name }}"
+      - "The unattend install ISO file path is {{ unattend_iso_file_path }}"
+      - "The rebuilt OS installation ISO file name is {{ new_os_installation_iso }}"
+      - "The rebuilt OS installation ISO file path is {{ new_os_installation_iso_path }}"
 
-# Upload unattend install ISO to ESXi datastore
-- include_tasks: ../../common/esxi_upload_datastore_file.yml
+- name: "Set fact of unattend install ISO files to be uploaded to ESXi datastore"
+  ansible.builtin.set_fact:
+    transferred_unattend_iso_list: "{{ [unattend_iso_file_name, new_os_installation_iso] | select }}"
+
+- name: "Display unattend install ISO files to be uploaded to ESXi datastore"
+  ansible.builtin.debug:
+    msg: "The unattend install ISO to be uploaded to ESXi datastore {{ datastore }}: {{ transferred_unattend_iso_list }}"
+
+- name: "Upload unattend install ISO files to ESXi datastore"
+  include_tasks: ../../common/esxi_upload_datastore_file.yml
   vars:
-    src_file_path: "{{ generated_unattend_iso }}"
-    dest_file_path: "{{ unattend_iso_file_name }}"
+    src_file_path: "{{ unattend_iso_cache }}/{{ item }}"
+    dest_file_path: "{{ item }}"
     upload_file_timeout: 600
+  with_items: "{{ transferred_unattend_iso_list }}"
 
-- name: "Append generated unattend ISO file to the list"
+- name: "Replace original OS installation ISO file with new rebuilt ISO file"
   ansible.builtin.set_fact:
-    os_installation_iso_list: "{{ os_installation_iso_list + [transferred_unattend_iso] }}"
-    os_install_iso_list_len: "{{ os_install_iso_list_len | int + 1 }}"
-  when:
-    - unattend_install_conf is not match('Photon')
-    - unattend_install_conf is not match('Debian')
-    - unattend_install_conf is not match('Ubuntu/Desktop/Ubiquity')
-    - unattend_install_conf is not match('FreeBSD')
-    - unattend_install_conf is not match('Pardus')
-
-- name: "Replace original install ISO file with unattend install ISO file"
-  ansible.builtin.set_fact:
-    os_installation_iso_list: "{{ [transferred_unattend_iso] }}"
+    os_installation_iso_list:
+      - "[{{ datastore }}] {{ new_os_installation_iso }}"
     os_install_iso_list_len: 1
-  when: >
-    unattend_install_conf is match('Photon') or
-    unattend_install_conf is match('Debian') or
-    unattend_install_conf is match('Ubuntu/Desktop/Ubiquity') or
-    unattend_install_conf is match('FreeBSD') or
-    unattend_install_conf is match('Pardus')
+  when: new_os_installation_iso
 
-- name: "Copy generated unattend install config file to log folder"
-  ansible.builtin.copy:
-    src: "{{ new_unattend_install_conf }}"
-    dest: "{{ current_test_log_folder }}/{{ new_unattend_install_conf | basename }}"
-  when: unattend_install_conf is not match('Ubuntu/Server/')
-
-- name: "Remove cache folder {{ unattend_iso_cache }}"
-  ansible.builtin.file:
-    path: "{{ unattend_iso_cache }}"
-    state: absent
+- name: "Append generated unattend install ISO file to OS installation ISO list"
+  ansible.builtin.set_fact:
+    os_installation_iso_list: "{{ os_installation_iso_list + ['[' ~ datastore ~ '] ' ~ unattend_iso_file_name] }}"
+    os_install_iso_list_len: "{{ os_install_iso_list_len | int + 1 }}"
+  when: unattend_iso_file_name

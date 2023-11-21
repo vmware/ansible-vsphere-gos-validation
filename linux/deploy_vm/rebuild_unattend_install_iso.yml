@@ -10,8 +10,9 @@
     iso_file_datastore: "{{ os_installation_iso_list[0].split()[0] | regex_replace('\\[|\\]', '') }}"
     iso_file_path_in_datastore: "{{ os_installation_iso_list[0].split()[1] }}"
 
-# Fetch ISO file from ESXi datastore
-- include_tasks: ../../common/esxi_download_datastore_file.yml
+# Fetch original ISO file from ESXi datastore
+- name: "Download source ISO image file from ESXi datastore"
+  include_tasks: ../../common/esxi_download_datastore_file.yml
   vars:
     src_datastore: "{{ iso_file_datastore }}"
     src_file_path: "{{ iso_file_path_in_datastore }}"
@@ -28,19 +29,15 @@
   ansible.builtin.set_fact:
     unattend_install_file_name: "{{ new_unattend_install_conf | basename }}"
 
-- name: "Set fact of unattend install config file name"
-  ansible.builtin.set_fact:
-    unattend_install_os_type: "{{ unattend_install_conf.split('/')[0]  | lower }}"
+- name: "Rebuild ISO image file for {{ unattend_installer }}"
+  include_tasks: "rebuild_{{ unattend_installer.split('-')[0] | lower }}_unattend_install_iso.yml"
+  when: unattend_installer in ["Ubuntu-Ubiquity", "Ubuntu-Subiquity", "Photon", "Debian", "Pardus"]
 
-- name: "rebuild ISO for {{ unattend_install_os_type }}"
-  include_tasks: "rebuild_{{ unattend_install_os_type }}_unattend_install_iso.yml"
-  when: unattend_install_os_type in ["photon", "debian", "ubuntu", "pardus"]
-
-- name: "Rebuild ISO for FreeBSD"
+- name: "Rebuild ISO image file for FreeBSD"
   community.general.iso_customize:
     src_iso: "{{ src_iso_file_path }}"
     dest_iso: "{{ rebuilt_unattend_iso_path }}"
     add_files:
       - src_file: "{{ new_unattend_install_conf }}"
         dest_file: "/etc/installerconfig"
-  when: unattend_install_os_type == "freebsd"
+  when: unattend_installer == "FreeBSD"

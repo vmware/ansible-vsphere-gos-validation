@@ -30,8 +30,17 @@
 - name: "Create cloud-init seed ISO to configure guest OS"
   include_tasks: ../utils/create_seed_iso.yml
   vars:
+    seed_iso_dir_path: "{{ unattend_iso_cache }}"
     user_data_template: "{{ ova_guest_os_type }}-ova-user-data.j2"
     local_hostname: "{{ ova_guest_os_type }}-ova-{{ hostname_timestamp }}"
+
+- name: "Set fact of cloud-init seed ISO to be uploaded to ESXi datastore"
+  ansible.builtin.set_fact:
+    transferred_unattend_iso_list: ["{{ seed_iso_path | basename }}"]
+
+- name: "Display cloud-init seed ISO to be uploaded to ESXi datastore"
+  ansible.builtin.debug:
+    msg: "The cloud-init seed ISO to be uploaded to ESXi datastore {{ datastore }}: {{ transferred_unattend_iso_list }}"
 
 - name: "Upload cloud-init seed ISO to ESXi server datastore"
   include_tasks: ../../common/esxi_upload_datastore_file.yml
@@ -115,10 +124,13 @@
 - name: "Eject CDROM devices from guest OS"
   include_tasks: ../utils/eject_cdrom_in_guest.yml
 
-- name: "Remove local temporary directory {{ tmp_seed_dir }}"
-  include_tasks: ../../common/delete_local_file.yml
+- name: "Delete uploaded cloud-init seed ISO from ESXi datastore"
+  include_tasks: ../../common/esxi_check_delete_datastore_file.yml
   vars:
-    local_path: "{{ tmp_seed_dir }}"
+    file_in_datastore: "{{ datastore }}"
+    file_in_datastore_path: "{{ vm_dir_name }}/{{ seed_iso_path | basename }}"
+    file_in_datastore_ops: "absent"
+    file_in_datastore_ignore_failed: true
 
 - name: "Get all CDROM devices on VM"
   include_tasks: ../../common/vm_get_cdrom_devices.yml

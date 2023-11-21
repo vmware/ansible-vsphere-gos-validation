@@ -39,16 +39,17 @@
     - "install_en.cfg"
     - "install.cfg"
 
+# Add DPMS=-s\ 0 to boot command line to disable screen saver for debian installer
 - name: "Update boot parameters with preseed.cfg"
   ansible.builtin.replace:
     path: "{{ src_iso_file_dir }}/{{ item }}"
-    regexp: '(.*)(append )(.*)'
-    replace: "\\1\\2 auto=true file=/cdrom/{{ unattend_install_file_name }} \\3"
+    regexp: 'append'
+    replace: 'append auto=true file=/cdrom/{{ unattend_install_file_name }} "DPMS=-s 0"'
   with_items:
     - "install_en.cfg"
     - "install.cfg"
 
-- name: "Update default memuentry for grub.cfg"
+- name: "Update default memu entry for grub.cfg"
   ansible.builtin.replace:
     path: "{{ src_iso_file_dir }}/grub.cfg"
     regexp: "set default=0"
@@ -60,6 +61,7 @@
     insertafter: "^submenu.*English.*{#"
     line: '  set default="autoinstall"'
 
+# Add DPMS=-s\ 0 to boot command line to disable screen saver for debian installer
 - name: "Update boot parameters for autoinstall"
   ansible.builtin.blockinfile:
     path: "{{ src_iso_file_dir }}/grub.cfg"
@@ -68,8 +70,8 @@
       # menuentry for unattended installation
         menuentry "Automated installation" --id autoinstall {
           set background_color=black
-          linux    /install/gtk/vmlinuz auto=true file=/cdrom/{{ unattend_install_file_name }} video=vesa:ywrap,mtrr vga=788 --- quiet
-          initrd   /install/gtk/initrd.gz
+          linux  /install/gtk/vmlinuz auto=true file=/cdrom/{{ unattend_install_file_name }} video=vesa:ywrap,mtrr vga=788 "DPMS=-s 0" --- quiet
+          initrd /install/gtk/initrd.gz
         }
 
 - name: "Update md5sum for Pardus ISO files"
@@ -85,10 +87,10 @@
     - "echo \"`md5sum install.cfg | awk '{print $1}'` ./isolinux/install.cfg\" >>md5sum.txt"
   args:
     chdir: "{{ src_iso_file_dir }}"
-  register: update_initrd_output
+  register: update_md5sum_result
 
-- name: "Print command output for updating initrd"
-  ansible.builtin.debug: var=update_initrd_output
+- name: "Print command output for updating files' md5sum"
+  ansible.builtin.debug: var=update_md5sum_result
 
 - name: "Customize the ISO"
   community.general.iso_customize:
@@ -107,4 +109,7 @@
         dest_file: "md5sum.txt"
       - src_file: "{{ new_unattend_install_conf }}"
         dest_file: "{{ unattend_install_file_name }}"
-
+      - src_file: "{{ src_iso_file_dir }}/{{ pre_install_script_file }}"
+        dest_file: "{{ pre_install_script_file }}"
+      - src_file: "{{ src_iso_file_dir }}/{{ post_install_script_file }}"
+        dest_file: "{{ post_install_script_file }}"

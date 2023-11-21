@@ -24,8 +24,8 @@
         - name: "Get VM's guest info"
           include_tasks: ../../common/vm_get_guest_info.yml
           when:
-            - unattend_install_conf is defined
-            - unattend_install_conf | lower is not match('.*bclinux-for-euler.*')
+            - unattend_installer is defined
+            - unattend_installer != "BCLinux-for-Euler"
             - vmtools_is_running
 
         - name: "Collect cloud-init logs"
@@ -33,8 +33,7 @@
           when:
             - guestinfo_guest_id is defined
             - ((guestinfo_guest_id is match('ubuntu.*') and
-                unattend_install_conf is defined and
-                (unattend_install_conf is match('Ubuntu/Server/') or
-                 unattend_install_conf is match('Ubuntu/Desktop/Subiquity'))) or
+                unattend_installer is defined and
+                unattend_installer == 'Ubuntu-Subiquity') or
                (ova_guest_os_type is defined and
                 ova_guest_os_type in ['photon', 'ubuntu', 'amazon']))
