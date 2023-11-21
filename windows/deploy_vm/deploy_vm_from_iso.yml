@@ -45,7 +45,7 @@
     vm_exists: true
 
 - name: "Handle VM with EFI firmware"
-  when: firmware is defined and firmware | lower == "efi"
+  when: firmware | lower == "efi"
   block:
     - name: "Enable secure boot"
       include_tasks: ../../common/vm_set_boot_options.yml
@@ -58,7 +58,7 @@
         win_enable_vbs: true
       when:
         - enable_vbs is defined and enable_vbs | bool
-        - guest_id is defined and "'64' in guest_id"
+        - guest_id is match('.*64Guest')
     - name: "Handle virtual TPM device"
       when: virtual_tpm is defined and virtual_tpm | bool
       block:
@@ -85,7 +85,7 @@
       - DOWNARROW
       - ENTER
       - ENTER
-  when: firmware is defined and firmware | lower == "efi"
+  when: firmware | lower == "efi"
 
 - name: "Wait 3 minutes while OS install"
   ansible.builtin.pause:
@@ -100,7 +100,7 @@
     vm_wait_log_ignore_errors: false
     vm_wait_log_hide_output: false
   when:
-    - firmware is defined and firmware | lower == 'efi'
+    - firmware | lower == 'efi'
     - secureboot_enabled is defined and secureboot_enabled
 
 - name: "Wait for VM network adapter is connected"
@@ -128,8 +128,8 @@
 - name: "Enable VBS in guest OS"
   when:
     - enable_vbs is defined and enable_vbs | bool
-    - guest_id is defined and "'64' in guest_id"
-    - firmware is defined and firmware | lower == "efi"
+    - guest_id is match('.*64Guest')
+    - firmware | lower == "efi"
   block:
     - name: "Get guest OS system info"
       include_tasks: ../utils/get_windows_system_info.yml
