@@ -18,6 +18,7 @@
   when: vtpm_test_operation == 'add'
 
 # Check VM is not encrypted after removing vTPM device
+# when VM home files are not encrypted at the beginning
 - name: "Check 'keyId' property is unset in VM config"
   ansible.builtin.assert:
     that:
@@ -25,7 +26,7 @@
     fail_msg: "'keyId' property is set in VM config: {{ vm_key_id_info }}, which should be unset after removing vTPM device."
   when:
     - vtpm_test_operation == 'remove'
-    - not vm_disk_encrypted_before
+    - not vm_home_encrypted
 
 - name: "Get TPM device info in guest OS"
   include_tasks: ../utils/win_get_tpm_status.yml
