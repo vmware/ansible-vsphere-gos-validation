@@ -8,7 +8,7 @@
 #   vm_set_power_state_sleep (optional): wait time in seconds when VM power state
 #     changed. Default value is 10.
 #
-- name: Set fact of valid power state list
+- name: "Set fact of valid power state list"
   ansible.builtin.set_fact:
     valid_expected_power_state:
       - powered-off
@@ -18,15 +18,18 @@
       - shutdown-guest
       - suspended
       - present
-- name: Check required parameter
+
+- name: "Check required parameter"
   ansible.builtin.assert:
     that:
       - vm_power_state_set is defined
       - vm_power_state_set | lower in valid_expected_power_state
-    fail_msg: "vm_power_state_set is undefined or invalid, valid value is in: {{ valid_expected_power_state }}"
+    fail_msg: >-
+      vm_power_state_set is undefined or invalid, valid value is in: {{ valid_expected_power_state }}
 
 # Make sure VMware tools is installed and running before shutdown VM
-- include_tasks: vm_wait_vmtools_status.yml
+- name: "Wait for VMware Tools running"
+  include_tasks: vm_wait_vmtools_status.yml
   vars:
     vm_wait_vmtools_running: true
   when: vm_power_state_set | lower == 'shutdown-guest' or vm_power_state_set | lower == 'reboot-guest'
@@ -46,7 +49,8 @@
 
 - name: "Replace serial port output file at power on"
   block:
-    - include_tasks: vm_answer_question.yml
+    - name: "Answer question about overwritting serial port file"
+      include_tasks: vm_answer_question.yml
       vars:
         vm_question: "{{ vm_change_power_state.instance.guest_question }}"
         vm_question_response: "button.serial.file.overwrite"
@@ -69,13 +73,13 @@
 - name: "Change VM power state failure"
   ansible.builtin.fail:
     msg: >
-      {% if vm_change_power_state is defined and vm_change_power_state.msg is defined %}{{ vm_change_power_state.msg }}
-      {% else %}Failed to set VM power state to {{ vm_power_state_set | lower }}{% endif %}
+      Failed to set VM power state to {{ vm_power_state_set | lower }} because of:
+      {{ vm_change_power_state.msg | default('') }}
   when: >
     vm_change_power_state is undefined or
     vm_change_power_state.failed is defined and vm_change_power_state.failed | bool
 
-- name: Display the result of changing VM power state
+- name: "Display the result of changing VM power state"
   ansible.builtin.debug: var=vm_change_power_state
 
 - name: "Wait for VM enter into the expected state"

@@ -1,0 +1,32 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Extract text from a local screenshot file
+# Parameters:
+#   local_screenshot_path: The local screenshot file path
+# Return:
+#   text_in_screenshot: The text extracted from the screenshot file
+#
+- name: "Check local screenshot file path is an absolute path"
+  ansible.builtin.assert:
+    that:
+      - local_screenshot_path is defined
+      - local_screenshot_path
+      - local_screenshot_path is ansible.builtin.abs
+    fail_msg: "Parameter 'local_screenshot_path' must be set with a local absolute path"
+
+- name: "Initialize the fact of extracted screenshot text"
+  ansible.builtin.set_fact:
+    text_in_screenshot: []
+
+- name: "Extract text from local screenshot file"
+  ansible.builtin.script: "../tools/extractor.py -t text -f {{ local_screenshot_path }}"
+  ignore_errors: True
+  register: extract_text_result
+
+- name: "Set fact of extracted screenshot text"
+  ansible.builtin.set_fact:
+    text_in_screenshot: "{{ extract_text_result.stdout_lines | select }}"
+  when:
+    - extract_text_result.stdout_lines is defined
+    - extract_text_result.stdout_lines | length > 0

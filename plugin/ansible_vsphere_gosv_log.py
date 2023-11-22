@@ -602,6 +602,10 @@ class CallbackModule(CallbackBase):
                 self._play_tasks_cache['known_issue'].append(task_path)
                 self.add_logger_file_handler(self.known_issues_log)
 
+        if 'fail_message' in task.tags and 'msg' in result._result:
+            self._display.display("TAGS: fail_message", color=C.COLOR_WARN)
+            log_failed_tasks = True
+
         # Add logger handler for failed tasks
         if log_failed_tasks:
             log_header = ""

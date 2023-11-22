@@ -4,15 +4,16 @@
 
 ### Prerequisites
 1. Install Ansible on your control machine, please refer to [Installing Ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html)
-2. Install required Python libraries in requirements.txt
+2. Install Tesseract Open Source OCR Engine for extracting text from screenshots, please refer to [Installing Tesseract](https://github.com/tesseract-ocr/tesseract?tab=readme-ov-file#installing-tesseract)
+3. Install required Python libraries in requirements.txt
 ```
 $ pip install -r requirements.txt
 ```
-3. Install required Ansible collections with latest version in requirements.yml
+4. Install required Ansible collections with latest version in requirements.yml
 ```
 $ ansible-galaxy install -r requirements.yml
 ```
-4. Log in to local control machine as root or a user in sudoers, which must enable NOPASSWD for all commands
+5. Log in to local control machine as root or a user in sudoers, which must enable NOPASSWD for all commands
 
 ### Steps to Launch Testing
 1. Git clone project from github to your workspace on control machine.

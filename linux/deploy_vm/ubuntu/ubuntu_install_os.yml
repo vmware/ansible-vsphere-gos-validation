@@ -7,15 +7,16 @@
 
 # Wait for autoinstall start message in serial port output file
 - name: "Wait for Ubuntu autoinstall is started successfully"
-  when: ubuntu_install_method is defined and ubuntu_install_method == "cloud-init"
+  when: unattend_installer == 'Ubuntu-Subiquity'
   block:
-    - name: "Wait for autoinstall start message"
-      include_tasks: ../../../common/vm_wait_log_msg.yml
+    - name: "Wait for Ubuntu autoinstall start message"
+      include_tasks: ../../../common/wait_vm_deploy_checkpoint.yml
       vars:
-        vm_wait_log_name: "{{ vm_serial_port_output_file | basename }}"
-        vm_wait_log_msg: "{{ autoinstall_start_msg }}[^\\r\\n]*"
-        vm_wait_log_retries: 150
-        vm_wait_log_delay: 5
+        wait_checkpoint_name: "autoinstall_start"
+        wait_checkpoint_log_file: "{{ vm_serial_file_name }}"
+        wait_checkpoint_msg: "{{ autoinstall_start_msg }}[^\\r\\n]*"
+        wait_checkpoint_delay: 10
+        wait_checkpoint_retires: 150
 
     # Ubuntu autoinstall with cloud configs requires network connection.
     # When autoinstall start message is detected, its must be followed with an IPv4
@@ -25,7 +26,7 @@
       ansible.builtin.set_fact:
         ubuntu_autoinstall_start_ipv4: >-
           {{
-            vm_wait_log_msg_list |
+            checkpoint_msg_list |
             map('replace', autoinstall_start_msg, '') |
             map('trim') |
             ansible.utils.ipaddr('address')

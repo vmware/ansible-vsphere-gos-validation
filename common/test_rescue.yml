@@ -43,7 +43,26 @@
     - name: "Take a screenshot at VM current state"
       include_tasks: vm_take_screenshot.yml
       vars:
-        vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
+        vm_screenshot_local_dir: "{{ current_test_log_folder }}"
+        vm_screenshot_local_name: "screenshot_at_{{ current_testcase_index }}_{{ ansible_play_name }}.png"
+        vm_screen_active: "{{ gosv_test_suite == 'linux' }}"
+
+    - name: "Extract text from VM screenshot at failed test case {{ current_testcase_name }}"
+      when:
+        - vm_screenshot_local_path
+        - gosv_test_suite == 'windows' or ansible_play_name != 'deploy_vm'
+      block:
+        - name: "Extract text from screenshot file"
+          include_tasks: extract_text_from_screenshot.yml
+          vars:
+            local_screenshot_path: "{{ vm_screenshot_local_path }}"
+
+        - name: "Display extracted text from screenshot"
+          ansible.builtin.debug:
+            msg: "{{ text_in_screenshot }}"
+          tags:
+            - fail_message
+          when: text_in_screenshot | length > 0
 
     - name: "Download VM's vmware.log"
       include_tasks: esxi_download_datastore_file.yml
