@@ -1,0 +1,41 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Create a new VM from the specified VM or template
+# Paramters:
+#   parent_vm_name: The name of parent VM or template
+#   cloned_vm_name: The name of cloned VM
+#
+- name: "Check parameters for VM clone"
+  ansible.builtin.assert:
+    that:
+      - parent_vm_name is defined and parent_vm_name
+      - cloned_vm_name is defined and cloned_vm_name
+    fail_msg: >-
+      VM clone requires 'parent_vm_name' and 'cloned_vm_name'.
+      At least one of them is not set.
+
+- name: "Clone a VM from '{{ parent_vm_name }}'"
+  community.vmware.vmware_guest:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    datastore: "{{ datastore }}"
+    template: "{{ parent_vm_name }}"
+    name: "{{ cloned_vm_name }}"
+  register: vm_clone_result
+- name: "Display the result of VM clone"
+  ansible.builtin.debug: var=vm_clone_result
+  when: enable_debug
+
+- name: "Check VM clone result"
+  ansible.builtin.assert:
+    that:
+      - vm_clone_result is defined
+      - vm_clone_result.changed is defined
+      - vm_clone_result.changed
+    fail_msg: "Failed to create a cloned VM '{{ cloned_vm_name }}' from '{{ parent_vm_name }}'."
+    success_msg: "VM '{{ cloned_vm_name }}' is cloned from '{{ parent_vm_name }}' successfully."

@@ -1,0 +1,78 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Handle VM without vTPM device situation"
+  when: not vm_with_vtpm
+  block:
+    - name: "Power off instant cloned VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-off'
+    - name: "Add key provider on vCenter server"
+      include_tasks: ../../common/vcenter_add_key_provider.yml
+      vars:
+        vc_cert_path: "{{ current_test_log_folder }}"
+      when:
+        - key_provider_type is defined and key_provider_type
+        - not (key_provider_added is defined and key_provider_added)
+    - name: "Add vTPM device to cloned VM"
+      include_tasks: ../../common/vm_add_remove_vtpm.yml
+      vars:
+        vtpm_operation: 'present'
+    - name: "Pause 10 seconds after adding vTPM device"
+      ansible.builtin.pause:
+        seconds: 10
+
+- name: "Power on cloned VM"
+  include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-on'
+
+- name: "Get cloned VM primary MAC address"
+  include_tasks: ../../common/vm_wait_primary_nic_mac.yml
+
+- name: "Check cloned VM MAC is not the same as parent VM MAC address"
+  ansible.builtin.assert:
+    that:
+      - vm_primary_nic_mac != vm_nic_mac_clone_from
+    fail_msg: >-
+      Cloned VM '{{ vm_name_clone_to }}' MAC address is '{{ vm_primary_nic_mac }}',
+      which is the same as parent VM '{{ vm_name_clone_from }}' MAC address.
+    success_msg:
+      - "Parent VM '{{ vm_name_clone_from }}' MAC address is: {{ vm_nic_mac_clone_from }}."
+      - "Cloned VM '{{ vm_name_clone_to }}' MAC address is: {{ vm_primary_nic_mac }}."
+
+- name: "Initialize cloned VM IP address"
+  ansible.builtin.set_fact:
+    retry_vm_guest_ip: ""
+- name: "Retry to get cloned VM IP address"
+  block:
+    - name: "Get cloned VM IP address"
+      include_tasks: retry_vm_get_ip.yml
+      with_list: "{{ range(1, 11) | list }}"
+      loop_control:
+        loop_var: retry_count
+  when: >
+    (not retry_vm_guest_ip) or
+    (retry_vm_guest_ip == vm_ip_clone_from)
+
+- name: "Check cloned VM IP is not the same as parent VM IP address"
+  ansible.builtin.assert:
+    that:
+      - retry_vm_guest_ip != vm_ip_clone_from
+    fail_msg: >-
+      Cloned VM '{{ vm_name_clone_to }}' IP address is '{{ retry_vm_guest_ip }}',
+      which is the same as parent VM '{{ vm_name_clone_from }}' IP address after refreshing 100 seconds.
+    success_msg:
+      - "Parent VM '{{ vm_name_clone_from }}' IP address is: {{ vm_ip_clone_from }}."
+      - "Cloned VM '{{ vm_name_clone_to }}' IP address is: {{ retry_vm_guest_ip }}."
+
+- name: "Check winrm is connectable in cloned VM"
+  include_tasks: ../utils/win_check_winrm.yml
+- name: "Add Windows host to in-memory inventory"
+  include_tasks: ../utils/add_windows_host.yml
+
+- name: "Check vTPM device added"
+  include_tasks: vtpm_add_remove_check.yml
+  vars:
+    vtpm_test_operation: "add"

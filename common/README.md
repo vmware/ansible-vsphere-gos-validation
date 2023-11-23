@@ -14,6 +14,7 @@
 * vm_get_cdrom_devices.yml: Get VM CDROM devices info list
 * vm_get_vbs_status.yml: Get Windows VM VBS enablement status
 * collect_ovf_vm_config.yml: Collect VM hardware configurations and save to a json file
+* vm_get_cryptokey_id.yml: Get cryptographic key ID info in VM config
 
 ### Tasks for VM deploy or remove
 * vm_create.yml: Create a new VM on ESXi host
@@ -22,6 +23,7 @@
 * ovf_export.yml: Export VM to OVF template
 * vm_remove.yml: Delete VM from ESXi host
 * vm_instant_clone.yml: Create an instant clone of VM
+* vm_clone.yml: Create a cloned VM from existing VM or template
 
 ### Tasks for VM basic settings
 * vm_set_guest_id.yml: Set VM's guest id
@@ -35,7 +37,6 @@
 * vm_set_video_card.yml: Configure VM video card settings
 * vm_remove_serial_port.yml: Remove a serial port from VM
 * vm_add_remove_vtpm.yml: Add or remove vTPM device from VM
-* vm_add_vtpm_device.yml: Add key provider on vCenter then add new vTPM device to VM
 * vm_answer_question.yml: Answer question at VM power on
 
 ### Tasks for VM CPU or Memory settings

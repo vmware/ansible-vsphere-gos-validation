@@ -1,0 +1,38 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the values of 'KeyId' properties in VM config
+# and disk device info in VM config.hardware.device.
+#
+- name: "Initialize the values of 'keyId' properties"
+  ansible.builtin.set_fact:
+    vm_key_id_info: ""
+    vm_disk_key_id_info: []
+
+- name: "Get 'keyId' and 'hardware' properties in VM config"
+  include_tasks: vm_get_config.yml
+  vars:
+    property_list: ['config.keyId', 'config.hardware.device']
+
+- name: "Set fact of 'keyId' info from VM config"
+  ansible.builtin.set_fact:
+    vm_key_id_info: "{{ vm_config.config.keyId }}"
+  when:
+    - vm_config.config.keyId is defined
+    - vm_config.config.keyId
+
+- name: "Set fact of disk 'keyId' info from VM config.hardware.device"
+  ansible.builtin.set_fact:
+    vm_disk_key_id_info: "{{ vm_disk_key_id_info + [item.backing.keyId] }}"
+  when:
+    - item.backing.keyId is defined
+    - item.backing.keyId
+  with_items: "{{ vm_config.config.hardware.device |
+                  selectattr('_vimtype', 'equalto', 'vim.vm.device.VirtualDisk') }}"
+  no_log: true
+
+- name: "Display the VM cryptographic key info"
+  ansible.builtin.debug:
+    msg:
+      - "The VM 'KeyId' info in VM config: {{ vm_key_id_info }}"
+      - "The disk 'KeyId' info in VM config.hardware.device: {{ vm_disk_key_id_info }}"
