@@ -1,53 +1,73 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Check VMware tools service is running and display the installed VMware tools
-# version, get VMware tools installation log file.
+# Check VMware Tools service is running and display the installed VMware Tools
+# version, get VMware Tools installation log file.
 #
-- include_tasks: ../utils/win_get_path.yml
+- name: "Get VMware Tools install log file path"
+  include_tasks: ../utils/win_get_path.yml
   vars:
     win_get_path_specified: '$env:temp\vminst.log'
-- include_tasks: ../utils/win_get_file.yml
+- name: "Fetch VMware Tools install log file"
+  include_tasks: ../utils/win_get_file.yml
   vars:
     win_get_file_src_path: "{{ win_get_path_absolute }}"
     win_get_file_dst_path: "{{ current_test_log_folder }}"
 
-# Check VMware tools service status
-- include_tasks: ../utils/win_get_service_status.yml
+- name: "Get VMware Tools service status"
+  include_tasks: ../utils/win_get_service_status.yml
   vars:
     win_service_name: "VMTools"
-- name: Verify VMware tools service status is running
+- name: "Verify VMware Tools service status is running"
   ansible.builtin.assert:
     that:
       - service_status == "Running"
-    fail_msg: "VMTools service status is not Running"
-    success_msg: "VMTools service status is Running"
+    fail_msg: "VMTools service status: {{ service_status }}, which is not 'Running'."
+    success_msg: "VMTools service status is 'Running'."
 
-# Get VMware tools version and build number
-- include_tasks: ../utils/win_get_vmtools_version_build.yml
-- name: "Print VMware Tools version and build"
+- name: "Get VMware Tools version and build number"
+  include_tasks: ../utils/win_get_vmtools_version_build.yml
+- name: "Print VMware Tools version and build number"
   ansible.builtin.debug: var=vmtools_info_from_vmtoolsd
 
-# Get VMware drivers list
-- include_tasks: ../utils/win_get_vmtools_driver_list.yml
-# Get VMware services list
-- include_tasks: ../utils/win_get_vmtools_service_list.yml
+- name: "Get VMware drivers list"
+  include_tasks: ../utils/win_get_vmtools_driver_list.yml
+
+- name: "Get VMware services list"
+  include_tasks: ../utils/win_get_vmtools_service_list.yml
 # Not all services are running, e.g., vmvss
-- name: Display all services running status in guest OS
+- name: "Display services running status in guest OS"
   ansible.builtin.debug:
     msg: "Service '{{ item.key }}' status is: {{ item.value }}"
-  # ansible.builtin.assert:
-  #   that:
-  #     - "{{ item.value == 'Running' }}"
-  #   success_msg: "Service '{{ item.key }}' status is: {{ item.value }}"
-  #   fail_msg: "Service '{{ item.key }}' status is: {{ item.value }}"
   with_dict: "{{ vmtools_service_dict }}"
 
-# Check problem device after VMware tools install
-- include_tasks: ../utils/win_get_problem_device.yml
+- name: "Set fact of expected usernames of VMware Tools processes"
+  ansible.builtin.set_fact:
+    win_vmtoolsd_username_list: ["NT AUTHORITY\\SYSTEM", "{{ guest_os_hostname }}\\{{ vm_username }}"]
+- name: "Get usernames of VMware Tools processes in guest OS"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "(Get-Process vmtoolsd -IncludeUserName).UserName"
+- name: "Check usernames of VMware Tools processes"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.stdout_lines is defined
+      - win_powershell_cmd_output.stdout_lines | length == 2
+      - win_powershell_cmd_output.stdout_lines | sort == win_vmtoolsd_username_list | sort
+    fail_msg: >-
+      Get usernames of 'vmtoolsd' processes:
+      {{ win_powershell_cmd_output.stdout_lines | default('') }},
+      expected ones are {{ win_vmtoolsd_username_list }}.
+    success_msg: >-
+      Get usernames of 'vmtoolsd' processes:
+      {{ win_powershell_cmd_output.stdout_lines }}.
+
+- name: "Get problem device after VMware Tools install"
+  include_tasks: ../utils/win_get_problem_device.yml
 - name: "Check no problem device listed"
   ansible.builtin.assert:
     that:
       - gos_has_problem_device is defined
       - not gos_has_problem_device
-    fail_msg: "Problem devices were found on the system, please check listed problem devices: {{ gos_problem_device_list }}"
+    fail_msg: "Problem devices were found in guest OS, please check listed problem devices: {{ gos_problem_device_list }}"
+    success_msg: "No problem device is found in guest OS."
