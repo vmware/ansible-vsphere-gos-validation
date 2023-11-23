@@ -31,11 +31,16 @@
 - name: "Get cloned VM primary MAC address"
   include_tasks: ../../common/vm_wait_primary_nic_mac.yml
 
-- name: "Print VM primary MAC address"
-  ansible.builtin.debug:
-    msg:
-      - "Cloned VM primary MAC address: {{ vm_primary_nic_mac }}"
-      - "Parent VM primary MAC address: {{ vm_nic_mac_clone_from }}"
+- name: "Check cloned VM MAC is not the same as parent VM MAC address"
+  ansible.builtin.assert:
+    that:
+      - vm_primary_nic_mac != vm_nic_mac_clone_from
+    fail_msg: >-
+      Cloned VM '{{ vm_name_clone_to }}' MAC address is '{{ vm_primary_nic_mac }}',
+      which is the same as parent VM '{{ vm_name_clone_from }}' MAC address.
+    success_msg:
+      - "Parent VM '{{ vm_name_clone_from }}' MAC address is: {{ vm_nic_mac_clone_from }}."
+      - "Cloned VM '{{ vm_name_clone_to }}' MAC address is: {{ vm_primary_nic_mac }}."
 
 - name: "Initialize cloned VM IP address"
   ansible.builtin.set_fact:
@@ -51,11 +56,16 @@
     (not retry_vm_guest_ip) or
     (retry_vm_guest_ip == vm_ip_clone_from)
 
-- name: "Print VM IP address"
-  ansible.builtin.debug:
-    msg:
-      - "Cloned VM IP address: {{ vm_guest_ip }}"
-      - "Parent VM IP address: {{ vm_ip_clone_from }}"
+- name: "Check cloned VM IP is not the same as parent VM IP address"
+  ansible.builtin.assert:
+    that:
+      - retry_vm_guest_ip != vm_ip_clone_from
+    fail_msg: >-
+      Cloned VM '{{ vm_name_clone_to }}' IP address is '{{ retry_vm_guest_ip }}',
+      which is the same as parent VM '{{ vm_name_clone_from }}' IP address after refreshing 100 seconds.
+    success_msg:
+      - "Parent VM '{{ vm_name_clone_from }}' IP address is: {{ vm_ip_clone_from }}."
+      - "Cloned VM '{{ vm_name_clone_to }}' IP address is: {{ retry_vm_guest_ip }}."
 
 - name: "Check winrm is connectable in cloned VM"
   include_tasks: ../utils/win_check_winrm.yml
