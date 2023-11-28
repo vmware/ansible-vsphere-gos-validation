@@ -35,16 +35,16 @@
             dest: "{{ current_test_log_folder }}/{{ win_install_msu_script }}"
             mode: '0755'
 
-        - name: "Execute the script to install Windows Update file"
-          include_tasks: win_install_update_file.yml
+#        - name: "Execute the script to install Windows Update file"
+#          include_tasks: win_install_update_file.yml
 
-#        - name: "Install the Windows Update msu file"
-#          include_tasks: ../utils/win_execute_cmd.yml
-#          vars:
-#            win_powershell_cmd: ""
-#              net use Z: {{ suvp_share_point }} {{ suvp_pwd }} /user:{{ suvp_name }};
-#              Copy-Item -Path {{ msu_file_src }} -Destination {{ msu_file_dest }}  -ErrorAction Stop;
-#              wusa.exe {{ msu_file_dest }} /quiet /norestart;
+        - name: "Install the Windows Update msu file"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              net use Z: {{ suvp_share_point }} {{ suvp_pwd }} /user:{{ suvp_name }};
+              Copy-Item -Path {{ msu_file_src }} -Destination {{ msu_file_dest }}  -ErrorAction Stop;
+              wusa.exe {{ msu_file_dest }} /quiet /forcerestart;
 #              $kb_installed = Get-HotFix | Where HotFixID -eq {{ wu_kb_number }};
 #              $check_attempt = 0;
 #              do {Start-Sleep -seconds 300;$check_attempt = $check_attempt + 1;$kb_installed = Get-HotFix | Where HotFixID -eq {{ wu_kb_number }};
@@ -57,10 +57,14 @@
 #          vars:
 #            win_powershell_cmd: "wusa.exe {{ msu_file_dest }} /quiet /norestart"
 
-        - name: "Restart guest OS after installing updates"
-          include_tasks: ../utils/win_shutdown_restart.yml
-          vars:
-            set_win_power_state: "restart"
+#        - name: "Restart guest OS after installing updates"
+#          include_tasks: ../utils/win_shutdown_restart.yml
+#          vars:
+#            set_win_power_state: "restart"
+
+        - name: "Pause for 30 minutes"
+          ansible.builtin.pause:
+            minutes: 30
 
         - name: "Check if the specified Windows Update is installed"
           include_tasks: ../utils/win_execute_cmd.yml
