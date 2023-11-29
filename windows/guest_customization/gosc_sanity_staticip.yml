@@ -2,105 +2,16 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is used for check guest customization with static
-# network configuration. If VMware tools is not installed, the test
-# result is 'No Run'.
-# Note: VM guest customization requires vCenter server.
+#   This test case is used for check guest OS customization (GOSC)
+# with static network configuration. If VMware Tools is not installed,
+# the test result is 'No Run'.
+# Note: VM guest OS customization requires vCenter server.
 #
 - name: gosc_sanity_staticip
   hosts: localhost
   gather_facts: false
+  vars:
+    customize_network_type: "static"
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
-          vars:
-            skip_test_no_vmtools: true
-
-        - include_tasks: ../../common/skip_test_case.yml
-          vars:
-            skip_msg: "Test case '{{ ansible_play_name }}' is blocked because vCenter server is not configured"
-            skip_reason: "Blocked"
-          when: vcenter_is_defined is undefined or not vcenter_is_defined | bool
-
-        # Prepare router VM, vSwitch and portgroup
-        - include_tasks: ../../common/network_testbed_setup.yml
-          when: router_vm_deployed is undefined or not router_vm_deployed | bool
-
-        - include_tasks: win_gosc_prepare.yml
-
-        # Use router VM as the default gateway hardcoded to 192.168.192.1,
-        # use configured static IP address in this subnet
-        - name: Set fact of customize static network and gosc start
-          ansible.builtin.set_fact:
-            customize_network_type: 'static'
-            vm_static_gosc_start: true
-
-        - include_tasks: win_gosc_execution.yml
-          vars:
-            customize_ip: '192.168.192.10'
-            customize_gateway: "{{ vlan_gateway }}"
-            customize_netmask: '255.255.255.0'
-            customize_network: "{{ portgroup_name }}"
-            timeout: 2400
-
-        # Wait guest customization state is completed
-        - include_tasks: ../../common/vm_wait_log_msg.yml
-          vars:
-            vm_wait_log_name: "vmware.log"
-            vm_wait_log_msg: "Chipset: The guest has requested that the virtual machine be hard reset.*|GuestRpc: Reinitializing Channel 0.*"
-            vm_wait_log_retries: 60
-            vm_wait_log_delay: 30
-            vm_wait_log_msg_times: 2
-          when:
-            - esxi_version is defined and esxi_version
-            - esxi_version is version('6.5.0', '=')
-        - include_tasks: ../../common/vm_wait_gosc_completed.yml
-          when: >
-            (esxi_version is undefined) or
-            (not esxi_version) or
-            (esxi_version is version('6.5.0', '>'))
-
-        # Wait guest get the customized static IP
-        - include_tasks: ../../common/vm_wait_guest_ip.yml
-          vars:
-            wait_ipv4: "192.168.192.10"
-
-        # Get guest IP after customization from guestinfo
-        - include_tasks: ../../common/vm_get_ip_from_vmtools.yml
-        - name: Set fact of the VM guest IP after GOSC
-          ansible.builtin.set_fact:
-            guest_ip_after_gosc: "{{ vm_guest_ip }}"
-
-        # Get guest hostname after customization from guestinfo
-        - include_tasks: ../../common/vm_wait_guest_hostname.yml
-          vars:
-            wait_guest_hostname: "{{ customize_gos_hostname }}"
-
-        - include_tasks: ../../common/vm_get_config.yml
-          vars:
-            property_list: ['guest.hostName']
-        - name: Set fact of the hostname after GOSC
-          ansible.builtin.set_fact:
-            hostname_after_gosc: "{{ vm_config.guest.hostName }}"
-        - ansible.builtin.debug:
-            msg: "Get guest OS hostname/IP after customization: {{ hostname_after_gosc }}/{{ guest_ip_after_gosc }}"
-
-        - name: Check IP and hostname changed after customization
-          ansible.builtin.assert:
-            that:
-              - "{{ guest_ip_before_gosc != guest_ip_after_gosc }}"
-              - "{{ hostname_before_gosc != hostname_after_gosc }}"
-              - "{{ hostname_after_gosc == customize_gos_hostname }}"
-              - "{{ guest_ip_after_gosc == '192.168.192.10' }}"
-            success_msg: "Check guest IP address, hostname after GOSC succeed."
-            fail_msg: "Check guest IP address, hostname after GOSC failed."
-
-      rescue:
-        - include_tasks: ../../common/test_rescue.yml
-      always:
-        - block:
-            - include_tasks: ../../common/vm_get_power_state.yml
-            # Get GOSC log files
-            - include_tasks: get_gosc_logs_no_network.yml
-              when: vm_power_state_get == "poweredOn"
-          when: vm_static_gosc_start is defined and vm_static_gosc_start
+    - name: "GOSC test with static network configure"
+      include_tasks: win_gosc_workflow.yml

@@ -1,6 +1,10 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+- name: "Set fact of GOSC starts"
+  ansible.builtin.set_fact:
+    win_customize_start: true
+
 - name: "Customize Windows guest OS"
   community.vmware.vmware_guest:
     validate_certs: "{{ validate_certs | default(false) }}"
@@ -29,9 +33,14 @@
       runonce:
         - "{{ customize_runonce }}"
     wait_for_customization: true
-    wait_for_customization_timeout: "{{ timeout | default(omit) }}"
+    wait_for_customization_timeout: 2400
   register: customize_windows_result
 
-- name: Display the Windows customization result
+- name: "Display the Windows GOSC result"
   ansible.builtin.debug: var=customize_windows_result
   when: enable_debug
+
+- name: "Set fact of the password for user 'Administrator'"
+  ansible.builtin.set_fact:
+    vm_password: "{{ customize_logon_password }}"
+  when: vm_username | lower == "administrator"
