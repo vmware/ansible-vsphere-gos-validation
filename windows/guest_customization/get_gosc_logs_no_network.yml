@@ -2,16 +2,15 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Fetch log files from Windows guest OS to local
-- name: "Initialize the dict of source log files and dest path"
+- name: "Initialize the GOSC log files source and dest paths"
   ansible.builtin.set_fact:
-    separator: '\'
-    source_log_list: []
-    dest_log_list: []
-    gosc_win_log_src_dest: {}
+    win_gosc_log_files: []
+    win_gosc_log_files_dst: []
+    win_gosc_log_src_dest: {}
 
-- name: "Set fact of the GOSC log files' paths"
+- name: "Set fact of the relative file path list of GOSC log"
   ansible.builtin.set_fact:
-    gosc_win_log_files:
+    win_gosc_log_files_rel:
       - 'Temp\vmware-imc\guestcust.log'
       - 'Temp\vmware-imc\toolsDeployPkg.log'
       - 'System32\Sysprep\Panther\setupact.log'
@@ -24,19 +23,18 @@
       - 'Debug\PASSWD.LOG'
       - 'Debug\sammui.log'
 
-- name: "Set fact of the absolute log files path list"
+- name: "Set fact of the absolute file path list of GOSC log"
   ansible.builtin.set_fact:
-    source_log_list: "{{ source_log_list + [win_dir ~ separator ~ item] }}"
-    dest_log_list: "{{ dest_log_list + [current_test_log_folder ~ '/' ~ item.split(separator) | join('/')] }}"
-  with_items: "{{ gosc_win_log_files }}"
-  no_log: true
+    win_gosc_log_files: "{{ win_gosc_log_files + [win_windows_dir ~ win_dir_separator ~ item] }}"
+    win_gosc_log_files_dst: "{{ win_gosc_log_files_dst + [current_test_log_folder ~ '/' ~ item.split(win_dir_separator) | join('/')] }}"
+  with_items: "{{ win_gosc_log_files_rel }}"
 
 - name: "Set fact of the source and dest log files path dict"
   ansible.builtin.set_fact:
-    gosc_win_log_src_dest: "{{ dict(source_log_list | zip(dest_log_list)) }}"
+    win_gosc_log_src_dest: "{{ dict(win_gosc_log_files | zip(win_gosc_log_files_dst)) }}"
 
 - name: "Display the GOSC log files to be fetched"
-  ansible.builtin.debug: var=gosc_win_log_src_dest
+  ansible.builtin.debug: var=win_gosc_log_src_dest
 
 - name: "Fetch GOSC log files from guest OS"
   include_tasks: ../../common/vm_guest_file_operation.yml
@@ -44,4 +42,4 @@
     operation: "fetch_file"
     src_path: "{{ item.key }}"
     dest_path: "{{ item.value }}"
-  loop: "{{ gosc_win_log_src_dest | dict2items }}"
+  loop: "{{ win_gosc_log_src_dest | dict2items }}"

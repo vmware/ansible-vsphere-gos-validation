@@ -15,49 +15,12 @@
   include_tasks: ../../common/vm_wait_gosc_completed.yml
   when: esxi_version is version('6.5.0', '>')
 
-- name: "Wait for VM IP address after GOSC"
-  include_tasks: ../../common/vm_wait_guest_ip.yml
-  vars:
-    wait_ipv4: "{{ customize_ip if (customize_network_type == 'static') else '' }}"
-
-- name: "Get VM IP address after GOSC"
-  include_tasks: ../../common/vm_get_ip_from_vmtools.yml
-
-- name: "Wait for guest OS hostname after GOSC"
-  include_tasks: ../../common/vm_wait_guest_hostname.yml
-  vars:
-    wait_guest_hostname: "{{ customize_gos_hostname }}"
-- name: "Set fact of the guest OS hostname"
-  ansible.builtin.set_fact:
-    hostname_after_gosc: "{{ vm_guest_facts.instance.guest.hostName }}"
-
-- name: "Print guest OS info"
-  ansible.builtin.debug:
-    msg: "Guest OS hostname/IP address after GOSC: {{ hostname_after_gosc }}/{{ vm_guest_ip }}"
-
-- name: "Check customized guest OS hostname"
-  ansible.builtin.assert:
-    that:
-      - "{{ hostname_after_gosc == customize_gos_hostname }}"
-    success_msg: "Guest OS hostname is customized successfully: {{ hostname_after_gosc }}."
-    fail_msg: "Guest OS hostname is '{{ hostname_after_gosc }} after GOSC, expected '{{ customize_gos_hostname }}'."
-
-- name: "Check customized IP address"
-  ansible.builtin.assert:
-    that:
-      - "{{ vm_guest_ip == '192.168.192.10' }}"
-    success_msg: "Guest OS IP address is customized successfully: {{ vm_guest_ip }}."
-    fail_msg: "Guest OS IP address is '{{ vm_guest_ip }}' after GOSC, expected '192.168.192.10'."
-  when: customize_network_type == "static"
+- name: "Check guest OS IP address and hostname"
+  include_tasks: check_ip_hostname.yml
 
 - name: "Verify customization results"
-  when: customize_network_type == "dhcp"
+  when: gosc_network_type == "dhcp"
   block:
-    - name: "Check Windows winrm is connectable"
-      include_tasks: ../utils/win_check_winrm.yml
-    - name: "Add VM IP address to Ansible hosts"
-      include_tasks: ../utils/add_windows_host.yml
-
     - name: "Check auto admin logon and count"
       include_tasks: check_autologon_count.yml
     - name: "Check run once command executed"

@@ -1,46 +1,50 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get auto Admin logon value after gosc
-- include_tasks: ../utils/win_execute_cmd.yml
+# Check logon as Administrator automatically is set in guest OS
+- name: "Initialize the registry value of logon as Administrator automatically"
+  ansible.builtin.set_fact:
+    auto_admin_logon: 0
+
+- name: "Get logon as Administrator automatically registry value"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "(get-itemproperty -path 'HKLM:\\software\\microsoft\\Windows NT\\CurrentVersion\\Winlogon').AutoAdminLogon"
-- name: Set fact of the Admin auto logon
+    win_powershell_cmd: >-
+      (Get-ItemProperty -path 'HKLM:\\software\\microsoft\\Windows NT\\CurrentVersion\\Winlogon').AutoAdminLogon
+
+- name: "Set fact of logon as Administrator automatically registry value"
   ansible.builtin.set_fact:
     auto_admin_logon: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
-- ansible.builtin.debug:
-    msg: "Get auto Admin logon enabled value: {{ auto_admin_logon }}"
-  when: enable_debug
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
 
-- name: Get auto admin logon count value after GOSC
-  ansible.windows.win_shell: "(get-itemproperty -path 'HKLM:\\software\\microsoft\\Windows NT\\CurrentVersion\\Winlogon').AutoLogonCount"
+- name: "Check logon as Administrator automatically is enabled"
+  ansible.builtin.assert:
+    that:
+      - "{{ auto_admin_logon | int == 1 }}"
+    success_msg: "Logon as Administrator automatically is enabled in guest OS."
+    fail_msg: "Logon as Administrator automatically registry value '{{ auto_admin_logon }}' is not equal to 1."
+
+- name: "Get number of times to logon as Administrator automatically"
+  ansible.windows.win_shell: >-
+    (Get-ItemProperty -path 'HKLM:\\software\\microsoft\\Windows NT\\CurrentVersion\\Winlogon').AutoLogonCount
   register: get_auto_logon_count
   delegate_to: "{{ vm_guest_ip }}"
   until:
+    - get_auto_logon_count.stdout_lines is defined
     - get_auto_logon_count.stdout_lines | length != 0
-    - get_auto_logon_count.stdout_lines[0] | int == customize_autologon_count | int - 1
+    - get_auto_logon_count.stdout_lines[0] | int == win_gosc_spec.gosc_autologon_count | int - 1
   retries: 100
   delay: 3
   ignore_errors: true
 
-- name: "Check auto admin logon count value after GOSC"
+- name: "Check number of times to logon as Administrator automatically"
   ansible.builtin.assert:
     that:
-      - get_auto_logon_count is defined
-      - get_auto_logon_count.stdout_lines | length != 0
-      - get_auto_logon_count.stdout_lines[0] | int == customize_autologon_count | int - 1
+      - not get_auto_logon_count.failed
+    success_msg: "Number of times to logon as Administrator automatically is set correctly: {{ get_auto_logon_count.stdout_lines[0] }}."
     fail_msg: >-
-      Auto admin logon count value after GOSC is still incorrect after 300 seconds.
-      Current auto admin logon count value is '{{ get_auto_logon_count.stdout_lines[0] | int | default("") }}',
-      not expected '{{ customize_autologon_count | int - 1 }}'.
-
-- ansible.builtin.debug:
-    msg: "Get remain auto logon count: {{ get_auto_logon_count.stdout_lines[0] }}"
-  when: enable_debug
-
-- name: Check auto admin logon enabled and count is accurate
-  ansible.builtin.assert:
-    that:
-      - "{{ auto_admin_logon | int == 1 }}"
-    success_msg: "Auto Admin logon is enabled and customized auto logon count is accurate."
-    fail_msg: "Auto Admin logon is not enabled."
+      The number of times to logon as Administrator automatically is incorrect after 300 seconds.
+      Got value '{{ get_auto_logon_count.stdout_lines[0] | default('') }}' in guest OS after GOSC,
+      expected value is '{{ win_gosc_spec.gosc_autologon_count | int - 1 }}'.

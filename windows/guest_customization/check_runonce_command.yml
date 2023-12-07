@@ -2,16 +2,19 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Check runonce command executed in guest OS
-- name: Display the run once command
-  ansible.builtin.debug: var=customize_runonce
+- name: "Display the GOSC run once command"
+  ansible.builtin.debug: var=win_gosc_spec.gosc_runonce
 
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Get GOSC run once command output file"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "get-content -Path C:\\gosc_runonce.txt"
+    win_powershell_cmd: "Get-Content -Path {{ win_gosc_spec.gosc_echo_file }}"
 
-- name: Check run once command executed
+- name: "Check GOSC run once command executed in guest OS"
   ansible.builtin.assert:
     that:
-      - "{{ win_powershell_cmd_output.stdout_lines[0].strip() == customize_runonce_echo_string.strip() }}"
-    success_msg: "Run once command executed and test file created"
-    fail_msg: "Run once command not executed or test file not created"
+      - win_powershell_cmd_output.stdout_lines is defined
+      - win_powershell_cmd_output.stdout_lines | length != 0
+      - "{{ win_powershell_cmd_output.stdout_lines[0].strip() == win_gosc_spec.gosc_echo_string.strip() }}"
+    success_msg: "Run once command is executed in guest OS."
+    fail_msg: "Run once command is not executed successfully in guest OS."

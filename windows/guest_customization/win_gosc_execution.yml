@@ -1,9 +1,9 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Set fact of GOSC starts"
+- name: "Set fact of Windows GOSC starts"
   ansible.builtin.set_fact:
-    win_customize_start: true
+    win_gosc_start: true
 
 - name: "Customize Windows guest OS"
   community.vmware.vmware_guest:
@@ -16,31 +16,32 @@
     folder: "{{ vm_folder }}"
     name: "{{ vm_name }}"
     networks:
-      - name: "{{ customize_network }}"
-        ip: "{{ customize_ip | default(omit) }}"
-        gateway: "{{ customize_gateway | default(omit) }}"
-        netmask: "{{ customize_netmask | default(omit) }}"
-        type: "{{ customize_network_type }}"
+      - name: "{{ win_gosc_spec.gosc_network }}"
+        ip: "{{ win_gosc_spec.gosc_ip | default(omit) }}"
+        gateway: "{{ win_gosc_spec.gosc_gateway | default(omit) }}"
+        netmask: "{{ win_gosc_spec.gosc_netmask | default(omit) }}"
+        type: "{{ gosc_network_type }}"
     customization:
       existing_vm: true
-      dns_servers: "{{ gosc_dns_servers }}"
-      domain: "{{ customize_domain }}"
-      hostname: "{{ customize_gos_hostname }}"
-      autologon: "{{ customize_autologon }}"
-      autologoncount: "{{ customize_autologon_count }}"
-      password: "{{ customize_logon_password }}"
-      timezone: "{{ customize_timezone_id }}"
+      dns_servers: "{{ win_gosc_spec.gosc_dns_servers | default(omit) }}"
+      dns_suffix: "{{ win_gosc_spec.gosc_dns_suffix | default(omit) }}"
+      domain: "{{ win_gosc_spec.gosc_domain | default(omit) }}"
+      hostname: "{{ win_gosc_spec.gosc_hostname }}"
+      autologon: "{{ win_gosc_spec.gosc_autologon }}"
+      autologoncount: "{{ win_gosc_spec.gosc_autologon_count }}"
+      password: "{{ win_gosc_spec.gosc_logon_password }}"
+      timezone: "{{ win_gosc_spec.gosc_timezone_id }}"
       runonce:
-        - "{{ customize_runonce }}"
+        - "{{ win_gosc_spec.gosc_runonce }}"
     wait_for_customization: true
     wait_for_customization_timeout: 2400
-  register: customize_windows_result
+  register: win_gosc_result
 
 - name: "Display the Windows GOSC result"
-  ansible.builtin.debug: var=customize_windows_result
+  ansible.builtin.debug: var=win_gosc_result
   when: enable_debug
 
 - name: "Set fact of the password for user 'Administrator'"
   ansible.builtin.set_fact:
-    vm_password: "{{ customize_logon_password }}"
+    vm_password: "{{ win_gosc_spec.gosc_logon_password }}"
   when: vm_username | lower == "administrator"
