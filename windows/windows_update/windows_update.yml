@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This case is to test Microsoft's Windows updates
+#   This case is to test Microsoft's Windows updates.
+#   Install Windows Update patch by msu file.
 #
 - name: windows_update
   hosts: localhost
@@ -17,93 +18,84 @@
           vars:
             create_current_test_folder: true
 
-        - name: "Initialize the msu file related Variables"
-          ansible.builtin.set_fact:
-            suvp_share_point: "\\\\whql-suvp.eng.vmware.com\\SUVP"
-            msu_file_src: "Z:\\{{windows_update_msu_path }}"
-            msu_file_name: "{{ windows_update_msu_path | win_basename }}"
-            win_install_msu_script: "win_install_update.ps1"
+        - name: "Get unused driver letter"
+          include_tasks: ../utils/win_get_unused_drive_letter.yml
 
-        - name: "Set the msu file destination"
+        - name: "Initialize the msu file name and sharepoint"
           ansible.builtin.set_fact:
-            wu_kb_number: "{{ msu_file_name | regex_search('KB\\d+') }}"
+            msu_share_point: "\\\\whql-suvp.eng.vmware.com\\SUVP"
+            msu_file_src: "{{ drive_letter_new }}:\\{{ windows_update_msu_path }}"
+            msu_file_name: "{{ windows_update_msu_path | win_basename }}"
+
+        - name: "Set the msu file destination and KB number"
+          ansible.builtin.set_fact:
+            msu_kb_number: "{{ msu_file_name | regex_search('KB\\d+') }}"
             msu_file_dest: "C:\\{{ msu_file_name }}"
 
-        - name: "Create PowerShell script for installing Windows Update file"
-          ansible.builtin.template:
-            src: "{{ win_install_msu_script }}"
-            dest: "{{ current_test_log_folder }}/{{ win_install_msu_script }}"
-            mode: '0755'
-
-#        - name: "Execute the script to install Windows Update file"
-#          include_tasks: win_install_update_file.yml
-
-        - name: "Install the Windows Update msu file"
+        - name: "Copy the msu file to local disk of guest OS"
           include_tasks: ../utils/win_execute_cmd.yml
           vars:
             win_powershell_cmd: >-
-              net use Z: {{ suvp_share_point }} {{ suvp_pwd }} /user:{{ suvp_name }};
+              net use {{ drive_letter_new }}: {{ msu_share_point }} {{ suvp_pwd }} /user:{{ suvp_name }};
               Copy-Item -Path {{ msu_file_src }} -Destination {{ msu_file_dest }}  -ErrorAction Stop;
-              wusa.exe {{ msu_file_dest }} /quiet /forcerestart;
-#              $kb_installed = Get-HotFix | Where HotFixID -eq {{ wu_kb_number }};
-#              $check_attempt = 0;
-#              do {Start-Sleep -seconds 300;$check_attempt = $check_attempt + 1;$kb_installed = Get-HotFix | Where HotFixID -eq {{ wu_kb_number }};
-#              Write-Host "$check_attempt Attempt";}
-#              while (!($kb_installed) -and ($check_attempt -le 11));
-              
 
-#        - name: "Install the Windows Update msu file"
-#          include_tasks: ../utils/win_execute_cmd.yml
-#          vars:
-#            win_powershell_cmd: "wusa.exe {{ msu_file_dest }} /quiet /norestart"
-
-#        - name: "Restart guest OS after installing updates"
-#          include_tasks: ../utils/win_shutdown_restart.yml
-#          vars:
-#            set_win_power_state: "restart"
-
-        - name: "Pause for 30 minutes"
-          ansible.builtin.pause:
-            minutes: 30
-
-        - name: "Check if the specified Windows Update is installed"
+        - name: "Enable the user Administrator"
           include_tasks: ../utils/win_execute_cmd.yml
           vars:
-            win_powershell_cmd: "Get-HotFix | Where HotFixID -eq {{ wu_kb_number }}"
+            win_powershell_cmd: "net user Administrator /active:yes"
 
-        - name: "Check the result of installing {{ wu_kb_number }}"
-          ansible.builtin.assert:
-            that:
-              - win_powershell_cmd_output.rc is defined
-              - win_powershell_cmd_output.rc == 0
-              - win_powershell_cmd_output.stdout_lines is defined
-              - win_powershell_cmd_output.stdout_lines | length != 0
-            fail_msg: "{{ wu_kb_number }} is not installed after 1 hour. Please check it."
+        - name: "Install the msu file"
+          ansible.windows.win_shell: >-
+            wusa.exe {{ msu_file_dest }} /quiet /norestart
+          delegate_to: "{{ vm_guest_ip }}"
+          register: install_msu_result
+          become: true
+          become_method: runas
+          become_user: Administrator
+          async: 7200
+          poll: 0
 
-#        - name: "Execute the script to install updates"
-#          include_tasks: ../utils/win_execute_cmd.yml
-#          vars:
-#            win_powershell_cmd: "powershell.exe -ExecutionPolicy bypass -File {{ install_wu_script }}"
-#
+        - name: "Check if the msu file is installed before restart"
+          ansible.windows.win_shell: "Get-HotFix | Where-Object HotFixID -eq {{ msu_kb_number }}"
+          register: win_get_hotfix_result
+          ignore_errors: true
+          delegate_to: "{{ vm_guest_ip }}"
+          ignore_unreachable: true
+          until:
+            - win_get_hotfix_result.rc is defined
+            - win_get_hotfix_result.rc == 0
+            - win_get_hotfix_result.stdout_lines | length != 0
+          retries: 24
+          delay: 300
 
-        - name: "Reset base snapshot after installing updates"
+        - name: "Restart guest OS after installing the msu file"
+          include_tasks: ../utils/win_shutdown_restart.yml
+          vars:
+            set_win_power_state: "restart"
+
+        - name: "Check if the msu file is installed after restart"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "Get-HotFix | Where-Object HotFixID -eq {{ msu_kb_number }}"
+
+        - name: "Reset base snapshot after installing the msu file"
           include_tasks: ../../common/reset_base_snapshot.yml
 
-#
-#        - name: "Clean the folder {{ wu_dest_file }}"
-#          include_tasks: ../utils/win_execute_cmd.yml
-#          vars:
-#            win_powershell_cmd: "rm {{ wu_dest_file }}\\*"
-#          when: win_is_folder_result
-#
-
-#
-#        - name: "Check the installed Windows Update"
-#          include_tasks: ../utils/win_execute_cmd.yml
-#          vars:
-#            win_powershell_cmd: "Got-Hotfix"
-#
-
+        - name: "Save the new name of the old base snapshot"
+          ansible.builtin.set_fact:
+            msu_old_snapshot_name: "{{ old_snapshot_new_name }}"
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
+      always:
+        - name: "Check if the msu file exists in guest OS"
+          include_tasks: ../utils/win_check_file_exist.yml
+          vars:
+            win_check_file_exist_file: "{{ msu_file_dest }}"
+
+        - name: "Delete the msu file from guest OS"
+          ansible.windows.win_file:
+            path: "{{ msu_file_dest }}"
+            state: absent
+          delegate_to: "{{ vm_guest_ip }}"
+          register: delete_file_result
