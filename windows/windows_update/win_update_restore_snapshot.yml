@@ -1,0 +1,40 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This case is to restore VM to the original base snapshot, which is not installed the msu file
+#   by playbook windows_update.yml
+#
+- name: win_update_restore_snapshot
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
+  tasks:
+    - name: "Test case block"
+      when:
+        - msu_old_snapshot_name is defined
+        - msu_old_snapshot_name
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+
+        - name: "Revert to original base snapshot {{ msu_old_snapshot_name }}"
+          include_tasks: ../../common/vm_revert_snapshot.yml
+          vars:
+            snapshot_name: "{{ msu_old_snapshot_name }}"
+
+        - name: "Remove the current base snapshot {{ base_snapshot_name }}"
+          include_tasks: ../../common/vm_remove_snapshot.yml
+          vars:
+            snapshot_name: "{{ base_snapshot_name }}"
+          when: base_snapshot_exists
+
+        - name: "Rename snapshot {{ msu_old_snapshot_name }} to {{ base_snapshot_name }}"
+          include_tasks: ../../common/vm_rename_snapshot.yml
+          vars:
+            current_snapshot_name: "{{ msu_old_snapshot_name }}"
+            new_snapshot_name: "{{ base_snapshot_name }}"
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
