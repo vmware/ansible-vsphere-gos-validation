@@ -1,0 +1,52 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Install all available Windows Updates in Windows guest OS
+#
+- name: "Set fact of Windows Updates install log path"
+  ansible.builtin.set_fact:
+    win_udpates_log_file: "C:\\win_updates_log.txt"
+
+- name: "Install Windows Updates in Windows guest OS"
+  ansible.windows.win_updates:
+    server_selection: "windows_update"
+    category_names: '*'
+    log_path: "{{ win_udpates_log_file }}"
+    skip_optional: true
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: true
+  register: win_updates_install_result
+  async: 3600
+  poll: 0
+  environment:
+    ANSIBLE_WIN_ASYNC_STARTUP_TIMEOUT: 10
+
+- name: "Pause 1 minute before checking task status"
+  ansible.builtin.pause:
+    minutes: 1
+- name: "Check Windows Updates install task started"
+  ansible.builtin.assert:
+    that:
+      - win_updates_install_result is defined
+      - win_updates_install_result.ansible_job_id is defined
+    fail_msg: "The execution result of above Windows Updates install task in guest OS is not returned."
+
+- name: "Check Windows Updates install task status every 30 seconds"
+  ansible.builtin.async_status:
+    jid: "{{ win_updates_install_result.ansible_job_id }}"
+  register: win_updates_job
+  delegate_to: "{{ vm_guest_ip }}"
+  until:
+    - win_updates_job is defined
+    - win_updates_job.finished is defined
+    - win_updates_job.finished
+  retries: 120
+  delay: 30
+
+- name: "Restart guest OS when required"
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+  when:
+    - win_updates_install_result.reboot_required is defined
+    - win_updates_install_result.reboot_required
