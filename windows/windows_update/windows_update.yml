@@ -21,23 +21,60 @@
         - name: "Get unused driver letter"
           include_tasks: ../utils/win_get_unused_drive_letter.yml
 
-        - name: "Initialize the msu file name and sharepoint"
+        - name: "Initialize the msu file path"
           ansible.builtin.set_fact:
             msu_share_point: "\\\\whql-suvp.eng.vmware.com\\SUVP"
-            msu_file_src: "{{ drive_letter_new }}:\\{{ windows_update_msu_path }}"
-            msu_file_name: "{{ windows_update_msu_path | win_basename }}"
+            msu_file_src_path: "{{ drive_letter_new }}:\\{{ windows_update_msu_path }}\\*"
+            msu_file_dest_path: "C:\\msu"
 
-        - name: "Set the msu file destination and KB number"
-          ansible.builtin.set_fact:
-            msu_kb_number: "{{ msu_file_name | regex_search('KB\\d+') }}"
-            msu_file_dest: "C:\\{{ msu_file_name }}"
+        - name: "Check if folder {{ msu_file_dest_path }} exists on guest OS"
+          include_tasks: ../utils/win_is_folder.yml
+          vars:
+            win_is_folder_path: "{{ msu_file_dest_path }}"
+
+        - name: "Create folder {{ msu_file_dest_path }} on guest OS"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "mkdir {{ msu_file_dest_path }}"
+          when: not win_is_folder_result
 
         - name: "Copy the msu file to local disk of guest OS"
           include_tasks: ../utils/win_execute_cmd.yml
           vars:
             win_powershell_cmd: >-
               net use {{ drive_letter_new }}: {{ msu_share_point }} {{ suvp_pwd }} /user:{{ suvp_name }};
-              Copy-Item -Path {{ msu_file_src }} -Destination {{ msu_file_dest }}  -ErrorAction Stop;
+              Copy-Item -Path {{ msu_file_src_path }} -Include *.msu -Destination {{ msu_file_dest_path }}  -ErrorAction Stop;
+              net use {{ drive_letter_new }}: /delete
+
+        - name: "Get the msu file name"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >- 
+              Get-ChildItem -Path {{ msu_file_dest_path }} -Include *.msu -Name -ErrorAction Stop;
+
+        - name: "Set the msu file name"
+          ansible.builtin.set_fact:
+            msu_file_name: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+          when:
+            - win_powershell_cmd_output.stdout_lines is defined
+            - win_powershell_cmd_output.stdout_lines | length != 0
+
+        - name: "Failed to copy the msu file to {{ msu_file_dest_path }}"
+          ansible.builtin.fail:
+            fail_msg: "The msu file is not found in {{ msu_file_dest_path }}."
+          when: msu_file_name is not defined
+
+        - name: "Set the msu file installation related parameters"
+          ansible.builtin.set_fact:
+            msu_kb_number: "{{ msu_file_name | regex_search('KB\\d+') }}"
+            msu_file_dest: "{{ msu_file_dest_path }}\\{{msu_file_name }}"
+            msu_install_timeout: 7200
+            msu_become_user: Administrator
+
+        - name: "Change the become_user for 32bit OS"
+          ansible.builtin.set_fact:
+            msu_become_user: SYSTEM
+          when: guest_os_ansible_architecture == "32-bit"
 
         - name: "Enable the user Administrator"
           include_tasks: ../utils/win_execute_cmd.yml
@@ -51,8 +88,8 @@
           register: install_msu_result
           become: true
           become_method: runas
-          become_user: Administrator
-          async: 7200
+          become_user: "{{ msu_become_user }}"
+          async: "{{ msu_install_timeout }}"
           poll: 0
 
         - name: "Check if the msu file is installed before restart"
@@ -65,18 +102,34 @@
             - win_get_hotfix_result.rc is defined
             - win_get_hotfix_result.rc == 0
             - win_get_hotfix_result.stdout_lines | length != 0
-          retries: 24
+          retries: "{{ msu_install_timeout // 300 }}"
           delay: 300
+
+        - name: "The msu file installation failed"
+          ansible.builtin.fail:
+            msg: "Failed to install the msu file in {{ msu_install_timeout }} seconds."
+          when:
+            - win_get_hotfix_result.failed is defined
+            - win_get_hotfix_result.failed
 
         - name: "Restart guest OS after installing the msu file"
           include_tasks: ../utils/win_shutdown_restart.yml
           vars:
             set_win_power_state: "restart"
+            win_reboot_timeout: 1800
 
         - name: "Check if the msu file is installed after restart"
           include_tasks: ../utils/win_execute_cmd.yml
           vars:
             win_powershell_cmd: "Get-HotFix | Where-Object HotFixID -eq {{ msu_kb_number }}"
+
+        - name: "Check the msu installation result after restart"
+          ansible.builtin.assert:
+            that:
+              - win_powershell_cmd_output.stdout_lines is defined
+              - win_powershell_cmd_output.stdout_lines | length != 0
+            fail_msg: "The msu file {{ msu_kb_number }} is not installed in guest OS."
+            success_msg: "The msu file {{ msu_kb_number }} is installed in guest OS."
 
         - name: "Reset base snapshot after installing the msu file"
           include_tasks: ../../common/reset_base_snapshot.yml
@@ -99,3 +152,4 @@
             state: absent
           delegate_to: "{{ vm_guest_ip }}"
           register: delete_file_result
+          when: win_check_file_exist_result
