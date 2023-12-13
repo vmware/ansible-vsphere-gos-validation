@@ -2,9 +2,6 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Install all available Windows Updates in Windows guest OS
-# Note:
-#   Change 'async' value from 3600s to larger one if Windows
-# Updates installation takes longer time.
 #
 - name: "Set fact of Windows Updates install log path"
   ansible.builtin.set_fact:
@@ -17,54 +14,35 @@
     log_path: "{{ win_udpates_log_file }}"
     skip_optional: true
     state: "searched"
-  # become: true
-  # become_method: runas
-  # become_user: SYSTEM
   delegate_to: "{{ vm_guest_ip }}"
   register: win_updates_list
 - name: "Print the list of Windows Updates"
   ansible.builtin.debug: var=win_updates_list
 
-- name: "Install Windows Updates in Windows guest OS"
-  ansible.windows.win_updates:
-    # server_selection: "windows_update"
-    category_names: '*'
-    log_path: "{{ win_udpates_log_file }}"
-    skip_optional: true
-  delegate_to: "{{ vm_guest_ip }}"
-  ignore_errors: true
-  register: win_updates_install_result
-  async: 3600
-  poll: 0
-  environment:
-    ANSIBLE_WIN_ASYNC_STARTUP_TIMEOUT: 10
-
-- name: "Pause 1 minute before checking task status"
-  ansible.builtin.pause:
-    minutes: 1
-- name: "Check if Windows Updates install task started"
-  ansible.builtin.assert:
-    that:
-      - win_updates_install_result is defined
-      - win_updates_install_result.ansible_job_id is defined
-    fail_msg: "The execution result of above Windows Updates install task in guest OS is not returned."
-
-- name: "Check Windows Updates install task status every 30 seconds"
-  ansible.builtin.async_status:
-    jid: "{{ win_updates_install_result.ansible_job_id }}"
-  register: win_updates_job
-  delegate_to: "{{ vm_guest_ip }}"
-  until:
-    - win_updates_job is defined
-    - win_updates_job.finished is defined
-    - win_updates_job.finished
-  retries: 120
-  delay: 30
-
-- name: "Restart guest OS when required"
-  include_tasks: ../utils/win_shutdown_restart.yml
-  vars:
-    set_win_power_state: "restart"
+- name: "Install above listed Windows Updates"
   when:
-    - win_updates_install_result.reboot_required is defined
-    - win_updates_install_result.reboot_required
+    - win_updates_list.found_update_count is defined
+    - win_updates_list.found_update_count | int != 0
+    - win_updates_list.updates is defined
+    - win_updates_list.updates | length != 0
+  block:
+    - name: "Install Windows Updates"
+      ansible.windows.win_updates:
+        server_selection: "windows_update"
+        category_names: '*'
+        log_path: "{{ win_udpates_log_file }}"
+        skip_optional: true
+        state: "installed"
+        reboot: true
+        reboot_timeout: 1800
+      delegate_to: "{{ vm_guest_ip }}"
+      register: win_updates_install_result
+    - name: "Print Windows Updates install result"
+      debug: var=win_updates_install_result
+
+- name: "Skip install Windows Updates"
+  ansible.builtin.debug:
+    msg: "Will not execute Windows Updates installation task due to no Windows Updates listed."
+  when: >
+    (win_updates_list.found_update_count is undefined) or
+    (win_updates_list.found_update_count | int == 0)
