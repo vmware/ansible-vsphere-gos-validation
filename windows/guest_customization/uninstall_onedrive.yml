@@ -1,46 +1,30 @@
 # Copyright 2022-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Set fact of OneDrive setup exe file path for Windows 11 GA"
+- name: "Set fact of OneDrive setup file path for Windows 11 GA"
   ansible.builtin.set_fact:
     one_drive_setup_exe: "C:\\Windows\\SysWOW64\\OneDriveSetup.exe"
-  when:
-    - guest_os_ansible_distribution_ver == '10.0.22000.0'
-- name: Set fact of OneDrive setup exe file path
+  when: guest_os_ansible_distribution_ver == '10.0.22000.0'
+
+- name: "Set fact of OneDrive setup file path"
   ansible.builtin.set_fact:
     one_drive_setup_exe: "C:\\Windows\\System32\\OneDriveSetup.exe"
   when: one_drive_setup_exe is undefined
 
-# Check OneDrive setup exe file exists
-- include_tasks: ../utils/win_check_file_exist.yml
+- name: "Check if OneDrive setup file exists"
+  include_tasks: ../utils/win_check_file_exist.yml
   vars:
     win_check_file_exist_file: "{{ one_drive_setup_exe }}"
 
-# Uninstall OneDrive when predefined setup exe file exists
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Uninstall OneDrive"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Start-Process -NoNewWindow -Wait -FilePath {{ one_drive_setup_exe }} -ArgumentList '/uninstall'"
   when:
     - win_check_file_exist_result is defined
     - win_check_file_exist_result
 
-# Get installed OneDrive appx package name
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Remove OneDriveSync Appx package"
+  include_tasks: ../utils/win_remove_appx_package.yml
   vars:
-    win_powershell_cmd: "(Get-AppxPackage -AllUsers | Where PackageFullName -Like '*OneDriveSync*').PackageFullName"
-
-- name: Set fact of OneDrive Sync appx package name
-  ansible.builtin.set_fact:
-    one_drive_appx_package_name: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
-  when:
-    - win_powershell_cmd_output is defined
-    - "'stdout_lines' in win_powershell_cmd_output"
-    - win_powershell_cmd_output.stdout_lines | length != 0
-    - win_powershell_cmd_output.stdout_lines[0]
-
-- include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "Remove-AppxPackage -Package {{ one_drive_appx_package_name }}"
-  when:
-    - one_drive_appx_package_name is defined
-    - one_drive_appx_package_name
+    win_appx_package: "OneDriveSync"

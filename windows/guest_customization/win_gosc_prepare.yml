@@ -1,70 +1,92 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Set the common parameters in static and dhcp
-# GOSC specification
+# Set the parameters in static and DHCP GOSC specifications
 # Note: refer to this page to set time zone id and name:
 # https://msdn.microsoft.com/en-us/library/ms912391.aspx
 #
-- name: "Set fact of the common parameters in static and dhcp GOSC spec"
+- name: "Prepare router VM, vSwitch and portgroup"
+  include_tasks: ../../common/network_testbed_setup.yml
+  when:
+    - (router_vm_deployed is undefined) or (not router_vm_deployed | bool)
+    - gosc_network_type == "static"
+
+- name: "Set fact of Windows GOSC spec with common items"
   ansible.builtin.set_fact:
-    customize_gos_hostname: 'gosc-test-win'
-    customize_domain: "autotest.com"
-    customize_autologon: true
-    customize_autologon_count: 10
-    customize_logon_password: 'B1gd3m0z!'
-    customize_timezone_id: '2'
-    customize_timezone_name: "Hawaiian Standard Time"
-    gosc_dns_servers: ['192.168.0.1', '192.168.0.2']
-    customize_runonce_echo_string: 'Windows gosc automation test'
+    win_gosc_spec: {
+      'gosc_hostname': "win-gosc-{{ gosc_network_type }}",
+      'gosc_timezone_id': "2",
+      'gosc_timezone_name': "Hawaiian Standard Time",
+      'gosc_autologon': true,
+      'gosc_autologon_count': 10,
+      'gosc_logon_password': "B1gd3m0z!",
+      'gosc_echo_file': "C:\\win_gosc_runonce.txt",
+      'gosc_echo_string': "Windows {{ gosc_network_type }} GOSC automation test"
+    }
 
-- name: "Set fact of the run once command"
+- name: "Add run once command to Windows GOSC spec"
   ansible.builtin.set_fact:
-    customize_runonce: "cmd.exe /c echo {{ customize_runonce_echo_string }} > C:\\gosc_runonce.txt"
+    win_gosc_spec: >-
+      {{ win_gosc_spec | combine({'gosc_runonce':
+      "cmd.exe /c echo " ~ win_gosc_spec.gosc_echo_string ~ " > " ~ win_gosc_spec.gosc_echo_file}) }}
 
-- name: "Set fact of the VM guest IP before GOSC"
+- name: "Set fact of Windows GOSC spec with static IP"
   ansible.builtin.set_fact:
-    guest_ip_before_gosc: "{{ vm_guest_ip }}"
+    win_gosc_spec: >-
+      {{ win_gosc_spec | combine({
+      'gosc_dns_servers': ['192.168.0.1', '192.168.0.2'],
+      'gosc_ip': '192.168.192.10',
+      'gosc_domain': "gosc.test.com",
+      'gosc_dns_suffix': ["test.com", "gosc.test.com"],
+      'gosc_gateway': vlan_gateway,
+      'gosc_netmask': '255.255.255.0',
+      'gosc_network': portgroup_name}) }}
+  when: gosc_network_type == "static"
 
-- name: "Get guest OS hostname from VM guestinfo"
-  include_tasks: ../../common/vm_get_config.yml
-  vars:
-    property_list: ['guest.hostName']
-
-- name: "Set fact of the hostname before GOSC"
+- name: "Set fact of Windows GOSC spec with DHCP IP"
   ansible.builtin.set_fact:
-    hostname_before_gosc: "{{ vm_config.guest.hostName }}"
+    win_gosc_spec: >-
+      {{ win_gosc_spec | combine({'gosc_network': (gosc_dhcp_network | default('VM Network'))}) }}
+  when: gosc_network_type == "dhcp"
 
-- ansible.builtin.debug:
-    msg: "Get guest OS hostname/IP before customization: {{ hostname_before_gosc }}/{{ guest_ip_before_gosc }}"
+- name: "Print Windows GOSC spec"
+  ansible.builtin.debug: var=win_gosc_spec
 
 - name: "Set fact of default Windows dir"
   ansible.builtin.set_fact:
-    win_dir: '$env:windir'
-
-- name: "Get OS directory"
+    win_windows_dir: '$env:windir'
+    win_dir_separator: '\'
+- name: "Get directory path in Windows guest OS"
   include_tasks: ../utils/win_get_path.yml
   vars:
-    win_get_path_specified: "{{ win_dir }}"
-
+    win_get_path_specified: "{{ win_windows_dir }}"
 - name: "Set fact of the absolute path of Windows dir"
   ansible.builtin.set_fact:
-    win_dir: "{{ win_get_path_absolute }}"
-- ansible.builtin.debug:
-    msg: "Windows GOSC log files in Windows dir: {{ win_dir }}"
+    win_windows_dir: "{{ win_get_path_absolute }}"
 
-# Uninstall OneDrive in Windows 11 for the known 3rd-party issue
-# Paramter 'uninstall_onedrive' is used for internal testing only
-- name: "Uninstall OneDrive"
-  include_tasks: uninstall_onedrive.yml
+# Workaround for this type of SYSPREP known issue:
+# Package <PackageFullName> was installed for a user, but not provisioned for all users.
+# This package will not function properly in the sysprep image.
+# For more information, please refer to this KB article or Microsoft doc linked:
+# https://kb.vmware.com/s/article/87307
+- name: "Workaround for SYSPREP error"
   when:
-    - uninstall_onedrive is defined
-    - uninstall_onedrive | bool
     - guest_os_ansible_distribution_ver is version('10.0.22000.0', '>=')
     - guest_os_product_type | lower == 'client'
+  block:
+    - name: "Remove BingSearch Appx package"
+      include_tasks: ../utils/win_remove_appx_package.yml
+      vars:
+        win_appx_package: "BingSearch"
+    # Parameter 'uninstall_onedrive' is only used for internal testing now
+    - name: "Uninstall OneDrive"
+      include_tasks: uninstall_onedrive.yml
+      when:
+        - uninstall_onedrive is defined
+        - uninstall_onedrive | bool
 
-# Disable BitLocker which will cause sysprep failure.
-# BitLocker is not installed by default on Windows Server.
+# Disable BitLocker which will cause sysprep failure
+# BitLocker is not installed by default on Windows Server
 - name: "Disable BitLocker"
   when: guest_os_product_type | lower == 'client'
   block:
@@ -82,8 +104,7 @@
     - name: "Decrypt Bitlocker volumes"
       include_tasks: ../utils/win_decrypt_bitlocker_volume.yml
 
-# Shutdown guest OS before execute guest customization
-- name: "Shutdown OS"
+- name: "Shutdown guest OS before executing GOSC"
   include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "shutdown"

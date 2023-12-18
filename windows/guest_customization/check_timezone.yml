@@ -1,23 +1,32 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Check timezone name after gos customization
-- ansible.builtin.debug:
-    msg: "Configured timezone: {{ customize_timezone_name }}"
-  when: enable_debug is defined and enable_debug
-- name: Check timezone in guest OS
+# Check timezone name after GOS customization
+- name: "Initialize the timezone name in guest OS"
+  ansible.builtin.set_fact:
+    timezone_after_gosc: ""
+
+- name: "Print timezone name in Windows GOSC spec"
+  ansible.builtin.debug:
+    msg: "Configured timezone in GOSC spec: {{ win_gosc_spec.gosc_timezone_name }}"
+
+- name: "Get timezone info in guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "tzutil /g"
-- name: Set fact of the timezone in guest OS
+
+- name: "Set fact of the timezone in guest OS"
   ansible.builtin.set_fact:
-    timezone_after_customize: "{{ win_powershell_cmd_output.stdout_lines[0] if not win_powershell_cmd_output.failed else 'NA'}}"
-- ansible.builtin.debug:
-    msg: "Get timezone after customize: {{ timezone_after_customize }}"
-- name: Check returned timezone name is the specified one
+    timezone_after_gosc: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+
+- name: "Check customized timezone in guest OS"
   ansible.builtin.assert:
     that:
-      - "{{ not win_powershell_cmd_output.failed }}"
-      - "{{ win_powershell_cmd_output.stdout_lines[0] == customize_timezone_name }}"
-    success_msg: "Check customized timezone in guest OS succeed."
-    fail_msg: "Check customized timezone in guest OS failed."
+      - timezone_after_gosc == win_gosc_spec.gosc_timezone_name
+    success_msg: "Timezone '{{ timezone_after_gosc }}' is set by GOSC successfully in guest OS."
+    fail_msg: >-
+      Got timezone in guest OS '{{ timezone_after_gosc }}',
+      which is not the one set in GOSC sepc '{{ win_gosc_spec.gosc_timezone_name }}'.

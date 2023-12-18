@@ -1,0 +1,29 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Check GOSC state in vmware.log on ESXi 6.5"
+  include_tasks: ../../common/vm_wait_log_msg.yml
+  vars:
+    vm_wait_log_name: "vmware.log"
+    vm_wait_log_msg: "Chipset: The guest has requested that the virtual machine be hard reset.*|GuestRpc: Reinitializing Channel 0.*"
+    vm_wait_log_retries: 60
+    vm_wait_log_delay: 30
+    vm_wait_log_msg_times: 2
+  when: esxi_version is version('6.5.0', '=')
+
+- name: "Check GOSC state in vmware.log on ESXi {{ esxi_version }}"
+  include_tasks: ../../common/vm_wait_gosc_completed.yml
+  when: esxi_version is version('6.5.0', '>')
+
+- name: "Check guest OS IP address and hostname"
+  include_tasks: check_ip_hostname.yml
+
+- name: "Verify customization results"
+  when: gosc_network_type == "dhcp"
+  block:
+    - name: "Check auto admin logon and count"
+      include_tasks: check_autologon_count.yml
+    - name: "Check run once command executed"
+      include_tasks: check_runonce_command.yml
+    - name: "Check timezone configured"
+      include_tasks: check_timezone.yml
