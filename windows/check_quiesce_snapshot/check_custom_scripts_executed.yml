@@ -2,72 +2,100 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Check custom scripts run before and after quiesce
-- include_tasks: ../utils/win_wait_file_exist.yml
+- name: "Wait until script output file generated"
+  include_tasks: ../utils/win_wait_file_exist.yml
   vars:
     win_wait_file_exist_file: "C:\\test_pre_freeze.txt"
-- include_tasks: ../utils/win_wait_file_exist.yml
+- name: "Wait until script output file generated"
+  include_tasks: ../utils/win_wait_file_exist.yml
   vars:
     win_wait_file_exist_file: "C:\\test_post_thaw.txt"
-- include_tasks: ../utils/win_wait_file_exist.yml
+- name: "Wait until script output file generated"
+  include_tasks: ../utils/win_wait_file_exist.yml
   vars:
     win_wait_file_exist_file: "C:\\test_quiesce_1.txt"
-- include_tasks: ../utils/win_wait_file_exist.yml
+- name: "Wait until script output file generated"
+  include_tasks: ../utils/win_wait_file_exist.yml
   vars:
     win_wait_file_exist_file: "C:\\test_quiesce_2.txt"
 
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Get content of the script output file"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "get-content -Path C:\\test_pre_freeze.txt"
-- name: Set fact of the pre-freeze time
+- name: "Set fact of the pre-freeze time"
   ansible.builtin.set_fact:
     pre_freeze_time: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length == 1
 
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Get content of the script output file"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "get-content -Path C:\\test_post_thaw.txt"
-- name: Set fact of the post-thaw time
+- name: "Set fact of the post-thaw time"
   ansible.builtin.set_fact:
     post_thaw_time: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length == 1
 
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Get content of the script output file"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "get-content -Path C:\\test_quiesce_1.txt"
-- name: Set fact of the first script execute time
+- name: "Set fact of the first script executing time"
   ansible.builtin.set_fact:
     take_quiesce_time_1: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length == 1
 
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Get content of the script output file"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "get-content -Path C:\\test_quiesce_2.txt"
-- name: Set fact of the second script execute time
+- name: "Set fact of the second script executing time"
   ansible.builtin.set_fact:
     take_quiesce_time_2: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length == 1
 
-- name: Check pre-freeze script executed after snapshot take
+- name: "Check pre-freeze script executed after taking snapshot"
   ansible.builtin.assert:
     that:
-      - "{{ pre_freeze_time|int > before_snapshot_time|int }}"
-  when: pre_freeze_time|int != 0 and before_snapshot_time|int != 0
+      - pre_freeze_time is defined
+      - before_snapshot_time | int != 0
+      - pre_freeze_time | int > before_snapshot_time | int
+    fail_msg: >-
+      Get 'pre-freeze' time in script output file: {{ pre_freeze_time | default(0) }},
+      it's not later than the time of taking snapshot: {{ before_snapshot_time }}
 
-- name: Check pre-freeze script executed before post-thaw script
+- name: "Check pre-freeze script executed before post-thaw script"
   ansible.builtin.assert:
     that:
-      - "{{ pre_freeze_time|int < post_thaw_time|int }}"
-  when: pre_freeze_time|int != 0 and post_thaw_time|int != 0
+      - post_thaw_time is defined
+      - pre_freeze_time | int < post_thaw_time | int
+    fail_msg: >-
+      Get 'post-thaw' time in script output file: {{ post_thaw_time | default(0) }},
+      it's not later than the 'pre-freeze' time: {{ pre_freeze_time }}
 
-- name: Check script executed after pre-freeze
+- name: "Check 1st script executed after pre-freeze"
   ansible.builtin.assert:
     that:
-      - "{{ pre_freeze_time|int < take_quiesce_time_1|int }}"
-  when: pre_freeze_time|int != 0 and take_quiesce_time_1|int != 0
+      - take_quiesce_time_1 is defined
+      - pre_freeze_time | int < take_quiesce_time_1 | int
+    fail_msg: >-
+      Get executing time of 1st script: {{ take_quiesce_time_1 | default(0) }},
+      it's not later than the 'pre-freeze' time: {{ pre_freeze_time }}
 
-- name: Check script executed after pre-freeze
+- name: "Check 2nd script executed after pre-freeze"
   ansible.builtin.assert:
     that:
-      - "{{ pre_freeze_time|int < take_quiesce_time_2|int }}"
-  when: pre_freeze_time|int != 0 and take_quiesce_time_2|int != 0
-
-- name: Check time variables value
-  ansible.builtin.fail:
-    msg: "Time before taking snapshot, time pre-freeze or time post-thaw got failed"
-  when: not before_snapshot_time or not pre_freeze_time or not post_thaw_time
+      - take_quiesce_time_2 is defined
+      - pre_freeze_time | int < take_quiesce_time_2 | int
+    fail_msg: >-
+      Get executing time of 2nd script: {{ take_quiesce_time_2 | default(0) }},
+      it's not later than the 'pre-freeze' time: {{ pre_freeze_time }}
