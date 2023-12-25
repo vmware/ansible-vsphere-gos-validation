@@ -3,13 +3,11 @@
 ---
 # Description:
 #   This case is to test Microsoft's Windows updates.
-#   Install Windows Update patch by msu file.
+#   Install Windows .msu update package.
 #
 - name: windows_update
   hosts: localhost
   gather_facts: no
-  vars_files:
-    - "{{ testing_vars_file | default('../../vars/test.yml') }}"
   tasks:
     - name: "Test case block"
       block:
@@ -25,6 +23,7 @@
           ansible.builtin.set_fact:
             msu_file_src_path: "{{ drive_letter_new }}:\\{{ windows_update_msu_path }}\\*"
             msu_file_dest_path: "C:\\msu"
+            msu_file_name: ""
 
         - name: "Check if folder {{ msu_file_dest_path }} exists on guest OS"
           include_tasks: ../utils/win_is_folder.yml
@@ -41,7 +40,7 @@
           include_tasks: ../utils/win_execute_cmd.yml
           vars:
             win_powershell_cmd: >-
-              net use {{ drive_letter_new }}: {{ windows_msu_share_point }} {{ suvp_pwd }} /user:{{ suvp_name }};
+              net use {{ drive_letter_new }}: {{ windows_msu_share_point }} {{ windows_nfs_pwd }} /user:{{ windows_nfs_username }};
               Copy-Item -Path {{ msu_file_src_path }} -Include *.msu -Destination {{ msu_file_dest_path }}  -ErrorAction Stop;
               net use {{ drive_letter_new }}: /delete
 
@@ -61,24 +60,20 @@
         - name: "Failed to copy the msu file to {{ msu_file_dest_path }}"
           ansible.builtin.fail:
             fail_msg: "The msu file is not found in {{ msu_file_dest_path }}."
-          when: msu_file_name is not defined
+          when: msu_file_name
 
         - name: "Set the msu file installation related parameters"
           ansible.builtin.set_fact:
             msu_kb_number: "{{ msu_file_name | regex_search('KB\\d+') }}"
             msu_file_dest: "{{ msu_file_dest_path }}\\{{msu_file_name }}"
             msu_install_timeout: 7200
-            msu_become_user: Administrator
-
-        - name: "Change the become_user for 32bit OS"
-          ansible.builtin.set_fact:
-            msu_become_user: SYSTEM
-          when: guest_os_ansible_architecture == "32-bit"
+            msu_become_user: "{{ 'SYSTEM' if guest_os_ansible_architecture == '32-bit' else 'Administrator' }}"
 
         - name: "Enable the user Administrator"
           include_tasks: ../utils/win_execute_cmd.yml
           vars:
             win_powershell_cmd: "net user Administrator /active:yes"
+          when: vm_username | lower != "administrator"
 
         - name: "Install the msu file"
           ansible.windows.win_shell: >-
@@ -90,6 +85,8 @@
           become_user: "{{ msu_become_user }}"
           async: "{{ msu_install_timeout }}"
           poll: 0
+          environment:
+            ANSIBLE_WIN_ASYNC_STARTUP_TIMEOUT: 10
 
         - name: "Check if the msu file is installed before restart"
           ansible.windows.win_shell: "Get-HotFix | Where-Object HotFixID -eq {{ msu_kb_number }}"
