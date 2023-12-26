@@ -5,7 +5,7 @@
 #   This case is to test Microsoft's Windows updates.
 #   Install Windows .msu update package.
 #
-- name: windows_update
+- name: windows_update_install
   hosts: localhost
   gather_facts: no
   tasks:
@@ -50,21 +50,21 @@
             win_powershell_cmd: >- 
               Get-ChildItem -Path {{ msu_file_dest_path }} -Include *.msu -Name -ErrorAction Stop;
 
+        - name: "Check if the msu file is copied to {{ msu_file_dest_path }}"
+          ansible.builtin.assert:
+            that:
+              - win_powershell_cmd_output.stdout_lines is defined
+              - win_powershell_cmd_output.stdout_lines | length != 0
+            fail_msg: "The msu file is not found in {{ msu_file_dest_path }} in guest OS."
+            success_msg: "The msu file is copied to {{ msu_file_dest_path }} in guest OS."
+
         - name: "Set the msu file name"
           ansible.builtin.set_fact:
             msu_file_name: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
-          when:
-            - win_powershell_cmd_output.stdout_lines is defined
-            - win_powershell_cmd_output.stdout_lines | length != 0
-
-        - name: "Failed to copy the msu file to {{ msu_file_dest_path }}"
-          ansible.builtin.fail:
-            fail_msg: "The msu file is not found in {{ msu_file_dest_path }}."
-          when: msu_file_name
 
         - name: "Set the msu file installation related parameters"
           ansible.builtin.set_fact:
-            msu_kb_number: "{{ msu_file_name | regex_search('KB\\d+') }}"
+            msu_kb_number: "{{ msu_file_name | regex_search('(?i)KB\\d+') | upper }}"
             msu_file_dest: "{{ msu_file_dest_path }}\\{{msu_file_name }}"
             msu_install_timeout: 7200
             msu_become_user: "{{ 'SYSTEM' if guest_os_ansible_architecture == '32-bit' else 'Administrator' }}"
@@ -139,15 +139,20 @@
           vars:
             exit_testing_when_fail: true
       always:
-        - name: "Check if the msu file exists in guest OS"
-          include_tasks: ../utils/win_check_file_exist.yml
-          vars:
-            win_check_file_exist_file: "{{ msu_file_dest }}"
-
         - name: "Delete the msu file from guest OS"
-          ansible.windows.win_file:
-            path: "{{ msu_file_dest }}"
-            state: absent
-          delegate_to: "{{ vm_guest_ip }}"
-          register: delete_file_result
-          when: win_check_file_exist_result
+          when:
+            - msu_file_dest is defined
+            - msu_file_dest
+          block:
+            - name: "Check if the msu file exists in guest OS"
+              include_tasks: ../utils/win_check_file_exist.yml
+              vars:
+                win_check_file_exist_file: "{{ msu_file_dest }}"
+
+            - name: "Delete the msu file from guest OS"
+              ansible.windows.win_file:
+                path: "{{ msu_file_dest }}"
+                state: absent
+              delegate_to: "{{ vm_guest_ip }}"
+              register: delete_file_result
+              when: win_check_file_exist_result
