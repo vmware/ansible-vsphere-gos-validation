@@ -39,3 +39,24 @@
       when:
         - cleanup_vm | bool
         - new_vm is defined and new_vm | bool
+
+    - name: "Restore base snapshot for windows update installation"
+      when:
+        - win_update_snapshot_name is defined
+        - win_update_snapshot_name
+        - (vm_exists is defined and vm_exists)
+      block:
+        - name: "Revert to original base snapshot {{ win_update_snapshot_name }}"
+          include_tasks: ../common/vm_revert_snapshot.yml
+          vars:
+            snapshot_name: "{{ win_update_snapshot_name }}"
+        - name: "Remove the current base snapshot {{ base_snapshot_name }}"
+          include_tasks: ../common/vm_remove_snapshot.yml
+          vars:
+            snapshot_name: "{{ base_snapshot_name }}"
+          when: base_snapshot_exists
+        - name: "Rename snapshot {{ win_update_snapshot_name }} to {{ base_snapshot_name }}"
+          include_tasks: ../common/vm_rename_snapshot.yml
+          vars:
+            current_snapshot_name: "{{ win_update_snapshot_name }}"
+            new_snapshot_name: "{{ base_snapshot_name }}"
