@@ -16,11 +16,14 @@
     win_powershell_cmd: >-
       (Get-ChildItem -Path
       "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Update\\TargetingInfo\\Installed\\*.OS.*").Name
+    win_execute_cmd_ignore_error: true
 
 - name: "Set fact of registry key path for getting OS version"
   ansible.builtin.set_fact:
     win_os_version_reg_path: "{{ win_powershell_cmd_output.stdout_lines[0] | replace('HKEY_LOCAL_MACHINE', 'HKLM:') }}"
   when:
+    - win_powershell_cmd_output.failed is defined
+    - not win_powershell_cmd_output.failed
     - win_powershell_cmd_output.stdout_lines is defined
     - win_powershell_cmd_output.stdout_lines | length == 1
 
@@ -32,10 +35,34 @@
       vars:
         win_powershell_cmd: >-
           Get-ItemPropertyValue -Path "{{ win_os_version_reg_path }}" -Name Version
+        win_execute_cmd_ignore_error: true
     - name: "Set fact of Windows OS version"
       ansible.builtin.set_fact:
         win_os_version_build: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
       when:
+        - win_powershell_cmd_output.failed is defined
+        - not win_powershell_cmd_output.failed
+        - win_powershell_cmd_output.stdout_lines is defined
+        - win_powershell_cmd_output.stdout_lines | length == 1
+
+- name: "Get Windows OS version"
+  when: not win_os_version_reg_path
+  block:
+    - name: "Get registry key value for getting OS version"
+      include_tasks: win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: >-
+          $majorver = Get-ItemPropertyValue -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion" -Name CurrentMajorVersionNumber;
+          $minorver = Get-ItemPropertyValue -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion" -Name CurrentMinorVersionNumber;
+          $buildnum = (Get-ItemPropertyValue -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion" -Name BuildLabEx) -match "\d{5}\.\d{4}";
+          Write-Host($majorver, $minorver, $matches[0] -join '.')
+        win_execute_cmd_ignore_error: true
+    - name: "Set fact of Windows OS version"
+      ansible.builtin.set_fact:
+        win_os_version_build: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+      when:
+        - win_powershell_cmd_output.failed is defined
+        - not win_powershell_cmd_output.failed
         - win_powershell_cmd_output.stdout_lines is defined
         - win_powershell_cmd_output.stdout_lines | length == 1
 
