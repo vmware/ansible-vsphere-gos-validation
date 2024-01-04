@@ -16,13 +16,13 @@
           vars:
             create_current_test_folder: true
 
-        - name: "Prepare the msu file"
+        - name: "Prepare the .msu file"
           include_tasks: prepare_msu_file.yml
 
-        - name: "Install the msu file"
+        - name: "Install the .msu file"
           include_tasks: install_msu_file.yml
 
-        - name: "Reset base snapshot after installing the msu file"
+        - name: "Reset base snapshot after installing the .msu file"
           include_tasks: ../../common/reset_base_snapshot.yml
 
         - name: "Save the new name of the old base snapshot"
@@ -34,19 +34,19 @@
           vars:
             exit_testing_when_fail: true
       always:
-        - name: "Delete the msu file from guest OS"
+        - name: "Delete the .msu file from guest OS"
           when:
-            - msu_file_dest is defined
-            - msu_file_dest
+            - msu_file_dest_path is defined
+            - msu_file_dest_path
           block:
-            - name: "Check if the msu file exists in guest OS"
+            - name: "Check if the .msu file exists in guest OS"
               include_tasks: ../utils/win_check_file_exist.yml
               vars:
-                win_check_file_exist_file: "{{ msu_file_dest }}"
+                win_check_file_exist_file: "{{ msu_file_dest_path }}"
 
-            - name: "Delete the msu file from guest OS"
+            - name: "Delete the .msu file from guest OS"
               ansible.windows.win_file:
-                path: "{{ msu_file_dest }}"
+                path: "{{ msu_file_dest_path }}"
                 state: absent
               delegate_to: "{{ vm_guest_ip }}"
               register: delete_file_result

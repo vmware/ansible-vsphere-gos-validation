@@ -4,45 +4,45 @@
 - name: "Get unused driver letter"
   include_tasks: ../utils/win_get_unused_drive_letter.yml
 
-- name: "Initialize the msu file path"
+- name: "Initialize the .msu file path"
   ansible.builtin.set_fact:
     msu_file_src_path: "{{ drive_letter_new }}:\\{{ windows_update_msu_path }}\\*"
-    msu_file_dest_path: "C:\\msu"
+    msu_dir_path: "C:\\msu"
     msu_file_name: ""
 
-- name: "Check if folder {{ msu_file_dest_path }} exists on guest OS"
+- name: "Check if folder {{ msu_dir_path }} exists on guest OS"
   include_tasks: ../utils/win_is_folder.yml
   vars:
-    win_is_folder_path: "{{ msu_file_dest_path }}"
+    win_is_folder_path: "{{ msu_dir_path }}"
 
-- name: "Create folder {{ msu_file_dest_path }} on guest OS"
+- name: "Create folder {{ msu_dir_path }} on guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "mkdir {{ msu_file_dest_path }}"
+    win_powershell_cmd: "mkdir {{ msu_dir_path }}"
   when: not win_is_folder_result
 
-- name: "Copy the msu file to local disk of guest OS"
+- name: "Copy the .msu file to local disk of guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: >-
       net use {{ drive_letter_new }}: {{ windows_msu_share_point }} {{ windows_nfs_pwd }} /user:{{ windows_nfs_username }};
-      Copy-Item -Path {{ msu_file_src_path }} -Include *.msu -Destination {{ msu_file_dest_path }}  -ErrorAction Stop;
+      Copy-Item -Path {{ msu_file_src_path }} -Include *.msu -Destination {{ msu_dir_path }}  -ErrorAction Stop;
       net use {{ drive_letter_new }}: /delete
 
-- name: "Get the msu file name"
+- name: "Get the .msu file name"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: >- 
-      Get-ChildItem -Path {{ msu_file_dest_path }} -Include *.msu -Name -ErrorAction Stop;
+      Get-ChildItem -Path {{ msu_dir_path }} -Include *.msu -Name -ErrorAction Stop;
 
-- name: "Check if the msu file is copied to {{ msu_file_dest_path }}"
+- name: "Check if the .msu file is copied to {{ msu_dir_path }}"
   ansible.builtin.assert:
     that:
       - win_powershell_cmd_output.stdout_lines is defined
       - win_powershell_cmd_output.stdout_lines | length != 0
-    fail_msg: "The msu file is not found in {{ msu_file_dest_path }} in guest OS."
-    success_msg: "The msu file is copied to {{ msu_file_dest_path }} in guest OS."
+    fail_msg: "The .msu file is not found in {{ msu_dir_path }} in guest OS."
+    success_msg: "The .msu file is copied to {{ msu_dir_path }} in guest OS."
 
-- name: "Set the msu file name"
+- name: "Set the .msu file name"
   ansible.builtin.set_fact:
     msu_file_name: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
