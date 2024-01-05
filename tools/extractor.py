@@ -39,7 +39,11 @@ def escape_ansi(text):
 def extract_text_from_image(image_path):
     # Open the image file
     img = Image.open(image_path)
-
+    if (img.width <= 1280 or img.height <= 1280):
+        (width, height) = (img.width * 3, img.height * 3)
+    else:
+        (width, height) = (img.width, img.height)
+    img = img.resize((width, height))
     # Use pytesseract to do OCR on the image
     text = pytesseract.image_to_string(img)
     text = remove_empty_lines(text)
