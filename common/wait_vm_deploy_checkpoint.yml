@@ -53,26 +53,6 @@
       ansible.builtin.set_fact:
         checkpoint_errors: []
 
-    - name: "Take a screenshot at checkpoint {{ wait_checkpoint_name }}"
-      include_tasks: vm_take_screenshot.yml
-      vars:
-        vm_screenshot_local_dir: "{{ current_test_log_folder }}"
-        vm_screenshot_local_name: "screenshot_at_{{ wait_checkpoint_name }}_failure.png"
-        vm_screen_active: true
-
-    - name: "Extract text from VM screenshot"
-      when: vm_screenshot_local_path
-      block:
-        - name: "Extract text from screenshot"
-          include_tasks: extract_text_from_screenshot.yml
-          vars:
-            local_screenshot_path: "{{ vm_screenshot_local_path }}"
-
-        - name: "Set fact of extracted text from VM screenshot"
-          ansible.builtin.set_fact:
-            checkpoint_errors: "{{ text_in_screenshot }}"
-          when: text_in_screenshot | length > 0
-
     - name: "Collect serial port log"
       include_tasks: collect_serial_port_log.yml
 
@@ -84,6 +64,7 @@
         - name: "Set fact of serial port file local path for checkpoint {{ wait_checkpoint_name }}"
           ansible.builtin.set_fact:
             checkpoint_serial_file_local_path: "{{ current_test_log_folder }}/serial_at_{{ wait_checkpoint_name }}.log"
+
         - name: "Rename serial port file at local"
           ansible.builtin.shell: "mv {{ vm_serial_file_local_path }} {{ checkpoint_serial_file_local_path }}"
 
