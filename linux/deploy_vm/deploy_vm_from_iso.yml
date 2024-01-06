@@ -201,6 +201,19 @@
   vars:
     vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
 
+# VM might not have MAC address after creation without power-on
+# So here try to get it again for below update_inventory.yml
+- name: "Retry to get VM primary network adapter MAC address"
+  include_tasks: ../../common/vm_wait_primary_nic_mac.yml
+  when: not vm_primary_nic_mac
+
+- name: "Assert VM primary network adapter has MAC address"
+  ansible.builtin.assert:
+    that:
+      - vm_primary_nic_mac
+    fail_msg: "No MAC address is assigned to the VM primary network adapter"
+    success_msg: "VM primary network adapter MAC address is {{ vm_primary_nic_mac }}"
+
 # VMware Photon OS kickstart file can't add shutdown action,
 # so here needs to shutdown it separately
 - name: "Shutdown VMware Photon OS VM after auto install completes"
