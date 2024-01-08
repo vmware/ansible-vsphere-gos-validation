@@ -1,0 +1,60 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Search and install Windows Updates in all categories,
+# and skip optional ones in Windows guest OS.
+# Return:
+#   win_udpates_log_file: Windows Updates install log file path.
+#
+- name: "Set fact of Windows Updates install log path"
+  ansible.builtin.set_fact:
+    win_udpates_log_file: "C:\\win_updates_log.txt"
+
+- name: "Get the list of available Windows Updates"
+  ansible.windows.win_updates:
+    server_selection: "windows_update"
+    category_names: '*'
+    log_path: "{{ win_udpates_log_file }}"
+    skip_optional: true
+    state: "searched"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: win_updates_list
+- name: "Print the list of Windows Updates"
+  ansible.builtin.debug: var=win_updates_list
+
+- name: "Install Windows Updates when updates found"
+  when:
+    - win_updates_list.found_update_count is defined
+    - win_updates_list.found_update_count | int != 0
+    - win_updates_list.updates is defined
+    - win_updates_list.updates | length != 0
+  block:
+    - name: "Install Windows Updates"
+      ansible.windows.win_updates:
+        server_selection: "windows_update"
+        category_names: '*'
+        log_path: "{{ win_udpates_log_file }}"
+        skip_optional: true
+        state: "installed"
+        reboot: true
+        reboot_timeout: 1800
+      delegate_to: "{{ vm_guest_ip }}"
+      register: win_updates_install_result
+    - name: "Print Windows Updates install result"
+      debug: var=win_updates_install_result
+    - name: "Check updates found are installed"
+      ansible.builtin.assert:
+        that:
+          - win_updates_install_result.found_update_count is defined
+          - win_updates_install_result.installed_update_count is defined
+          - win_updates_install_result.found_update_count | int == win_updates_install_result.installed_update_count | int
+        fail_msg: >-
+          Installed update count '{{ win_updates_install_result.installed_update_count | default(0) }}',
+          is not match found update count '{{ win_updates_install_result.found_update_count | default(0) }}'.
+
+- name: "No need to install Windows Updates"
+  ansible.builtin.debug:
+    msg: "Will not execute Windows Updates installation task due to no update found."
+  when: >
+    (win_updates_list.found_update_count is undefined) or
+    (win_updates_list.found_update_count | int == 0)
