@@ -4,7 +4,7 @@
 - name: "Set the .msu file installation related parameters"
   ansible.builtin.set_fact:
     msu_kb_number: "{{ msu_file_name | regex_search('(?i)KB\\d+') | upper }}"
-    msu_file_dest_path: "{{ msu_dir_path }}\\{{msu_file_name }}"
+    msu_file_dest_path: "{{ msu_dir_path }}\\{{ msu_file_name }}"
     msu_install_timeout: 7200
     msu_become_user: "{{ 'SYSTEM' if guest_os_ansible_architecture == '32-bit' else 'Administrator' }}"
 
@@ -26,6 +26,13 @@
   poll: 0
   environment:
     ANSIBLE_WIN_ASYNC_STARTUP_TIMEOUT: 10
+
+- name: "Check if the .msu file installation task started"
+  ansible.builtin.assert:
+    that:
+      - install_msu_result is defined
+      - install_msu_result.ansible_job_id is defined
+    fail_msg: "The result of above .msu file installation task executed in guest OS is not returned."
 
 - name: "Check if the .msu file is installed before restart"
   ansible.windows.win_shell: "Get-HotFix | Where-Object HotFixID -eq {{ msu_kb_number }}"

@@ -21,11 +21,21 @@
     win_powershell_cmd: "mkdir {{ msu_dir_path }}"
   when: not win_is_folder_result
 
+- name: "Set mount command for accessing the shared folder"
+  ansible.builtin.set_fact:
+    win_nfs_mount_cmd: |-
+      {%- if windows_nfs_username is defined and windows_nfs_username and 
+        windows_nfs_pwd is defined and windows_nfs_pwd -%}
+      {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_msu_share_point ~ ' ' ~ windows_nfs_pwd ~ ' /user:' ~ windows_nfs_username }}
+      {%- else -%}
+      {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_msu_share_point }}
+      {%- endif -%}
+
 - name: "Copy the .msu file to local disk of guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: >-
-      net use {{ drive_letter_new }}: {{ windows_msu_share_point }} {{ windows_nfs_pwd }} /user:{{ windows_nfs_username }};
+      {{ win_nfs_mount_cmd }};
       Copy-Item -Path {{ msu_file_src_path }} -Include *.msu -Destination {{ msu_dir_path }}  -ErrorAction Stop;
       net use {{ drive_letter_new }}: /delete
 
