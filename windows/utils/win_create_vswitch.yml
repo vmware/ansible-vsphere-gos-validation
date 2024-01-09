@@ -26,7 +26,8 @@
       - win_vswitch_type in ['Private', 'Internal', 'External']
     fail_msg: "Accepted values of parameter 'win_vswitch_type' are 'Private', 'Internal', 'External', while it's set to '{{ win_vswitch_type }}.'"
 
-- name: "Set fact of 'External' virtual switch powershell commands"
+- name: "Set fact of 'External' virtual switch PowerShell commands"
+  when: win_vswitch_type == 'External'
   block:
     - name: "Check required parameter for External virtual switch"
       ansible.builtin.assert:
@@ -34,13 +35,12 @@
           - win_ethernet_name is defined
           - win_ethernet_name
         fail_msg: "Parameter 'win_ethernet_name' is required and set to a valid value when 'win_vswitch_type' is 'External'."
-    - name: "Set fact of virtual switch powershell commands"
+    - name: "Set fact of virtual switch PowerShell commands"
       ansible.builtin.set_fact:
         win_get_vswitch_cmd: "(Get-VMSwitch -SwitchType {{ win_vswitch_type }} | where-object {$_.Name -eq '{{ win_vswitch_name }}' -and $_.NetAdapterInterfaceDescription -eq '{{ win_ethernet_name }}'} | measure-object).Count"
         win_create_vswitch_cmd: "New-VMSwitch -name '{{ win_vswitch_name }}' -NetAdapterName '{{ win_ethernet_name }}' -AllowManagementOS $true"
-  when: win_vswitch_type == 'External'
 
-- name: "Set fact of 'Internal/Private' virtual switch powershell commands"
+- name: "Set fact of 'Internal/Private' virtual switch PowerShell commands"
   ansible.builtin.set_fact:
     win_get_vswitch_cmd: "(Get-VMSwitch -SwitchType {{ win_vswitch_type }} | where-object {$_.Name -eq '{{ win_vswitch_name }}'} | measure-object).Count"
     win_create_vswitch_cmd: "New-VMSwitch -name '{{ win_vswitch_name }}' -SwitchType {{ win_vswitch_type }}"
@@ -59,6 +59,7 @@
     - win_powershell_cmd_output.stdout_lines | length == 1
 
 - name: "vswitch with specified type and name not exist"
+  when: win_vswitch_exists | int == 0
   block:
     - name: "Create new vswitch"
       include_tasks: win_execute_cmd.yml
@@ -75,7 +76,6 @@
           - win_powershell_cmd_output.stdout_lines | length == 1
           - win_powershell_cmd_output.stdout_lines[0] | int == 1
         fail_msg: "Failed to get new vswitch with name '{{ win_vswitch_name }}' and type '{{ win_vswitch_type }}' after creation: '{{ win_powershell_cmd_output.stdout_lines | default('') }}'"
-  when: win_vswitch_exists | int == 0
 
 - name: "vswitch with specified type and name exists"
   debug:
