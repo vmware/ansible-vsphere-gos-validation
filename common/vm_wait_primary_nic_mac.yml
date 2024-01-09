@@ -41,7 +41,10 @@
     - gather_network_facts.network_data['0'].mac_addr is defined
     - gather_network_facts.network_data['0'].mac_addr
 
-- name: "Display VM's primary network adapter MAC address"
-  ansible.builtin.debug:
-    msg:
-      - "VM primary network adapter MAC address: {{ vm_primary_nic_mac }}"
+- name: "Assert VM primary network adapter has MAC address"
+  ansible.builtin.assert:
+    that:
+      - vm_primary_nic_mac
+      - vm_primary_nic_mac | ansible.utils.hwaddr
+    fail_msg: "VM primary network adapter has No MAC address"
+    success_msg: "VM primary network adapter MAC address is {{ vm_primary_nic_mac }}"
