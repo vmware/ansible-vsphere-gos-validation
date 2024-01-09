@@ -6,7 +6,7 @@
 
 - name: "Initialize the .msu file path"
   ansible.builtin.set_fact:
-    msu_file_src_path: "{{ drive_letter_new }}:\\{{ windows_update_msu_path }}\\*"
+    msu_file_src_path: "{{ drive_letter_new }}:\\{{ windows_msu_nfs_path }}\\*"
     msu_dir_path: "C:\\msu"
     msu_file_name: ""
 
@@ -26,10 +26,11 @@
     win_nfs_mount_cmd: |-
       {%- if windows_nfs_username is defined and windows_nfs_username and 
         windows_nfs_pwd is defined and windows_nfs_pwd -%}
-      {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_msu_share_point ~ ' ' ~ windows_nfs_pwd ~ ' /user:' ~ windows_nfs_username }}
+      {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_nfs_share ~ ' ' ~ windows_nfs_pwd ~ ' /user:' ~ windows_nfs_username }}
       {%- else -%}
-      {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_msu_share_point }}
+      {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_nfs_share }}
       {%- endif -%}
+  no_log: "{{ hide_secrets | default(false) }}"
 
 - name: "Copy the .msu file to local disk of guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
