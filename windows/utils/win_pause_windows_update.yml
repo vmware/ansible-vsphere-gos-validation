@@ -2,32 +2,35 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Windows Update will cause poweroff or restart taking a long time,
-# or GOSC test cases failure, so here try to disable auto pdate
+# or GOSC test cases failure, so here try to disable auto update
 # and pause update 7 days.
 #
-# Transfer powershell script to guest OS
-- name: Set fact of powershell script file path
+# Transfer PowerShell script to guest OS
+- name: "Set fact of PowerShell script file path"
   ansible.builtin.set_fact:
     local_ps_file: "scripts/pause_windows_update.ps1"
     remote_ps_file: "C:\\pause_windows_update.ps1"
-- include_tasks: win_copy_file_from_local.yml
+- name: "Copy file from local to guest OS"
+  include_tasks: win_copy_file_from_local.yml
   vars:
     src_path_local: "{{ local_ps_file }}"
     dest_path_remote: "C:\\"
-- include_tasks: win_check_file_exist.yml
+- name: "Check if file exists"
+  include_tasks: win_check_file_exist.yml
   vars:
     win_check_file_exist_file: "{{ remote_ps_file }}"
 
-# Pause Windows update is not a demand task, so ignore errors
-- block:
-    - name: Execute powershell script in guest OS
+# Pause Windows Update is not a demand task, so ignore errors
+- name: "Execute the PowerShell script to pause Windows Update"
+  when:
+    - win_check_file_exist_result is defined
+    - win_check_file_exist_result | bool
+  block:
+    - name: "Execute PowerShell script in guest OS"
       ansible.windows.win_command: "powershell.exe -ExecutionPolicy bypass -File {{ remote_ps_file }}"
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: true
       register: pause_update_result
-    - name: Display the script execute result
+    - name: "Display the script execute result"
       ansible.builtin.debug: var=pause_update_result
       when: enable_debug
-  when:
-    - win_check_file_exist_result is defined
-    - win_check_file_exist_result | bool

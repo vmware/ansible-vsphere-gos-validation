@@ -7,28 +7,29 @@
 # Return:
 #   win_get_files_folders_list
 #
-- ansible.builtin.debug:
+- name: "Display debug message"
+  ansible.builtin.debug:
     msg: "Specified folder path in guest OS: {{ win_get_files_folders_folder }}"
 
-- name: Initialize the fact of sub folder and file list
+- name: "Initialize the fact of sub folder and file list"
   ansible.builtin.set_fact:
     win_get_files_folders_list: []
 
-# Get child items in specified folder
-- include_tasks: win_execute_cmd.yml
+- name: "Get child items in specified folder"
+  include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "(Get-ChildItem -Path '{{ win_get_files_folders_folder }}').Name"
     win_execute_cmd_ignore_error: true
 
-- name: Get files or folder from powershell output
+- name: "Get files or folder from PowerShell output"
   ansible.builtin.set_fact:
     win_get_files_folders_list: "{% for item in win_powershell_cmd_output.stdout_lines %}{{ win_get_files_folders_folder }}\\{{ item }} {% endfor %}"
   when: not win_powershell_cmd_output.failed
 
-- name: Set fact of the files or folder list
+- name: "Set fact of the files or folder list"
   ansible.builtin.set_fact:
     win_get_files_folders_list: "{{ win_get_files_folders_list.split() }}"
   when: win_get_files_folders_list | length != 0
 
-- name: Display the files or folders list
+- name: "Display the files or folders list"
   ansible.builtin.debug: var=win_get_files_folders_list
