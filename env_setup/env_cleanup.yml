@@ -13,8 +13,12 @@
 
     # Need to revert to base snapshot of target VM firstly, or removing portgroup would fail
     - name: "Revert to base snapshot then cleanup network testbed configurations"
+      when:
+        - router_vm_deployed is defined
+        - router_vm_deployed | bool
       block:
-        - include_tasks: ../common/vm_revert_snapshot.yml
+        - name: "Revert to snapshot {{ base_snapshot_name }}"
+          include_tasks: ../common/vm_revert_snapshot.yml
           vars:
             snapshot_name: "{{ base_snapshot_name }}"
             skip_if_not_exist: true
@@ -22,20 +26,42 @@
             - base_snapshot_exists is defined
             - base_snapshot_exists | bool
         # Clean up router VM, vSwitch and portgroup
-        - include_tasks: ../common/network_testbed_cleanup.yml
-      when:
-        - router_vm_deployed is defined
-        - router_vm_deployed | bool
+        - name: "Cleanup router VM and vSwitch"
+          include_tasks: ../common/network_testbed_cleanup.yml
 
-    - name: Cleanup new deployed VM
-      block:
-        - include_tasks: ../common/vm_set_power_state.yml
-          vars:
-            vm_power_state_set: 'powered-off'
-        - include_tasks: ../common/vm_remove.yml
-        - name: "Set VM cleaned flag is True"
-          ansible.builtin.set_fact:
-            vm_cleaned_up: true
+    - name: "Cleanup new deployed VM"
       when:
         - cleanup_vm | bool
         - new_vm is defined and new_vm | bool
+      block:
+        - name: "Power off VM"
+          include_tasks: ../common/vm_set_power_state.yml
+          vars:
+            vm_power_state_set: 'powered-off'
+        - name: "Remove VM"
+          include_tasks: ../common/vm_remove.yml
+        - name: "Set VM cleaned flag to true and VM exists to false"
+          ansible.builtin.set_fact:
+            vm_cleaned_up: true
+            vm_exists: false
+
+    - name: "Restore base snapshot for Windows Update installation"
+      when:
+        - win_update_snapshot_name is defined
+        - win_update_snapshot_name
+        - (vm_exists is defined and vm_exists)
+      block:
+        - name: "Revert to original base snapshot {{ win_update_snapshot_name }}"
+          include_tasks: ../common/vm_revert_snapshot.yml
+          vars:
+            snapshot_name: "{{ win_update_snapshot_name }}"
+        - name: "Remove the current base snapshot {{ base_snapshot_name }}"
+          include_tasks: ../common/vm_remove_snapshot.yml
+          vars:
+            snapshot_name: "{{ base_snapshot_name }}"
+          when: base_snapshot_exists
+        - name: "Rename snapshot {{ win_update_snapshot_name }} to {{ base_snapshot_name }}"
+          include_tasks: ../common/vm_rename_snapshot.yml
+          vars:
+            current_snapshot_name: "{{ win_update_snapshot_name }}"
+            new_snapshot_name: "{{ base_snapshot_name }}"

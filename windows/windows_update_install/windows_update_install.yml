@@ -1,0 +1,64 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This case is to test Microsoft's Windows updates.
+#   Install Windows .msu update package.
+#
+- name: windows_update_install
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_current_test_folder: true
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case due to parameter windows_nfs_share or windows_nfs_msu_path is not provided 
+              and no need to test the .msu file installation.
+            skip_reason: "Skipped"
+          when: >-
+            (windows_nfs_msu_path is undefined or not windows_nfs_msu_path) or 
+            (windows_nfs_share is undefined or not windows_nfs_share)
+
+        - name: "Prepare the .msu file"
+          include_tasks: prepare_msu_file.yml
+
+        - name: "Install the .msu file"
+          include_tasks: install_msu_file.yml
+
+        - name: "Reset base snapshot after installing the .msu file"
+          include_tasks: ../../common/reset_base_snapshot.yml
+
+        - name: "Save the new name of the old base snapshot"
+          ansible.builtin.set_fact:
+            win_update_snapshot_name: "{{ old_snapshot_new_name }}"
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true
+      always:
+        - name: "Delete the .msu file from guest OS"
+          when:
+            - msu_file_dest_path is defined
+            - msu_file_dest_path
+          block:
+            - name: "Check if the .msu file exists in guest OS"
+              include_tasks: ../utils/win_check_file_exist.yml
+              vars:
+                win_check_file_exist_file: "{{ msu_file_dest_path }}"
+
+            - name: "Delete the .msu file from guest OS"
+              ansible.windows.win_file:
+                path: "{{ msu_file_dest_path }}"
+                state: absent
+              delegate_to: "{{ vm_guest_ip }}"
+              register: delete_file_result
+              when: win_check_file_exist_result
