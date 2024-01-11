@@ -7,8 +7,8 @@
 6. For SLED 15 SP4 or later unattend auto-install, please use SLE/15/SP4/SLED/autoinst.xml.
 7. For Windows 10, or Windows 11 with TPM device unattend auto-install, please use files under Windows/win10.
 8. For Windows 11 without TPM device unattend auto-install, please use files under Windows/win11 to bypass TPM check during installation.
-9. For Windows Server LTSC unattend auto-install, please use files under Windows/win_server.
-10. For Windows Server SAC unattend auto-install, please use files under Windows/win_server_sac.
+9. For Windows Server LTSC releases unattend auto-install, please use files under Windows/win_server.
+10. For Windows Server AC releases unattend auto-install, please use files under Windows/win_server_ac.
 11. For Photon OS 3.0 or later unattend auto-install, please use file Photon/ks.cfg.
 12. For Ubuntu Server 20.04 or later unattend auto-install, please use file Ubuntu/Server/user-data.j2.
 13. For Ubuntu Desktop 20.04 ~ 22.10 unattend auto-install, please use file Ubuntu/Desktop/Ubiquity/ubuntu.seed.
