@@ -1,0 +1,29 @@
+# Copyright 2023 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Install Windows Updates"
+  include_tasks: ../utils/win_install_updates.yml
+
+- name: "Set fact if guest OS has installed Windows Updates"
+  ansible.builtin.set_fact:
+    win_updates_installed: |-
+      {%- if win_updates_install_result is defined and win_updates_install_result.installed_update_count is defined and 
+        win_updates_install_result.installed_update_count | int > 0 -%}true
+      {%- else -%}false
+      {%- endif -%}
+
+- name: "Get guest OS version build"
+  include_tasks: ../utils/win_get_os_version.yml
+- name: "Set fact of guest OS version build"
+  ansible.builtin.set_fact:
+    win_version_before: "{{ win_os_version_build }}"
+
+# If guest OS has been updated, take a new one as base snapshot and remove the old one.
+- name: "Reset the base snapshot and remove the old one"
+  include_tasks: ../../common/reset_base_snapshot.yml
+  vars:
+    remove_old_base_snapshot: true
+    snapshot_description: "{{ win_version_before }}"
+  when: win_updates_installed
+
+
