@@ -6,48 +6,54 @@
 # installation package, and script for configuring Windows for Ansible from this path:
 # https://raw.githubusercontent.com/ansible/ansible-documentation/devel/examples/scripts/ConfigureRemotingForAnsible.ps1
 #
-- name: Set fact of the timestamp suffix of ISO file name
+- name: "Set fact of unattend install ISO file name"
   ansible.builtin.set_fact:
-    iso_timestamp: "{{ lookup('pipe','date +%s') }}"
-- name: Set fact of unattend install ISO file name
-  ansible.builtin.set_fact:
-    unattend_install_iso: "{{ guest_id }}-{{ firmware }}-{{ boot_disk_controller }}-{{ iso_timestamp }}.iso"
-- name: Set fact of unattend install ISO file path on ESXi host
+    unattend_install_iso: "{{ guest_id }}-{{ firmware }}-{{ boot_disk_controller }}-{{ current_test_timestamp }}.iso"
+
+- name: "Set fact of unattend install ISO file path on ESXi host"
   ansible.builtin.set_fact:
     transferred_unattend_iso: "[{{ datastore }}] {{ unattend_install_iso }}"
 
-- include_tasks: get_ansible_remote_config.yml
+- name: "Get Ansible remote config script for Windows guest OS"
+  include_tasks: get_ansible_remote_config.yml
 
-- include_tasks: gen_unattend_xml_file.yml
+- name: "Get unattend install config file"
+  include_tasks: gen_unattend_xml_file.yml
 
-- name: Set fact of the file list contained in generated ISO file
+- name: "Set fact of the file list contained in generated ISO file"
   ansible.builtin.set_fact:
     unattend_install_file_list:
       - "{{ created_unattend_file }}"
       - "{{ local_cache }}/{{ config_remote_windows.split('/')[-1] }}"
 
-- block:
-    - include_tasks: get_pvscsi_driver.yml
-    - name: Add PVSCSI driver files to unattend install file list
-      ansible.builtin.set_fact:
-        unattend_install_file_list: "{{ unattend_install_file_list + pvscsi_file_path_list }}"
+- name: "Add PVSCSI driver for unattend install"
   when:
     - boot_disk_controller is defined
     - boot_disk_controller == 'paravirtual'
     - windows_has_inbox_driver is undefined or not windows_has_inbox_driver
+  block:
+    - name: "Get PVSCSI driver"
+      include_tasks: get_pvscsi_driver.yml
 
-- include_tasks: ../../common/create_iso.yml
+    - name: "Add PVSCSI driver files to unattend install file list"
+      ansible.builtin.set_fact:
+        unattend_install_file_list: "{{ unattend_install_file_list + pvscsi_file_path_list }}"
+
+- name: "Create unattend install ISO file"
+  include_tasks: ../../common/create_iso.yml
   vars:
     create_iso_src: "{{ unattend_install_file_list }}"
     create_iso_dest: "{{ local_cache }}/{{ unattend_install_iso }}"
 
-# Copy generated unattend install ISO file to ESXi host
-- include_tasks: ../../common/esxi_upload_datastore_file.yml
+- name: "Copy generated unattend install ISO file to ESXi host"
+  include_tasks: ../../common/esxi_upload_datastore_file.yml
   vars:
     src_file_path: "{{ local_cache }}/{{ unattend_install_iso }}"
     dest_file_path: "{{ unattend_install_iso }}"
     upload_file_timeout: 600
-- ansible.builtin.debug:
+
+- name: "Display the unattend install ISO file path on ESXi host"
+  ansible.builtin.debug:
     msg: "Unattend install ISO file is uploaded to ESXi host: {{ transferred_unattend_iso }}"
 
 - name: "Append generated unattend ISO file to the list"
