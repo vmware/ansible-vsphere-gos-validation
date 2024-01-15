@@ -18,7 +18,7 @@ def parse_arguments():
                             usage='%(prog)s [OPTIONS]',
                             formatter_class=RawTextHelpFormatter)
     parser.add_argument("-t", dest="type", choices=["text", "error"], required=True,
-                        help="the type to be extracted from file.\n" +
+                        help="the data type to be extracted from file.\n" +
                              "text - Extracting text from image file\n" +
                              "error - Extracting error, failed, exception, call trace, etc from log file")
     parser.add_argument("-f", dest="file", required=True,

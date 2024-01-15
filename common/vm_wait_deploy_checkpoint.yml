@@ -4,14 +4,15 @@
 # Wait for a checkpoint in VM's log file. If fail, collect information from
 # VM screenshot and log file
 # Parameters:
-#   wait_checkpoint_name: The checkpoint name, which could be: secureboot,
-#     autoinstall_start, autoinstall_complete
+#   wait_checkpoint_name: The checkpoint name, which must be: secureboot,
+#     autoinstall_start, or autoinstall_complete.
 #   wait_checkpoint_log_file: The log file name to wait for the checkpoint,
-#     e.g. vmware.log or serial port file log
+#     e.g. vmware.log or serial port file log.
 #   wait_checkpoint_msg: The checkpoint message to wait in log file
-#     which could be vmware.log or serial port file
-#   wait_checkpoint_retires: Retry count for waiting the checkpoint
-#   wait_checkpoint_delay: The delay seconds for retry
+#     which could be vmware.log or serial port file.
+#   wait_checkpoint_retires (optional): Retry count for waiting the checkpoint.
+#     Default is 10.
+#   wait_checkpoint_delay (optional): The delay seconds for retry. Default is 30.
 #
 - name: "Validate the checkpoint name"
   ansible.builtin.assert:
@@ -22,9 +23,12 @@
                                  'autoinstall_complete']
       - wait_checkpoint_log_file is defined
       - wait_checkpoint_log_file
+      - wait_checkpoint_msg is defined
+      - wait_checkpoint_msg
     fail_msg: >-
       Parameters 'wait_checkpoint_name' must be set to 'secureboot', 'autoinstall_start',
-      or 'autoinstall_complete', and 'wait_checkpoint_log_file' must be set with VM's log.
+      or 'autoinstall_complete'; 'wait_checkpoint_log_file' and 'wait_checkpoint_msg'
+      must be set with VM's log and the message to check.
 
 - name: "Initialize the fact of waited checkpoint result and error message list"
   ansible.builtin.set_fact:
@@ -36,7 +40,7 @@
   vars:
     vm_wait_log_name: "{{ wait_checkpoint_log_file }}"
     vm_wait_log_msg: "{{ wait_checkpoint_msg }}"
-    vm_wait_log_retries: "{{ wait_checkpoint_retires }}"
+    vm_wait_log_retries: "{{ wait_checkpoint_retires | default(10) }}"
     vm_wait_log_delay: "{{ wait_checkpoint_delay | default(30) }}"
     vm_wait_log_ignore_errors: true
     vm_wait_log_hide_output: true
