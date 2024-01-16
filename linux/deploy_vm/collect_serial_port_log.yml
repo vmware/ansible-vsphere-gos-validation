@@ -6,8 +6,7 @@
 #   vm_dir_name: VM directory name, which is defined in vm_get_vm_info.yml
 #   vm_serial_file_name: VM serial port file name, which is defined in vm_add_serial_port.yml
 #   vm_serial_file_local_name: the local file name of downloaded serial port log file
-# Return:
-#   vm_serial_file_local_path: the local path to downloaded serial port log file   
+#   detect_errors (optional): True to detect errors in serial port file. Default is false.
 #
 - name: "Initialize facts of downloaded serial port log file name and path"
   ansible.builtin.set_fact:
@@ -21,29 +20,44 @@
     - vm_serial_file_name
   block:
     - name: "Download VM serial port log file from datastore"
-      include_tasks: esxi_download_datastore_file.yml
+      include_tasks: ../../common/esxi_download_datastore_file.yml
       vars:
         src_datastore: "{{ datastore }}"
         src_file_path: "{{ vm_dir_name }}/{{ vm_serial_file_name }}"
         dest_file_path: "{{ current_test_log_folder }}/{{ vm_serial_file_name }}"
         download_file_fail_ignore: true
 
-    - name: "Get the local path to downloaded serial port log"
+    - name: "Detect errors in downloaded serial port log"
       when:
+        - detect_errors | default(false)
         - file_in_datastore_result is defined
         - file_in_datastore_result == 'Success'
         - datastore_file_download_result.changed is defined
         - datastore_file_download_result.changed
       block:
-        - name: "Check downloaded VM serial log at local"
+        - name: "Set fact of downloaded serial log path at localhost"
+          ansible.builtin.set_fact:
+            vm_serial_file_local_path: "{{ current_test_log_folder }}/{{ vm_serial_file_name }}"
+
+        - name: "Check downloaded VM serial port log exists at localhost"
           ansible.builtin.stat:
-            path: "{{ current_test_log_folder }}/{{ vm_serial_file_name }}"
+            path: "{{ vm_serial_file_local_path }}"
           register: local_file_stat_result
           ignore_errors: True
 
-        - name: "Set fact of downloaded serial log path at local"
-          ansible.builtin.set_fact:
-            vm_serial_file_local_path: "{{ current_test_log_folder }}/{{ vm_serial_file_name }}"
+        - name: "Detect errors from VM serial port log"
           when:
             - local_file_stat_result.stat.exists is defined
             - local_file_stat_result.stat.exists
+          block:
+            - name: "Extract errors from VM serial port log"
+              include_tasks: ../../common/extract_errors_from_log.yml
+              vars:
+                local_log_path: "{{ vm_serial_file_local_path }}"
+
+            - name: "Display detected errors from VM serial port log"
+              ansible.builtin.debug:
+                msg: "{{ errors_in_log }}"
+              tags:
+                - fail_message
+              when: errors_in_log | length > 0

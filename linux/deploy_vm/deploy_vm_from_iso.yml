@@ -143,24 +143,24 @@
     seconds: 5
 
 - name: "Check 'Image APPROVED' in vmware.log when VM secure boot is enabled"
-  include_tasks: ../../common/vm_wait_deploy_checkpoint.yml
+  include_tasks: ../../common/vm_wait_log_msg.yml
   vars:
-    wait_checkpoint_name: "secureboot"
-    wait_checkpoint_log_file: "vmware.log"
-    wait_checkpoint_msg: "SECUREBOOT: Image APPROVED"
-    wait_checkpoint_retires: 10
+    vm_wait_log_name: "vmware.log"
+    vm_wait_log_msg: "SECUREBOOT: Image APPROVED"
+    vm_wait_log_retries: 10
+    vm_wait_log_ignore_errors: false
+    vm_wait_log_hide_output: false
   when:
     - firmware | lower == 'efi'
     - secureboot_enabled is defined and secureboot_enabled
 
 - name: "Wait autoinstall start message appear in serial port file"
-  include_tasks: ../../common/vm_wait_deploy_checkpoint.yml
+  include_tasks: ../../common/vm_wait_log_msg.yml
   vars:
-    wait_checkpoint_name: "autoinstall_start"
-    wait_checkpoint_log_file: "{{ vm_serial_file_name }}"
-    wait_checkpoint_msg: "{{ autoinstall_start_msg }}"
-    wait_checkpoint_delay: 10
-    wait_checkpoint_retires: 10
+    vm_wait_log_name: "{{ vm_serial_file_name }}"
+    vm_wait_log_msg: "{{ autoinstall_start_msg }}"
+    vm_wait_log_delay: 10
+    vm_wait_log_retries: 10
   when:
     - unattend_installer
     - unattend_installer != 'Ubuntu-Subiquity'
@@ -203,13 +203,12 @@
   when: unattend_installer == 'UOS'
 
 - name: "Wait autoinstall complete message appear in serial port output file"
-  include_tasks: ../../common/vm_wait_deploy_checkpoint.yml
+  include_tasks: ../../common/vm_wait_log_msg.yml
   vars:
-    wait_checkpoint_name: "autoinstall_complete"
-    wait_checkpoint_log_file: "{{ vm_serial_file_name }}"
-    wait_checkpoint_msg: "{{ autoinstall_complete_msg }}"
-    wait_checkpoint_delay: 30
-    wait_checkpoint_retires: 120
+    vm_wait_log_name: "{{ vm_serial_file_name }}"
+    vm_wait_log_msg: "{{ autoinstall_complete_msg }}"
+    vm_wait_log_delay: 30
+    vm_wait_log_retries: 120
 
 # For only ESXi managed VM, its MAC address is generated after power on
 # not at VM creation
@@ -253,7 +252,7 @@
   when: unattend_installer is match('Ubuntu.*')
 
 - name: "Collect serial port log before removing serial port"
-  include_tasks: ../../common/collect_serial_port_log.yml
+  include_tasks: collect_serial_port_log.yml
 
 - name: "Remove serial port"
   include_tasks: ../../common/vm_remove_serial_port.yml
