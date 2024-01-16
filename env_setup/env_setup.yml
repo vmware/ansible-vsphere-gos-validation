@@ -65,6 +65,7 @@
       when: esxi_version is version('8.0.0', '>=')
 
     - name: "Cleanup snapshots and get VM related information for existing VM"
+      when: vm_exists is defined and vm_exists
       block:
         - name: "Not cleanup old snapshot by default"
           ansible.builtin.set_fact:
@@ -89,13 +90,12 @@
 
         - name: "Wait for VM primary network adapter has MAC address"
           include_tasks: ../common/vm_wait_primary_nic_mac.yml
-      when: vm_exists is defined and vm_exists
 
-    - name: Set fact of the VM datastore path
+    - name: "Set fact of the VM datastore path"
       ansible.builtin.set_fact:
         vm_datastore_path: "/vmfs/volumes/{{ datastore }}"
 
-    - name: Display the datatore path of VM files
+    - name: "Display the datatore path of VM files"
       ansible.builtin.debug: var=vm_datastore_path
 
     - name: "Add vSphere hosts into memory inventory"
@@ -103,3 +103,19 @@
 
     - name: "Enable guest IP hack on ESXi host to get VM IP address when there is no VMware tools installed or VMware tools is not up"
       include_tasks: ../common/esxi_enable_guest_ip_hack.yml
+
+    - name: "Test Tesseract OCR engine is installed or not for extracting text from screenshot"
+      ansible.builtin.shell: "tesseract --version"
+      ignore_errors: true
+      register: tesseract_version_result
+
+    - name: "Set fact of Tesseract OCR is installed or not"
+      ansible.builtin.set_fact:
+        tesseract_is_installed: "{{ tesseract_version_result.rc is defined and tesseract_version_result.rc == 0 }}"
+
+    - name: "Warning about installing Tesseract OCR engine"
+      ansible.builtin.debug:
+        msg: >-
+          Tesseract OCR engine is required for extracting text from VM screenshot at test failure. Please install
+          Tesseract OCR for full functionality by referring to https://github.com/tesseract-ocr/tesseract?tab=readme-ov-file#installing-tesseract.
+      when: not tesseract_is_installed
