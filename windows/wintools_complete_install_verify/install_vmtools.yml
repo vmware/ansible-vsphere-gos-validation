@@ -43,18 +43,22 @@
       - wintools_install_result is defined
       - wintools_install_result.ansible_job_id is defined
     fail_msg: "The result of above VMware Tools installation task executed in guest OS is not returned."
+
 - name: "Check VMware Tools install task status every 3 seconds"
   ansible.builtin.async_status:
     jid: "{{ wintools_install_result.ansible_job_id }}"
-  register: job_result
+  register: wintools_install_job
   delegate_to: "{{ vm_guest_ip }}"
-  until: job_result.finished is defined and job_result.finished
-  retries: 80
+  until:
+    - wintools_install_job.finished is defined
+    - wintools_install_job.finished
+  retries: 100
   delay: 3
   when:
     - wintools_install_result is defined
     - wintools_install_result.ansible_job_id is defined
 
-- include_tasks: ../utils/win_shutdown_restart.yml
+- name: "Restart guest OS after VMware Tools install"
+  include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"
