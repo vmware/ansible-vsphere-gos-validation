@@ -3,24 +3,24 @@
 ---
 # Extract call trace or other error messages in a log file downloaded from guest OS
 # Parameters:
-#   local_log_path: The local log file path to extract call trace and errors
+#   extract_log_file_path: The local log file path to extract call trace and errors
 # Return:
 #   errors_in_log: The call trace or error messages extracted from the log file
 #
 - name: "Check the local log path is an absolute path"
   ansible.builtin.assert:
     that:
-      - local_log_path is defined
-      - local_log_path
-      - local_log_path is ansible.builtin.abs
-    fail_msg: "Parameter 'local_log_path' must be set with a local absolute path"
+      - extract_log_file_path is defined
+      - extract_log_file_path
+      - extract_log_file_path is ansible.builtin.abs
+    fail_msg: "Parameter 'extract_log_file_path' must be set with a local absolute path"
 
-- name: "Initialize the facts of extracted errors from log"
+- name: "Initialize the fact of extracted errors from log"
   ansible.builtin.set_fact:
     errors_in_log: []
 
 - name: "Extract error messages from log file"
-  ansible.builtin.script: "../tools/extractor.py -t error -f {{ local_log_path }}"
+  ansible.builtin.script: "../tools/extractor.py -t error -f {{ extract_log_file_path }}"
   ignore_errors: True
   register: extract_error_result
 
@@ -28,5 +28,6 @@
   ansible.builtin.set_fact:
     errors_in_log: "{{ extract_error_result.stdout_lines | select }}"
   when:
+    - not extract_error_result.failed
     - extract_error_result.stdout_lines is defined
     - extract_error_result.stdout_lines | length > 0
