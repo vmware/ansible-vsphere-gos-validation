@@ -9,14 +9,22 @@
 #   download_file_timeout: timeout in seconds for downloading datastore file. Default is 300s
 #   download_file_fail_ignore: whether ignore errors or not in this task, default is false
 #
-- include_tasks: esxi_check_delete_datastore_file.yml
+- name: "Initialize the fact of downloading datastore file success status"
+  ansible.builtin.set_fact:
+    datastore_file_download_success: false
+
+- name: "Check file exists in ESXi datastore"
+  include_tasks: esxi_check_delete_datastore_file.yml
   vars:
     file_in_datastore_ops: file
     file_in_datastore: "{{ src_datastore }}"
     file_in_datastore_path: "{{ src_file_path }}"
     file_in_datastore_failed_ignore: "{{ download_file_fail_ignore | default(false) }}"
 
-- name: "File in datastore"
+- name: "File exists in ESXi datastore"
+  when:
+    - file_in_datastore_result is defined
+    - file_in_datastore_result == 'Success'
   block:
     - name: "VM datastore file URL get failure"
       ansible.builtin.fail:
@@ -28,11 +36,15 @@
            (ds_file_result.url is undefined) or
            (not ds_file_result.url))
 
-    - name: "Download File from URL"
+    - name: "Download ESXi datastore file from URL"
+      when:
+        - ds_file_result.url is defined
+        - ds_file_result.url
       block:
         - name: "Set fact of downloading URL for the src datastore file"
           ansible.builtin.set_fact:
             datastore_file_url: "{{ ds_file_result.url }}"
+
         - name: "Download datastore file"
           ansible.builtin.get_url:
             url: "{{ datastore_file_url }}"
@@ -44,12 +56,14 @@
             timeout: "{{ download_file_timeout | default(300) }}"
           ignore_errors: "{{ download_file_fail_ignore | default(false) }}"
           register: datastore_file_download_result
+
         - name: "Print datastore file download result"
           ansible.builtin.debug: var=datastore_file_download_result
           when: enable_debug
-      when:
-        - ds_file_result.url is defined
-        - ds_file_result.url
-  when:
-    - file_in_datastore_result is defined
-    - file_in_datastore_result == 'Success'
+
+        - name: "Set fact of downloading datastore file success status"
+          ansible.builtin.set_fact:
+            datastore_file_download_success: true
+          when:
+            - datastore_file_download_result.status_code is defined
+            - datastore_file_download_result.status_code | int == 200

@@ -30,14 +30,11 @@
     - name: "Detect errors in downloaded serial port log"
       when:
         - detect_errors | default(false)
-        - file_in_datastore_result is defined
-        - file_in_datastore_result == 'Success'
-        - datastore_file_download_result.changed is defined
-        - datastore_file_download_result.changed
+        - datastore_file_download_success
       block:
         - name: "Set fact of downloaded serial log path at localhost"
           ansible.builtin.set_fact:
-            vm_serial_file_local_path: "{{ current_test_log_folder }}/{{ vm_serial_file_name }}"
+            vm_serial_file_local_path: "{{ datastore_file_download_result.dest }}"
 
         - name: "Check downloaded VM serial port log exists at localhost"
           ansible.builtin.stat:
