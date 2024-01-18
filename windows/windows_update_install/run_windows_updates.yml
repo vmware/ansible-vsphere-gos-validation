@@ -1,10 +1,19 @@
-# Copyright 2023 VMware, Inc.
+# Copyright 2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+# Do not install KB5034439 for Windows Server 2022, due to known issue. Please refer to following link.
+# https://support.microsoft.com/en-au/topic/kb5034439-windows-recovery-environment-update-for-azure-stack-hci-version-22h2-and-windows-server-2022-january-9-2024-6f9d26e6-784c-4503-a3c6-0beedda443ca
+- name: "Set reject list for Windows Server 2022 due to known issue"
+  ansible.builtin.set_fact:
+    win_updates_reject_list: ["KB5034439"]
+  when:
+    - guest_os_product_type | lower == 'server'
+    - guest_os_build_num | int == 20348
+
 - name: "Install Windows Updates"
   include_tasks: ../utils/win_install_updates.yml
   vars:
-    win_update_category_names: ['CriticalUpdates', 'SecurityUpdates', 'UpdateRollups']
+    win_updates_category_names: ['CriticalUpdates', 'SecurityUpdates', 'UpdateRollups']
 
 - name: "Set fact if guest OS has installed Windows Updates"
   ansible.builtin.set_fact:
