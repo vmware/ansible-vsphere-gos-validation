@@ -9,9 +9,13 @@ import os
 import sys
 import re
 import traceback
-import pytesseract
-from PIL import Image
 from argparse import ArgumentParser, RawTextHelpFormatter
+try:
+    import pytesseract
+    from PIL import Image
+    pytesseract_installed = True
+except ImportError:
+    pytesseract_installed = False
 
 def parse_arguments():
     parser = ArgumentParser(description="A tool to extract text from image file or call trace from log file",
@@ -37,18 +41,22 @@ def escape_ansi(text):
     return ansi_escape.sub('', text)
 
 def extract_text_from_image(image_path):
-    # Open the image file
-    img = Image.open(image_path)
-    if (img.width <= 1280 or img.height <= 1280):
-        (width, height) = (img.width * 3, img.height * 3)
-    else:
-        (width, height) = (img.width, img.height)
-    img = img.resize((width, height))
-    # Use pytesseract to do OCR on the image
-    text = pytesseract.image_to_string(img)
-    text = remove_empty_lines(text)
-    if len(text) > 0:
-        print("Extracted text from image:\n" + text)
+    try:
+        # Open the image file
+        img = Image.open(image_path)
+        if (img.width <= 1280 or img.height <= 1280):
+            (width, height) = (img.width * 3, img.height * 3)
+        else:
+            (width, height) = (img.width, img.height)
+        img = img.resize((width, height))
+        # Use pytesseract to do OCR on the image
+        text = pytesseract.image_to_string(img)
+        text = remove_empty_lines(text)
+        if len(text) > 0:
+            print("Extracted text from image:\n" + text)
+    except pytesseract.pytesseract.TesseractNotFoundError as e:
+        sys.stderr.write("'tesseract-ocr' is required for extracting text from image file. Please install it.")
+        sys.exit(1)
 
 def extract_calltrace_from_log(log_path):
     calltrace_stack = []
@@ -140,7 +148,7 @@ if __name__ == "__main__":
         if not os.path.isfile(args.file):
             raise FileNotFoundError(f"{args.file} doesn't exist or is not a file.")
 
-        if args.type == 'text':
+        if args.type == 'text' and pytesseract_installed:
             # Extract text from the image
             extract_text_from_image(args.file)
         elif args.type == 'error':
