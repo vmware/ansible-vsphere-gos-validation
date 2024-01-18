@@ -1,15 +1,23 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Skip GOSC testing if no vCenter or no open-vm-tools"
+- name: "Skip test case"
   include_tasks: ../../common/skip_test_case.yml
   vars:
-    skip_msg: "Test case is blocked because test environment doesn't meet GOSC requirements"
-    skip_reason: "Blocked"
+    skip_msg: "Test case '{{ ansible_play_name }}' is skipped because vCenter server is not configured"
+    skip_reason: "Not Applicable"
   when: >
     (vcenter_is_defined is undefined) or
-    (not vcenter_is_defined) or
-    (enable_cloudinit_gosc and not vmtools_is_ovt)
+    (not vcenter_is_defined | bool)
+
+- name: "Skip test case"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      Test case '{{ ansible_play_name }}' is blocked because cloud-init GOSC
+      requires installed VMware Tools is open-vm-tools
+    skip_reason: "Blocked"
+  when: enable_cloudinit_gosc and not vmtools_is_ovt
 
 - name: "Check GOSC support status"
   block:
