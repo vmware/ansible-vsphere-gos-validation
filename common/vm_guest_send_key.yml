@@ -2,15 +2,18 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Parameters:
-## keys_send: a list of keys to be sent to guest
-## string_send: a string to be sent to guest
-- name: Assert keys or string to be sent is defined
+#   keys_send: a list of keys to be sent to guest OS
+#   string_send: a string to be sent to guest OS
+#   vm_send_key_ignore_errors: whether to ignore errors when sending keys.
+#     Default is false.
+#
+- name: "Assert keys or string to be sent is defined"
   ansible.builtin.assert:
     that:
       - keys_send is defined or string_send is defined
     fail_msg: "Either keys_send or string_send shall be defined"
 
-- name: "Send keys to {{ vm_name }}"
+- name: "Send keys or string to {{ vm_name }}"
   community.vmware.vmware_guest_sendkey:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -22,12 +25,19 @@
     keys_send: "{{ keys_send }}"
     string_send: "{{ string_send | default('') }}"
   register: vm_sendkey
+  ignore_errors: true
 
-- ansible.builtin.debug: var=vm_sendkey
-  when: enable_debug is defined and enable_debug
+- name: "Display the result of sending keys or string to guest OS"
+  ansible.builtin.debug: var=vm_sendkey
+  when: enable_debug
 
-- name: "Verify send keys to VM {{ vm_name }} operation succeed"
+- name: "Check sending keys or string to guest OS succeeds"
   ansible.builtin.assert:
     that:
-      - "not vm_sendkey.failed"
-      - "vm_sendkey.changed"
+      - not vm_sendkey.failed
+      - vm_sendkey.changed
+    fail_msg: "Failed to send keys or string to guest OS"
+    success_msg: "Successfully send keys or string to guest OS"
+  when: >-
+    (vm_send_key_ignore_errors is undefined or
+     not vm_send_key_ignore_errors)

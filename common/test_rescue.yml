@@ -43,7 +43,26 @@
     - name: "Take a screenshot at VM current state"
       include_tasks: vm_take_screenshot.yml
       vars:
-        vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
+        vm_screenshot_local_dir: "{{ current_test_log_folder }}"
+        vm_screenshot_local_name: "screenshot_at_{{ current_testcase_index }}_{{ ansible_play_name }}.png"
+        vm_screen_active: "{{ gosv_test_suite == 'linux' }}"
+
+    - name: "Extract text from VM screenshot at failed test case {{ current_testcase_name }}"
+      when:
+        - tesseract_is_installed
+        - vm_screenshot_local_path
+      block:
+        - name: "Extract text from screenshot file"
+          include_tasks: extract_text_from_screenshot.yml
+          vars:
+            local_screenshot_path: "{{ vm_screenshot_local_path }}"
+
+        - name: "Display extracted text from screenshot"
+          ansible.builtin.debug:
+            msg: "{{ text_in_screenshot }}"
+          tags:
+            - fail_message
+          when: text_in_screenshot | length > 0
 
     - name: "Download VM's vmware.log"
       include_tasks: esxi_download_datastore_file.yml
@@ -53,6 +72,22 @@
         dest_file_path: "{{ current_test_log_folder }}/vmware.log"
         download_file_fail_ignore: true
       when: vm_dir_name is defined and vm_dir_name
+
+    - name: "Check Windows guest BSOD in vmware.log"
+      when:
+        - gosv_test_suite == 'windows'
+        - datastore_file_download_success
+      block:
+        - name: "Look up Windows guest BSOD in vmware.log"
+          ansible.builtin.set_fact:
+            winbsod_in_vmware_log: "{{ lookup('file', datastore_file_download_result.dest) | regex_findall('.*WinBSOD:.*') }}"
+
+        - name: "Detected Windows guest BSOD in vmware.log"
+          ansible.builtin.debug:
+            msg: "{{ winbsod_in_vmware_log }}"
+          tags:
+            - fail_message
+          when: winbsod_in_vmware_log | length > 0
 
     - name: "Take a snapshot at VM current state"
       include_tasks: vm_take_snapshot.yml

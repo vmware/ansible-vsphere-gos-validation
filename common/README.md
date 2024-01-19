@@ -191,3 +191,5 @@
 * compose_vm_cdroms.yml: Generate VM CDROM device info list for creating new VM
 * download_iso_and_transfer.yml: Download ISO file and transfer to ESXi datastore
 * get_iso_file_list.yml: Generate and validate OS installation ISO file list
+* extract_errors_from_log.yml: Extract error messages in a log file downloaded from guest OS
+* extract_text_from_screenshot.yml: Extract text from an image file

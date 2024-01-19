@@ -2,22 +2,81 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Capture the specified VM console screenshot and transfer screenshot
-# file to local path if 'vm_take_screenshot_local_path' is defined.
+# file to local path if 'vm_screenshot_local_dir' is defined.
 # Parameters:
-#   vm_take_screenshot_path(optional): the local path of the screenshot file
+#   vm_screenshot_local_dir(optional): the local dir path for the screenshot taken from VM
+#   vm_screenshot_local_name(optional): the local file name for the VM screenshot
+#   vm_screen_active(optional): whether to send a key to active VM screen. Default is false.
+# Return:
+#   vm_screenshot_local_path: the local file path of the screenshot taken from VM
 #
-- name: "Take VM '{{ vm_name }}' console screenshot"
-  community.vmware.vmware_guest_screenshot:
-    validate_certs: "{{ validate_certs | default(false) }}"
-    hostname: "{{ vsphere_host_name }}"
-    username: "{{ vsphere_host_user }}"
-    password: "{{ vsphere_host_user_password }}"
-    datacenter: "{{ vsphere_host_datacenter }}"
-    folder: "{{ vm_folder }}"
-    name: "{{ vm_name }}"
-    local_path: "{{ vm_take_screenshot_local_path | default(omit) }}"
-  register: vm_take_screnshot_result
-  failed_when: false
-- name: Display taking VM screenshot result
-  ansible.builtin.debug: var=vm_take_screnshot_result
-  when: enable_debug is defined and enable_debug
+- name: "Initialize the fact of local file path for the VM screenshot"
+  ansible.builtin.set_fact:
+    vm_screenshot_local_path: ""
+
+- name: "Get VM power state"
+  include_tasks: vm_get_power_state.yml
+
+- name: "VM is not 'poweredOn', couldn't take screenshot"
+  ansible.builtin.debug:
+    msg: "Can't take screenshot when VM is {{ vm_power_state_get }}"
+  when: vm_power_state_get != 'poweredOn'
+
+- name: "Take screenshot when VM is 'poweredOn'"
+  when: vm_power_state_get == 'poweredOn'
+  block:
+    - name: "Send a TAB key to active screen in case it is blank"
+      include_tasks: vm_guest_send_key.yml
+      vars:
+        keys_send:
+          - TAB
+        vm_send_key_ignore_errors: true
+      when: vm_screen_active | default(false)
+    
+    - name: "Take console screenshot for VM '{{ vm_name }}'"
+      community.vmware.vmware_guest_screenshot:
+        validate_certs: "{{ validate_certs | default(false) }}"
+        hostname: "{{ vsphere_host_name }}"
+        username: "{{ vsphere_host_user }}"
+        password: "{{ vsphere_host_user_password }}"
+        datacenter: "{{ vsphere_host_datacenter }}"
+        folder: "{{ vm_folder }}"
+        name: "{{ vm_name }}"
+        local_path: "{{ vm_screenshot_local_dir | default(omit) }}"
+      register: vm_take_screenshot_result
+      failed_when: false
+    
+    - name: "Display taking VM screenshot result"
+      ansible.builtin.debug: var=vm_take_screenshot_result
+      when: enable_debug
+    
+    - name: "Set fact of local file path for the VM screenshot"
+      when:
+        - vm_take_screenshot_result.screenshot_info.download_local_path is defined
+        - vm_take_screenshot_result.screenshot_info.download_local_path
+        - vm_take_screenshot_result.screenshot_info.screenshot_file is defined
+        - vm_take_screenshot_result.screenshot_info.screenshot_file
+      block:
+        - name: "Set fact of VM screenshot file name"
+          ansible.builtin.set_fact:
+            vm_screenshot_file_name: "{{ vm_take_screenshot_result.screenshot_info.screenshot_file | basename }}"
+    
+        - name: "Set fact of default VM screenshot file name at local"
+          ansible.builtin.set_fact:
+            vm_screenshot_local_name: "{{ vm_screenshot_file_name }}"
+          when: vm_screenshot_local_name is undefined or not vm_screenshot_local_name
+    
+        - name: "Set facts of VM screenshot file downloaded path and expected path at local"
+          ansible.builtin.set_fact:
+            vm_screenshot_download_local_path: >-
+              {{
+                [vm_take_screenshot_result.screenshot_info.download_local_path, vm_screenshot_file_name] | path_join
+              }}
+            vm_screenshot_local_path: >-
+              {{ 
+                [vm_take_screenshot_result.screenshot_info.download_local_path, vm_screenshot_local_name] | path_join
+              }}
+    
+        - name: "Rename VM screenshot file at local"
+          ansible.builtin.shell: "mv {{ vm_screenshot_download_local_path }} {{ vm_screenshot_local_path }}"
+          when: vm_screenshot_download_local_path != vm_screenshot_local_path

@@ -11,6 +11,7 @@
     network_adapter_type: "{{ network_adapter_type if (network_adapter_type is defined and network_adapter_type) else 'vmxnet3' }}"
     vm_video_memory_mb: ""
     autoinstall_complete_msg: "Autoinstall is completed."
+    unattend_installer: ""
 
 - name: "Set CPU number to {{ cpu_cores_per_socket }}"
   ansible.builtin.set_fact:
@@ -105,28 +106,32 @@
         video_memory_mb: "{{ vm_video_memory_mb }}"
       when: vm_default_video_memory_mb | int < vm_video_memory_mb | int
 
-- name: "Enable secure boot on VM"
-  include_tasks: ../../common/vm_set_boot_options.yml
-  vars:
-    secure_boot_enabled_set: true
-  when:
-    - firmware | lower == 'efi'
-    - secureboot_enabled is defined and secureboot_enabled
-
-- name: "Handle virtual TPM device"
-  when:
-    - firmware | lower == 'efi'
-    - virtual_tpm is defined and virtual_tpm | bool
+- name: "Config VM with UEFI firmware"
+  when: firmware | lower == 'efi'
   block:
-    - name: "Add key provider on vCenter server"
-      include_tasks: ../../common/vcenter_add_key_provider.yml
+    - name: "Enable secure boot on VM"
+      include_tasks: ../../common/vm_set_boot_options.yml
       vars:
-        vc_cert_path: "{{ current_test_log_folder }}"
-      when: key_provider_type is defined and key_provider_type
-    - name: "Add virtual TPM device to VM" 
-      include_tasks: ../../common/vm_add_remove_vtpm.yml
-      vars:
-        vtpm_operation: 'present'
+        secure_boot_enabled_set: true
+      when:
+        - secureboot_enabled is defined
+        - secureboot_enabled | bool
+
+    - name: "Handle virtual TPM device"
+      when:
+        - virtual_tpm is defined
+        - virtual_tpm | bool
+      block:
+        - name: "Add key provider on vCenter server"
+          include_tasks: ../../common/vcenter_add_key_provider.yml
+          vars:
+            vc_cert_path: "{{ current_test_log_folder }}"
+          when: key_provider_type is defined and key_provider_type
+
+        - name: "Add virtual TPM device to VM" 
+          include_tasks: ../../common/vm_add_remove_vtpm.yml
+          vars:
+            vtpm_operation: 'present'
 
 - name: "Power on VM"
   include_tasks: ../../common/vm_set_power_state.yml
@@ -137,7 +142,7 @@
   ansible.builtin.pause:
     seconds: 5
 
-- name: "Check Image APPROVED in vmware.log when VM secure boot is enabled"
+- name: "Check 'Image APPROVED' in vmware.log when VM secure boot is enabled"
   include_tasks: ../../common/vm_wait_log_msg.yml
   vars:
     vm_wait_log_name: "vmware.log"
@@ -148,6 +153,19 @@
   when:
     - firmware | lower == 'efi'
     - secureboot_enabled is defined and secureboot_enabled
+
+- name: "Wait autoinstall start message appear in serial port file"
+  include_tasks: ../../common/vm_wait_log_msg.yml
+  vars:
+    vm_wait_log_name: "{{ vm_serial_file_name }}"
+    vm_wait_log_msg: "{{ autoinstall_start_msg }}"
+    vm_wait_log_delay: 10
+    vm_wait_log_retries: 10
+  when:
+    - unattend_installer
+    - unattend_installer != 'Ubuntu-Subiquity'
+    - autoinstall_start_msg is defined
+    - autoinstall_start_msg
 
 - name: "Install Ubuntu OS"
   include_tasks: ubuntu/ubuntu_install_os.yml
@@ -162,11 +180,10 @@
       - DOWNARROW
       - ENTER
   when:
-    - unattend_installer is defined
     - unattend_installer in ['SLE', 'openSUSE']
     - firmware | lower == "bios"
 
-# For RHEL, Fedora or RHEL-like OS, send key to boot screen to skip 
+# For RHEL, Fedora or RHEL-like OS, send key to boot screen to skip
 # disk check and start installation directly.
 - name: "Select boot menu for RHEL or Fedora family OS"
   include_tasks: ../../common/vm_guest_send_key.yml
@@ -175,7 +192,6 @@
       - UPARROW
       - ENTER
   when:
-    - unattend_installer is defined
     - unattend_installer in ['RHEL', 'CentOS', 'Fedora', 'BCLinux', 'BCLinux-for-Euler', 'FusionOS']
 
 # For UnionTech OS, send key to boot screen
@@ -184,22 +200,15 @@
   vars:
     keys_send:
       - ENTER
-  when:
-    - unattend_installer is defined
-    - unattend_installer == 'UOS'
+  when: unattend_installer == 'UOS'
 
 - name: "Wait autoinstall complete message appear in serial port output file"
   include_tasks: ../../common/vm_wait_log_msg.yml
   vars:
-    vm_wait_log_name: "{{ vm_serial_port_output_file | basename }}"
+    vm_wait_log_name: "{{ vm_serial_file_name }}"
     vm_wait_log_msg: "{{ autoinstall_complete_msg }}"
     vm_wait_log_delay: 30
     vm_wait_log_retries: 120
-
-- name: "Take a screenshot when autoinstall complete message is received"
-  include_tasks: ../../common/vm_take_screenshot.yml
-  vars:
-    vm_take_screenshot_local_path: "{{ current_test_log_folder }}"
 
 # For only ESXi managed VM, its MAC address is generated after power on
 # not at VM creation
@@ -209,9 +218,7 @@
 # VMware Photon OS kickstart file can't add shutdown action,
 # so here needs to shutdown it separately
 - name: "Shutdown VMware Photon OS VM after auto install completes"
-  when:
-    - unattend_installer is defined
-    - unattend_installer == 'Photon'
+  when: unattend_installer == 'Photon'
   block:
     - name: "Wait for guest full name on VMware Photon OS VM"
       include_tasks: ../../common/vm_wait_guest_fullname.yml
@@ -230,9 +237,9 @@
   include_tasks: ../../common/vm_wait_power_state.yml
   vars:
     expected_power_status: 'poweredOff'
-    wait_power_state_timeout: 600
+    wait_power_state_timeout: 900
 
-- name: "Delete unattend install ISO"
+- name: "Delete unattend install ISO from ESXi datastore"
   include_tasks: delete_unattend_install_iso.yml
   when:
     - transferred_unattend_iso_list is defined
@@ -242,7 +249,7 @@
   include_tasks: ../../common/vm_set_boot_options.yml
   vars:
     boot_order_list: ['disk']
-  when: guest_id is match('ubuntu.*')
+  when: unattend_installer is match('Ubuntu.*')
 
 - name: "Collect serial port log before removing serial port"
   include_tasks: collect_serial_port_log.yml

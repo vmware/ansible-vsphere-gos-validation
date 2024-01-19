@@ -8,7 +8,7 @@
 #   vm_set_power_state_sleep (optional): wait time in seconds when VM power state
 #     changed. Default value is 10.
 #
-- name: Set fact of valid power state list
+- name: "Set fact of valid power state list"
   ansible.builtin.set_fact:
     valid_expected_power_state:
       - powered-off
@@ -18,18 +18,21 @@
       - shutdown-guest
       - suspended
       - present
-- name: Check required parameter
+
+- name: "Check required parameter"
   ansible.builtin.assert:
     that:
       - vm_power_state_set is defined
       - vm_power_state_set | lower in valid_expected_power_state
-    fail_msg: "vm_power_state_set is undefined or invalid, valid value is in: {{ valid_expected_power_state }}"
+    fail_msg: >-
+      vm_power_state_set is undefined or invalid, valid value is in: {{ valid_expected_power_state }}
 
 # Make sure VMware tools is installed and running before shutdown VM
-- include_tasks: vm_wait_vmtools_status.yml
+- name: "Wait for VMware Tools running"
+  include_tasks: vm_wait_vmtools_status.yml
   vars:
     vm_wait_vmtools_running: true
-  when: vm_power_state_set | lower == 'shutdown-guest' or vm_power_state_set | lower == 'reboot-guest'
+  when: vm_power_state_set | lower in ['shutdown-guest', 'reboot-guest']
 
 - name: "Set VM power state to '{{ vm_power_state_set }}'"
   community.vmware.vmware_guest_powerstate:
@@ -45,8 +48,17 @@
   ignore_errors: true
 
 - name: "Replace serial port output file at power on"
+  when:
+    - vm_power_state_set | lower == 'powered-on'
+    - vm_change_power_state is defined
+    - vm_change_power_state.instance is defined
+    - vm_change_power_state.instance.guest_question is defined
+    - vm_change_power_state.instance.guest_question.message is defined
+    - vm_change_power_state.instance.guest_question.message | length > 0
+    - vm_change_power_state.instance.guest_question.message[0].id == "msg.serial.file.open"
   block:
-    - include_tasks: vm_answer_question.yml
+    - name: "Answer question about overwritting serial port file"
+      include_tasks: vm_answer_question.yml
       vars:
         vm_question: "{{ vm_change_power_state.instance.guest_question }}"
         vm_question_response: "button.serial.file.overwrite"
@@ -57,45 +69,42 @@
       when:
         - vm_answer_question_result is defined
         - vm_answer_question_result
-  when:
-    - vm_power_state_set | lower == 'powered-on'
-    - vm_change_power_state is defined
-    - vm_change_power_state.instance is defined
-    - vm_change_power_state.instance.guest_question is defined
-    - vm_change_power_state.instance.guest_question.message is defined
-    - vm_change_power_state.instance.guest_question.message | length > 0
-    - vm_change_power_state.instance.guest_question.message[0].id == "msg.serial.file.open"
 
-- name: "Change VM power state failure"
+- name: "Failed to set VM power state"
   ansible.builtin.fail:
     msg: >
-      {% if vm_change_power_state is defined and vm_change_power_state.msg is defined %}{{ vm_change_power_state.msg }}
-      {% else %}Failed to set VM power state to {{ vm_power_state_set | lower }}{% endif %}
+      Failed to set VM power state to {{ vm_power_state_set | lower }} because of:
+      {{ vm_change_power_state.msg | default('') }}
   when: >
     vm_change_power_state is undefined or
     vm_change_power_state.failed is defined and vm_change_power_state.failed | bool
 
-- name: Display the result of changing VM power state
+- name: "Display the result of changing VM power state"
   ansible.builtin.debug: var=vm_change_power_state
 
-- name: "Wait for VM enter into the expected state"
+- name: "Wait for VM having expected power state"
+  when: vm_change_power_state.changed
   block:
-    - name: "Wait {{ vm_set_power_state_sleep | default(10) }} seconds after VM power state changed"
+    - name: "Wait {{ vm_set_power_state_sleep | default(10) }} seconds after setting VM power state"
       ansible.builtin.pause:
         seconds: "{{ vm_set_power_state_sleep | default(10) }}"
-    - include_tasks: vm_wait_power_state.yml
+
+    - name: "Wait for VM being powered off"
+      include_tasks: vm_wait_power_state.yml
       vars:
         expected_power_status: 'poweredOff'
         wait_power_state_timeout: 300
-      when: vm_power_state_set | lower == 'shutdown-guest' or vm_power_state_set | lower == 'powered-off'
-    - include_tasks: vm_wait_power_state.yml
+      when: vm_power_state_set | lower in ['shutdown-guest', 'powered-off']
+
+    - name: "Wait for VM being powered on"
+      include_tasks: vm_wait_power_state.yml
       vars:
         expected_power_status: 'poweredOn'
         wait_power_state_timeout: 300
       when: vm_power_state_set | lower == 'powered-on'
-  when: vm_change_power_state.changed
 
-# Get current VM power state
-- include_tasks: vm_get_power_state.yml
-- name: Display the current VM power state
+- name: "Get VM power state"
+  include_tasks: vm_get_power_state.yml
+
+- name: "Display VM power state"
   ansible.builtin.debug: var=vm_power_state_get
