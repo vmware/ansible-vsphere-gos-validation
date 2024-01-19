@@ -1,40 +1,57 @@
-# Copyright 2024 VMware, Inc.
+# Copyright 2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Do not install KB5034439 for Windows Server 2022, due to known issue. Please refer to following link.
-# https://support.microsoft.com/en-au/topic/kb5034439-windows-recovery-environment-update-for-azure-stack-hci-version-22h2-and-windows-server-2022-january-9-2024-6f9d26e6-784c-4503-a3c6-0beedda443ca
-- name: "Set reject list for Windows Server 2022 due to known issue"
-  ansible.builtin.set_fact:
-    win_updates_reject_list: ["KB5034439"]
-  when:
-    - guest_os_product_type | lower == 'server'
-    - guest_os_build_num | int == 20348
+# Description:
+#   This case is to test Microsoft's Windows updates.
+#   Install Windows .msu update package.
+#
+- name: run_windows_updates
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_current_test_folder: true
 
-- name: "Install Windows Updates"
-  include_tasks: ../utils/win_install_updates.yml
-  vars:
-    win_updates_category_names: ['CriticalUpdates', 'SecurityUpdates', 'UpdateRollups']
+        # Do not install KB5034439 for Windows Server 2022, due to known issue. Please refer to following link.
+        # https://support.microsoft.com/en-au/topic/kb5034439-windows-recovery-environment-update-for-azure-stack-hci-version-22h2-and-windows-server-2022-january-9-2024-6f9d26e6-784c-4503-a3c6-0beedda443ca
+        - name: "Set reject list for Windows Server 2022 due to known issue"
+          ansible.builtin.set_fact:
+            win_updates_reject_list: ["KB5034439"]
+          when:
+            - guest_os_product_type | lower == 'server'
+            - guest_os_build_num | int == 20348
 
-- name: "Set fact if guest OS has installed Windows Updates"
-  ansible.builtin.set_fact:
-    win_updates_installed: |-
-      {%- if win_updates_install_result is defined and win_updates_install_result.installed_update_count is defined and 
-        win_updates_install_result.installed_update_count | int > 0 -%}true
-      {%- else -%}false
-      {%- endif -%}
+        - name: "Install Windows Updates"
+          include_tasks: ../utils/win_install_updates.yml
+#          vars:
+#            win_updates_category_names: ['CriticalUpdates', 'SecurityUpdates', 'UpdateRollups']
 
-- name: "Get guest OS version build"
-  include_tasks: ../utils/win_get_os_version.yml
-- name: "Set fact of guest OS version build"
-  ansible.builtin.set_fact:
-    win_version_before: "{{ win_os_version_build }}"
+        - name: "Set fact if guest OS has installed Windows Updates"
+          ansible.builtin.set_fact:
+            win_updates_installed: |-
+              {%- if win_updates_install_result is defined and win_updates_install_result.installed_update_count is defined and 
+                win_updates_install_result.installed_update_count | int > 0 -%}true
+              {%- else -%}false
+              {%- endif -%}
 
-# If guest OS has been updated, take a new one as base snapshot and remove the old one.
-- name: "Reset the base snapshot and remove the old one"
-  include_tasks: ../../common/reset_base_snapshot.yml
-  vars:
-    remove_old_base_snapshot: true
-    new_snapshot_description: "{{ win_version_before }}"
-  when: win_updates_installed
+        - name: "Get guest OS version build"
+          include_tasks: ../utils/win_get_os_version.yml
+
+        # If guest OS has been updated, take a new one as base snapshot and remove the old one.
+        - name: "Reset the base snapshot and remove the old one"
+          include_tasks: ../../common/reset_base_snapshot.yml
+          vars:
+            remove_old_base_snapshot: true
+            new_snapshot_description: "{{ win_os_version_build }}"
+          when: win_updates_installed
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true
 
 
