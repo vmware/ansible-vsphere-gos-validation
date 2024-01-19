@@ -16,6 +16,12 @@
           vars:
             create_current_test_folder: true
 
+        - name: "Get guest OS version build"
+          include_tasks: ../utils/win_get_os_version.yml
+        - name: "Display the guest OS version build before running Windows Updates"
+          ansible.builtin.debug:
+            msg: "Before running Windows Updates, guest OS version build is {{ win_os_version_build }}"
+
         # Do not install KB5034439 for Windows Server 2022, due to known issue. Please refer to following link.
         # https://support.microsoft.com/en-au/topic/kb5034439-windows-recovery-environment-update-for-azure-stack-hci-version-22h2-and-windows-server-2022-january-9-2024-6f9d26e6-784c-4503-a3c6-0beedda443ca
         - name: "Set reject list for Windows Server 2022 due to known issue"
@@ -40,13 +46,16 @@
 
         - name: "Get guest OS version build"
           include_tasks: ../utils/win_get_os_version.yml
+        - name: "Display the guest OS version build after running Windows Updates"
+          ansible.builtin.debug:
+            msg: "After running Windows Updates, guest OS version build is {{ win_os_version_build }}"
 
         # If guest OS has been updated, take a new one as base snapshot and remove the old one.
         - name: "Reset the base snapshot and remove the old one"
           include_tasks: ../../common/reset_base_snapshot.yml
           vars:
             remove_old_base_snapshot: true
-            new_snapshot_description: "{{ win_os_version_build }}"
+            take_snapshot_description: "{{ win_os_version_build }}"
           when: win_updates_installed
       rescue:
         - name: "Test case failure"
