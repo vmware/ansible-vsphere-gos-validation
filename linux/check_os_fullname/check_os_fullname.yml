@@ -17,17 +17,20 @@
           vars:
             skip_test_no_vmtools: true
 
-        - name: "Set VMware Tools debug logging directory"
-          ansible.builtin.set_fact:
-            vmtools_log_dir: "/tmp/vmware-tools-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}"
 
-        # From Flatcar 3760.2.0, /etc/vmware-tools became a read-only file system, which
-        # is not writable.
-        - name: "Enable debug logging for VMware Tools"
-          include_tasks: ../utils/enable_vmtools_logging.yml
+        # From Flatcar 3760.2.0, /etc/vmware-tools became a read-only file system, which is
+        # not writable. So here won't enable VMware Tools logging for Flatcar 3760.2.0 or later
+        - name: "Enable VMware Tools logging"
           when: >-
             not (guest_os_ansible_distribution == 'Flatcar' and
                  guest_os_ansible_distribution_ver is version('3760.2.0', '>='))
+          block:
+            - name: "Set VMware Tools debug logging directory"
+              ansible.builtin.set_fact:
+                vmtools_log_dir: "/tmp/vmware-tools-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}"
+
+            - name: "Enable debug logging for VMware Tools"
+              include_tasks: ../utils/enable_vmtools_logging.yml
 
         - name: "Get ESXi version and build"
           include_tasks: ../../common/esxi_get_version_build.yml
