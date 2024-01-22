@@ -22,9 +22,10 @@
           vars:
             skip_msg: "{{ guest_os_ansible_distribution }} doesn't have VGAuth service"
             skip_reason: "Not Supported"
-          when:
-            - guest_os_ansible_distribution is defined
-            - guest_os_ansible_distribution in ['Flatcar', 'FreeBSD']
+          when: >-
+            (guest_os_ansible_distribution == 'FreeBSD' or
+             (guest_os_ansible_distribution == 'Flatcar' and
+              guest_os_ansible_distribution_ver is version('3760.2.0', '<')))
 
         - name: "Set facts of VGAuthService process and service"
           include_tasks: ../utils/set_vgauth_facts.yml

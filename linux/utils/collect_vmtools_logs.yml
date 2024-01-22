@@ -1,0 +1,27 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Collect VMware Tools logs to local test case log directory
+# Parameter:
+#   vmtools_vmtoolsd_log_file: the VMware Tools vmtoolsd log path in guest OS
+#   vmtools_vmsvc_log_file: the VMware Tools vmsvc log path in guest OS
+#
+- name: "Initialize fact of default VMware Tools vmtoolsd log path in guest OS"
+  ansible.builtin.set_fact:
+    vmtools_vmtoolsd_log_file: "/var/log/vmware-vmtoolsd-root.log"
+  when: vmtools_vmtoolsd_log_file is undefined or not vmtools_vmtoolsd_log_file
+
+- name: "Initialize fact of default VMware Tools vmsvc log path in guest OS"
+  ansible.builtin.set_fact:
+    vmtools_vmsvc_log_file: "/var/log/vmware-vmsvc-root.log"
+  when: vmtools_vmsvc_log_file is undefined or not vmtools_vmsvc_log_file
+
+- name: "Collect VMware Tools logs to test case log directory"
+  include_tasks: fetch_file.yml
+  vars:
+    fetch_file_src_path: "{{ item }}"
+    fetch_file_dst_path: "{{ current_test_log_folder }}/"
+    fetch_file_ignore_errors: true
+  with_items:
+    - "{{ vmtools_vmtoolsd_log_file }}"
+    - "{{ vmtools_vmsvc_log_file }}"
