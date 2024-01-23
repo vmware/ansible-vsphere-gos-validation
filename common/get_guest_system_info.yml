@@ -48,9 +48,14 @@
     guest_os_hostname: "{{ guest_system_info.ansible_hostname | default('') }}"
     guest_os_installation_type: "{{ guest_system_info.ansible_os_installation_type | default('') }}"
 
-- name: "Set fact of guest_os_ansible_pkg_mgr when is unknown"
+- name: "Set fact of ansible_pkg_mgr manually when it'is unknown"
   ansible.builtin.set_fact:
-    guest_os_ansible_pkg_mgr: "dnf"
+    guest_system_info: >-
+      {{
+        guest_system_info |
+        combine({'ansible_pkg_mgr': 'dnf'})
+      }}
+    guest_os_ansible_pkg_mgr: 'dnf'
   when: 
     - guest_os_ansible_pkg_mgr == 'unknown' or guest_os_ansible_pkg_mgr == ''
     - guest_os_ansible_distribution is match('Kylin.*')
