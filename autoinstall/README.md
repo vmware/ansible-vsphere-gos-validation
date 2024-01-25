@@ -25,7 +25,7 @@
 24. For BCLinux-for-Euler 21.10 unattend auto-install, please use file BCLinux-for-Euler/21.10/ks.cfg.
 25. For FusionOS 22 unattend auto-install, please use files under Fusion.
 26. For FusionOS 23 unattend auto-install, please use file Fusion/server_without_GUI/ks.cfg.
-27. For Kylin Server V10 and later unattend auto-install, please use file Kylin/Server/10/ks.cfg.
+27. For Kylin Linux Advanced Server V10 and later unattend auto-install, please use file Kylin/Server/10/ks.cfg.
 
 # Notes
 ## For Windows
