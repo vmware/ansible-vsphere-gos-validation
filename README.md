@@ -95,7 +95,7 @@ This project supports below scenarios for end-to-end guest operating system vali
 | Red Hat Enterprise Linux CoreOS (RHCOS) 4.13 and later |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
 | FusionOS 22 and 23                                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Miracle Linux 8.x, 9.x                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Kylin Linux Advanced Server V10 and later              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Kylin Linux Advanced Server V10                        | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 
 **Notes**
 This compatible guest operating systems list is used for this project only. For guest operating system support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
