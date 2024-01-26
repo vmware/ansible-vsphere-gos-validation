@@ -109,25 +109,25 @@
             state: "{{ package_state }}"
           delegate_to: "{{ vm_guest_ip }}"
           when: guest_os_ansible_pkg_mgr | lower == "yum"
+        
+        - name: "Get DNF version and {{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+          block:
+            - name: "Get DNF version on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+              ansible.builtin.command: "dnf --version"
+              register: dnf_version_result
+              delegate_to: "{{ vm_guest_ip }}"
 
-        - name: "Get DNF version on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-          ansible.builtin.command: "dnf --version"
-          register: dnf_version_result
-          delegate_to: "{{ vm_guest_ip }}"
-          when: guest_os_ansible_distribution == "Kylin Linux Advanced Server"
-
-        - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-          ansible.builtin.dnf:
-            name: "{{ package_manage_list }}"
-            allow_downgrade: true
-            state: "{{ package_state }}"
-            use_backend: |-
-              {%- if guest_os_ansible_distribution == "Kylin Linux Advanced Server" and dnf_version_result is defined and 
-                dnf_version_result.rc is defined and dnf_version_result.rc | int == 0 and 
-                dnf_version_result.stdout_lines is defined and dnf_version_result.stdout_lines | length > 0 -%}
-              {{ 'dnf' + dnf_version_result.stdout_lines[0].split('.')[0] }}
-              {%- else -%}auto{%- endif -%}
-          delegate_to: "{{ vm_guest_ip }}"
+            - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+              ansible.builtin.dnf:
+                name: "{{ package_manage_list }}"
+                allow_downgrade: true
+                state: "{{ package_state }}"
+                use_backend: |-
+                  {%- if dnf_version_result is defined and dnf_version_result.rc is defined and dnf_version_result.rc | int == 0 and 
+                    dnf_version_result.stdout_lines is defined and dnf_version_result.stdout_lines | length > 0 -%}
+                  {{ 'dnf' + dnf_version_result.stdout_lines[0].split('.')[0] }}
+                  {%- else -%}auto{%- endif -%}
+              delegate_to: "{{ vm_guest_ip }}"
           when: guest_os_ansible_pkg_mgr | lower == "dnf"
       when: guest_os_family == "RedHat"
 
