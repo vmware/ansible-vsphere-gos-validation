@@ -113,18 +113,18 @@
         - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
           block:
             - name: "Get DNF version on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-              ansible.builtin.command: "dnf --version"
-              register: dnf_version_result
+              ansible.builtin.command: "dnf --version | head -n 1 | cut -d '.' -f 1"
+              register: dnf_major_version_result
               delegate_to: "{{ vm_guest_ip }}"
 
             - name: "Set fact of DNF major version"
               ansible.builtin.set_fact:
-                dnf_major_version: "{{ dnf_version_result.stdout_lines[0].split('.')[0] }}"
+                dnf_major_version: "{{ dnf_major_version_result.stdout }}"
               when:
-                - dnf_version_result.rc is defined
-                - dnf_version_result.rc | int == 0
-                - dnf_version_result.stdout_lines is defined
-                - dnf_version_result.stdout_lines | length > 0
+                - dnf_major_version_result.rc is defined
+                - dnf_major_version_result.rc | int == 0
+                - dnf_major_version_result.stdout is defined
+                - dnf_major_version_result.stdout
 
             - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
               ansible.builtin.dnf:
@@ -132,7 +132,7 @@
                 allow_downgrade: true
                 state: "{{ package_state }}"
                 use_backend: |-
-                  {%- if dnf_major_version is defined and dnf_major_version and dnf_major_version | int >= 4 -%}{{ 'dnf' + dnf_major_version }}
+                  {%- if dnf_major_version | default('') and dnf_major_version | int >= 4 -%}{{ 'dnf' + dnf_major_version }}
                   {%- else -%}auto{%- endif -%}
               delegate_to: "{{ vm_guest_ip }}"
           when: guest_os_ansible_pkg_mgr | lower == "dnf"
