@@ -1,24 +1,27 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Enable VMware tools vss log in tools.conf
-- name: Set fact of VMware tools config file path
+# Enable VMware Tools vss log in tools.conf
+# Parameter:
+#   win_vmbackup_log_path: the vmbackup log file path in guest OS
+#
+- name: "Set fact of VMware Tools config file path"
   ansible.builtin.set_fact:
     vmtools_conf_path: "C:\\ProgramData\\VMware\\VMware Tools\\tools.conf"
     vmtools_conf_template: "C:\\ProgramData\\VMware\\VMware Tools\\tools.conf.example"
 
-# Check if VMware tools config file exists
-- include_tasks: win_check_file_exist.yml
+- name: "Check if VMware Tools config file exists"
+  include_tasks: win_check_file_exist.yml
   vars:
     win_check_file_exist_file: "{{ vmtools_conf_path }}"
 
-# Copy VMware tools config file from template file
-- include_tasks: win_execute_cmd.yml
+- name: "Copy VMware Tools config file from template file"
+  include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Copy-Item '{{ vmtools_conf_template }}' -Destination '{{ vmtools_conf_path }}'"
   when: win_check_file_exist_result is defined and not win_check_file_exist_result
 
-- name: Enable vss log in VMware tools config file
+- name: "Enable vss log in VMware Tools config file"
   community.windows.win_lineinfile:
     path: "{{ vmtools_conf_path }}"
     regexp: "{{ item.key }}"
@@ -28,15 +31,15 @@
     - {key: '^#vmvss.handler.*', value: 'vmvss.handler = vmx'}
     - {key: '^#vmbackup.level.*', value: 'vmbackup.level = debug'}
     - {key: '^#vmbackup.handler.*', value: 'vmbackup.handler = file'}
-    - {key: '^#vmbackup.data.*', value: 'vmbackup.data = C://vmbackup.log'}
+    - {key: '^#vmbackup.data.*', value: 'vmbackup.data = C:\\vmbackup.log'}
   delegate_to: "{{ vm_guest_ip }}"
 
-# Restart VMware tools service
-- include_tasks: win_execute_cmd.yml
+- name: "Restart VMware Tools service"
+  include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Restart-Service -Force -Name VMTools"
 
-# Make sure VMware tools service is running before taking quiesce snapshot
-- include_tasks: win_wait_service_status.yml
+- name: "Make sure VMware Tools service is running"
+  include_tasks: win_wait_service_status.yml
   vars:
     win_service_name: 'VMTools'
