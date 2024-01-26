@@ -110,12 +110,21 @@
           delegate_to: "{{ vm_guest_ip }}"
           when: guest_os_ansible_pkg_mgr | lower == "yum"
         
-        - name: "Get DNF version and {{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+        - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
           block:
             - name: "Get DNF version on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
               ansible.builtin.command: "dnf --version"
               register: dnf_version_result
               delegate_to: "{{ vm_guest_ip }}"
+
+            - name: "Set fact of DNF major version"
+              ansible.builtin.set_fact:
+                dnf_major_version: "{{ dnf_version_result.stdout_lines[0].split('.')[0] }}"
+              when:
+                - dnf_version_result.rc is defined
+                - dnf_version_result.rc | int == 0
+                - dnf_version_result.stdout_lines is defined
+                - dnf_version_result.stdout_lines | length > 0
 
             - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
               ansible.builtin.dnf:
@@ -123,9 +132,7 @@
                 allow_downgrade: true
                 state: "{{ package_state }}"
                 use_backend: |-
-                  {%- if dnf_version_result is defined and dnf_version_result.rc is defined and dnf_version_result.rc | int == 0 and 
-                    dnf_version_result.stdout_lines is defined and dnf_version_result.stdout_lines | length > 0 -%}
-                  {{ 'dnf' + dnf_version_result.stdout_lines[0].split('.')[0] }}
+                  {%- if dnf_major_version is defined and dnf_major_version | int >= 4 -%}{{ 'dnf' + dnf_major_version }}
                   {%- else -%}auto{%- endif -%}
               delegate_to: "{{ vm_guest_ip }}"
           when: guest_os_ansible_pkg_mgr | lower == "dnf"
