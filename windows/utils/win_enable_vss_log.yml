@@ -5,6 +5,13 @@
 # Parameter:
 #   win_vmbackup_log_path: the vmbackup log file path in guest OS
 #
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - win_vmbackup_log_path is defined
+      - win_vmbackup_log_path
+    fail_msg: "Parameter 'win_vmbackup_log_path' is required to be defined as the vmbackup log file path."
+
 - name: "Set fact of VMware Tools config file path"
   ansible.builtin.set_fact:
     vmtools_conf_path: "C:\\ProgramData\\VMware\\VMware Tools\\tools.conf"
@@ -31,7 +38,7 @@
     - {key: '^#vmvss.handler.*', value: 'vmvss.handler = vmx'}
     - {key: '^#vmbackup.level.*', value: 'vmbackup.level = debug'}
     - {key: '^#vmbackup.handler.*', value: 'vmbackup.handler = file'}
-    - {key: '^#vmbackup.data.*', value: 'vmbackup.data = C:\\vmbackup.log'}
+    - {key: '^#vmbackup.data.*', value: "vmbackup.data = {{ win_vmbackup_log_path }}"}
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Restart VMware Tools service"
