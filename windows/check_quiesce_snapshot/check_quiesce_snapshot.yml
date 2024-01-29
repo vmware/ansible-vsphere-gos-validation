@@ -16,20 +16,23 @@
           vars:
             skip_test_no_vmtools: true
 
+        - name: "Set fact of the remote path in guest OS"
+          ansible.builtin.set_fact:
+            quiesce_scripts_freeze_thaw_path: "C:\\Windows\\"
+            quiesce_scripts_tools_path: "C:\\Program Files\\VMware\\VMware Tools\\backupScripts.d\\"
+            quiesce_log_file_path: "C:\\vmbackup.log"
+
         - name: "Check disk.EnableUUID in VMX file"
           include_tasks: check_vmx_disk_enable_uuid.yml
           when: guest_os_product_type | lower == "server"
 
         - name: "Enable vss logging"
           include_tasks: ../utils/win_enable_vss_log.yml
+          vars:
+            win_vmbackup_log_path: "{{ quiesce_log_file_path }}"
           when:
             - vmtools_version is defined and vmtools_version
             - vmtools_version is version('11.0.0', '>=')
-
-        - name: "Set fact of the remote path in guest OS"
-          ansible.builtin.set_fact:
-            quiesce_scripts_freeze_thaw_path: "C:\\Windows\\"
-            quiesce_scripts_tools_path: "C:\\Program Files\\VMware\\VMware Tools\\backupScripts.d\\"
 
         - name: "Get Windows guest OS time"
           include_tasks: ../utils/win_get_time.yml
@@ -44,6 +47,11 @@
 
         - name: "Copy custom scripts to guest OS"
           include_tasks: copy_custom_scripts_to_guest.yml
+
+        - name: "Get VMware Snapshot Provider service status in guest OS"
+          include_tasks: ../utils/win_get_service_status.yml
+          vars:
+            win_service_name: "vmvss"
 
         - name: "Set fact of collecting quiesce log file"
           ansible.builtin.set_fact:
