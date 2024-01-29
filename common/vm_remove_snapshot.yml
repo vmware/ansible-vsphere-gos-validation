@@ -24,8 +24,11 @@
   ansible.builtin.debug: var=task_result
   when: enable_debug is defined and enable_debug
 
-- block:
-    - include_tasks: vm_get_snapshot_facts.yml
+- name: "Check if the snapshot '{{ snapshot_name }}' is removed"
+  when: snapshot_remove_state | default('absent') == 'absent'
+  block:
+    - name: "Get VM's snapshots"
+      include_tasks: vm_get_snapshot_facts.yml
 
     - name: "Assert snapshot '{{ snapshot_name }}' not exist"
       ansible.builtin.assert:
@@ -33,4 +36,4 @@
           - item.name != snapshot_name
         fail_msg: "Failed to remove snapshot {{ snapshot_name }}"
       with_items: "{{ vm_snapshot_facts.guest_snapshots.snapshots }}"
-  when: snapshot_remove_state | default('absent') == 'absent'
+      when: vm_snapshot_facts.guest_snapshots | length > 0
