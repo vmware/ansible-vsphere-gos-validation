@@ -47,3 +47,14 @@
     guest_os_product_type: "{{ guest_system_info.ansible_os_product_type | default('') }}"
     guest_os_hostname: "{{ guest_system_info.ansible_hostname | default('') }}"
     guest_os_installation_type: "{{ guest_system_info.ansible_os_installation_type | default('') }}"
+
+- name: "Update guest OS distribution facts for {{ guest_os_ansible_distribution }}"
+  ansible.builtin.set_fact:
+    guest_os_ansible_pkg_mgr: 'dnf'
+    guest_os_ansible_distribution_ver: "{{ guest_os_ansible_distribution_ver  | regex_replace('V', '', ignorecase=True) }}"
+    guest_os_ansible_distribution_major_ver:  "{{ guest_os_ansible_distribution_major_ver | regex_replace('V', '', ignorecase=True) | int }}"
+  when: 
+    - guest_os_ansible_distribution == "Kylin Linux Advanced Server"
+    - guest_os_ansible_distribution_major_ver | regex_replace('V', '', ignorecase=True) | int >= 10 
+    - (not guest_os_ansible_pkg_mgr) or guest_os_ansible_pkg_mgr == 'unknown'
+

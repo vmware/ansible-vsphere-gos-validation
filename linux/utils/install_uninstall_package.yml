@@ -61,8 +61,10 @@
       - "The package operation is {{ package_manage_op }}"
 
 - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }}"
+  when: package_manage_list | length > 0
   block:
     - name: "Set proxy and add repositories for installing or upgrading package"
+      when: package_state in ['installed', 'latest', 'present']
       block:
         - name: "Set proxy for installing package"
           include_tasks: set_proxy.yml
@@ -74,9 +76,9 @@
         # Add known online repos for other Linux OS
         - include_tasks: ../utils/add_official_online_repo.yml
           when: guest_os_ansible_distribution not in ['SLES', 'SLED', 'RedHat']
-      when: package_state in ['installed', 'latest', 'present']
 
     - name: "{{ package_manage_op }} packages on VMware Photon OS"
+      when: guest_os_ansible_distribution == "VMware Photon OS"
       block:
         - name: "Set facts of packages and command for VMware Photon OS"
           ansible.builtin.set_fact:
@@ -98,9 +100,9 @@
 
         - name: "Display the result of '{{ package_manage_cmd }}'"
           ansible.builtin.debug: var=tdnf_cmd_result
-      when: guest_os_ansible_distribution == "VMware Photon OS"
 
     - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }}"
+      when: guest_os_family == "RedHat"
       block:
         - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
           ansible.builtin.yum:
@@ -111,13 +113,32 @@
           when: guest_os_ansible_pkg_mgr | lower == "yum"
 
         - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-          ansible.builtin.dnf:
-            name: "{{ package_manage_list }}"
-            allow_downgrade: true
-            state: "{{ package_state }}"
-          delegate_to: "{{ vm_guest_ip }}"
           when: guest_os_ansible_pkg_mgr | lower == "dnf"
-      when: guest_os_family == "RedHat"
+          block:
+            - name: "Get DNF version on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+              ansible.builtin.shell: "dnf --version | head -n 1 | cut -d '.' -f 1"
+              register: dnf_major_version_result
+              ignore_errors: true
+              delegate_to: "{{ vm_guest_ip }}"
+
+            - name: "Set fact of DNF major version"
+              ansible.builtin.set_fact:
+                dnf_major_version: "{{ dnf_major_version_result.stdout }}"
+              when:
+                - dnf_major_version_result.rc is defined
+                - dnf_major_version_result.rc | int == 0
+                - dnf_major_version_result.stdout is defined
+                - dnf_major_version_result.stdout
+
+            - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+              ansible.builtin.dnf:
+                name: "{{ package_manage_list }}"
+                allow_downgrade: true
+                state: "{{ package_state }}"
+                use_backend: |-
+                  {%- if dnf_major_version | default('') and dnf_major_version | int >= 4 -%}{{ 'dnf' + dnf_major_version }}
+                  {%- else -%}auto{%- endif -%}
+              delegate_to: "{{ vm_guest_ip }}"
 
     - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       community.general.zypper:
@@ -127,6 +148,7 @@
       when: guest_os_family == "Suse"
 
     - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }}"
+      when: guest_os_family in ["Debian", "Astra Linux (Orel)"]
       block:
         - name: "Remove dpkg lock file"
           include_tasks: remove_dpkg_lock_file.yml
@@ -145,5 +167,4 @@
             state: "{{ package_state }}"
           delegate_to: "{{ vm_guest_ip }}"
           when: guest_os_family == "Astra Linux (Orel)"
-      when: guest_os_family in ["Debian", "Astra Linux (Orel)"]
-  when: package_manage_list | length > 0
+
