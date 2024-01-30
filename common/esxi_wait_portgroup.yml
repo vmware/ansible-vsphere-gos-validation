@@ -26,9 +26,10 @@
   until:
     - portgroup_facts is defined
     - portgroup_facts.hosts_portgroup_info is defined
-    - portgroup_facts.hosts_portgroup_info[esxi_hostname] is defined
-    - portgroup_facts.hosts_portgroup_info[esxi_hostname] | length > 0
-    - (portgroup_facts.hosts_portgroup_info[esxi_hostname] | selectattr('portgroup', 'equalto', wait_for_portgroup_name)) | length != 0
+    - portgroup_facts.hosts_portgroup_info | length == 1
+    - (portgroup_facts.hosts_portgroup_info |
+       dict2items | map(attribute='value') | flatten |
+       selectattr('portgroup', 'equalto', wait_for_portgroup_name)) | length != 0
   ignore_errors: true
   register: portgroup_facts
 
