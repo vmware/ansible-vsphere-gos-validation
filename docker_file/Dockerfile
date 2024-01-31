@@ -21,17 +21,15 @@ RUN pip3 install ansible-core==2.15.8
 # ENV HTTPS_PROXY="https://proxy.xxxx.com:xxxx"
 # Ansible 2.14.0 or later requires the locale encoding to be UTF-8
 ENV LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
-COPY requirements.yml /tmp/requirements.yml
-RUN ansible-galaxy install -r /tmp/requirements.yml
+RUN ansible-galaxy collection install ansible.netcommon ansible.posix community.general community.vmware community.windows community.crypto
 
 # Download latest 'ansible-vsphere-gos-validation' release to working dir
-RUN curl -s https://api.github.com/repos/vmware/ansible-vsphere-gos-validation/releases/latest | grep "tarball_url" | cut -d "\"" -f 4 | xargs -n 1 wget -O test.tar.gz && \
-    tar -zxf test.tar.gz && \
-    mv vmware-ansible-vsphere-gos-validation*/* ./
+RUN wget --no-check-certificate https://github.com/vmware/ansible-vsphere-gos-validation/archive/refs/heads/main.tar.gz -O /tmp/test.tar.gz && \
+    tar -zxf /tmp/test.tar.gz -C /tmp && \
+    mv /tmp/ansible-vsphere-gos-validation-main/* ./
 
 # Clean up unused files
-RUN rm -rf test.tar.gz vmware-ansible-vsphere-gos-validation* && \
-    tdnf clean all && \
+RUN tdnf clean all && \
     rm -rf /var/cache/* /root/.cache/pip/* /var/log/* /tmp/* /root/.ansible/tmp/*
 
 # Known issue: ping: socket SOCK_DGRAM 1: Permission denied, Kernel bug workaround

@@ -2,24 +2,15 @@
 ## Build docker image
 Build a new docker image with version tag vX.Y for latest release.
 ```
-cp -f ../requirements.yml .
-docker build . -t projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:vX.Y
+docker build . -t ansible-vsphere-gos-validation:vX.Y
 ```
 
 ## Run docker container to test the new docker image
 ```
-docker run -it --privileged projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:vX.Y
+docker run -it --privileged ansible-vsphere-gos-validation:vX.Y
 ```
 
-## Push new docker image to registry
+## Tag the docker image as latest
 ```
-docker login projects.registry.vmware.com
-docker push projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:vX.Y
-```
-
-## Tag the docker image as latest one and push it
-```
-docker image tag projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:vX.Y projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
-docker login projects.registry.vmware.com
-docker push projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
+docker image tag ansible-vsphere-gos-validation:vX.Y ansible-vsphere-gos-validation:latest
 ```
