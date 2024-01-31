@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright 2021-2023 VMware, Inc.
+# Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 #set -x
 
