@@ -1,7 +1,7 @@
 # Copyright 2021-2023 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Initilize DNS configuration check results"
+- name: "Initilize facts of guest OS resolvectl command and DNS configuration check results"
   ansible.builtin.set_fact:
     guest_resolvectl_cmd: "/usr/bin/resolvectl"
     dns_servers_success: false
@@ -22,7 +22,7 @@
 
 # Guest OS has /usr/bin/resolvectl command
 - name: "Get DNS servers and search domains for {{ guest_os_ansible_distribution }}"
-  when: resolvectl_status_result | bool
+  when: resolvectl_status_result
   block:
     - name: "Fetch the output file of '{{ guest_resolvectl_cmd }} status'"
       include_tasks: ../../common/vm_guest_file_operation.yml
@@ -43,7 +43,7 @@
         resolvectl_dns_result: "{{ vm_shell_result.exit_code is defined and vm_shell_result.exit_code == 0 }}"
 
     - name: "Get DNS servers for {{ guest_os_ansible_distribution }}"
-      when: resolvectl_dns_result | bool
+      when: resolvectl_dns_result
       block:
         - name: "Fetch the output file of '{{ guest_resolvectl_cmd }} dns'"
           include_tasks: ../../common/vm_guest_file_operation.yml
@@ -68,7 +68,7 @@
         resolvectl_domain_result: "{{ vm_shell_result.exit_code is defined and vm_shell_result.exit_code == 0 }}"
 
     - name: "Get DNS search domains for {{ guest_os_ansible_distribution }}"
-      when: resolvectl_domain_result | bool
+      when: resolvectl_domain_result
       block:
         - name: "Fetch the output file of '{{ guest_resolvectl_cmd }} domain'"
           include_tasks: ../../common/vm_guest_file_operation.yml
@@ -85,7 +85,7 @@
 # Try to get DNS servers and DNS search domains from /etc/resolv.conf
 - name: "Get DNS servers and search domains for {{ guest_os_ansible_distribution }}"
   when:
-    - not resolvectl_status_result | bool
+    - not resolvectl_status_result
     - guest_os_ansible_distribution != 'Ubuntu'
   block:
     # In SLES 15, /etc/resolv.conf is a symbolic link. But after cloud-init GOSC,
@@ -133,7 +133,7 @@
         systemd_resolve_result: "{{ vm_shell_result.exit_code is defined and vm_shell_result.exit_code == 0 }}"
 
     - name: "Get DNS servers and search domains from systemd-resolve status"
-      when: systemd_resolve_result | bool
+      when: systemd_resolve_result
       block:
         - include_tasks: ../../common/vm_guest_file_operation.yml
           vars:
