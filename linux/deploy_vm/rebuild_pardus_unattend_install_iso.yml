@@ -18,6 +18,21 @@
       - 'isolinux/install.cfg'
       - 'md5sum.txt'
 
+- name: "Extract kernel file inside ISO"
+  community.general.iso_extract:
+    image: "{{ src_iso_file_path }}"
+    dest: "{{ src_iso_file_dir }}"
+    files:
+      - '/install/gtk/vmlinuz'
+    register: kernel_initrd_dir_result
+    ignore_errors: true
+
+- name: "Set fact of the kernel and initrd file directory"
+  ansible.builtin.set_fact:
+    kernel_initrd_dir: |-
+      {%- if kernel_initrd_dir_result.failed is defined and not kernel_initrd_dir_result.failed -%}/install/
+      {%- else -%}/install/gtk/{%- endif -%}
+
 - name: "Update timeout of file isolinux.cfg"
   ansible.builtin.replace:
     path: "{{ src_iso_file_dir }}/isolinux.cfg"
@@ -70,8 +85,8 @@
       # menuentry for unattended installation
         menuentry "Automated installation" --id autoinstall {
           set background_color=black
-          linux  /install/gtk/vmlinuz auto=true file=/cdrom/{{ unattend_install_file_name }} video=vesa:ywrap,mtrr vga=788 "DPMS=-s 0" --- quiet
-          initrd /install/gtk/initrd.gz
+          linux  {{ kernel_initrd_dir }}vmlinuz auto=true file=/cdrom/{{ unattend_install_file_name }} video=vesa:ywrap,mtrr vga=788 "DPMS=-s 0" --- quiet
+          initrd {{ kernel_initrd_dir }}initrd.gz
         }
 
 - name: "Update md5sum for Pardus ISO files"
