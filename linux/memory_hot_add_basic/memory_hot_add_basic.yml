@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is used for check VM memory hotadd works as expected. When calculated
-# memory hotadd size list from free memory size on ESXi server and the configured
+#   This test case is used for check VM memory hot-add works as expected. When calculated
+# memory hot-add size list from free memory size on ESXi server and the configured
 # maximum memory size (default 16384MB) is empty, or the free memory size on ESXi server
 # is lower than 4096MB, this test case result is 'Blocked'.
 # Note: Linux VM memory size will be set to 2048MB before hotadd test.
@@ -14,38 +14,62 @@
   tasks:
     - name: "Test case block"
       block:
+        # Except for VM guest_id like 'freebsd.*Guest' not supporting memory hot-add,
+        # the other guest OS compatible with ansible-vsphere-gos-validation support memory hot-add
+        - name: "Skip test case '{{ ansible_play_name }}' due to VM not support memory hot-add"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case '{{ ansible_play_name }}' because memory hot-add is not supported by guest id {{ guest_id }}"
+            skip_reason: "Not Supported"
+          when:
+            - vm_guest_id is defined
+            - vm_guest_id is match('freebsd.*')
+
         - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
 
-        - name: Set fact of VM initial memory size to 2048MB before hotadd test
+        - name: "Set fact of VM initial memory size to 2048MB before hotadd test"
           ansible.builtin.set_fact:
             vm_initial_mem_mb: 2048
-        - include_tasks: generate_mem_hot_add_list.yml
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Generate memory size list for hot-add"
+          include_tasks: generate_mem_hot_add_list.yml
+
+        - name: "Test case is blocked due to empty memory size list"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Test case '{{ ansible_play_name }}' is blocked because memory hotadd test value list is empty"
+            skip_msg: "Test case '{{ ansible_play_name }}' is blocked because memory hot-add test value list is empty"
             skip_reason: "Blocked"
           when: memory_hotadd_size_list | length == 0
 
-        - include_tasks: ../../common/skip_test_case.yml
+        # From guest OS, Debian for 32bit and FreeBSD for 32bit and 64bit don't support memory hot-add.
+        - name: "Skip test case '{{ ansible_play_name }} for {{ vm_guest_os_distribution }}"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Skip testcase '{{ ansible_play_name }}', memory hotadd is not supported on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_architecture }}"
+            skip_msg: "Skip testcase '{{ ansible_play_name }}', memory hot-add is not supported on {{ vm_guest_os_distribution }}"
             skip_reason: "Not Supported"
           when: >
             (guest_os_ansible_distribution == "Debian" and guest_os_ansible_architecture == "i386") or
             guest_os_ansible_distribution == "FreeBSD"
 
-        - name: Initialize memory hotadd test result
+        - name: "Initialize memory hot-add test result"
           ansible.builtin.set_fact:
             mem_hotadd_results: []
 
-        - include_tasks: memory_hot_add_prepare.yml
-        - include_tasks: memory_set_and_validate.yml
+        - name: "Reconfigure VM with initial memory size"
+          include_tasks: memory_hot_add_prepare.yml
+
+        - name: "Check memory size in guest OS after memory hot-add"
+          include_tasks: memory_set_and_validate.yml
           loop: "{{ memory_hotadd_size_list }}"
           loop_control:
             loop_var: hotadd_mb
-        - name: Display the test results
+
+        - name: "Display validation result for VM memory hot-add"
           ansible.builtin.debug: var=mem_hotadd_results
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Collect Linux guest OS information for triage"
+          include_tasks: ../setup/linux_test_rescue.yml
+
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml

@@ -3,12 +3,11 @@
 ---
 # Hot add a new network adapter and apply network config
 #
-
-# FreeBSD does not support "dmesg --clear"
 - name: "Clear dmesg ring buffer"
-  ansible.builtin.shell: "dmesg -c"
-  changed_when: false
-  delegate_to: "{{ vm_guest_ip }}"
+  include_tasks: ../utils/collect_dmesg.yml
+  vars:
+    dmesg_opts: '-c'
+    dmesg_output_file_name: 'dmesg_before_nic_hotadd.log'
 
 - name: "Hot add a new network adapter to VM"
   include_tasks: ../../common/vm_add_network_adapter.yml
@@ -19,10 +18,9 @@
     vm_wait_connection_timeout: 60
 
 - name: "Get new messages in dmesg ring buffer"
-  ansible.builtin.shell: "dmesg"
-  changed_when: false
-  delegate_to: "{{ vm_guest_ip }}"
-  register: dmesg_delta
+  include_tasks: ../utils/collect_dmesg.yml
+  vars:
+    dmesg_output_file_name: 'dmesg_after_nic_hotadd.log'
 
 - name: "Set match string for newly added NIC in dmesg ring buffer"
   ansible.builtin.set_fact:
@@ -38,7 +36,7 @@
   ansible.builtin.set_fact:
     new_network_adapter_dmesg: >-
       {{
-        dmesg_delta.stdout_lines | default([]) |
+        dmesg_cmd_result.stdout_lines | default([]) |
         select('match', '.*' ~ nic_match_in_dmesg ~ '.*')
       }}
 

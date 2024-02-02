@@ -12,7 +12,10 @@
   tasks:
     - name: "Test case block"
       block:
-        - include_tasks: ../setup/test_setup.yml
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_test_log_folder: true
 
         - name: "Check whether guest OS supports PVRDMA testing"
           include_tasks: check_pvrdma_support_status.yml
@@ -61,6 +64,7 @@
             parent_vm_name: "{{ pvrdma_server_vm_name }}"
             cloned_vm_name: "{{ pvrdma_client_vm_name }}"
 
+
         # On server VM
         - name: "Initialize the static IP address for the server VM"
           ansible.builtin.set_fact:
@@ -89,6 +93,16 @@
         - name: "Switch to client VM"
           ansible.builtin.set_fact:
             vm_name: "{{ pvrdma_client_vm_name }}"
+
+        - name: "Get client VM basic information"
+          include_tasks: ../../common/vm_get_config.yml
+          vars:
+            property_list: ['config.files.logDirectory', 'config.files.vmPathName']
+
+        - name: "Set facts of client VM's directory name and VMX path"
+          ansible.builtin.set_fact:
+            pvrdma_client_vm_dir_name: "{{ vm_config.config.files.logDirectory.split(']')[-1].strip(' \\/') }}"
+            pvrdma_client_vm_vmx_path: "{{ vm_config.config.files.vmPathName | regex_replace('\\[(.*)\\] ', '/vmfs/volumes/\\1/') }}"
 
         - name: "Get client VM '{{ pvrdma_client_vm_name }}' primary network adapter MAC address"
           include_tasks: ../../common/vm_get_network_facts.yml
@@ -203,11 +217,39 @@
         - name: "Cleanup network"
           include_tasks: ../../common/vds_network_cleanup.yml
       rescue:
-        - name: "Switch to server VM"
-          ansible.builtin.set_fact:
-            vm_name: "{{ pvrdma_server_vm_name }}"
+        - name: "Test failed on client VM"
           when:
             - pvrdma_client_vm_name is defined
             - vm_name == pvrdma_client_vm_name
+          block:
+            - name: "Set log folder for client VM"
+              ansible.builtin.set_fact:
+                pvrdma_client_test_log_folder: "{{ current_test_log_folder }}/{{ pvrdma_client_vm_name }}"
 
-        - include_tasks: ../../common/test_rescue.yml
+            - name: "Create log folder for client VM"
+              include_tasks: ../../common/create_directory.yml
+              vars:
+                dir_path: "{{ pvrdma_client_test_log_folder }}"
+                dir_mode: "0755"
+
+            - name: "Collect client VM's guest OS information for triage"
+              include_tasks: ../setup/linux_test_rescue.yml
+              vars:
+                current_test_log_folder: "{{ pvrdma_client_test_log_folder }}"
+
+            - name: "Test case failure on client VM"
+              include_tasks: ../../common/test_rescue.yml
+              vars:
+                current_test_log_folder: "{{ pvrdma_client_test_log_folder }}"
+                vm_dir_name: "{{ pvrdma_client_vm_dir_name }}"
+                vm_vmx_path: "{{ pvrdma_client_vm_vmx_path }}"
+
+            - name: "Switch to server VM"
+              ansible.builtin.set_fact:
+                vm_name: "{{ pvrdma_server_vm_name }}"
+
+        - name: "Collect server VM's guest OS information for triage"
+          include_tasks: ../setup/linux_test_rescue.yml
+
+        - name: "Test case failure on server VM"
+          include_tasks: ../../common/test_rescue.yml

@@ -4,25 +4,43 @@
 # Description:
 #   Collect dmesg and save output to a local file
 # Parameters:
-#   dmesg_opts: The dmesg command options
-#   dmesg_output_file_src: Save dmesg output file on guest OS
+#   dmesg_opts: the dmesg command options
+#   dmesg_output_file_name (optional): the file name for saving dmesg output in test case log folder
+#   dmesg_ignore_errors (optional): ignore errors when executing dmesg. Default is false.
 # Return:
-#   dmesg_output_file_local: The dmesg output file at localhost
+#   dmesg_output_file_path: the file path to saved dmesg output at localhost
 #
-- name: "Print dmesg ring buffer to {{ dmesg_output_file_src }}"
-  ansible.builtin.shell: "dmesg {{ dmesg_opts | default('') }} >{{ dmesg_output_file_src }}"
-  changed_when: false
-  delegate_to: "{{ vm_guest_ip }}"
-
-- name: "Fetch dmesg output to test case log folder"
-  include_tasks: fetch_file.yml
-  vars:
-    fetch_file_src_path: "{{ dmesg_output_file_src }}"
-    fetch_file_dst_path: "{{ current_test_log_folder }}/"
-
-- name: "Set facts of dmesg output file at localhost"
+- name: "Initialize facts of dmesg command result and output file path at localhost"
   ansible.builtin.set_fact:
-    dmesg_output_file_local: "{{ fetch_file_local_path }}"
+    dmesg_cmd_result: ""
+    dmesg_output_file_path: ""
+
+- name: "Print dmesg ring buffer"
+  ansible.builtin.shell: "dmesg {{ dmesg_opts | default('') }}"
+  changed_when: false
+  ignore_errors: "{{ dmesg_ignore_errors | default(false) }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: dmesg_cmd_result
+
+- name: "Save dmesg output to local file in test case log folder"
   when:
-    - fetch_file_local_path is defined
-    - fetch_file_local_path
+    - dmesg_output_file_name is defined
+    - dmesg_output_file_name
+    - dmesg_cmd_result.rc is defined
+    - dmesg_cmd_result.rc == 0
+    - dmesg_cmd_result.stdout is defined
+    - dmesg_cmd_result.stdout
+  block:
+    - name: "Save dmesg output"
+      ansible.builtin.copy:
+        content: "{{ dmesg_cmd_result.stdout }}"
+        dest: "{{ current_test_log_folder }}/{{ dmesg_output_file_name }}"
+        mode: "0644"
+      register: save_dmesg_result
+
+    - name: "Set fact of dmesg output file path at localhost"
+      ansible.builtin.set_fact:
+        dmesg_output_file_path: "{{ current_test_log_folder }}/{{ dmesg_output_file_name }}"
+      when:
+        - save_dmesg_result.failed is defined
+        - not save_dmesg_result.failed
