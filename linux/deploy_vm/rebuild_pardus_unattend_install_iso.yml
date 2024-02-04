@@ -18,21 +18,6 @@
       - 'isolinux/install.cfg'
       - 'md5sum.txt'
 
-- name: "Extract kernel file inside ISO"
-  community.general.iso_extract:
-    image: "{{ src_iso_file_path }}"
-    dest: "{{ src_iso_file_dir }}"
-    files:
-      - '/install/gtk/vmlinuz'
-  register: kernel_initrd_dir_result
-  ignore_errors: true
-
-- name: "Set fact of the kernel and initrd file directory"
-  ansible.builtin.set_fact:
-    kernel_initrd_dir: |-
-      {%- if kernel_initrd_dir_result.failed is defined and kernel_initrd_dir_result.failed -%}/install/
-      {%- else -%}/install/gtk/{%- endif -%}
-
 - name: "Update timeout of file isolinux.cfg"
   ansible.builtin.replace:
     path: "{{ src_iso_file_dir }}/isolinux.cfg"
@@ -48,11 +33,54 @@
 - name: "Update default boot label"
   ansible.builtin.lineinfile:
     path: "{{ src_iso_file_dir }}/{{ item }}"
-    insertbefore: "^label install$"
+    firstmatch: true
+    insertbefore: "^label install*"
     line: "default installgui"
   with_items:
     - "install_en.cfg"
     - "install.cfg"
+
+- name: "Search and add label installgui for file install.cfg"
+  block:
+    - name: "Search label installgui in file install.cfg"
+      ansible.builtin.shell: "grep '^default installgui$' {{ src_iso_file_dir }}/install.cfg"
+      ignore_errors: true
+      register: result_search_str
+
+    - name: "Add label installgui when the label does not exist in file install.cfg"
+      ansible.builtin.blockinfile:
+        path: "{{ src_iso_file_dir }}/install.cfg"
+        insertafter: "^default installgui$"
+        block: |
+          label installgui
+              menu label ^Graphical Installer
+              linux /install/vmlinuz
+              initrd /install/initrd.gz
+              append vga=791 theme=pardusdark  --- quiet
+      when:
+        - result_search_str.failed is defined
+        - result_search_str.failed
+
+- name: "Search and add label installgui for file install_en.cfg"
+  block:
+    - name: "Search label installgui in file install_en.cfg"
+      ansible.builtin.shell: "grep '^default installgui$' {{ src_iso_file_dir }}/install_en.cfg"
+      ignore_errors: true
+      register: result_search_str
+
+    - name: "Add label installgui when the label does not exist in file install_en.cfg"
+      ansible.builtin.blockinfile:
+        path: "{{ src_iso_file_dir }}/install_en.cfg"
+        insertafter: "^default installgui$"
+        block: |
+          label installgui
+              menu label ^Graphical Installer
+              linux /install/vmlinuz
+              initrd /install/initrd.gz
+              append vga=791 theme=pardusdark  --- quiet
+      when:
+        - result_search_str.failed is defined
+        - result_search_str.failed
 
 # Add DPMS=-s\ 0 to boot command line to disable screen saver for debian installer
 - name: "Update boot parameters with preseed.cfg"
@@ -85,8 +113,8 @@
       # menuentry for unattended installation
         menuentry "Automated installation" --id autoinstall {
           set background_color=black
-          linux  {{ kernel_initrd_dir }}vmlinuz auto=true file=/cdrom/{{ unattend_install_file_name }} video=vesa:ywrap,mtrr vga=788 "DPMS=-s 0" --- quiet
-          initrd {{ kernel_initrd_dir }}initrd.gz
+          linux  /install/vmlinuz auto=true file=/cdrom/{{ unattend_install_file_name }} video=vesa:ywrap,mtrr vga=788 "DPMS=-s 0" --- quiet
+          initrd /install/initrd.gz
         }
 
 - name: "Update md5sum for Pardus ISO files"
