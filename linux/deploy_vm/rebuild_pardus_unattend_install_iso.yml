@@ -22,12 +22,11 @@
   ansible.builtin.command: "grep '\/install\/gtk\/vmlinuz' {{ src_iso_file_dir }}/grub.cfg"
   register: kernel_initrd_dir_result
   ignore_errors: true
-  delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Set fact of the kernel and initrd file directory"
   ansible.builtin.set_fact:
     kernel_initrd_dir: |-
-      {%- if kernel_initrd_dir_result.failed is defined and not kernel_initrd_dir_result.failed -%}/install/
+      {%- if kernel_initrd_dir_result.failed is defined and kernel_initrd_dir_result.failed -%}/install/
       {%- else -%}/install/gtk/{%- endif -%}
 
 - name: "Update timeout of file isolinux.cfg"
@@ -58,7 +57,7 @@
     insertafter: "^default autoinstall$"
     block: |
       label autoinstall
-          menu label ^Automated Graphical Installer
+          menu label ^Automated Installer
           linux {{ kernel_initrd_dir }}vmlinuz
           initrd {{ kernel_initrd_dir }}initrd.gz
           append auto=true file=/cdrom/{{ unattend_install_file_name }} "DPMS=-s 0" vga=791 theme=pardusdark  --- quiet
