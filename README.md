@@ -89,6 +89,7 @@ This project supports below scenarios for end-to-end guest operating system vali
 | ProLinux Server 7.9, 8.5                               | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | FreeBSD 13 and later                                   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Pardus 21.2 Server,XFCE Desktop and later              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Pardus 23.x Server,XFCE Desktop                        | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | openSUSE Leap 15.3 and later                           | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | BCLinux 8.x                                            | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | BCLinux-for-Euler 21.10                                | :heavy_check_mark:               |                          | :heavy_check_mark:                 |

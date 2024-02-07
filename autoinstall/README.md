@@ -20,12 +20,13 @@
 19. For FreeBSD 13 unattend auto-install, please use file FreeBSD/13/installerconfig.
 20. For FreeBSD 14 or later unattend auto-install, please use file FreeBSD/14/installerconfig.
 21. For Pardus 21.2 Server and XFCE Desktop or later unattend auto-install, please use file Pardus/preseed.cfg.
-22. For openSUSE Leap 15.3 or later unattend auto-install, please use file openSUSE/15/autoinst.xml.
-23. For BCLinux 8.x unattend auto-install, please use file BCLinux/8/ks.cfg.
-24. For BCLinux-for-Euler 21.10 unattend auto-install, please use file BCLinux-for-Euler/21.10/ks.cfg.
-25. For FusionOS 22 unattend auto-install, please use files under Fusion.
-26. For FusionOS 23 unattend auto-install, please use file Fusion/server_without_GUI/ks.cfg.
-27. For Kylin Linux Advanced Server V10 unattend auto-install, please use file Kylin/Server/10/ks.cfg.
+22. For Pardus 23.x Server and XFCE Desktop unattend auto-install, please use file Pardus/preseed.cfg.
+23. For openSUSE Leap 15.3 or later unattend auto-install, please use file openSUSE/15/autoinst.xml.
+24. For BCLinux 8.x unattend auto-install, please use file BCLinux/8/ks.cfg.
+25. For BCLinux-for-Euler 21.10 unattend auto-install, please use file BCLinux-for-Euler/21.10/ks.cfg.
+26. For FusionOS 22 unattend auto-install, please use files under Fusion.
+27. For FusionOS 23 unattend auto-install, please use file Fusion/server_without_GUI/ks.cfg.
+28. For Kylin Linux Advanced Server V10 unattend auto-install, please use file Kylin/Server/10/ks.cfg.
 
 # Notes
 ## For Windows

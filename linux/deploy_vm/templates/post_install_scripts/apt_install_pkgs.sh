@@ -9,6 +9,7 @@ for pkg in $required_pkgs; do
         apt install -y $pkg 2>&1
         if [ $? -ne 0 ]; then
             echo "ERROR: Failed to install package $pkg from CDROM"
+            cdrom_missing_pkgs="$cdrom_missing_pkgs $pkg"
         fi
     else
         echo "Package $pkg doesn't exist in CDROM"
