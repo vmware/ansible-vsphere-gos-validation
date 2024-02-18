@@ -1,7 +1,7 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Check open-vm-tools services status
+# Check systemd service status
 # Parameter:
 #   service_name: the name of the service
 #   expected_service_state: ['active', 'inactive', 'running', 'stopped', 'absent']
@@ -10,11 +10,11 @@
 #     running: the service is active and running
 #     stopped: the service is active and exited
 #     absent: the service doesn't exist
-#   expected_service_status: ['enabled', 'disabled']
+#   expected_service_status: ['enabled', 'disabled', '']
 #     enabled: the service is enabled to start at boot
 #     disabled: the service is disabled to start at boot
-
-
+#     If it is empty, the service can be enabled or disabled
+#
 - name: "Ignore expected_service_status when service '{{ service_name }}' is expected to be '{{ expected_service_state }}'"
   ansible.builtin.set_fact:
     expected_service_status: ""
@@ -26,11 +26,11 @@
   when: >
     (expected_service_state is undefined) or
     (expected_service_state not in ['active', 'inactive', 'running', 'stopped', 'absent']) or
-    (expected_service_state != 'absent' and
-     (expected_service_status is undefined or
-     expected_service_status not in ['enabled', 'disabled']))
+    (expected_service_status is undefined or
+     expected_service_status not in ['enabled', 'disabled', ''])
 
-- include_tasks: get_service_info.yml
+- name: "Get service information"
+  include_tasks: get_service_info.yml
 
 - name: "Check service '{{ service_name }}' is {{ expected_service_state }}"
   ansible.builtin.assert:

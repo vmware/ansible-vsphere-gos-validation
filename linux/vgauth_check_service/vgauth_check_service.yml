@@ -37,12 +37,37 @@
             process_name: "{{ vgauth_process.cmd }}"
             expected_process_state: "present"
 
-        - name: "Check VGAuthService is active and enabled"
+        - name: "Initialize the fact that VGAuthService is not upheld"
+          ansible.builtin.set_fact:
+            vgauth_service_is_upheld: false
+
+        - name: "Check VGAuthService is upheld or not for Flatcar"
+          when: guest_os_ansible_distribution == "Flatcar"
+          block:
+            # Since Flatcar Stable 3760.2.0, VGAuthService default status is disabled,
+            # but it can be started via a dependency in
+            # /usr/lib/systemd/system/multi-user.target.d/open-vm-tools-sysext-upholds.conf
+            # See https://github.com/flatcar/Flatcar/issues/1330#issuecomment-1905544304
+            - name: "Get properties of systemd unit 'multi-user.target'"
+              include_tasks: ../utils/get_systemd_unit_properties.yml
+              vars:
+                guest_systemd_unit: "multi-user.target"
+
+            - name: "Update the fact that VGAuthService is upheld"
+              ansible.builtin.set_fact:
+                vgauth_service_is_upheld: true
+              when:
+                - guest_systemd_unit_properties.DropInPaths is defined
+                - guest_systemd_unit_properties.DropInPaths is search('open-vm-tools-sysext-upholds.conf')
+                - guest_systemd_unit_properties.Upholds is defined
+                - guest_systemd_unit_properties.Upholds is search(vgauth_service_name ~ '.service')
+
+        - name: "Check VGAuthService state and status is as expected"
           include_tasks: ../utils/check_service_status.yml
           vars:
             service_name: "{{ vgauth_service_name }}"
             expected_service_state: "running"
-            expected_service_status: "enabled"
+            expected_service_status: "{{ 'enabled' if not vgauth_service_is_upheld else '' }}"
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
