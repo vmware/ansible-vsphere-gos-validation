@@ -58,23 +58,14 @@
 # 7. 	If present, MBEC/GMET is available.
 # 8. 	If present, APIC virtualization is available.
 #
-- name: "Initialize range stop value"
+- name: "Set the range stop value"
   ansible.builtin.set_fact:
-    range_stop_value: 8
-
-- name: "Set range stop value to 7 for some OS"
-  ansible.builtin.set_fact:
-    range_stop_value: 7
-  when: >-
-    (esxi_cpu_model == "AMD" and guest_os_build_num | int == 17763) or 
-    (esxi_cpu_model == "Intel" and guest_os_build_num | int == 14393)
-
-- name: "Set range stop value to 4 for some OS"
-  ansible.builtin.set_fact:
-    range_stop_value: 4
-  when:
-    - esxi_cpu_model == "Intel"
-    - guest_os_build_num | int == 10240
+    range_stop_value: >-
+      {%- if esxi_cpu_model == "Intel" and guest_os_build_num | int == 10240 -%}4
+      {%- elif (esxi_cpu_model == "AMD" and guest_os_build_num | int == 17763) or 
+        (esxi_cpu_model == "Intel" and guest_os_build_num | int == 14393) -%}7
+      {%- else -%}8
+      {%- endif -%}
 
 - name: "Handle known issue"
   block:
@@ -119,3 +110,11 @@
       - "'1' in win_vbs_running_service"
       - "'2' in win_vbs_running_service"
     fail_msg: "VBS status is '{{ win_vbs_status_guest }}' not expected '2', or HVCI '2'/Credential Guard '1' is not in the SecurityServicesRunning list: '{{ win_vbs_running_service }}'."
+  when: guest_os_build_num | int > 10240
+
+- name: "Check VBS is enabled"
+  ansible.builtin.assert:
+    that:
+      - win_vbs_status_guest | int == 1
+    fail_msg: "VBS status is '{{ win_vbs_status_guest }}' not expected '1'."
+  when: guest_os_build_num | int == 10240
