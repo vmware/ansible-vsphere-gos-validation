@@ -29,6 +29,24 @@
             skip_reason: "Not Applicable"
           when: vm_firmware | lower != 'efi'
 
+        - name: "Set ESXi CPU model"
+          ansible.builtin.set_fact:
+            esxi_cpu_model: |-
+              {%- if 'AMD' in esxi_cpu_model_info -%}AMD
+              {%- elif 'Intel' in esxi_cpu_model_info -%}Intel
+              {%- endif -%}
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >- 
+              Skip test case due to the supported minimum OS version build on AMD server is 17763. The current OS version
+              build is {{ guest_os_build_num }}. Please refer to https://kb.vmware.com/s/article/2009916.
+            skip_reason: "Not Applicable"
+          when:
+            - esxi_cpu_model == "AMD"
+            - guest_os_build_num | int < 17763
+
         - name: "VBS enable test"
           include_tasks: vbs_enable_test.yml
         - name: "VBS disable test"

@@ -58,6 +58,24 @@
 # 7. 	If present, MBEC/GMET is available.
 # 8. 	If present, APIC virtualization is available.
 #
+- name: "Initialize range stop value"
+  ansible.builtin.set_fact:
+    range_stop_value: 8
+
+- name: "Set range stop value to 7 for some OS"
+  ansible.builtin.set_fact:
+    range_stop_value: 7
+  when: >-
+    (esxi_cpu_model == "AMD" and guest_os_build_num | int == 17763) or 
+    (esxi_cpu_model == "Intel" and guest_os_build_num | int == 14393)
+
+- name: "Set range stop value to 4 for some OS"
+  ansible.builtin.set_fact:
+    range_stop_value: 4
+  when:
+    - esxi_cpu_model == "Intel"
+    - guest_os_build_num | int == 10240
+
 - name: "Handle known issue"
   block:
     - name: "Known issue - NX protections are not present in AvailableSecurityProperties on ESXi 7.0.3"
@@ -69,13 +87,16 @@
   when:
     - esxi_version is version('7.0.3', '==')
     - esxi_build | int < 21424296
-    - (range(1, 8) | list) | difference(win_dg_security_properties) == [5]
+    - (range(1, range_stop_value) | list) | difference(win_dg_security_properties) == [5]
 
 - name: "Check available security properties got in guest OS"
   ansible.builtin.assert:
     that:
-      - win_dg_security_properties | sort == range(1, 8) | list
-    fail_msg: "Available security properties list got in guest OS: {{ win_dg_security_properties }}, '{{ (range(1, 8) | list) | difference(win_dg_security_properties) }}' is missed compared with expected list '{{ range(1, 8) }}'."
+      - win_dg_security_properties | sort == range(1, range_stop_value) | list
+    fail_msg: >-
+      Available security properties list got in guest OS: {{ win_dg_security_properties }}, 
+      '{{ (range(1, range_stop_value) | list) | difference(win_dg_security_properties) }}' is missed compared with 
+      expected list '{{ range(1, range_stop_value) }}'.
   when: >
     (esxi_version is version('7.0.3', '>') or esxi_version is version('7.0.3', '<')) or
     (esxi_version is version('7.0.3', '==') and esxi_build | int >= 21424296)
