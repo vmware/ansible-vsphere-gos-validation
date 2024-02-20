@@ -30,7 +30,7 @@
         - name: "Set facts of VGAuthService process and service"
           include_tasks: ../utils/set_vgauth_facts.yml
 
-        - name: "Check VGAuthService processe is running"
+        - name: "Check VGAuthService process is running"
           include_tasks: ../utils/check_process_status.yml
           vars:
             process_uid: "{{ vgauth_process.uid }}"
@@ -41,13 +41,13 @@
           ansible.builtin.set_fact:
             vgauth_service_is_upheld: false
 
+        # Since Flatcar Stable 3760.2.0, VGAuthService default status is disabled,
+        # but it can be started via a dependency in
+        # /usr/lib/systemd/system/multi-user.target.d/open-vm-tools-sysext-upholds.conf
+        # See https://github.com/flatcar/Flatcar/issues/1330#issuecomment-1905544304
         - name: "Check VGAuthService is upheld or not for Flatcar"
           when: guest_os_ansible_distribution == "Flatcar"
           block:
-            # Since Flatcar Stable 3760.2.0, VGAuthService default status is disabled,
-            # but it can be started via a dependency in
-            # /usr/lib/systemd/system/multi-user.target.d/open-vm-tools-sysext-upholds.conf
-            # See https://github.com/flatcar/Flatcar/issues/1330#issuecomment-1905544304
             - name: "Get properties of systemd unit 'multi-user.target'"
               include_tasks: ../utils/get_systemd_unit_properties.yml
               vars:
