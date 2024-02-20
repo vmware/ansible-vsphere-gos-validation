@@ -58,6 +58,18 @@
 # 7. 	If present, MBEC/GMET is available.
 # 8. 	If present, APIC virtualization is available.
 #
+- name: "Set expected security properties"
+  ansible.builtin.set_fact:
+    expected_security_properties: >-
+      {%- if esxi_cpu_model == "Intel" and guest_os_build_num | int == 10240 -%}
+        {{ range(1, 4) | list }}
+      {%- elif (esxi_cpu_model == "AMD" and guest_os_build_num | int == 17763) or 
+        (esxi_cpu_model == "Intel" and guest_os_build_num | int == 14393) -%}
+        {{ range(1, 7) | list }}
+      {%- else -%}
+        {{ range(1, 8) | list }}
+      {%- endif -%}
+
 - name: "Handle known issue"
   block:
     - name: "Known issue - NX protections are not present in AvailableSecurityProperties on ESXi 7.0.3"
@@ -69,13 +81,16 @@
   when:
     - esxi_version is version('7.0.3', '==')
     - esxi_build | int < 21424296
-    - (range(1, 8) | list) | difference(win_dg_security_properties) == [5]
+    - expected_security_properties | difference(win_dg_security_properties) == [5]
 
 - name: "Check available security properties got in guest OS"
   ansible.builtin.assert:
     that:
-      - win_dg_security_properties | sort == range(1, 8) | list
-    fail_msg: "Available security properties list got in guest OS: {{ win_dg_security_properties }}, '{{ (range(1, 8) | list) | difference(win_dg_security_properties) }}' is missed compared with expected list '{{ range(1, 8) }}'."
+      - win_dg_security_properties | sort == expected_security_properties
+    fail_msg: >-
+      Available security properties list got in guest OS: {{ win_dg_security_properties }}, 
+      '{{ expected_security_properties | difference(win_dg_security_properties) }}' is missed compared with 
+      expected list '{{ expected_security_properties }}'.
   when: >
     (esxi_version is version('7.0.3', '>') or esxi_version is version('7.0.3', '<')) or
     (esxi_version is version('7.0.3', '==') and esxi_build | int >= 21424296)
@@ -98,3 +113,11 @@
       - "'1' in win_vbs_running_service"
       - "'2' in win_vbs_running_service"
     fail_msg: "VBS status is '{{ win_vbs_status_guest }}' not expected '2', or HVCI '2'/Credential Guard '1' is not in the SecurityServicesRunning list: '{{ win_vbs_running_service }}'."
+  when: guest_os_build_num | int > 10240
+
+- name: "Check VBS is enabled"
+  ansible.builtin.assert:
+    that:
+      - win_vbs_status_guest | int == 1
+    fail_msg: "VBS status is '{{ win_vbs_status_guest }}' not expected '1'."
+  when: guest_os_build_num | int == 10240
