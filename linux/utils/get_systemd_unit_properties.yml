@@ -1,0 +1,27 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get systemd unit properties
+# Parameter:
+#   guest_systemd_unit: the systemd unit name
+# Return:
+#   guest_systemd_unit_properties: systemd unit properties
+#
+- name: "Initialize the fact of systemd unit's properties"
+  ansible.builtin.set_fact:
+    guest_systemd_unit_properties: {}
+
+- name: "Get properties of systemd unit '{{ guest_systemd_unit }}'"
+  ansible.builtin.shell: "systemctl show {{ guest_systemd_unit }}"
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  register: systemctl_show_result
+
+- name: "Set fact of systemd unit's properties"
+  ansible.builtin.set_fact:
+    guest_systemd_unit_properties: "{{ systemctl_show_result.stdout | replace('=', ': ') | from_yaml }}"
+  when:
+    - systemctl_show_result.failed is defined
+    - not systemctl_show_result.failed
+    - systemctl_show_result.stdout is defined
+    - systemctl_show_result.stdout

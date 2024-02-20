@@ -9,39 +9,44 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case when VMware Tools is not installed"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed | default(false) }}"
             skip_reason: "Not Applicable"
           when: vmtools_is_installed is undefined or not vmtools_is_installed
 
-        # Check VMware Tools status is running
-        - include_tasks: check_vmtools_status.yml
+        - name: "Check VMware Tools status is running"
+          include_tasks: check_vmtools_status.yml
           vars:
             expected_vmtools_status: "running"
 
-        # Set the fact of open-vm-tools processes and services
-        - include_tasks: ../utils/set_ovt_facts.yml
+        - name: "Set facts of open-vm-tools processes and services"
+          include_tasks: ../utils/set_ovt_facts.yml
 
-        # Add user 'vmware' to check vmusr process
-        - block:
-            - include_tasks: ../utils/add_user.yml
+        - name: "Add user 'vmware' to check vmusr process"
+          when: "'open-vm-tools-desktop' in ovt_packages"
+          block:
+            - name: "Add new user 'vmware' if it doesn't exist"
+              include_tasks: ../utils/add_user.yml
               vars:
                 guest_user_name: "vmware"
 
-            - include_tasks: ../utils/enable_auto_login.yml
+            - name: "Enalbe auto login for user 'vmware'"
+              include_tasks: ../utils/enable_auto_login.yml
               vars:
                 autologin_user: "vmware"
 
-            # Reboot to make changes take effect and wait for tools running
-            - include_tasks: ../utils/reboot.yml
-          when: "'open-vm-tools-desktop' in ovt_packages"
+            - name: "Reboot guest OS and login as user 'vmware'"
+              include_tasks: ../utils/reboot.yml
 
-        # Check open-vm-tools packages are installed
-        - include_tasks: check_ovt_package.yml
+        - name: "Check open-vm-tools packages are installed"
+          include_tasks: check_ovt_package.yml
           vars:
             expected_package_state: "present"
           with_items: "{{ ovt_packages }}"
@@ -49,8 +54,8 @@
             loop_var: package_name
           when: guest_os_ansible_distribution != 'Flatcar'
 
-        # Check open-vm-tools processes are running
-        - include_tasks: ../utils/check_process_status.yml
+        - name: "Check open-vm-tools processes are running"
+          include_tasks: ../utils/check_process_status.yml
           vars:
             expected_process_state: "present"
             process_uid: "{{ ovt_process.uid }}"
@@ -59,11 +64,37 @@
           loop_control:
             loop_var: ovt_process
 
-        # Check open-vm-tools services are running
-        - include_tasks: ../utils/check_service_status.yml
+        - name: "Initialize the fact that open-vm-tools service is not upheld"
+          ansible.builtin.set_fact:
+            ovt_service_is_upheld: false
+
+        # Since Flatcar Stable 3760.2.0, open-vm-tools service default status is disabled,
+        # but it can be started via a dependency in
+        # /usr/lib/systemd/system/multi-user.target.d/open-vm-tools-sysext-upholds.conf
+        # See https://github.com/flatcar/Flatcar/issues/1330#issuecomment-1905544304
+        - name: "Check open-vm-tools service is upheld or not for Flatcar"
+          when: guest_os_ansible_distribution == "Flatcar"
+          block:
+            - name: "Get properties of systemd unit 'multi-user.target'"
+              include_tasks: ../utils/get_systemd_unit_properties.yml
+              vars:
+                guest_systemd_unit: "multi-user.target"
+
+            - name: "Update the fact that open-vm-tools service is upheld"
+              ansible.builtin.set_fact:
+                ovt_service_is_upheld: true
+              when:
+                - guest_systemd_unit_properties.DropInPaths is defined
+                - guest_systemd_unit_properties.DropInPaths is search('open-vm-tools-sysext-upholds.conf')
+                - guest_systemd_unit_properties.Upholds is defined
+                - guest_systemd_unit_properties.Upholds is search(ovt_service ~ '.service')
+
+        - name: "Check state and status of open-vm-tools service {{ ovt_service }}"
+          include_tasks: ../utils/check_service_status.yml
           vars:
             service_name: "{{ ovt_service }}"
             expected_service_state: "running"
-            expected_service_status: "enabled"
+            expected_service_status: "{{ 'enabled' if not ovt_service_is_upheld else '' }}"
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
