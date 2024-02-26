@@ -71,18 +71,9 @@
     take_snapshot_description: "{{ win_os_version_build }}"
   when: win_online_updates_succeed | bool
 
-- name: "Handle with online Windows Updates failure"
+- name: "Revert to the base snapshot when online Windows Updates failed"
+  include_tasks: ../../common/base_snapshot_check_revert.yml
   when: not win_online_updates_succeed | bool
-  block:
-    - name: "Take snapshot for online Windows Updates fail state"
-      include_tasks: ../../common/vm_take_snapshot.yml
-      vars:
-        snapshot_name: "online_windows_updates_fail_{{ current_test_timestamp }}"
-        dump_memory: true
-        vm_take_snapshot_ignore_err: true
-
-    - name: "Revert to the base snapshot"
-      include_tasks: ../../common/base_snapshot_check_revert.yml
 
 
 
