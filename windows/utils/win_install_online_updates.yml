@@ -1,7 +1,7 @@
 # Copyright 2023-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Search and install Windows Updates in all categories,
+# Search and install Windows Updates in specified categories,
 # and skip optional ones in Windows guest OS.
 # Parameter:
 #   win_updates_category_names(optional): A list of categories to install updates from.
@@ -14,9 +14,10 @@
 # Return:
 #   win_updates_log_file: Windows Updates install log file path.
 #
-- name: "Set fact of Windows Updates install log path"
+- name: "Set fact of Windows Updates install log path and initialize online update status"
   ansible.builtin.set_fact:
     win_updates_log_file: "C:\\win_updates_log.txt"
+    win_online_updates_succeed: false
 
 - name: "Get the list of available Windows Updates"
   ansible.windows.win_updates:
@@ -60,3 +61,24 @@
   when: >
     (win_updates_list.found_update_count is undefined) or
     (win_updates_list.found_update_count | int == 0)
+
+- name: "Set Windows Updates installation status"
+  ansible.builtin.set_fact:
+    win_online_updates_succeed: |-
+      {%- if win_updates_list.found_update_count is undefined or win_updates_list.found_update_count | int == 0 -%}
+        true
+      {%- elif win_updates_install_result is defined and win_updates_install_result.installed_update_count is defined and 
+        win_updates_install_result.found_update_count | int == win_updates_install_result.installed_update_count | int -%}
+        true
+      {%- else -%}
+        false
+      {%- endif -%}
+
+- name: "Check Windows Updates installation status"
+  ansible.builtin.assert:
+    that:
+      - win_online_updates_succeed
+    fail_msg: >-
+      Installed update count '{{ win_updates_install_result.installed_update_count | default(0) }}',
+      is not match found update count '{{ win_updates_install_result.found_update_count | default(0) }}'.
+  when: not win_updates_ignore_errors | bool

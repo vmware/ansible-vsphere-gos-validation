@@ -1,10 +1,6 @@
 # Copyright 2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 #
-- name: "Initialize the status of online Windows Updates"
-  ansible.builtin.set_fact:
-      win_online_updates_succeed: false
-
 - name: "Get guest OS version build"
   include_tasks: ../utils/win_get_os_version.yml
 - name: "Display the guest OS version build before online Windows Updates"
@@ -19,21 +15,9 @@
     - windows_updates_reject_list
 
 - name: "Install online Windows Updates"
-  include_tasks: ../utils/win_install_updates.yml
+  include_tasks: ../utils/win_install_online_updates.yml
   vars:
     win_updates_ignore_errors: true
-
-- name: "Check if online Windows Updates succeeds or not"
-  ansible.builtin.set_fact:
-    win_online_updates_succeed: |-
-      {%- if win_updates_list.found_update_count is undefined or win_updates_list.found_update_count | int == 0 -%}
-        true
-      {%- elif win_updates_install_result is defined and win_updates_install_result.installed_update_count is defined and 
-        win_updates_install_result.found_update_count | int == win_updates_install_result.installed_update_count | int -%}
-        true
-      {%- else -%}
-        false
-      {%- endif -%}
 
 - name: "Get guest OS version build"
   include_tasks: ../utils/win_get_os_version.yml
