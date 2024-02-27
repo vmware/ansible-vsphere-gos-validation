@@ -15,11 +15,17 @@
   vars:
     win_is_folder_path: "{{ msu_dir_path }}"
 
+- name: "Clean up all old .msu file in folder {{ msu_dir_path }}"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Remove-Item -Path {{ msu_dir_path }}\\*.msu -Force"
+  when: win_is_folder_result | bool
+
 - name: "Create folder {{ msu_dir_path }} on guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "mkdir {{ msu_dir_path }}"
-  when: not win_is_folder_result
+  when: not win_is_folder_result | bool
 
 - name: "Set mount command for accessing the shared folder"
   ansible.builtin.set_fact:

@@ -27,15 +27,25 @@
             (windows_nfs_msu_path is undefined or not windows_nfs_msu_path) or 
             (windows_nfs_share is undefined or not windows_nfs_share)
 
+        - name: "Install the online updates for guest OS"
+          include_tasks: install_online_updates.yml
+
         - name: "Prepare the .msu file"
           include_tasks: prepare_msu_file.yml
 
         - name: "Install the .msu file"
           include_tasks: install_msu_file.yml
 
+        - name: "Get guest OS version after installing the .msu file"
+          include_tasks: ../utils/win_get_os_version.yml
+        - name: "Display the guest OS version build after installing the .msu file"
+          ansible.builtin.debug:
+            msg: "After installing the .msu file, guest OS version build is {{ win_os_version_build }}"
+
         - name: "Reset base snapshot after installing the .msu file"
           include_tasks: ../../common/reset_base_snapshot.yml
-
+          vars:
+              base_snapshot_description: "{{ win_os_version_build }}"
         - name: "Save the new name of the old base snapshot"
           ansible.builtin.set_fact:
             win_update_snapshot_name: "{{ old_snapshot_new_name }}"

@@ -14,6 +14,7 @@
     snapshot_name: "{{ snapshot_name }}"
     quiesce: "{{ is_quiesce | default(false) }}"
     memory_dump: "{{ dump_memory | default(true) }}"
+    description: "{{ snapshot_description | default('') }}"
   ignore_errors: "{{ vm_take_snapshot_ignore_err | default(false) }}"
   register: vm_take_snapshot_result
 
@@ -21,8 +22,13 @@
   ansible.builtin.debug: var=vm_take_snapshot_result
   when: enable_debug is defined and enable_debug
 
-- block:
-    - include_tasks: vm_get_snapshot_facts.yml
+- name: "Check if snapshot is created successfully"
+  when:
+    - vm_take_snapshot_result.failed is defined
+    - not vm_take_snapshot_result.failed
+  block:
+    - name: "Get VM's all snapshots"
+      include_tasks: vm_get_snapshot_facts.yml
     - name: "Check VM snapshot is taken and is the current one"
       ansible.builtin.assert:
         that:
@@ -40,6 +46,3 @@
           - vm_snapshot_facts.guest_snapshots.current_snapshot.quiesced | bool
         fail_msg: "Snapshot '{{ snapshot_name }}' quiesced status is false."
       when: is_quiesce | default(false) | bool
-  when:
-    - "'failed' in vm_take_snapshot_result"
-    - not vm_take_snapshot_result.failed
