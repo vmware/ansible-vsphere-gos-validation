@@ -19,12 +19,6 @@
   vars:
     win_updates_ignore_errors: true
 
-- name: "Get guest OS version build"
-  include_tasks: ../utils/win_get_os_version.yml
-- name: "Display the guest OS version build after online Windows Updates"
-  ansible.builtin.debug:
-    msg: "After running online Windows Updates, guest OS version build is {{ win_os_version_build }}"
-
 - name: "Check if online Windows Updates log file exists in guest OS"
   include_tasks: ../utils/win_check_file_exist.yml
   vars:
@@ -47,13 +41,22 @@
       register: delete_file_result
       ignore_errors: true
 
+# For internal existing VM test scenario.
 # If guest OS has been updated, take a new one as base snapshot and remove the old one.
-- name: "Reset the base snapshot and remove the old one"
-  include_tasks: ../../common/reset_base_snapshot.yml
-  vars:
-    remove_old_base_snapshot: true
-    take_snapshot_description: "{{ win_os_version_build }}"
+- name: "Reset base snapshot if online Windows Updates succeeds"
   when: win_online_updates_succeed | bool
+  block:
+    - name: "Get guest OS version build"
+      include_tasks: ../utils/win_get_os_version.yml
+    - name: "Display the guest OS version build after online Windows Updates"
+      ansible.builtin.debug:
+        msg: "After running online Windows Updates, guest OS version build is {{ win_os_version_build }}"
+
+    - name: "Reset the base snapshot and remove the old one"
+      include_tasks: ../../common/reset_base_snapshot.yml
+      vars:
+        remove_old_base_snapshot: true
+        base_snapshot_description: "{{ win_os_version_build }}"
 
 - name: "Revert to the base snapshot when online Windows Updates failed"
   include_tasks: ../../common/base_snapshot_check_revert.yml

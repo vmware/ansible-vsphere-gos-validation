@@ -13,6 +13,7 @@
 #   win_updates_ignore_errors: Ignore errors when checking and installing Windows Updates. Default is false.
 # Return:
 #   win_updates_log_file: Windows Updates install log file path.
+#   win_online_updates_succeed: Windows Updates install result indicator.
 #
 - name: "Set fact of Windows Updates install log path and initialize online update status"
   ansible.builtin.set_fact:
@@ -34,6 +35,8 @@
 
 - name: "Install Windows Updates when updates found"
   when:
+    - win_updates_list.failed is defined
+    - not win_updates_list.failed
     - win_updates_list.found_update_count is defined
     - win_updates_list.found_update_count | int != 0
     - win_updates_list.updates is defined
@@ -57,7 +60,7 @@
 
 - name: "No need to install Windows Updates"
   ansible.builtin.debug:
-    msg: "Will not execute Windows Updates installation task due to no update found."
+    msg: "Will not execute Windows Updates installation task due to no update found or search failed."
   when: >
     (win_updates_list.found_update_count is undefined) or
     (win_updates_list.found_update_count | int == 0)
@@ -65,7 +68,8 @@
 - name: "Set Windows Updates installation status"
   ansible.builtin.set_fact:
     win_online_updates_succeed: |-
-      {%- if win_updates_list.found_update_count is undefined or win_updates_list.found_update_count | int == 0 -%}
+      {%- if win_updates_list.failed is defined and not win_updates_list.failed and 
+        win_updates_list.found_update_count | int == 0 -%}
         true
       {%- elif win_updates_install_result is defined and win_updates_install_result.installed_update_count is defined and 
         win_updates_install_result.found_update_count | int == win_updates_install_result.installed_update_count | int -%}
@@ -74,11 +78,5 @@
         false
       {%- endif -%}
 
-- name: "Check Windows Updates installation status"
-  ansible.builtin.assert:
-    that:
-      - win_online_updates_succeed
-    fail_msg: >-
-      Installed update count '{{ win_updates_install_result.installed_update_count | default(0) }}',
-      is not match found update count '{{ win_updates_install_result.found_update_count | default(0) }}'.
-  when: not win_updates_ignore_errors | bool
+- name: "Display Windows Updates installation status"
+  ansible.builtin.debug: var=win_online_updates_succeed
