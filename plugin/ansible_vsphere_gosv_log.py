@@ -82,6 +82,7 @@ class vSphereInfo(object):
         self.build = ''
         self.model = ''
         self.cpu_model = ''
+        self.cpu_codename = ''
 
     def __str__(self):
         info = {'hostname': self.hostname,
@@ -90,6 +91,7 @@ class vSphereInfo(object):
         if self.product.lower() == 'esxi':
             info['model'] = self.model
             info['cpu_model'] = self.cpu_model
+            info['cpu_codename'] = self.cpu_codename
         return json.dumps(info, indent=4)
 
     def update_property(self, p_name, p_value):
@@ -139,6 +141,8 @@ class TestbedInfo(object):
                                            ansible_gosv_facts.get('esxi_model_info', ''))
             self.esxi_info.update_property('cpu_model',
                                            ansible_gosv_facts.get('esxi_cpu_model_info', ''))
+            self.esxi_info.update_property('cpu_codename',
+                                           ansible_gosv_facts.get('esxi_cpu_code_name', ''))
 
     def __str__(self):
         """
@@ -167,8 +171,12 @@ class TestbedInfo(object):
         hostname_col_width = max(
             [len('Hostname or IP'), len(self.vcenter_info.hostname), len(self.esxi_info.hostname)])
         # Get server model column width
+        esxi_cpu_detail = self.esxi_info.cpu_model
+        if self.esxi_info.cpu_codename:
+           esxi_cpu_detail += f" ({self.esxi_info.cpu_codename})"
+
         server_model_col_width = max(
-            [len('Server Model'), len(self.esxi_info.model), len(self.esxi_info.cpu_model)])
+            [len('Server Model'), len(self.esxi_info.model), len(esxi_cpu_detail)])
 
         # Table width
         table_width = sum([9, version_col_width, build_col_width,
@@ -202,12 +210,12 @@ class TestbedInfo(object):
                                      self.esxi_info.build.ljust(build_col_width),
                                      self.esxi_info.hostname.ljust(hostname_col_width),
                                      self.esxi_info.model.ljust(server_model_col_width))
-            if self.esxi_info.cpu_model:
+            if esxi_cpu_detail:
                 msg += row_format.format('',
                                          ''.ljust(version_col_width),
                                          ''.ljust(build_col_width),
                                          ''.ljust(hostname_col_width),
-                                         self.esxi_info.cpu_model.ljust(server_model_col_width))
+                                         esxi_cpu_detail.ljust(server_model_col_width))
             msg += row_border
 
         msg += "\n"

@@ -60,6 +60,29 @@
           ansible.builtin.debug: var=vm_guest_ip
           when: vm_guest_ip is defined and vm_guest_ip
       rescue:
+        - name: "Display ESXi and CPU model information at deployment failure"
+          ansible.builtin.debug:
+            msg: >-
+              VM deployment failed on server {{ esxi_model_info }} with
+              ESXi version {{ esxi_version }} build {{ esxi_build }} installed.
+              The server's CPU model is {{ esxi_cpu_model_info }}
+              {% ' (code name ' ~ esxi_cpu_code_name ~ ')' if esxi_cpu_code_name %}
+          tags:
+            - fail_message
+
+        - name: "Known issue - Linux guest OS hung"
+          ansible.builtin.debug:
+            msg: >-
+              Linux guest OS could be hung on ESXi {{ esxi_version }} server
+              based on Intel {{ esxi_cpu_code_name }} CPU. Refer to KB articles
+              https://kb.vmware.com/s/article/92361 and
+              https://kb.vmware.com/s/article/91250.
+          tags:
+            - known_issue
+          when:
+            - esxi_version in ['7.0.0', '7.0.1']
+            - esxi_cpu_code_name in ['Skylake', 'Ice Lake', 'Cascade Lake']
+
         - name: "Collect serial port log at test failure"
           include_tasks: collect_serial_port_log.yml
           vars:
