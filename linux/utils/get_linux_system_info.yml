@@ -23,9 +23,11 @@
         not (guest_os_ansible_distribution == 'RedHat' and
         guest_os_release.NAME is defined and
         guest_os_release.NAME != 'Red Hat Enterprise Linux')
+        and not (guest_os_ansible_distribution == 'MIRACLE' and guest_os_ansible_distribution_major_ver | int == 8)
       }}
 
 - name: "Correct OS distribution info"
+  when: not guest_os_ansible_distrib_is_correct
   block:
     # Overwrite /etc/redhat-release with correct OS release information
     # for RHEL variant OS like ProLinux so that ansible can retrieve
@@ -44,6 +46,7 @@
       ansible.builtin.debug: var=guest_os_redhat_release
 
     - name: "Correct guest OS distribution info"
+      when: guest_os_redhat_release | regex_search("Red *Hat", ignorecase=True)
       block:
         - name: "Get content of guest OS file /etc/system-release"
           ansible.builtin.command: "cat /etc/system-release"
@@ -52,6 +55,9 @@
           register: get_system_release
 
         - name: "Update /etc/redhat-release and refresh OS distribution info"
+          when:
+            - get_system_release.stdout is defined
+            - get_system_release.stdout
           block:
             - name: "Set fact of guest OS system release"
               ansible.builtin.set_fact:
@@ -70,11 +76,6 @@
             - name: "Restore /etc/redhat-release"
               ansible.builtin.shell: "echo '{{ guest_os_redhat_release }}' > /etc/redhat-release"
               delegate_to: "{{ vm_guest_ip }}"
-          when:
-            - get_system_release.stdout is defined
-            - get_system_release.stdout
-      when: guest_os_redhat_release | regex_search("Red *Hat", ignorecase=True)
-  when: not guest_os_ansible_distrib_is_correct
 
 - name: "Set OS family for {{ guest_os_ansible_distribution }} to RedHat"
   ansible.builtin.set_fact:
