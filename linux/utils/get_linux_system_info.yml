@@ -16,13 +16,14 @@
     - guest_os_release.ID is defined
     - guest_os_release.ID == 'rhcos'
 
-- name: "Correct OS distribution info for Miracle Linux 8.x"
+- name: "Correct OS distribution version for Miracle Linux 8.x"
   ansible.builtin.set_fact:
-    guest_os_ansible_distribution_ver: "{{ guest_os_release.VERSION | regex_search('\\d\\.\\d') }}"
+    guest_os_ansible_distribution_ver: "{{ guest_os_release.VERSION.split()[0] }}"
     guest_os_ansible_distribution_minor_ver:  "{{ guest_os_release.VERSION.split()[0].split('.')[-1] }}"
   when: 
     - guest_os_ansible_distribution == "MIRACLE"
     - guest_os_ansible_distribution_major_ver | int  == 8
+    - guest_os_release.VERSION is defined and guest_os_release.VERSION | regex_search('\\d\\.\\d')
 
 - name: "Set fact of guest OS ansible distribution is correct or not"
   ansible.builtin.set_fact:
