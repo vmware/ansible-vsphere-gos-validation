@@ -25,6 +25,9 @@
   when: not current_test_folder_result.stat.exists
 
 - name: "Collect VM's information"
+  when:
+    - vm_exists is defined
+    - vm_exists | bool
   block:
     - name: "Get VM's config, guest and summary properties"
       include_tasks: vm_get_config.yml
@@ -100,9 +103,6 @@
         - ansible_failed_task is defined
         - ansible_failed_task.name is defined
         - ansible_failed_task.name is not match('Skip testcase:')
-  when:
-    - vm_exists is defined
-    - vm_exists | bool
 
 - name: "Testing exit due to failure"
   ansible.builtin.fail:
