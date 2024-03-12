@@ -1,0 +1,35 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Perform RDMA ping test from client VM to server VM
+#
+- name: "Start a listening service for RDMA connection on server VM"
+  include_tasks: start_pvrdma_server.yml
+  vars:
+    vm_guest_ip: "{{ pvrdma_server_vm_guest_ip }}"
+
+# rping server VM from client VM
+- name: "RDMA ping server VM '{{ pvrdma_server_vm_name }}' from client VM '{{ pvrdma_client_vm_name }}'"
+  ansible.builtin.shell: "rping -c -I {{ pvrdma_client_vm_ipv4 }} -a {{ pvrdma_server_vm_ipv4 }} -C 5 -vV"
+  delegate_to: "{{ pvrdma_client_vm_guest_ip }}"
+  ignore_errors: true
+  register: rping_server_result
+
+- name: "Display RDMA ping result from client VM to server VM"
+  ansible.builtin.debug: var=rping_server_result
+
+- name: "Check RDMA ping result from client VM to server VM"
+  ansible.builtin.assert:
+    that:
+      - rping_server_result is defined
+      - rping_server_result.rc is defined
+      - rping_server_result.rc == 0
+    fail_msg: >-
+      Failed to run RDMA ping from client VM '{{ pvrdma_client_vm_name }}'
+      to server VM '{{ pvrdma_server_vm_name }}'.
+      Hit error '{{ rping_server_result.stderr | default() }}'
+
+- name: "Stop PVRDMA listening on server VM"
+  ansible.builtin.shell: "kill -9 {{ rping_server_process_pid }}"
+  delegate_to: "{{ pvrdma_server_vm_guest_ip }}"
+  ignore_errors: true
