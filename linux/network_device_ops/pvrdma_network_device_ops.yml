@@ -240,8 +240,8 @@
             - name: "Collect client VM's guest OS information for triage"
               include_tasks: ../setup/linux_test_rescue.yml
               when:
-                - pvrdma_server_vm_guest_ip is defined
-                - pvrdma_client_vm_guest_ip is defined
+                - pvrdma_server_vm_guest_ip | default('')
+                - pvrdma_client_vm_guest_ip | default('')
                 - pvrdma_client_vm_guest_ip != pvrdma_server_vm_guest_ip
 
             - name: "Collect client VM information at test failure"
@@ -253,15 +253,13 @@
                 - pvrdma_client_vm_dir_name | default('')
                 - pvrdma_client_vm_vmx_path | default('')
 
-        - name: "Switch to server VM"
-          ansible.builtin.set_fact:
-            vm_name: "{{ pvrdma_server_vm_name }}"
-          when:
-            - pvrdma_server_vm_name is defined
-            - vm_name != pvrdma_server_vm_name
+            - name: "Switch to server VM"
+              ansible.builtin.set_fact:
+                vm_name: "{{ pvrdma_server_vm_name }}"
+                current_test_log_folder: "{{ pvrdma_server_test_log_folder }}"
 
         - name: "Collect server VM's guest OS information for triage"
           include_tasks: ../setup/linux_test_rescue.yml
 
-        - name: "Collect client VM information at test failure"
+        - name: "Collect server VM information at test failure"
           include_tasks: ../../common/test_rescue.yml
