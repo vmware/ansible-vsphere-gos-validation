@@ -13,14 +13,24 @@
     ansible_async_dir: /tmp/.ansible_async/
   async: 120
   poll: 0
-  delegate_to: "{{ pvrdma_server_vm_guest_ip }}"
+  delegate_to: "{{ vm_guest_ip }}"
   changed_when: false
+  ignore_unreachable: true
   register: pvrdma_server_job
+
+- name: "Check async job is started on server VM"
+  ansible.builtin.assert:
+    that:
+      - pvrdma_server_job.started is defined
+      - pvrdma_server_job.started == 1
+    fail_msg: >
+      Failed to start an async job '{{ pvrdma_server_start_cmd }}' on server VM.
+      {{ pvrdma_server_job.msg if pvrdma_server_job.msg is defined else '' }}
+    success_msg: "Successfully started an async job '{{ pvrdma_server_start_cmd }}' on server VM"
 
 - name: "Check PVRDMA listening process is started on server VM"
   include_tasks: ../utils/check_process_status.yml
   vars:
-    vm_guest_ip: "{{ pvrdma_server_vm_guest_ip }}"
     expected_process_state: "present"
     process_name: "{{ pvrdma_server_start_cmd }}"
 

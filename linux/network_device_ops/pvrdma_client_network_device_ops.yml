@@ -3,16 +3,16 @@
 ---
 # Perform network device operations on client VM
 #
-- name: "PVRDMA client VM block"
+- name: "Test block on PVRDMA client VM"
   block:
-    - name: "Set facts for client VM to perform network device operations"
+    - name: "Set facts to perform network device operations on client VM"
       ansible.builtin.set_fact:
         vm_name: "{{ pvrdma_client_vm_name }}"
         current_test_log_folder: "{{ pvrdma_client_test_log_folder }}"
         pvrdma_client_vm_ready: false
         pvrdma_client_test_success: false
 
-    - name: "Get client VM basic information"
+    - name: "Get client VM log directory and path"
       include_tasks: ../../common/vm_get_config.yml
       vars:
         property_list: ['config.files.logDirectory', 'config.files.vmPathName']
@@ -96,8 +96,27 @@
     - name: "Check PVRDMA device status and reload it if necessary on client VM"
       include_tasks: check_and_reload_pvrdma.yml
 
-    - name: "Perform rping test from client VM to server VM"
-      include_tasks: pvrdma_rping_test.yml
+    # rping server VM from client VM
+    - name: "RDMA ping server VM '{{ pvrdma_server_vm_name }}' from client VM '{{ pvrdma_client_vm_name }}'"
+      ansible.builtin.shell: "rping -c -I {{ pvrdma_client_vm_ipv4 }} -a {{ pvrdma_server_vm_ipv4 }} -C 5 -vV"
+      delegate_to: "{{ pvrdma_client_vm_guest_ip }}"
+      ignore_errors: true
+      ignore_unreachable: true
+      register: rping_server_result
+
+    - name: "Display RDMA ping result from client VM to server VM"
+      ansible.builtin.debug: var=rping_server_result
+
+    - name: "Check RDMA ping result from client VM to server VM"
+      ansible.builtin.assert:
+        that:
+          - rping_server_result is defined
+          - rping_server_result.rc is defined
+          - rping_server_result.rc == 0
+        fail_msg: >-
+          Failed to run RDMA ping from client VM '{{ pvrdma_client_vm_name }}'
+          to server VM '{{ pvrdma_server_vm_name }}'.
+          Hit error '{{ rping_server_result.stderr | default() }}'
 
     - name: "Power off the client VM"
       include_tasks: ../../common/vm_set_power_state.yml

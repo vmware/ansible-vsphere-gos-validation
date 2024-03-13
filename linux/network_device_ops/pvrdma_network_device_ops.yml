@@ -100,8 +100,11 @@
         - name: "Check PVRDMA device status and reload it if necessary on server VM"
           include_tasks: check_and_reload_pvrdma.yml
 
+        - name: "Start a listening service for RDMA connection on server VM"
+          include_tasks: start_pvrdma_server.yml
+
         # Switch to client VM
-        - name: "Switch to client VM"
+        - name: "Perform PVRDMA testing on client VM"
           include_tasks: pvrdma_client_network_device_ops.yml
 
         - name: "Check client VM test is successful"
@@ -113,14 +116,16 @@
             success_msg: "PVRDMA testing on client VM succeeded"
 
         # Switch to server VM
-        - name: "Switch to server VM and change test log folder for server VM"
+        - name: "Switch to server VM"
           ansible.builtin.set_fact:
             vm_name: "{{ pvrdma_server_vm_name }}"
+            vm_guest_ip: "{{ pvrdma_server_vm_guest_ip }}"
             current_test_log_folder: "{{ pvrdma_server_test_log_folder }}"
 
-        - name: "Update server VM's IP address"
-          ansible.builtin.set_fact:
-            vm_guest_ip: "{{ pvrdma_server_vm_guest_ip }}"
+        - name: "Stop PVRDMA listening on server VM"
+          ansible.builtin.shell: "kill -9 {{ rping_server_process_pid }}"
+          delegate_to: "{{ vm_guest_ip }}"
+          ignore_errors: true
 
         - name: "Hot remove the new {{ adapter_type }} network adapter from server VM"
           include_tasks: hot_remove_network_adapter.yml
