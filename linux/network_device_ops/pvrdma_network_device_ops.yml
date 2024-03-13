@@ -100,112 +100,17 @@
         - name: "Check PVRDMA device status and reload it if necessary on server VM"
           include_tasks: check_and_reload_pvrdma.yml
 
-       #  - name: "Start a listening service for RDMA connection on server VM"
-       #    include_tasks: start_pvrdma_server.yml
-
         # Switch to client VM
-        - name: "Switch to client VM and change test log folder for client VM"
-          ansible.builtin.set_fact:
-            vm_name: "{{ pvrdma_client_vm_name }}"
-            current_test_log_folder: "{{ pvrdma_client_test_log_folder }}"
+        - name: "Switch to client VM"
+          include_tasks: pvrdma_client_network_device_ops.yml
 
-        - name: "Get client VM basic information"
-          include_tasks: ../../common/vm_get_config.yml
-          vars:
-            property_list: ['config.files.logDirectory', 'config.files.vmPathName']
-
-        - name: "Set facts of client VM's directory name and VMX path"
-          ansible.builtin.set_fact:
-            pvrdma_client_vm_dir_name: "{{ vm_config.config.files.logDirectory.split(']')[-1].strip(' \\/') }}"
-            pvrdma_client_vm_vmx_path: "{{ vm_config.config.files.vmPathName | regex_replace('\\[(.*)\\] ', '/vmfs/volumes/\\1/') }}"
-
-        - name: "Get client VM '{{ pvrdma_client_vm_name }}' primary network adapter MAC address"
-          include_tasks: ../../common/vm_get_network_facts.yml
-
-        - name: "Set fact of client VM '{{ pvrdma_client_vm_name }}' primary network adapter MAC address"
-          ansible.builtin.set_fact:
-            pvrdma_client_vm_primary_nic_mac: "{{ vm_network_adapters['0'].mac_addr }}"
-          when:
-            - vm_network_adapters is defined
-            - vm_network_adapters['0'] is defined
-            - vm_network_adapters['0'].mac_addr is defined
-
-        - name: "Reset client VM '{{ pvrdma_client_vm_name }}' for updating IP address"
-          include_tasks: ../../common/vm_set_power_state.yml
-          vars:
-            vm_power_state_set: 'restarted'
-
-        - name: "Get client VM's guest IP"
-          block:
-            - name: "Refresh client VM's guest IP till it has different IP with server VM"
-              include_tasks: refresh_pvrdma_client_vm_ip.yml
-              with_list: "{{ range(1, 11) | list }}"
-              loop_control:
-                loop_var: retry_count
-          when: >
-            (not pvrdma_client_vm_guest_ip) or
-            (pvrdma_client_vm_guest_ip == pvrdma_server_vm_guest_ip)
-
-        - name: "Check client VM's guest IP is not same with server VM's guest IP"
+        - name: "Check client VM test is successful"
           ansible.builtin.assert:
             that:
-              - pvrdma_client_vm_guest_ip != pvrdma_server_vm_guest_ip
-            fail_msg: >-
-              Client VM '{{ pvrdma_client_vm_name }}' guest IP is '{{ pvrdma_client_vm_guest_ip }}',
-              which is same with server VM '{{ pvrdma_server_vm_name }}' guest IP after refreshing 10 times.
-            success_msg:
-              - "Server VM '{{ pvrdma_server_vm_name }}' guest IP is '{{ pvrdma_server_vm_guest_ip }}'."
-              - "Client VM '{{ pvrdma_client_vm_name }}' guest IP is '{{ pvrdma_client_vm_guest_ip }}'."
-
-        - name: "Add client VM's IP address into inventory"
-          include_tasks: ../../common/update_inventory.yml
-          vars:
-            vm_primary_nic_mac: "{{ pvrdma_client_vm_primary_nic_mac }}"
-
-        - name: "Hot add a new {{ adapter_type }} network adapter on client VM and apply network config"
-          include_tasks: hot_add_network_adapter.yml
-          vars:
-            new_nic_ipv4: "{{ pvrdma_client_vm_ipv4 }}"
-
-        - name: "Check the result of pinging gateway from client VM"
-          ansible.builtin.assert:
-            that:
-              - ping_success_after_hotadd | bool
-            fail_msg: "Failed to ping gateway from PVRDMA device on client VM {{ vm_name }}"
-
-        - name: "Check PVRDMA device status and reload it if necessary on client VM"
-          include_tasks: check_and_reload_pvrdma.yml
-
-        # rping server VM from client VM
-        - name: "Perform rping test from client VM to server VM"
-          include_tasks: pvrdma_rping_test.yml
-#        - name: "RDMA ping server VM '{{ pvrdma_server_vm_name }}' from client VM '{{ pvrdma_client_vm_name }}'"
-#          ansible.builtin.shell: "rping -c -I {{ pvrdma_client_vm_ipv4 }} -a {{ pvrdma_server_vm_ipv4 }} -C 5 -vV"
-#          delegate_to: "{{ vm_guest_ip }}"
-#          ignore_errors: true
-#          register: rping_server_result
-#
-#        - name: "Display RDMA ping result from client VM to server VM"
-#          ansible.builtin.debug: var=rping_server_result
-#
-#        - name: "Check RDMA ping result from client VM to server VM"
-#          ansible.builtin.assert:
-#            that:
-#              - rping_server_result is defined
-#              - rping_server_result.rc is defined
-#              - rping_server_result.rc == 0
-#            fail_msg: >-
-#              Failed to run RDMA ping from client VM '{{ pvrdma_client_vm_name }}'
-#              to server VM '{{ pvrdma_server_vm_name }}'.
-#              Hit error '{{ rping_server_result.stderr | default() }}'
-
-        - name: "Power off the client VM"
-          include_tasks: ../../common/vm_set_power_state.yml
-          vars:
-            vm_power_state_set: 'powered-off'
-
-        - name: "Remove the client VM"
-          include_tasks: ../../common/vm_remove.yml
+              - pvrdma_client_test_success is defined
+              - pvrdma_client_test_success
+            fail_msg: "PVRDMA testing on client VM failed"
+            success_msg: "PVRDMA testing on client VM succeeded"
 
         # Switch to server VM
         - name: "Switch to server VM and change test log folder for server VM"
@@ -216,11 +121,6 @@
         - name: "Update server VM's IP address"
           ansible.builtin.set_fact:
             vm_guest_ip: "{{ pvrdma_server_vm_guest_ip }}"
-
-#        - name: "Stop PVRDMA listening on server VM"
-#          ansible.builtin.shell: "kill -9 {{ rping_server_process_pid }}"
-#          delegate_to: "{{ vm_guest_ip }}"
-#          ignore_errors: true
 
         - name: "Hot remove the new {{ adapter_type }} network adapter from server VM"
           include_tasks: hot_remove_network_adapter.yml
@@ -233,35 +133,19 @@
         - name: "Cleanup network"
           include_tasks: ../../common/vds_network_cleanup.yml
       rescue:
-        - name: "Test failed on client VM"
+        - name: "Switch to server VM"
+          ansible.builtin.set_fact:
+            vm_name: "{{ pvrdma_server_vm_name }}"
           when:
-            - pvrdma_client_vm_name is defined
-            - vm_name == pvrdma_client_vm_name
-            - pvrdma_client_test_log_folder is defined
-            - current_test_log_folder == pvrdma_client_test_log_folder
-          block:
-            - name: "Collect client VM's guest OS information for triage"
-              include_tasks: ../setup/linux_test_rescue.yml
-              vars:
-                vm_guest_ip: "{{ pvrdma_client_vm_guest_ip }}"
-              when:
-                - pvrdma_server_vm_guest_ip | default('')
-                - pvrdma_client_vm_guest_ip | default('')
-                - pvrdma_client_vm_guest_ip != pvrdma_server_vm_guest_ip
+            - pvrdma_server_vm_name is defined
+            - vm_name != pvrdma_server_vm_name
 
-            - name: "Collect client VM information at test failure"
-              include_tasks: ../../common/test_rescue.yml
-              vars:
-                vm_dir_name: "{{ pvrdma_client_vm_dir_name }}"
-                vm_vmx_path: "{{ pvrdma_client_vm_vmx_path }}"
-              when:
-                - pvrdma_client_vm_dir_name | default('')
-                - pvrdma_client_vm_vmx_path | default('')
-
-            - name: "Switch to server VM"
-              ansible.builtin.set_fact:
-                vm_name: "{{ pvrdma_server_vm_name }}"
-                current_test_log_folder: "{{ pvrdma_server_test_log_folder }}"
+        - name: "Set test log folder for server VM"
+          ansible.builtin.set_fact:
+            current_test_log_folder: "{{ pvrdma_server_test_log_folder }}"
+          when:
+            - pvrdma_server_test_log_folder is defined
+            - current_test_log_folder != pvrdma_server_test_log_folder
 
         - name: "Update server VM's IP address"
           ansible.builtin.set_fact:
@@ -273,10 +157,3 @@
 
         - name: "Collect server VM information at test failure"
           include_tasks: ../../common/test_rescue.yml
-      always:
-        - name: "Reset VM name after testing"
-          ansible.builtin.set_fact:
-            vm_name: "{{ pvrdma_server_vm_name }}"
-          when:
-            - pvrdma_server_vm_name is defined
-            - vm_name != pvrdma_server_vm_name
