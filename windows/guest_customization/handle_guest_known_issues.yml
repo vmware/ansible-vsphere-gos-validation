@@ -1,0 +1,50 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Workaround for this type of SYSPREP known issue:
+# "Package <PackageFullName> was installed for a user, but not provisioned for all users.
+# This package will not function properly in the sysprep image."
+# For more information, please refer to this KB article or Microsoft doc linked:
+# https://kb.vmware.com/s/article/87307
+- name: "Workaround for SYSPREP error caused by Appx package"
+  block:
+    - name: "Remove BingSearch Appx package in Windows Client"
+      include_tasks: ../utils/win_remove_appx_package.yml
+      vars:
+        win_appx_package: "BingSearch"
+      when:
+        - guest_os_ansible_distribution_ver is version('10.0.22000.0', '>=')
+        - guest_os_product_type | lower == 'client'
+    - name: "Remove Edge.Stable Appx package in Windows Server"
+      include_tasks: ../utils/win_remove_appx_package.yml
+      vars:
+        win_appx_package: "Edge.Stable"
+      when: guest_os_product_type | lower == 'server' 
+
+# Parameter 'uninstall_onedrive' is used for internal testing only
+# when test case failure is caused by this
+- name: "Uninstall OneDrive in Windows Client"
+  include_tasks: uninstall_onedrive.yml
+  when:
+    - guest_os_product_type | lower == 'client'
+    - uninstall_onedrive is defined
+    - uninstall_onedrive | bool
+
+# Disable BitLocker which will cause sysprep failure
+# BitLocker is not installed by default on Windows Server
+- name: "Disable BitLocker in Windows Client when it's enabled"
+  when: guest_os_product_type | lower == 'client'
+  block:
+    - name: "Get BitLocker service status"
+      include_tasks: ../utils/win_get_service_status.yml
+      vars:
+        win_service_name: "BDESVC"
+
+    - name: "Stop and disable BitLocker service in guest OS"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "Set-Service -Name BDESVC -Status stopped -StartupType disabled"
+      when: service_status == "Running"
+
+    - name: "Decrypt Bitlocker volumes"
+      include_tasks: ../utils/win_decrypt_bitlocker_volume.yml
