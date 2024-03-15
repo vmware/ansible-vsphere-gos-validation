@@ -34,6 +34,7 @@
     eth0_name: "{{ network_adapters_before_hotadd[0] }}"
 
 - name: "Install rdma packages for PVRDMA testing"
+  when: adapter_type == "pvrdma"
   block:
     - name: "Install rdma packages in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       include_tasks: ../utils/install_uninstall_package.yml
@@ -69,4 +70,6 @@
           delegate_to: "{{ vm_guest_ip }}"
           when: guest_file_exists
       when: network_config_path
-  when: adapter_type == "pvrdma"
+
+- name: "Disable firewall in guest OS"
+  include_tasks: ../utils/disable_firewall.yml
