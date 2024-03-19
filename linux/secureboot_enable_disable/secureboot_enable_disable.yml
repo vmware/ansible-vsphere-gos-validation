@@ -4,9 +4,7 @@
 # Description:
 #   This test case is used for check VM secure boot can be enabled
 # and disabled successfully when VM firmware is UEFI and VM hardware
-# version >= 13. After secure boot enabled below line will be added
-# into vmx file:
-#   uefi.secureBoot.enabled = "TRUE"
+# version >= 13.
 # Note: This test case will not check if target guest OS supports
 # secure boot before enable it, please refer to VMware KB article for
 # secure boot support matrix.
@@ -17,20 +15,26 @@
   tasks:
     - name: "Test case block"
       block:
-        - name: "Test setup"
-          include_tasks: ../setup/test_setup.yml
-          vars:
-            create_test_log_folder: true
-
-        - name: "Get VM boot config"
-          include_tasks: ../../common/vm_get_boot_info.yml
-
         - name: "Skip test case '{{ ansible_play_name }}' for {{ vm_firmware }} VM"
           include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Secure boot is not applicable for VM with {{ vm_firmware }} firmware"
             skip_reason: "Not Applicable"
           when: vm_firmware | lower != "efi"
+
+        - name: "Skip test case for hardware version lower than 13"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case {{ ansible_play_name }} because secure boot is not supported
+              on VM with hardware version {{ vm_hardware_version_num }}.
+            skip_reason: "Not Supported"
+          when: vm_hardware_version_num | int < 13
+
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_test_log_folder: true
 
         - name: "Check secure boot is supported or not"
           include_tasks: check_secureboot_support_status.yml
@@ -47,7 +51,14 @@
           include_tasks: ../../common/vm_set_boot_options.yml
           vars:
             secure_boot_enabled_set: true
-          when: not vm_secureboot_enabled
+
+        - name: "Check secure boot is enabled on VM"
+          ansible.builtin.assert:
+            that:
+              - boot_facts.vm_boot_info.current_secure_boot_enabled is defined
+              - boot_facts.vm_boot_info.current_secure_boot_enabled
+            fail_msg: "Failed to enable secure boot on VM"
+            success_msg: "VM current secure boot is enabled"
 
         - name: "Power on VM"
           include_tasks: ../../common/vm_set_power_state.yml
@@ -65,15 +76,23 @@
             vm_wait_log_retries: 1
             vm_wait_log_ignore_errors: true
 
-        - name: "Get system firmware in guest OS"
-          include_tasks: ../utils/get_system_firmware.yml
+        - name: "Get messages in dmesg ring buffer after secure boot is enabled"
+          include_tasks: ../utils/collect_dmesg.yml
+          vars:
+            dmesg_output_file_name: "dmesg_after_secureboot_enabled.yml"
+
+        - name: "Set fact of guest OS secure boot state after secure boot is enabled"
+          ansible.builtin.set_fact:
+            guest_secureboot_state: "{{ dmesg_cmd_result.stdout | default('') |
+                                        regex_search('Secure boot (enabled|disabled)', ignorecase=True) |
+                                        regex_replace('Secure boot ', '', ignorecase=True) | lower }}"
 
         - name: "Set fact of secure boot enable test result"
           ansible.builtin.set_fact:
             secureboot_enabled_pass: true
           when:
             - vm_wait_log_msg_success | bool
-            - guest_firmware == "EFI"
+            - guest_secureboot_state == 'enabled'
 
         # Disable secureboot
         - name: "Shutdown guest OS"
@@ -84,6 +103,14 @@
           vars:
             secure_boot_enabled_set: false
 
+        - name: "Check secure boot is disabled on VM"
+          ansible.builtin.assert:
+            that:
+              - boot_facts.vm_boot_info.current_secure_boot_enabled is defined
+              - not boot_facts.vm_boot_info.current_secure_boot_enabled
+            fail_msg: "Failed to disable secure boot on VM"
+            success_msg: "VM current secure boot is disabled"
+
         - name: "Power on VM after disabling secure boot"
           include_tasks: ../../common/vm_set_power_state.yml
           vars:
@@ -92,13 +119,21 @@
         - name: "Update inventory"
           include_tasks: ../../common/update_inventory.yml
 
-        - name: "Get system firmware in guest OS"
-          include_tasks: ../utils/get_system_firmware.yml
+        - name: "Get messages in dmesg ring buffer after secure boot is disabled"
+          include_tasks: ../utils/collect_dmesg.yml
+          vars:
+            dmesg_output_file_name: "dmesg_after_secureboot_disabled.yml"
+
+        - name: "Set fact of guest OS secure boot state after secure boot is disabled"
+          ansible.builtin.set_fact:
+            guest_secureboot_state: "{{ dmesg_cmd_result.stdout | default('') |
+                                        regex_search('Secure boot (enabled|disabled)', ignorecase=True) |
+                                        regex_replace('Secure boot ', '', ignorecase=True) | lower }}"
 
         - name: "Set fact of secure boot disable test result"
           ansible.builtin.set_fact:
             secureboot_disabled_pass: true
-          when: guest_firmware == "EFI"
+          when: guest_secureboot_state == 'disabled'
 
         - name: "Check secure boot enable and disable test results"
           ansible.builtin.assert:
