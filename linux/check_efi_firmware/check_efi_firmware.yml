@@ -11,15 +11,6 @@
   tasks:
     - name: "Test case block"
       block:
-        - name: "Test setup"
-          include_tasks: ../setup/test_setup.yml
-          vars:
-            create_test_log_folder: true
-
-        - name: "Display VM firmware"
-          ansible.builtin.debug:
-            msg: "VM firmware is {{ vm_firmware }}"
-
         - name: "Skip testcase '{{ ansible_play_name }}' for {{ vm_firmware | upper }} VM"
           include_tasks: ../../common/skip_test_case.yml
           vars:
@@ -27,13 +18,29 @@
             skip_reason: "Not Applicable"
           when: vm_firmware != "efi"
 
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_test_log_folder: true
+
         - name: "Check EFI ROM in vmware.log"
           include_tasks: ../../common/vm_wait_log_msg.yml
           vars:
             vm_wait_log_name: "vmware.log"
             vm_wait_log_msg: "The EFI ROM is .*{{ guest_os_bit }}"
             vm_wait_log_retries: 1
-            vm_wait_log_ignore_errors: false
+            vm_wait_log_ignore_errors: true
+
+        - name: "Get system firmware in guest OS"
+          include_tasks: ../utils/get_system_firmware.yml
+
+        - name: "Check firmware is EFI in vmware.log and guest OS"
+          ansible.builtin.assert:
+            that:
+              - vm_wait_log_msg_success | bool
+              - guest_firmware == "EFI"
+            fail_msg: "Failed to find EFI ROM info in vmware.log or guest OS firmware is not EFI."
+            success_msg: "Found EFI ROM info in vmware.log, and guest OS firmware is EFI."
       rescue:
         - name: "Collect Linux guest OS information for triage"
           include_tasks: ../setup/linux_test_rescue.yml
