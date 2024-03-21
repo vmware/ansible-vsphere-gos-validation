@@ -15,40 +15,59 @@
   tasks:
     - name: "Test case block"
       block:
-        - include_tasks: ../../common/skip_test_case.yml
+        # Except for VM guest_id like 'fedora64Guest', 'freebsd.*Guest' not supporting vCPU hot-add,
+        # the other guest OS compatible with ansible-vsphere-gos-validation support vCPU hot-add
+        - name: "Skip test case '{{ ansible_play_name }}' due to VM not support vCPU hot-add"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Skip test case '{{ ansible_play_name }}' because vCPU hotadd is not supported by {{ guest_id }}"
+            skip_msg: >-
+              Skip test case '{{ ansible_play_name }}' because vCPU hot-add is not supported
+              by VM configured with guest ID {{ vm_guest_id }}
             skip_reason: "Not Supported"
           when:
             - vm_guest_id is defined
-            - vm_guest_id is match('fedora.*') or vm_guest_id is match('freebsd.*')
+            - vm_guest_id is match('(fedora|freebsd).*')
 
-        - name: Set fact of the initial VM vCPU number
+        - name: "Set facts of the initial VM vCPU and cores number"
           ansible.builtin.set_fact:
             initial_cpu_num: 2
             initial_cores_num: 1
-        - include_tasks: generate_cpu_hot_add_list.yml
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Generate vCPU number list for hot-add"
+          include_tasks: generate_cpu_hot_add_list.yml
+
+        - name: "Test case is blocked due to empty vCPU number list"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Test case '{{ ansible_play_name }}' is blocked because vCPU hotadd test value list is empty"
             skip_reason: "Blocked"
           when: cpu_hotadd_num_list | length == 0
 
-        - include_tasks: ../setup/test_setup.yml
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_test_log_folder: true
 
-        - name: Initialize test results
+        - name: "Initialize fact of vCPU hot-add validation results"
           ansible.builtin.set_fact:
             cpu_hotadd_results: []
 
-        - include_tasks: cpu_hot_add_prepare.yml
+        - name: "Reconfigure VM with initial vCPU number and vCPU hot-add enabled"
+          include_tasks: cpu_hot_add_prepare.yml
           vars:
             enable_vm_cpu_hotadd: true
-        - include_tasks: cpu_hot_add_validate.yml
+
+        - name: "Check CPU and cores number in guest OS after vCPU hot-add"
+          include_tasks: cpu_hot_add_validate.yml
           loop: "{{ cpu_hotadd_num_list }}"
           loop_control:
             loop_var: hotadd_num
-        - name: Display the test results
+
+        - name: "Display vCPU hot-add validation results"
           ansible.builtin.debug: var=cpu_hotadd_results
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Collect Linux guest OS information for triage"
+          include_tasks: ../setup/linux_test_rescue.yml
+
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml

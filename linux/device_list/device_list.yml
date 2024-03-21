@@ -8,7 +8,7 @@
 #   isolation.device.connectable.disable = "FALSE"
 #   isolation.device.edit.disable = "FALSE"
 # If VMware Tools is not installed or not running, then this test
-# case result will be "No Run".
+# case result will be "Blocked".
 #
 - name: device_list
   hosts: localhost
@@ -16,30 +16,40 @@
   tasks:
     - name: "Test case block"
       block:
-        - include_tasks: ../setup/test_setup.yml
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
           vars:
+            create_test_log_folder: true
             skip_test_no_vmtools: true
 
-        - include_tasks: ../utils/device_connectable_enable.yml
+        - name: "Enable VM device config for connection and disconnection"
+          include_tasks: ../utils/device_connectable_enable.yml
 
-        - include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
+        - name: "Get VMware Tools toolbox command path"
+          include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
 
         - name: "List devices in guest OS"
           ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} device list"
           register: device_list
           delegate_to: "{{ vm_guest_ip }}"
 
-        - ansible.builtin.debug:
-            msg: "Devices detected by VMware Tools in guest OS: {{ device_list.stdout_lines }}"
+        - name: "Display VM devices detected by VMware Tools"
+          ansible.builtin.debug:
+            msg: "VM Devices detected by VMware Tools in guest OS: {{ device_list.stdout_lines }}"
 
-        # Get VM's hardware devices
-        - include_tasks: ../../common/vm_get_config.yml
+        - name: "Get VM's virtual hardware devices"
+          include_tasks: ../../common/vm_get_config.yml
           vars:
             property_list: ['config.hardware.device']
-        # Check devices connection status
-        - include_tasks: device_connection_validate.yml
+
+        - name: "Check connection status of VM virtual hardware devices"
+          include_tasks: device_connection_validate.yml
           with_items: "{{ device_list.stdout_lines }}"
           loop_control:
             loop_var: device_status
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Collect Linux guest OS information for triage"
+          include_tasks: ../setup/linux_test_rescue.yml
+
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml

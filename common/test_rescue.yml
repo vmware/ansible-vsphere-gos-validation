@@ -25,6 +25,9 @@
   when: not current_test_folder_result.stat.exists
 
 - name: "Collect VM's information"
+  when:
+    - vm_exists is defined
+    - vm_exists | bool
   block:
     - name: "Get VM's config, guest and summary properties"
       include_tasks: vm_get_config.yml
@@ -60,13 +63,16 @@
             - fail_message
           when: text_in_screenshot | length > 0
 
-    - name: "Download VM's vmware.log"
+    - name: "Download VM's VMX file and vmware.log"
       include_tasks: esxi_download_datastore_file.yml
       vars:
         src_datastore: "{{ datastore }}"
-        src_file_path: "{{ vm_dir_name }}/vmware.log"
-        dest_file_path: "{{ current_test_log_folder }}/vmware.log"
+        src_file_path: "{{ vm_dir_name }}/{{ item }}"
+        dest_file_path: "{{ current_test_log_folder }}/{{ item }}"
         download_file_fail_ignore: true
+      with_items:
+        - "{{ vm_vmx_path | default(vm_name ~ '.vmx') | basename }}"
+        - "vmware.log"
       when: vm_dir_name is defined and vm_dir_name
 
     - name: "Check Windows guest BSOD in vmware.log"
@@ -97,9 +103,6 @@
         - ansible_failed_task is defined
         - ansible_failed_task.name is defined
         - ansible_failed_task.name is not match('Skip testcase:')
-  when:
-    - vm_exists is defined
-    - vm_exists | bool
 
 - name: "Testing exit due to failure"
   ansible.builtin.fail:

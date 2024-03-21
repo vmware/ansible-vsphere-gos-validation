@@ -1,0 +1,54 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Rescue tasks to be executed before common/test_rescue.yml
+# for collecting information from Linux guest OS 
+#
+- name: "Collect dmesg at test case failure"
+  include_tasks: ../utils/collect_dmesg.yml
+  vars:
+    dmesg_ignore_errors: true
+    dmesg_output_file_name: "dmesg_at_test_failure.log"
+
+- name: "No output file for dmesg"
+  ansible.builtin.debug:
+    msg: "There is no new messages in dmesg ring buffer or failed to get dmesg output"
+  when: not dmesg_output_file_path
+
+- name: "Detect errors in dmesg output"
+  when: dmesg_output_file_path
+  block:
+    - name: "Extract errors from guest OS dmesg"
+      include_tasks: ../../common/extract_errors_from_log.yml
+      vars:
+        extract_log_file_path: "{{ dmesg_output_file_path }}"
+
+    - name: "Display detected errors from guest OS dmesg"
+      ansible.builtin.debug:
+        msg: "{{ errors_in_log }}"
+      tags:
+        - fail_message
+      when: errors_in_log | length > 0
+
+- name: "Collect /var/log/messages at test case failure"
+  include_tasks: ../utils/fetch_file.yml
+  vars:
+    fetch_file_src_path: "/var/log/messages"
+    fetch_file_dst_path: "{{ current_test_log_folder }}/"
+    fetch_file_ignore_errors: true
+
+- name: "Generate system log from the current boot"
+  ansible.builtin.shell: "journalctl -b >/tmp/journalctl_b.log"
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  register: journalctl_result
+
+- name: "Collect system log from the current boot"
+  include_tasks: ../utils/fetch_file.yml
+  vars:
+    fetch_file_src_path: "/tmp/journalctl_b.log"
+    fetch_file_dst_path: "{{ current_test_log_folder }}/"
+    fetch_file_ignore_errors: true
+  when:
+    - journalctl_result.failed is defined
+    - not journalctl_result.failed
