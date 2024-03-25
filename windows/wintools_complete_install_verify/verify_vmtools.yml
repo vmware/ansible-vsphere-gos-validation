@@ -4,6 +4,10 @@
 # Check VMware Tools service is running and display the installed VMware Tools
 # version, get VMware Tools installation log file.
 #
+- name: "Set fact of VMware Tools services list"
+  ansible.builtin.set_fact:
+    win_tools_services: ['VGAuthService', 'VMTools', 'vmvss']
+
 - name: "Get VMware Tools install log file path"
   include_tasks: ../utils/win_get_path.yml
   vars:
@@ -33,19 +37,18 @@
 - name: "Get VMware drivers list"
   include_tasks: ../utils/win_get_vmtools_driver_list.yml
 
-- name: "Get VMware services list"
+- name: "Get VMware Tools services list"
   include_tasks: ../utils/win_get_vmtools_service_list.yml
 # Not all services are running, e.g., vmvss
-- name: "Display services running status in guest OS"
+- name: "Display VMware Tools services status"
   ansible.builtin.debug:
     msg: "Service '{{ item.key }}' status is: {{ item.value }}"
   with_dict: "{{ vmtools_service_dict }}"
-
-- name: "Check 4 services in the list"
+- name: "Check VMware Tools services"
   ansible.builtin.assert:
     that:
-      - vmtools_service_dict | length == 4
-    fail_msg: "Expect 4 VMware services in guest OS after VMware Tools install, while got '{{ vmtools_service_dict | length }}': {{ vmtools_service_dict.keys() | default('') }}"
+      - win_tools_services | difference(vmtools_service_dict.keys() | default([])) == []
+    fail_msg: "Check VMware Tools services '{{ win_tools_services }}' in guest OS, not find service '{{ win_tools_services | difference(vmtools_service_dict.keys() | default([])) }} after VMware Tools install."
 
 - name: "Set fact of expected usernames of VMware Tools processes"
   ansible.builtin.set_fact:
