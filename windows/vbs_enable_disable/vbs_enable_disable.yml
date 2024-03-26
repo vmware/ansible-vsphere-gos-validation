@@ -40,6 +40,18 @@
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
           vars:
+            skip_msg: >-
+              Skip test case due to using Intel CPUs for VBS requires vSphere 6.7 or later and using AMD CPUs for VBS
+              requires vSphere 7.0 Update 2 or later. 
+              Please refer to https://docs.vmware.com/en/VMware-vSphere/8.0/vsphere-security/GUID-CE292D3F-D4AC-4607-B262-DE19CE6E9F6B.html
+          skip_reason: "Not Supported"
+          when: >-
+            (vm_hardware_version_num | int < 14 and esxi_cpu_model == "Intel") or
+            (vm_hardware_version_num | int < 19 and esxi_cpu_model == "AMD")
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
             skip_msg: >- 
               Skip test case due to the supported minimum OS version build on AMD server is 17763. The current OS version
               build is {{ guest_os_build_num }}. Please refer to https://kb.vmware.com/s/article/2009916.
