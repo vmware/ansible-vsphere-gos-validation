@@ -48,8 +48,10 @@
 - name: "Check VMware Tools services"
   ansible.builtin.assert:
     that:
-      - win_tools_services | difference(vmtools_service_dict.keys() | default([])) == []
-    fail_msg: "Check VMware Tools services '{{ win_tools_services }}' in guest OS, not find service '{{ win_tools_services | difference(vmtools_service_dict.keys() | default([])) }} after VMware Tools install."
+      - win_tools_services_missing == []
+    fail_msg: "Check VMware Tools services '{{ win_tools_services }}' in guest OS, not find services '{{ win_tools_services_missing }}' after VMware Tools install."
+  vars:
+    win_tools_services_missing: "{{ win_tools_services | difference(vmtools_service_dict.keys() | default([])) }}"
   when:
     - vmtools_version is defined
     - vmtools_version is version('10.3.0', '>=')
