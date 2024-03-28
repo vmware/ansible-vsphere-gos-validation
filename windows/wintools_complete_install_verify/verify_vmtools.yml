@@ -4,6 +4,10 @@
 # Check VMware Tools service is running and display the installed VMware Tools
 # version, get VMware Tools installation log file.
 #
+- name: "Set fact of VMware Tools services list"
+  ansible.builtin.set_fact:
+    win_tools_services: ['VGAuthService', 'VMTools', 'vmvss']
+
 - name: "Get VMware Tools install log file path"
   include_tasks: ../utils/win_get_path.yml
   vars:
@@ -33,13 +37,24 @@
 - name: "Get VMware drivers list"
   include_tasks: ../utils/win_get_vmtools_driver_list.yml
 
-- name: "Get VMware services list"
+- name: "Get VMware Tools services list"
   include_tasks: ../utils/win_get_vmtools_service_list.yml
 # Not all services are running, e.g., vmvss
-- name: "Display services running status in guest OS"
+- name: "Display VMware Tools services status"
   ansible.builtin.debug:
     msg: "Service '{{ item.key }}' status is: {{ item.value }}"
   with_dict: "{{ vmtools_service_dict }}"
+
+- name: "Check VMware Tools services"
+  ansible.builtin.assert:
+    that:
+      - win_tools_services_missing == []
+    fail_msg: "Check VMware Tools services '{{ win_tools_services }}' in guest OS, not find services '{{ win_tools_services_missing }}' after VMware Tools install."
+  vars:
+    win_tools_services_missing: "{{ win_tools_services | difference(vmtools_service_dict.keys() | default([])) }}"
+  when:
+    - vmtools_version is defined
+    - vmtools_version is version('10.3.0', '>=')
 
 - name: "Set fact of expected usernames of VMware Tools processes"
   ansible.builtin.set_fact:
