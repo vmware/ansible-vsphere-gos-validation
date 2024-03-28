@@ -29,13 +29,17 @@
             skip_reason: "Not Applicable"
           when: vm_firmware | lower != 'efi'
 
-        - name: "Set ESXi CPU model"
-          ansible.builtin.set_fact:
-            esxi_cpu_model: |-
-              {%- if 'AMD' in esxi_cpu_model_info -%}AMD
-              {%- elif 'Intel' in esxi_cpu_model_info -%}Intel
-              {%- else -%}Others
-              {%- endif -%}
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case due to using Intel CPUs for VBS requires hardware version 14 or higher and using AMD CPUs for VBS requires 
+              hardware version 19 or higher. Current CPU is {{ esxi_cpu_vendor }} and hardware version is {{ vm_hardware_version_num }}.
+              Please refer to https://docs.vmware.com/en/VMware-vSphere/8.0/vsphere-security/GUID-CE292D3F-D4AC-4607-B262-DE19CE6E9F6B.html
+            skip_reason: "Not Supported"
+          when: >-
+            (vm_hardware_version_num | int < 14 and esxi_cpu_vendor == "intel") or
+            (vm_hardware_version_num | int < 19 and esxi_cpu_vendor == "amd")
 
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
@@ -45,7 +49,7 @@
               build is {{ guest_os_build_num }}. Please refer to https://kb.vmware.com/s/article/2009916.
             skip_reason: "Not Applicable"
           when:
-            - esxi_cpu_model == "AMD"
+            - esxi_cpu_vendor == "amd"
             - guest_os_build_num | int < 17763
 
         - name: "VBS enable test"
