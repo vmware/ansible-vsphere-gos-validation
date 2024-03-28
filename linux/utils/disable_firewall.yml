@@ -6,15 +6,17 @@
 - name: "Set fact of firewall service for {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
     firewall_service_name: "firewalld.service"
-  when: guest_os_family in ["RedHat", "Suse"]
+  when:
+    - guest_os_family in ["RedHat", "Suse"]
+    - guest_os_ansible_distribution != 'RHCOS'
 
 - name: "Set fact of firewall service for {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
     firewall_service_name: "ufw.service"
   when: guest_os_ansible_distribution == "Ubuntu"
 
-# Stop and disable firewall
-- include_tasks: service_operation.yml
+- name: "Stop and disable firewall service"
+  include_tasks: service_operation.yml
   vars:
     service_name: "{{ firewall_service_name }}"
     service_enabled: false
