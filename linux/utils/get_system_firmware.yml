@@ -5,17 +5,31 @@
 # Return:
 #   guest_firmware: EFI or BIOS
 #
-- name: "Check /sys/firmware/efi existence"
-  include_tasks: get_file_stat_info.yml
-  vars:
-    guest_file_path: "/sys/firmware/efi"
-
-- name: "System firmware is EFI"
+- name: "Initialize the fact of guest OS system firmware"
   ansible.builtin.set_fact:
-    guest_firmware: "EFI"
-  when: guest_file_exists | bool
+    guest_firmware: ""
 
-- name: "System firmware is BIOS"
-  ansible.builtin.set_fact:
-    guest_firmware: "BIOS"
-  when: not (guest_file_exists | bool)
+- name: "Get firmware for Linux system"
+  when: guest_os_ansible_system == "linux"
+  block:
+    - name: "Check /sys/firmware/efi existence"
+      include_tasks: get_file_stat_info.yml
+      vars:
+        guest_file_path: "/sys/firmware/efi"
+
+    - name: "Set fact of guest OS system firmware"
+      ansible.builtin.set_fact:
+        guest_firmware: "{{ 'EFI' if guest_file_exists | bool else 'BIOS' }}"
+
+- name: "Get firmware for FreeBSD system"
+  when: guest_os_ansible_system == "freebsd"
+  block:
+    - name: "Check 'efirt' module is loaded or not"
+      ansible.builtin.shell: "kldstat -m efirt"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      register: kldstat_efirt_result
+
+    - name: "Set fact of guest OS system firmware"
+      ansible.builtin.set_fact:
+        guest_firmware: "{{ 'EFI' if kldstat_efirt_result.rc is defined and kldstat_efirt_result.rc == 0 else 'BIOS' }}"

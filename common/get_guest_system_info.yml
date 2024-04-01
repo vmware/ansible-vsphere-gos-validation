@@ -1,7 +1,7 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get guest system info when it's not defined before
+# Get guest OS system info when it's not defined before
 # Note:
 #   For Debian 10.x and 11.x, its 'ansible_distribution_version' only shows major version,
 # minor version can be retrieved from 'ansible_distribution_minor_version'.
@@ -10,13 +10,14 @@
 #   For Windows guest, there is no 'ansible_distribution_release' in guest_system_info,
 # will display 'N/A'.
 #
-- name: "Initialize the facts of guest system info"
+- name: "Initialize the facts of guest OS system info"
   ansible.builtin.set_fact:
     guest_os_ansible_distribution_ver: ''
     guest_os_ansible_distribution_major_ver: ''
     guest_os_ansible_distribution_minor_ver: ''
 
-- include_tasks: get_system_info.yml
+- name: "Get guest OS system info"
+  include_tasks: get_system_info.yml
   vars:
     filter:
       - 'ansible_architecture'
@@ -32,7 +33,7 @@
 - name: "Set facts of guest OS system info"
   ansible.builtin.set_fact:
     guest_os_ansible_distribution: "{{ guest_system_info.ansible_distribution | default('') }}"
-    guest_os_ansible_system: "{{ guest_system_info.ansible_system | default('') }}"
+    guest_os_ansible_system: "{{ guest_system_info.ansible_system | default('') | lower }}"
     guest_os_ansible_architecture: "{{ guest_system_info.ansible_architecture | default('') }}"
     guest_os_ansible_distribution_ver: "{{ guest_system_info.ansible_distribution_version if guest_system_info.ansible_distribution != 'FreeBSD' else guest_system_info.ansible_kernel }}"
     guest_os_ansible_distribution_major_ver: "{{ guest_system_info.ansible_distribution_major_version if 'ansible_distribution_major_version' in guest_system_info else guest_system_info.ansible_distribution_release.split('-')[0].split('.')[0] }}"
