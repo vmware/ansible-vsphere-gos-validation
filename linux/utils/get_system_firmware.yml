@@ -1,21 +1,39 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# Get system firmware
+# Get guest OS system firmware is EFI or not
 # Return:
-#   guest_firmware: EFI or BIOS
+#   guest_firmware_is_efi: return true if the system firmware is EFI, otherwise return false.
 #
-- name: "Check /sys/firmware/efi existence"
-  include_tasks: get_file_stat_info.yml
-  vars:
-    guest_file_path: "/sys/firmware/efi"
-
-- name: "System firmware is EFI"
+- name: "Initialize the fact of guest OS system firmware is EFI or not"
   ansible.builtin.set_fact:
-    guest_firmware: "EFI"
-  when: guest_file_exists | bool
+    guest_firmware_is_efi: false
 
-- name: "System firmware is BIOS"
-  ansible.builtin.set_fact:
-    guest_firmware: "BIOS"
-  when: not (guest_file_exists | bool)
+- name: "Get firmware for Linux system"
+  when: guest_os_ansible_system == "linux"
+  block:
+    - name: "Check /sys/firmware/efi existence"
+      include_tasks: get_file_stat_info.yml
+      vars:
+        guest_file_path: "/sys/firmware/efi"
+
+    - name: "Set fact that guest OS system firmware is EFI"
+      ansible.builtin.set_fact:
+        guest_firmware_is_efi: true
+      when: guest_file_exists | bool
+
+- name: "Get firmware for FreeBSD system"
+  when: guest_os_ansible_system == "freebsd"
+  block:
+    - name: "Check 'efirt' module is loaded or not"
+      ansible.builtin.shell: "kldstat -m efirt"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      register: kldstat_efirt_result
+
+    - name: "Set fact that guest OS system firmware is EFI"
+      ansible.builtin.set_fact:
+        guest_firmware_is_efi: true
+      when: 
+        - kldstat_efirt_result.rc is defined
+        - kldstat_efirt_result.rc == 0
