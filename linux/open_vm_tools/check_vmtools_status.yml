@@ -16,30 +16,29 @@
       - expected_vmtools_status in ['installed', 'notInstalled', 'running', 'notRunning']
     fail_msg: "Invalid parameter: expected_vmtools_status={{ expected_vmtools_status | default('undefined') }}"
 
-- include_tasks: ../../common/vm_get_vmtools_status.yml
+- name: "Get VMware Tools status"
+  include_tasks: ../../common/vm_get_vmtools_status.yml
 
-- block:
-    - name: "Check VMware Tools install type is open-vm-tools"
-      ansible.builtin.assert:
-        that:
-          - vmtools_is_ovt is defined
-          - vmtools_is_ovt
-        fail_msg: "VMware Tools install type is not open-vm-tools"
-        success_msg: "VMware Tools install type is open-vm-tools"
-
+- name: "Check VMware Tools status is installed"
+  when: expected_vmtools_status != 'notInstalled'
+  block:
     - name: "Check VMware Tools status is installed"
       ansible.builtin.assert:
         that:
-          - vmtools_is_installed is defined
           - vmtools_is_installed
         fail_msg: "VMware Tools is not installed"
         success_msg: "VMware Tools is installed"
-  when: expected_vmtools_status != 'notInstalled'
+
+    - name: "Check VMware Tools is open-vm-tools"
+      ansible.builtin.assert:
+        that:
+          - vmtools_is_ovt
+        fail_msg: "VMware Tools installed in guest OS is not open-vm-tools"
+        success_msg: "VMware Tools installed in guest OS is open-vm-tools"
 
 - name: "Check VMware Tools status is running"
   ansible.builtin.assert:
     that:
-      - vmtools_is_running is defined
       - vmtools_is_running
     fail_msg: "VMware Tools status is not running"
     success_msg: "VMware Tools status is running"
@@ -48,19 +47,14 @@
 - name: "Check VMware Tools status is not installed"
   ansible.builtin.assert:
     that:
-      - vmtools_is_installed is defined
       - not vmtools_is_installed
-      - vmtools_is_running is defined
       - not vmtools_is_running
-      - vmtools_is_ovt is defined
       - not vmtools_is_ovt
   when: expected_vmtools_status == 'notInstalled'
 
 - name: "Check VMware Tools status is installed but not running"
   ansible.builtin.assert:
     that:
-      - vmtools_is_installed is defined
       - vmtools_is_installed
-      - vmtools_is_running is defined
       - not vmtools_is_running
   when: expected_vmtools_status == 'notRunning'

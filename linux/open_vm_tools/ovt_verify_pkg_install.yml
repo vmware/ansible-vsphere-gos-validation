@@ -17,7 +17,8 @@
   tasks:
     - name: "Test case block"
       block:
-        - include_tasks: ../setup/test_setup.yml
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
 
         - name: "Set update VMware tools by default"
           ansible.builtin.set_fact:
@@ -25,14 +26,15 @@
           when: update_vmtools is undefined
 
         # Flatcar and RHCOS doesn't support to install open-vm-tools
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case on {{ guest_os_ansible_distribution }}"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Skip test case because {{ guest_os_ansible_distribution }} doesn't support installing open-vm-tools"
             skip_reason: "Not Supported"
           when: guest_os_ansible_distribution in ['Flatcar', 'RHCOS']
 
-        # VM has open-vm-tools installed and update_vmtools is set false
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case when VM has open-vm-tools installed and update_vmtools is set false"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Test case '{{ ansible_play_name }}' is skipped because update_vmtools is set to: {{ update_vmtools }}"
             skip_reason: "Skipped"
@@ -46,22 +48,13 @@
               and the uninstall method is unknown.
             skip_reason: "Not Applicable"
           when:
-            - vmtools_is_installed is defined
             - vmtools_is_installed
             - vmtools_install_type != 'package'
 
         # Initialize variables
-        - name: "Initialize variables for installing open-vm-tools"
+        - name: "Set fact whether to uninstall open-vm-tools packages"
           ansible.builtin.set_fact:
-            uninstall_tools: false
-            install_tools: false
-
-        - name: "Set the fact for uninstalling open-vm-tools"
-          ansible.builtin.set_fact:
-            uninstall_tools: true
-          when:
-            - vmtools_is_installed is defined
-            - vmtools_is_installed
+            uninstall_tools: "{{ vmtools_is_installed }}"
 
         - name: "Set facts of open-vm-tools packages, processes and service"
           include_tasks: ../utils/set_ovt_facts.yml
@@ -74,34 +67,18 @@
 
         - name: "Uninstall open-vm-tools for reinstall"
           include_tasks: uninstall_ovt.yml
-          when:
-            - uninstall_tools is defined
-            - uninstall_tools
+          when: uninstall_tools | bool
 
-        # Initialize the variable for installing tools
-        - name: "Set the fact for installing tools"
-          ansible.builtin.set_fact:
-            install_tools: true
-          when: >
-            (vmtools_is_installed is undefined) or
-            (not vmtools_is_installed) or
-            (vmtools_is_removed is defined and vmtools_is_removed)
+        - name: "Install open-vm-tools packages"
+          include_tasks: install_ovt.yml
 
-        # Install open-vm-tools packages
-        - include_tasks: install_ovt.yml
-          when:
-            - install_tools is defined
-            - install_tools
+        - name: "Refresh VM guest info"
+          include_tasks: ../../common/vm_get_guest_info.yml
 
-        # Refresh VM guest info
-        - include_tasks: ../../common/vm_get_guest_info.yml
-
-        # Take a new snapshot and set it as base snapshot when test passes
-        - include_tasks: ../../common/reset_base_snapshot.yml
-          when:
-            - install_tools is defined
-            - install_tools
+        - name: "Take a new snapshot and set it as base snapshot"
+          include_tasks: ../../common/reset_base_snapshot.yml
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
           vars:
             exit_testing_when_fail: true
