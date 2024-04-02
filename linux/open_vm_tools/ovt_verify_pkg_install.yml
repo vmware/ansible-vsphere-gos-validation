@@ -1,14 +1,17 @@
-# Copyright 2021-2024 VMware, Inc.
+# Copyright 2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is to verify open-vm-tools installation.
-# If VM doesn't install open-vm-tools, this case will install open-vm-tools from OS ISO image (RHEL/SLES/SLED)
-# or official online repository (Ubuntu/Debian/VMware Photon OS/CentOS/RockyLinux/OracleLinux/ProLinux).
-# If it already has open-vm-tools installed and update_tools parameter is set True in vars/test.yml,
-# it will reinstall open-vm-tools. And then check the install or reinstall output.
+#   This test case is to verify open-vm-tools installation with guest OS package manager.
+# If guest OS doesn't have open-vm-tools, this case will install open-vm-tools from OS ISO image
+# (e.g. RHEL, SLES, SLED, etc),or install from official online repository (e.g. Ubuntu, Debian,
+# VMware Photon OS, CentOS, etc).
+# If it already has open-vm-tools installed from package, and update_tools parameter is set "true"
+# in vars/test.yml, it will reinstall open-vm-tools.
+# If it already has open-vm-tools not installed from package, this test case will be skipped with
+# result "Not Applicable" because of unknown uninstall method.
 #
-- name: ovt_verify_install
+- name: ovt_verify_pkg_install
   hosts: localhost
   gather_facts: false
   tasks:
@@ -35,6 +38,18 @@
             skip_reason: "Skipped"
           when: not update_vmtools | bool
 
+        - name: "Skip test case when current open-vm-tools is not installed from package"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case because current open-vm-tools install type is {{ vmtools_install_type }},
+              and the uninstall method is unknown.
+            skip_reason: "Not Applicable"
+          when:
+            - vmtools_is_installed is defined
+            - vmtools_is_installed
+            - vmtools_install_type != 'package'
+
         # Initialize variables
         - name: "Initialize variables for installing open-vm-tools"
           ansible.builtin.set_fact:
@@ -47,13 +62,15 @@
           when:
             - vmtools_is_installed is defined
             - vmtools_is_installed
-            - update_vmtools
 
         - name: "Set facts of open-vm-tools packages, processes and service"
           include_tasks: ../utils/set_ovt_facts.yml
 
         - name: "Set facts of VGAuthService process and service"
           include_tasks: ../utils/set_vgauth_facts.yml
+
+        - name: "Get OS commands to uninstall or install open-vm-tools"
+          include_tasks: get_install_uninstall_cmd.yml
 
         - name: "Uninstall open-vm-tools for reinstall"
           include_tasks: uninstall_ovt.yml

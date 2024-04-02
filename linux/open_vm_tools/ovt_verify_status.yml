@@ -2,8 +2,15 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is to verify open-vm-tools status, process status, and service status. If open-vm-tools is installed. open-vm-tools status
-# should be installed and running, vmtoolsd processes' should be running and service should be enabled and running.
+#   This test case is to verify open-vm-tools packages, processes, and service
+# status in guest OS when open-vm-tools install type is "package". 
+# The VMware Tools status should be installed and running, open-vm-tools packages
+# should be installed, vmtoolsd processes should be running and service should
+# be enabled and running.
+# If open-vm-tools install type is not "package", this test case will be skipped
+# with result "Not Applicable".
+# If VMware Tools status is not installed or not running, this test case result
+# will be "Blocked".
 #
 - name: ovt_verify_status
   hosts: localhost
@@ -13,13 +20,15 @@
       block:
         - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
+          vars:
+            skip_test_no_vmtools: true
 
-        - name: "Skip test case when VMware Tools is not installed"
+        - name: "Skip test case when current open-vm-tools is not installed from package"
           include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Skip test case due to VMware tools installed: {{ vmtools_is_installed | default(false) }}"
+            skip_msg: "Skip test case because current open-vm-tools install type is {{ vmtools_install_type }}"
             skip_reason: "Not Applicable"
-          when: vmtools_is_installed is undefined or not vmtools_is_installed
+          when: vmtools_install_type != 'package'
 
         - name: "Check VMware Tools status is running"
           include_tasks: check_vmtools_status.yml

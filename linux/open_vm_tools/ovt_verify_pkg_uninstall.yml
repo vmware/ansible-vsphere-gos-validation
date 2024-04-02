@@ -1,0 +1,59 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is to test open-vm-tools can be uninstalled with guest OS
+# package manager successfully if its install type is "package".
+# After open-vm-tools is uninstalled, VMware Tools status should be not
+# installed and not running, vmtoolsd processes should be not running, and
+# services should be absent.
+# If open-vm-tools install type is not "package", this test case will be skipped
+# with result "Not Applicable" because of unknown uninstall method.
+#
+- name: ovt_verify_pkg_uninstall
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+
+        # Flatcar doesn't support to uninstall open-vm-tools
+        - name: "Skip test case for {{ guest_os_ansible_distribution }}"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case because {{ guest_os_ansible_distribution }} doesn't support uninstalling open-vm-tools"
+            skip_reason: "Not Supported"
+          when: guest_os_ansible_distribution in ['Flatcar', 'RHCOS']
+
+        - name: "Block test case when guest OS doesn't have open-vm-tools"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Test case '{{ ansible_play_name }}' is blocked because guest OS doesn't have open-vm-tools installed."
+            skip_reason: "Blocked"
+          when: vmtools_is_installed is undefined or not (vmtools_is_installed | bool)
+
+        - name: "Skip test case when current open-vm-tools is not installed from package"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case because current open-vm-tools install type is {{ vmtools_install_type }},
+              and the uninstall method is unknown.
+            skip_reason: "Not Applicable"
+          when: vmtools_install_type != 'package'
+
+        - name: "Set facts of open-vm-tools packages, processes and service"
+          include_tasks: ../utils/set_ovt_facts.yml
+
+        - name: "Set facts of VGAuthService process and service"
+          include_tasks: ../utils/set_vgauth_facts.yml
+
+        - name: "Get OS commands to uninstall open-vm-tools"
+          include_tasks: get_install_uninstall_cmd.yml
+
+        - name: "Uninstall open-vm-tools and check result"
+          include_tasks: uninstall_ovt.yml
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
