@@ -708,9 +708,9 @@ class CallbackModule(CallbackBase):
         +-------------------------------------------------------------------------+
         | 01 | deploy_vm_efi_paravirtual_vmxnet3    |   Passed        | 00:22:03  |
         | 02 | check_inbox_driver                   |   Passed        | 00:01:17  |
-        | 03 | ovt_verify_install                   |   Passed        | 00:26:03  |
-        | .. | ...                                  |   ...            | ...       |
-        | 30 | ovt_verify_uninstall                 |   Passed        | 00:02:09  |
+        | 03 | ovt_verify_pkg_install               |   Passed        | 00:26:03  |
+        | .. | ...                                  |   ...           | ...       |
+        | 30 | ovt_verify_pkg_uninstall             |   Passed        | 00:02:09  |
         +-------------------------------------------------------------------------+
         """
         total_exec_time = ""

@@ -1,0 +1,84 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is to verify open-vm-tools installation with guest OS package manager.
+# If guest OS doesn't have open-vm-tools, this case will install open-vm-tools from OS ISO image
+# (e.g. RHEL, SLES, SLED, etc),or install from official online repository (e.g. Ubuntu, Debian,
+# VMware Photon OS, CentOS, etc).
+# If it already has open-vm-tools installed from package, and parameter "update_vmtools" is set "true"
+# in vars/test.yml, it will reinstall open-vm-tools.
+# If it already has open-vm-tools installed by other method (like building from source), this
+# test case will be skipped with result "Not Applicable" because of unknown uninstall method.
+#
+- name: ovt_verify_pkg_install
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+
+        - name: "Set update VMware Tools by default"
+          ansible.builtin.set_fact:
+            update_vmtools: true
+          when: update_vmtools is undefined
+
+        # Flatcar and RHCOS doesn't support to install open-vm-tools
+        - name: "Skip test case on {{ guest_os_ansible_distribution }}"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case because {{ guest_os_ansible_distribution }} doesn't support installing open-vm-tools"
+            skip_reason: "Not Supported"
+          when: guest_os_ansible_distribution in ['Flatcar', 'RHCOS']
+
+        - name: "Skip test case when VM has open-vm-tools installed and update_vmtools is set false"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Test case '{{ ansible_play_name }}' is skipped because update_vmtools is set to: {{ update_vmtools }}"
+            skip_reason: "Skipped"
+          when: not update_vmtools | bool
+
+        - name: "Skip test case when current open-vm-tools is not installed from package"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case because current open-vm-tools install type is {{ vmtools_install_type }},
+              and the uninstall method is unknown.
+            skip_reason: "Not Applicable"
+          when:
+            - vmtools_is_installed
+            - vmtools_install_type != 'package'
+
+        # Initialize variables
+        - name: "Set fact whether to uninstall open-vm-tools packages"
+          ansible.builtin.set_fact:
+            uninstall_tools: "{{ vmtools_is_installed }}"
+
+        - name: "Set facts of open-vm-tools packages, processes and service"
+          include_tasks: ../utils/set_ovt_facts.yml
+
+        - name: "Set facts of VGAuthService process and service"
+          include_tasks: ../utils/set_vgauth_facts.yml
+
+        - name: "Get OS commands to uninstall or install open-vm-tools"
+          include_tasks: get_install_uninstall_cmd.yml
+
+        - name: "Uninstall open-vm-tools for reinstall"
+          include_tasks: uninstall_ovt.yml
+          when: uninstall_tools | bool
+
+        - name: "Install open-vm-tools packages"
+          include_tasks: install_ovt.yml
+
+        - name: "Refresh VM guest info"
+          include_tasks: ../../common/vm_get_guest_info.yml
+
+        - name: "Take a new snapshot and set it as base snapshot"
+          include_tasks: ../../common/reset_base_snapshot.yml
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true

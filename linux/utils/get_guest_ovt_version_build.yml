@@ -1,40 +1,53 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# Get open-vm-tools version and build
+# Get open-vm-tools version, build, and install type
 #
 
-- name: "Initialize VMware tools info"
+- name: "Initialize facts about VMware Tools info"
   ansible.builtin.set_fact:
     vmtools_info_from_vmtoolsd: ""
     vmtools_version: ""
     vmtools_build_number: ""
+    vmtools_install_type: "unknown"
 
 - name: "Get path of vmware-toolbox-cmd"
   include_tasks: get_vmware_toolbox_cmd_path.yml
 
-- block:
-    # No env variable LD_LIBRARY_PATH in FreeBSD
-    - name: "Set LD_LIBRARY_PATH for source build ovt"
-      ansible.builtin.set_fact:
-        ld_library_path: "LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH"
-      when: 
-        - vmware_toolbox_cmd_path == '/usr/local/bin/vmware-toolbox-cmd'
-        - guest_os_ansible_distribution != "FreeBSD"
-
+- name: "Get VMware Tools version, build and install type"
+  when: vmware_toolbox_cmd_path
+  block:
     - name: "Get VMware Tools daemon version"
-      ansible.builtin.command: "{{ ld_library_path | default('') }} {{ vmware_toolbox_cmd_path }} -v"
+      ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} -v"
       register: ovt_version
       delegate_to: "{{ vm_guest_ip }}"
 
-    - name: "Set VMware tools info from guest OS"
+    - name: "Set VMware Tools info from guest OS"
       ansible.builtin.set_fact:
         vmtools_info_from_vmtoolsd: "{{ ovt_version.stdout }}"
         vmtools_version: "{{ ovt_version.stdout.split()[0] | regex_search('([0-9]+\\.){2}[0-9]+') }}"
         vmtools_build_number: "{{ ovt_version.stdout.split()[-1] | regex_search('[0-9]+') }}"
-  when:
-    - vmware_toolbox_cmd_path is defined
-    - vmware_toolbox_cmd_path
 
-- name: "Print open-vm-tools version and build"
-  ansible.builtin.debug: var=vmtools_info_from_vmtoolsd
+    - name: "Get open-vm-tools install type on {{ guest_os_ansible_distribution }}"
+      when: guest_os_ansible_distribution != 'Flatcar'
+      block:
+        - name: "Get open-vm-tools package info"
+          include_tasks: get_installed_package_info.yml
+          vars:
+            package_name: "{{ 'open-vm-tools-nox11' if guest_os_family == 'FreeBSD' and not guest_os_with_gui else 'open-vm-tools' }}"
+    
+        - name: "Set fact of open-vm-tools install type to 'package' for {{ guest_os_ansible_distribution }}"
+          ansible.builtin.set_fact:
+            vmtools_install_type: "package"
+          when: package_info | length > 0
+
+    - name: "Set fact of open-vm-tools install type to 'package' for Flatcar"
+      ansible.builtin.set_fact:
+        vmtools_install_type: "package"
+      when: guest_os_ansible_distribution == 'Flatcar'
+
+- name: "Print open-vm-tools version, build and install type"
+  ansible.builtin.debug:
+    msg:
+      - "Guest OS open-vm-tools version is {{ vmtools_info_from_vmtoolsd }}"
+      - "Guest OS open-vm-tools install type is {{ vmtools_install_type }}"

@@ -10,14 +10,15 @@
   when: guest_os_ansible_distribution in ['CentOS', 'VMware Photon OS', 'Debian']
 
 - name: "Add package repositories for {{ guest_os_ansible_distribution }}"
+  when: linux_ovt_repo_url is undefined or not linux_ovt_repo_url
   block:
     - name: "Add a local package repository from ISO image for {{ guest_os_ansible_distribution }}"
       include_tasks: ../utils/add_local_dvd_repo.yml
       when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat', 'Rocky', 'AlmaLinux', 'openSUSE Leap']
+
     - name: "Add online package repositories for {{ guest_os_ansible_distribution }}"
       include_tasks: ../utils/add_official_online_repo.yml
       when: guest_os_ansible_distribution in ['OracleLinux', 'Ubuntu']
-  when: linux_ovt_repo_url is undefined or not linux_ovt_repo_url
 
 - name: "Add an extra open-vm-tools repository from URL"
   include_tasks: ../utils/add_extra_online_repo.yml
@@ -25,9 +26,6 @@
     extra_repo_name: "open-vm-tools-repo"
     extra_repo_baseurl: "{{ linux_ovt_repo_url }}"
   when: linux_ovt_repo_url is defined and linux_ovt_repo_url
-
-- name: "Get OS commands to install open-vm-tools"
-  include_tasks: get_install_uninstall_cmd.yml
 
 - name: "Update package metadata"
   include_tasks: ../utils/repo_update.yml
@@ -57,10 +55,13 @@
   include_tasks: ../utils/eject_cdrom_in_guest.yml
   when:
     - linux_ovt_repo_url is undefined or not linux_ovt_repo_url
-    - guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat']
+    - guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat', 'Rocky', 'AlmaLinux', 'openSUSE Leap']
 
 - name: "Reboot guest OS"
   include_tasks: ../utils/reboot.yml
+
+- name: "Update inventory after reboot"
+  include_tasks: ../../common/update_inventory.yml
 
 - name: "Get VMware Tools version and build"
   include_tasks: ../utils/get_guest_ovt_version_build.yml
