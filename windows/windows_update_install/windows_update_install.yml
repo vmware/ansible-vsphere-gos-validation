@@ -4,6 +4,8 @@
 # Description:
 #   This case is to test Microsoft's Windows updates.
 #   Install Windows .msu update package.
+#   There are two types of .msu file. One is SSU(servicing stack update), the other is LCU(security update).
+#   SSU is not always offered. If it's offered, install the SSU firstly.
 #
 - name: windows_update_install
   hosts: localhost
@@ -30,10 +32,23 @@
         - name: "Install the online updates for guest OS"
           include_tasks: install_online_updates.yml
 
-        - name: "Prepare the .msu file"
+        - name: "Prepare the .msu file of type {{ msu_file_type }}"
           include_tasks: prepare_msu_file.yml
+          vars:
+            msu_file_type: "SSU"
 
-        - name: "Install the .msu file"
+        - name: "Install the .msu file of type {{ msu_file_type }}"
+          include_tasks: install_msu_file.yml
+          when:
+            - msu_file_path is defined
+            - msu_file_path
+
+        - name: "Prepare the .msu file of type {{ msu_file_type }}"
+          include_tasks: prepare_msu_file.yml
+          vars:
+            msu_file_type: "LCU"
+
+        - name: "Install the .msu file of type {{ msu_file_type }}"
           include_tasks: install_msu_file.yml
 
         - name: "Get guest OS version after installing the .msu file"
@@ -56,19 +71,10 @@
             exit_testing_when_fail: true
       always:
         - name: "Delete the .msu file from guest OS"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "Get-ChildItem -Path {{ msu_root_dir }} -Include *.msu -Recurse | Remove-Item"
+            win_execute_cmd_ignore_error: true
           when:
-            - msu_file_dest_path is defined
-            - msu_file_dest_path
-          block:
-            - name: "Check if the .msu file exists in guest OS"
-              include_tasks: ../utils/win_check_file_exist.yml
-              vars:
-                win_check_file_exist_file: "{{ msu_file_dest_path }}"
-
-            - name: "Delete the .msu file from guest OS"
-              ansible.windows.win_file:
-                path: "{{ msu_file_dest_path }}"
-                state: absent
-              delegate_to: "{{ vm_guest_ip }}"
-              register: delete_file_result
-              when: win_check_file_exist_result
+            - msu_root_dir is defined
+            - msu_root_dir
