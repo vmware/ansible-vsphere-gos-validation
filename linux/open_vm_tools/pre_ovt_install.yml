@@ -7,13 +7,14 @@
     update_vmtools: true
   when: update_vmtools is undefined
 
-# VM has open-vm-tools installed and update_vmtools is set false
-- name: "Skip test case because update_vmtools is false"
+- name: "Skip test case because VM has open-vm-tools installed and update_vmtools is false"
   include_tasks: ../../common/skip_test_case.yml
   vars:
-    skip_msg: "Test case '{{ ansible_play_name }}' is skipped because update_vmtools is set to: {{ update_vmtools }}"
+    skip_msg: "Test case '{{ ansible_play_name }}' is skipped because VM has open-vm-tools and update_vmtools is set to: {{ update_vmtools }}"
     skip_reason: "Skipped"
-  when: not update_vmtools | bool
+  when:
+    - vmtools_is_installed
+    - not update_vmtools
 
 - name: "Test setup"
   include_tasks: ../setup/test_setup.yml
