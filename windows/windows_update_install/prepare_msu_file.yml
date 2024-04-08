@@ -35,7 +35,7 @@
 - name: "Create folder {{ msu_dest_dir }} on guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "mkdir /s {{ msu_dest_dir }}"
+    win_powershell_cmd: "New-Item -ItemType Directory -Path {{ msu_dest_dir }} -Force"
   when: not win_is_folder_result | bool
 
 - name: "Set mount command for accessing the shared folder"
@@ -52,14 +52,12 @@
 - name: "Copy the .msu file to local disk of guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
+    win_execute_cmd_no_log: "{{ hide_secrets | default(false) }}"
     win_powershell_cmd: >-
       {{ win_nfs_mount_cmd }};
       $file = Get-ChildItem -Path {{ msu_file_nfs_path }} | where Name -like '{{ msu_file_reg }}';
-      if ($file) { 
-        Copy-Item -Path $file.FullName -Destination {{ msu_dest_dir }} -ErrorAction Stop;
-      };
+      if ($file) {Copy-Item -Path $file.FullName -Destination {{ msu_dest_dir }} -ErrorAction Stop;};
       net use {{ drive_letter_new }}: /delete
-    win_execute_cmd_no_log: "{{ hide_secrets | default(false) }}"
 
 - name: "Get the .msu file name"
   include_tasks: ../utils/win_execute_cmd.yml
