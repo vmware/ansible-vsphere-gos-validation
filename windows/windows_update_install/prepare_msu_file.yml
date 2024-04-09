@@ -7,6 +7,13 @@
 # Return:
 #  msu_file_path: the .msu file path in guest OS.
 #
+- name: "Check if the .msu file type is set"
+  ansible.builtin.assert:
+    that:
+      - msu_file_type is defined
+      - msu_file_type in ['SSU', 'LCU']
+    fail_msg:
+
 - name: "Initialize the .msu file path and file name regexp"
   ansible.builtin.set_fact:
     msu_root_dir: "C:\\msu"
@@ -71,12 +78,15 @@
       - win_powershell_cmd_output.stdout_lines is defined
       - win_powershell_cmd_output.stdout_lines | length != 0
     fail_msg: "The .msu file is not found in {{ msu_dest_dir }} in guest OS."
-    success_msg: "The .msu file is copied to {{ msu_dest_dir }} in guest OS."
   when: msu_file_type == "LCU"
 
-- name: "Set the .msu file name"
+- name: "Set the .msu file path"
   ansible.builtin.set_fact:
     msu_file_path: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
   when:
     - win_powershell_cmd_output.stdout_lines is defined
     - win_powershell_cmd_output.stdout_lines | length != 0
+
+- name: "Display the .msu file path in guest OS"
+  ansible.builtin.debug:
+    msg: "The path for the .msu file of type {{ msu_file_type }} in guest OS is: {{ msu_file_path }}"
