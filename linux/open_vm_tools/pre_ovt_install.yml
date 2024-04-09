@@ -1,0 +1,93 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+#
+- name: "Set fact to update VMware Tools by default"
+  ansible.builtin.set_fact:
+    update_vmtools: true
+  when: update_vmtools is undefined
+
+- name: "Test setup"
+  include_tasks: ../setup/test_setup.yml
+
+- name: "Skip test case because VM has open-vm-tools installed and update_vmtools is false"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: "Test case '{{ ansible_play_name }}' is skipped because VM has open-vm-tools and update_vmtools is set to: {{ update_vmtools }}"
+    skip_reason: "Skipped"
+  when:
+    - vmtools_is_installed
+    - not update_vmtools
+
+# Flatcar and RHCOS doesn't support to install open-vm-tools
+- name: "Skip test case for {{ guest_os_ansible_distribution }}"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: "Skip test case {{ ansible_play_name }} because {{ guest_os_ansible_distribution }} doesn't support installing open-vm-tools"
+    skip_reason: "Not Supported"
+  when: guest_os_ansible_distribution in ['Flatcar', 'RHCOS']
+
+- name: "Skip test case when current open-vm-tools is not installed from package"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      Skip test case because current open-vm-tools install type is {{ vmtools_install_type }},
+      and the uninstall method is unknown.
+    skip_reason: "Not Applicable"
+  when:
+    - vmtools_is_installed
+    - vmtools_install_type != 'package'
+
+- name: "Initialize fact whether to uninstall open-vm-tools"
+  ansible.builtin.set_fact:
+    uninstall_tools: "{{ vmtools_is_installed }}"
+
+- name: "Set facts of open-vm-tools packages, processes and service"
+  include_tasks: ../utils/set_ovt_facts.yml
+
+- name: "Set facts of VGAuthService process and service"
+  include_tasks: ../utils/set_vgauth_facts.yml
+
+- name: "Get OS commands to uninstall or install open-vm-tools"
+  include_tasks: get_install_uninstall_cmd.yml
+
+- name: "Uninstall open-vm-tools packages for reinstall"
+  include_tasks: uninstall_ovt.yml
+  when: uninstall_tools | bool
+
+# Add package repositories
+# Always add online package repositories for CentOS/VMware Photon OS/Debian
+- name: "Add online package repositories for {{ guest_os_ansible_distribution }}"
+  include_tasks: ../utils/add_official_online_repo.yml
+  when: guest_os_ansible_distribution in ['CentOS', 'VMware Photon OS', 'Debian']
+
+# Add local DVD repository or online repository for installing OS bundled open-vm-tools
+- name: "Add package repositories for {{ guest_os_ansible_distribution }}"
+  when: linux_ovt_repo_url is undefined or not linux_ovt_repo_url
+  block:
+    - name: "Set fact of enabling local DVD repository"
+      ansible.builtin.set_fact:
+         enable_local_dvd_repo: >-
+           {{
+             guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat', 'Rocky',
+                                                'AlmaLinux', 'openSUSE Leap']
+           }}
+
+    - name: "Add a local package repository from ISO image for {{ guest_os_ansible_distribution }}"
+      include_tasks: ../utils/add_local_dvd_repo.yml
+      when: enable_local_dvd_repo | bool
+
+    - name: "Add online package repositories for {{ guest_os_ansible_distribution }}"
+      include_tasks: ../utils/add_official_online_repo.yml
+      when: guest_os_ansible_distribution in ['OracleLinux', 'Ubuntu']
+
+# Add an extra online repository for install not-bundled open-vm-tools
+- name: "Add an extra open-vm-tools repository from URL"
+  include_tasks: ../utils/add_extra_online_repo.yml
+  vars:
+    extra_repo_name: "open-vm-tools-repo"
+    extra_repo_baseurl: "{{ linux_ovt_repo_url }}"
+  when: linux_ovt_repo_url is defined and linux_ovt_repo_url
+
+- name: "Update package metadata"
+  include_tasks: ../utils/repo_update.yml
