@@ -12,7 +12,7 @@
     that:
       - msu_file_type is defined
       - msu_file_type in ['SSU', 'LCU']
-    fail_msg:
+    fail_msg: "Parameter 'msu_file_type' is required and set to a valid value: '{{ msu_file_type | default('') }}'"
 
 - name: "Initialize the .msu file path and file name regexp"
   ansible.builtin.set_fact:
@@ -23,10 +23,11 @@
 - name: "Get unused driver letter"
   include_tasks: ../utils/win_get_unused_drive_letter.yml
 
-- name: "Set the facts of the .msu file source and destination path"
+- name: "Set the facts of the .msu file source and destination path and existence status"
   ansible.builtin.set_fact:
     msu_file_nfs_path: "{{ drive_letter_new }}:\\{{ windows_nfs_msu_path }}\\{{ msu_file_type}}"
     msu_dest_dir: "{{ msu_root_dir }}\\{{ msu_file_type }}"
+    msu_file_exists_on_src: false
 
 - name: "Check if folder {{ msu_dest_dir }} exists on guest OS"
   include_tasks: ../utils/win_is_folder.yml
@@ -64,29 +65,51 @@
       {{ win_nfs_mount_cmd }};
       $file = Get-ChildItem -Path {{ msu_file_nfs_path }} | where Name -like '{{ msu_file_name_reg }}';
       if ($file) {Copy-Item -Path $file.FullName -Destination {{ msu_dest_dir }} -ErrorAction Stop;};
-      net use {{ drive_letter_new }}: /delete
+      net use {{ drive_letter_new }}: /delete;
+      Write-Host $file.FullName
 
-- name: "Get the .msu file name"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: >- 
-      (Get-ChildItem -Path {{ msu_dest_dir }} | Where-Object {$_.name -like '*.msu'}).FullName;
-
-- name: "Check if the .msu file is copied to {{ msu_dest_dir }}"
-  ansible.builtin.assert:
-    that:
-      - win_powershell_cmd_output.stdout_lines is defined
-      - win_powershell_cmd_output.stdout_lines | length != 0
-    fail_msg: "The .msu file is not found in {{ msu_dest_dir }} in guest OS."
-  when: msu_file_type == "LCU"
-
-- name: "Set the .msu file path"
-  ansible.builtin.set_fact:
-    msu_file_path: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+- name: "Check if the .msu file exists on source"
   when:
     - win_powershell_cmd_output.stdout_lines is defined
-    - win_powershell_cmd_output.stdout_lines | length != 0
+    - win_powershell_cmd_output.stdout_lines | length > 0
+  block:
+    - name: "Set facts if the .msu file exists on source"
+      ansible.builtin.set_fact:
+        msu_file_exists_on_src: true
+      when:
+        - item | length != 0
+        - item | regex_search('(?i)windows.*\\.msu$')
+      with_items: "{{ win_powershell_cmd_output.stdout_lines }}"
 
-- name: "Display the .msu file path in guest OS"
-  ansible.builtin.debug:
-    msg: "The path for the .msu file of type {{ msu_file_type }} in guest OS is: {{ msu_file_path }}"
+- name: "Verify the .msu file of type {{ msu_file_type }} exists on source"
+  ansible.builtin.assert:
+    that:
+      - msu_file_exists_on_src
+    fail_msg: >-
+      The .msu file of type {{ msu_file_type }} is essential. But it's not found in shared folder: {{ windows_nfs_msu_path }}.
+  when: msu_file_type == "LCU"
+
+- name: "Check if the .msu file is copied to guest OS folder {{ msu_dest_dir }}"
+  when: msu_file_exists_on_src | bool
+  block:
+    - name: "Get the .msu file name in guest OS"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: >- 
+          (Get-ChildItem -Path {{ msu_dest_dir }} | Where-Object {$_.name -like '*.msu'}).FullName;
+
+    - name: "Set the .msu file path"
+      ansible.builtin.set_fact:
+        msu_file_path: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+      when:
+        - win_powershell_cmd_output.stdout_lines is defined
+        - win_powershell_cmd_output.stdout_lines | length != 0
+
+    - name: "Verify if the .msu file is copied to {{ msu_dest_dir }}"
+      ansible.builtin.assert:
+        that:
+          - msu_file_path
+        fail_msg: "The .msu file is not found in {{ msu_dest_dir }} in guest OS."
+
+    - name: "Display the .msu file path in guest OS"
+      ansible.builtin.debug: var=msu_file_path
