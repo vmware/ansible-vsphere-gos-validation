@@ -7,6 +7,9 @@
     update_vmtools: true
   when: update_vmtools is undefined
 
+- name: "Test setup"
+  include_tasks: ../setup/test_setup.yml
+
 - name: "Skip test case because VM has open-vm-tools installed and update_vmtools is false"
   include_tasks: ../../common/skip_test_case.yml
   vars:
@@ -15,9 +18,6 @@
   when:
     - vmtools_is_installed
     - not update_vmtools
-
-- name: "Test setup"
-  include_tasks: ../setup/test_setup.yml
 
 # Flatcar and RHCOS doesn't support to install open-vm-tools
 - name: "Skip test case for {{ guest_os_ansible_distribution }}"
@@ -38,7 +38,6 @@
     - vmtools_is_installed
     - vmtools_install_type != 'package'
 
-# Initialize variables
 - name: "Initialize fact whether to uninstall open-vm-tools"
   ansible.builtin.set_fact:
     uninstall_tools: "{{ vmtools_is_installed }}"
