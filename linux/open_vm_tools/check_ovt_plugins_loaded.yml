@@ -1,0 +1,31 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check Linux open-vm-tools common and vmsvc plugins installed from source are loaded
+#
+- name: "Get loaded open-vm-tools plugins"
+  ansible.builtin.shell: "lsof 2>/dev/null | grep '/usr/lib/open-vm-tools/plugins' | awk '{print $NF}' | sort | uniq"
+  register: ovt_plugins_load_result
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Check the result of getting loaded open-vm-tools plugins"
+  ansible.builtin.assert:
+    that:
+      - ovt_plugins_load_result.failed is defined
+      - not ovt_plugins_load_result.failed
+      - ovt_plugins_load_result.stdout_lines is defined
+      - ovt_plugins_load_result.stdout_lines | length > 0
+    fail_msg: "Failed to get loaded open-vm-tools plugins. Caught errors: {{ ovt_plugins_load_result.stderr | default('') }}"
+    success_msg: "Successfully get loaded open-vm-tools plugins"
+
+- name: "Set fact of not loaded open-vm-tools plugins"
+  ansible.builtin.set_fact:
+    ovt_plugins_unloaded: "{{ ovt_plugins | select('match', '.*.so') | difference(ovt_plugins_load_result.stdout_lines) }}"
+
+- name: "Check open-vm-tools plugins installed from source are loaded"
+  ansible.builtin.assert:
+    that:
+      - ovt_plugins_unloaded | length == 0
+    fail_msg: "Failed to load open-vm-tools plugins: {{ ovt_plugins_unloaded }}"
+    success_msg: "All open-vm-tools common and vmsvc plugins are loaded"

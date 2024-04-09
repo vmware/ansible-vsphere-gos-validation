@@ -10,6 +10,7 @@
 #     If package_state is 'latest', installed packages in package_list will be upgraded, and missing
 #       packages will be installed.
 #     If package_state is 'absent' or 'removed', installed packages in package_list will be uninstalled.
+#   package_repo_enable (optional): Default value is true, then it will configure guest OS package repositories.
 #
 - name: "Set default value of package_state to 'present'"
   ansible.builtin.set_fact:
@@ -69,13 +70,17 @@
         - name: "Set proxy for installing package"
           include_tasks: set_proxy.yml
 
-        # Add a local repo from ISO image for RHEL/SLES/SLED
-        - include_tasks: ../utils/add_local_dvd_repo.yml
-          when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat']
-
-        # Add known online repos for other Linux OS
-        - include_tasks: ../utils/add_official_online_repo.yml
-          when: guest_os_ansible_distribution not in ['SLES', 'SLED', 'RedHat']
+        - name: "Add OS release package repositories"
+          when: package_repo_enable | default(true)
+          block:
+            - name: "Add a local repo from ISO image for {{ guest_os_ansible_distribution }}"
+              include_tasks: ../utils/add_local_dvd_repo.yml
+              when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat', 'Rocky',
+                                                'AlmaLinux', 'openSUSE Leap']
+    
+            - name: "Add known online repos for other Linux OS"
+              include_tasks: ../utils/add_official_online_repo.yml
+              when: guest_os_ansible_distribution not in ['SLES', 'SLED', 'RedHat']
 
     - name: "{{ package_manage_op }} packages on VMware Photon OS"
       when: guest_os_ansible_distribution == "VMware Photon OS"
@@ -157,14 +162,6 @@
           ansible.builtin.apt:
             name: "{{ package_manage_list }}"
             state: "{{ package_state }}"
-            update_cache: true
+            update_cache: "{{ guest_os_family == 'Debian' }}"
           delegate_to: "{{ vm_guest_ip }}"
           when: guest_os_family == "Debian"
-
-        - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-          ansible.builtin.apt:
-            name: "{{ package_manage_list }}"
-            state: "{{ package_state }}"
-          delegate_to: "{{ vm_guest_ip }}"
-          when: guest_os_family == "Astra Linux (Orel)"
-

@@ -12,7 +12,7 @@ required_pkgs="$required_pkgs open-vm-tools-desktop build-essential openssh-serv
 required_pkgs="$required_pkgs open-vm-tools-desktop cloud-init debconf-utils rdma-core rdmacm-utils ibverbs-utils"
 {% elif unattend_installer == 'Pardus' %}
 # Pardus required packages
-required_pkgs="$required_pkgs openssh-server build-essential open-vm-tools sg3-utils vim python3-apt dbus"
+required_pkgs="$required_pkgs openssh-server build-essential open-vm-tools sg3-utils vim python3-apt dbus lsof"
 if [ "X$OS_DM" != "X" ]; then
   required_pkgs="$required_pkgs open-vm-tools-desktop"
 fi

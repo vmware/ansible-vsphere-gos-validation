@@ -1,0 +1,33 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check open-vm-tools binaries, libraries and plugins installed from source
+#
+- name: "Get stat information about open-vm-tools installed files"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  with_items: "{{ ovt_files }}"
+  register: ovt_files_stat_result
+
+- name: "Set facts of open-vm-tools files checking result"
+  ansible.builtin.set_fact:
+    ovt_files_exist_result: "{{ dict(_keys|zip(_values)) }}"
+  vars:
+    _keys: "{{ ovt_files_stat_result.results | map(attribute='item') }}"
+    _values: "{{ ovt_files_stat_result.results | map(attribute='stat', default={}) | map(attribute='exists', default=false) }}"
+
+- name: "Display open-vm-tools files checking result"
+  ansible.builtin.debug: var=ovt_files_exist_result
+
+- name: "Set fact of missing open-vm-tools files"
+  ansible.builtin.set_fact:
+    ovt_files_missing: "{{ ovt_files_exist_result | dict2items | selectattr('value', 'equalto', false) | map(attribute='key') }}"
+
+- name: "Check all open-vm-tools files exist"
+  ansible.builtin.assert:
+    that:
+      - ovt_files_missing | length == 0
+    fail_msg: "Failed to install open-vm-tools files {{ ovt_files_missing }} from source."
+    success_msg: "All open-vm-tools files exist after installing from source."

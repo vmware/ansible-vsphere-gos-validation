@@ -38,6 +38,50 @@
     - vmtools_is_installed
     - vmtools_install_type != 'package'
 
+- name: "Set fact of open-vm-tools install type"
+  ansible.builtin.set_fact:
+    ovt_install_type: "{{ linux_ovt_install_type | default('package') }}"
+
+- name: "Display open-vm-tools install type"
+  ansible.builtin.debug:
+    msg: "The open-vm-tools install type is {{ ovt_install_type }}"
+
+- name: "Block test case because of missing linux_ovt_tarball_url for open-vm-tools source install"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      Skip test case {{ ansible_play_name }} because 'linux_ovt_tarball_url' is not set, which is
+      required when open-vm-tools install type is {{ ovt_install_type }}.
+    skip_reason: "Blocked"
+  when:
+    - ovt_install_type == 'source'
+    - linux_ovt_tarball_url is undefined or not linux_ovt_tarball_url
+
+- name: "Skip test case when open-vm-tools install type is not applicable"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      Skip test case {{ ansible_play_name }} because open-vm-tools
+      install type {{ ovt_install_type }} is not applicable
+    skip_reason: "Skipped"
+  when: >-
+    (ansible_play_name == 'ovt_verify_pkg_install' and ovt_install_type != 'package') or
+    (ansible_play_name == 'ovt_verify_src_install' and ovt_install_type != 'source')
+
+# At present, only Debian family OS is supported to install open-vm-tools from source,
+# including Debian, Ubuntu, and Pardus.
+# We will gradually expand guest OS support scope in future
+- name: "Skip test case for {{ guest_os_ansible_distribution }}"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      Skip test case {{ ansible_play_name }} because installing open-vm-tools from
+      source is not supported on {{ guest_os_ansible_distribution }} at present.
+    skip_reason: "Not Supported"
+  when:
+    - ovt_install_type == "source"
+    - guest_os_family != "Debian"
+
 - name: "Initialize fact whether to uninstall open-vm-tools"
   ansible.builtin.set_fact:
     uninstall_tools: "{{ vmtools_is_installed }}"
@@ -52,8 +96,15 @@
   include_tasks: get_install_uninstall_cmd.yml
 
 - name: "Uninstall open-vm-tools packages for reinstall"
-  include_tasks: uninstall_ovt.yml
   when: uninstall_tools | bool
+  block:
+    # Download original services files for reuse
+    - name: "Download original open-vm-tools service files"
+      include_tasks: download_service_files.yml
+      when: ovt_install_type == "source"
+
+    - name: "Uninstall open-vm-tools packages"
+      include_tasks: uninstall_ovt.yml
 
 # Add package repositories
 # Always add online package repositories for CentOS/VMware Photon OS/Debian
@@ -79,7 +130,7 @@
 
     - name: "Add online package repositories for {{ guest_os_ansible_distribution }}"
       include_tasks: ../utils/add_official_online_repo.yml
-      when: guest_os_ansible_distribution in ['OracleLinux', 'Ubuntu']
+      when: guest_os_ansible_distribution not in ['SLES', 'SLED', 'RedHat']
 
 # Add an extra online repository for install not-bundled open-vm-tools
 - name: "Add an extra open-vm-tools repository from URL"

@@ -1,0 +1,156 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Install open-vm-tools by building source tarball
+#
+- name: "Set facts of config files for building and checking open-vm-tools"
+  ansible.builtin.set_fact:
+    ovt_build_config_file_tmpl: "{{ guest_os_ansible_system }}_ovt_build_config.tmpl"
+    ovt_build_config_file_path: "{{ current_test_log_folder }}/ovt_build_config.yml"
+    ovt_check_config_file_tmpl: "{{ guest_os_ansible_system }}_ovt_check_config.tmpl"
+    ovt_check_config_file_path: "{{ current_test_log_folder }}/ovt_check_config.yml"
+
+- name: "Create config files for installing open-vm-tools from source"
+  ansible.builtin.template:
+    src: "templates/{{ item[0] }}"
+    dest: "{{ item[1] }}"
+    mode: "0755"
+  with_list:
+    - ["{{ ovt_build_config_file_tmpl }}", "{{ ovt_build_config_file_path }}"]
+    - ["{{ ovt_check_config_file_tmpl }}", "{{ ovt_check_config_file_path }}"]
+
+- name: "Set facts of dependencies and configure options to install open-vm-tools from source"
+  ansible.builtin.set_fact:
+    ovt_dependencies: "{{ _ovt_build_config.dependencies | default([]) }}"
+    ovt_configure_options: "{{ _ovt_build_config.configure_options | default([]) }}"
+  vars:
+    _ovt_build_config: "{{ lookup('file', ovt_build_config_file_path) | from_yaml }}"
+
+- name: "Check open-vm-tools dependencies are not empty"
+  ansible.builtin.assert:
+    that:
+      - ovt_dependencies | length > 0
+    fail_msg: "Missing dependencies for installing open-vm-tools from source on {{ vm_guest_os_distribution }}"
+    success_msg: "Dependencies to be installed for open-vm-tools: {{ ovt_dependencies }}"
+
+- name: "Install open-vm-tools build dependencies"
+  include_tasks: ../utils/install_uninstall_package.yml
+  vars:
+    package_list: "{{ ovt_dependencies }}"
+    package_repo_enable: false
+
+- name: "Set facts of open-vm-tools directory for downloading source tarball"
+  ansible.builtin.set_fact:
+    guest_ovt_download_dir: "/root/ovt_source_{{ current_test_timestamp }}"
+
+- name: "Create directory for downloading open-vm-tools source tarball"
+  ansible.builtin.file:
+    path: "{{ guest_ovt_download_dir }}"
+    mode: "{{ dir_mode | default('0755') }}"
+    state: directory
+    recurse: true
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Download open-vm-tools source tarball"
+  ansible.builtin.get_url:
+    url: "{{ linux_ovt_tarball_url }}"
+    dest: "{{ guest_ovt_download_dir }}"
+    validate_certs: False
+    mode: "0644"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: ovt_tarball_download_result
+
+- name: "Unarchive open-vm-tools source tarball"
+  ansible.builtin.unarchive:
+    src: "{{ ovt_tarball_download_result.dest }}"
+    dest: "{{ guest_ovt_download_dir }}"
+    remote_src: True
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Search open-vm-tools configure.ac file"
+  ansible.builtin.shell: "find {{ guest_ovt_download_dir }} -name configure.ac"
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: true
+  register: find_configure_result
+
+- name: "Check open-vm-tools configure.ac file exists"
+  ansible.builtin.assert:
+    that:
+      - find_configure_result.rc is defined
+      - find_configure_result.rc == 0
+      - find_configure_result.stdout is defined
+      - find_configure_result.stdout
+    fail_msg: "The open-vm-tools configure.ac file doesn't exist in source tarball"
+    success_msg: "The open-vm-tools configure.ac file path is {{ find_configure_result.stdout }}"
+
+- name: "Set fact of open-vm-tools source directory, installer path and log"
+  ansible.builtin.set_fact:
+    guest_ovt_source_dir: "{{ _ovt_src_dir }}"
+    guest_ovt_installer_path: "{{ _ovt_src_dir }}/ovt_installer.sh"
+    guest_ovt_installer_log: "{{ _ovt_src_dir }}/ovt_installer.log"
+  vars:
+    _ovt_src_dir: "{{ find_configure_result.stdout | replace('/configure.ac', '') }}"
+
+- name: "Copy open-vm-tools installer script to guest OS"
+  ansible.builtin.copy:
+    src: "ovt_installer.sh"
+    dest: "{{ guest_ovt_installer_path }}"
+    mode: "0755"
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Display configure options for installing open-vm-tools from source"
+  ansible.builtin.debug: var=ovt_configure_options
+
+- name: "Install open-vm-tools from source"
+  ansible.builtin.shell: "{{ guest_ovt_installer_path }} {{ ' '.join(ovt_configure_options) }} >>{{ guest_ovt_installer_log }}"
+  args:
+    chdir: "{{ guest_ovt_source_dir }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: ovt_installer_result
+  async: 900
+  poll: 0
+
+- name: "Check on async task for installing open-vm-tools"
+  async_status:
+    jid: "{{ ovt_installer_result.ansible_job_id }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: ovt_install_job_result
+  until: ovt_install_job_result.finished
+  retries: 60
+  delay: 10
+
+- name: "Set facts of open-vm-tools files and plugins should be installed from source"
+  ansible.builtin.set_fact:
+    ovt_files: "{{ _ovt_check_config | dict2items | map(attribute='value') | flatten | sort }}"
+    ovt_plugins: "{{ _ovt_check_config.plugins | sort }}"
+  vars:
+    _ovt_check_config: "{{ lookup('file', ovt_check_config_file_path) | from_yaml }}"
+
+- name: "Check open-vm-tools files and plugins are not empty"
+  ansible.builtin.assert:
+    that:
+      - ovt_files | length > 0
+      - ovt_plugins | length > 0
+    fail_msg: >-
+      Missing open-vm-tools files or plugins to check after installing open-vm-tools
+      from source on {{ vm_guest_os_distribution }}
+
+- name: "Check open-vm-tools required files are installed"
+  include_tasks: check_ovt_files_exist.yml
+
+- name: "Add and enable open-vm-tools service"
+  include_tasks: add_enable_service.yml
+  vars:
+    service_name: "{{ ovt_service_name }}"
+    service_file: "{{ ovt_service_file }}"
+    service_file_local_path: "{{ ovt_service_file_local_path | default('') }}"
+
+- name: "Add and enable VGAuthService service"
+  include_tasks: add_enable_service.yml
+  vars:
+    service_name: "{{ vgauth_service_name }}"
+    service_file: "{{ vgauth_service_file }}"
+    service_file_local_path: "{{ vgauth_service_file_local_path | default('') }}"
+  when:
+    - vgauth_service_name
+    - vgauth_service_file

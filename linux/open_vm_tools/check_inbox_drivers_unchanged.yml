@@ -1,0 +1,40 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check Linux inbox drivers' paths are not changed after installing
+# open-vm-tools from source. Inbox drivers to be checked include vmxnet3,
+# vmw_pvscsi, vmw_balloon.
+#
+- name: "Set fact of guest OS inbox drivers directory path"
+  ansible.builtin.set_fact:
+    guest_inbox_drivers_dir: "/lib/modules/{{ guest_os_ansible_kernel }}/kernel/drivers"
+
+- name: "Get guest OS inbox drivers information"
+  ansible.builtin.shell: "modinfo -F filename {{ item }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  with_items:
+    - vmxnet3
+    - vmw_pvscsi
+    - vmw_balloon
+  register: modinfo_results
+
+- name: "Set facts inbox drivers paths after installing open-vm-tools from source"
+  ansible.builtin.set_fact:
+    guest_inbox_drivers: "{{ dict(_keys|zip(_values)) }}"
+  vars:
+    _keys: "{{ modinfo_results.results | map(attribute='item') }}"
+    _values: "{{ modinfo_results.results | map(attribute='stdout', default='') | flatten }}"
+
+- name: "Display inbox drivers paths after installing open-vm-tools from source"
+  ansible.builtin.debug: var=guest_inbox_drivers
+
+- name: "Check guest OS inbox drivers are not changed"
+  ansible.builtin.assert:
+    that:
+      - guest_inbox_drivers['vmxnet3'] is match(guest_inbox_drivers_dir + '/net/vmxnet3/vmxnet3.*')
+      - guest_inbox_drivers['vmw_pvscsi'] is match(guest_inbox_drivers_dir + '/scsi/vmw_pvscsi.*')
+      - guest_inbox_drivers['vmw_balloon'] is match(guest_inbox_drivers_dir + '/misc/vmw_balloon.*')
+    fail_msg: >-
+      Inbox drivers' paths should not be changed after installing open-vm-tools from source,
+      but now at least one of them is changed: {{ guest_inbox_drivers }}
+    success_msg: "Inbox drivers' paths are not changed after installing open-vm-tools from source."

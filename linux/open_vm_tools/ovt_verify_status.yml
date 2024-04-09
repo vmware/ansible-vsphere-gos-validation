@@ -88,6 +88,7 @@
               include_tasks: ../utils/get_systemd_unit_properties.yml
               vars:
                 guest_systemd_unit: "multi-user.target"
+                guest_systemd_show_properties: "DropInPaths,Upholds"
 
             - name: "Update the fact that open-vm-tools service is upheld"
               ansible.builtin.set_fact:
@@ -96,12 +97,12 @@
                 - guest_systemd_unit_properties.DropInPaths is defined
                 - guest_systemd_unit_properties.DropInPaths is search('open-vm-tools-sysext-upholds.conf')
                 - guest_systemd_unit_properties.Upholds is defined
-                - guest_systemd_unit_properties.Upholds is search(ovt_service ~ '.service')
+                - guest_systemd_unit_properties.Upholds is search(ovt_service_name ~ '.service')
 
-        - name: "Check state and status of open-vm-tools service {{ ovt_service }}"
+        - name: "Check state and status of open-vm-tools service {{ ovt_service_name }}"
           include_tasks: ../utils/check_service_status.yml
           vars:
-            service_name: "{{ ovt_service }}"
+            service_name: "{{ ovt_service_name }}"
             expected_service_state: "running"
             expected_service_status: "{{ 'enabled' if not ovt_service_is_upheld else '' }}"
       rescue:

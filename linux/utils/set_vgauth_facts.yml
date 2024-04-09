@@ -16,14 +16,19 @@
   block:
     - name: "Set facts of VGAuthService service, process, config file and default latest log file"
       ansible.builtin.set_fact:
+        vgauth_service_file: ""
         vgauth_service_name: "{{ 'vgauth' if guest_os_family in ['Debian', 'Astra Linux (Orel)'] else 'vgauthd' }}"
         vgauth_process: {"uid": "root", "cmd": "VGAuthService"}
         vgauth_config_file: "/etc/vmware-tools/vgauth.conf"
         vgauth_latest_log_file: "/var/log/vmware-vgauthsvc.log.0"
 
+    - name: "Get systemd unit path"
+      include_tasks: get_systemd_unit_path.yml
+      when: guest_systemd_unit_path is undefined or not guest_systemd_unit_path
+
     - name: "Set fact of VGAuthService service file"
       ansible.builtin.set_fact:
-        vgauth_service_file: "/lib/systemd/system/{{ vgauth_service_name }}.service"
+        vgauth_service_file:  "{{ guest_systemd_unit_path }}/{{ vgauth_service_name }}.service"
 
 - name: "FreeBSD system doesn't have VGAuthService"
   ansible.builtin.debug:
