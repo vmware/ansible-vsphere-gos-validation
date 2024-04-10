@@ -2,23 +2,20 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Parameters:
-#   msu_file_path: the .msu file path in guest OS.
+#   msu_file_path (required): the .msu file path in guest OS.
+#   msu_file_basename (optional): the base name of the .msu file.
 #
-- name: "Get the .msu file basename"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "(Get-Item {{ msu_file_path }}).BaseName"
-
-- name: "Check if the .msu file basename is retrieved successfully"
+- name: "Check if the input parameter is set"
   ansible.builtin.assert:
     that:
-      - win_powershell_cmd_output.stdout_lines is defined
-      - win_powershell_cmd_output.stdout_lines | length == 1
-    fail_msg: "Failed to get the .msu file basename from specified path: {{ msu_file_path }}."
+      - msu_file_path is defined
+      - msu_file_type
+    fail_msg: "Parameter 'msu_file_path' is required to be set."
 
 - name: "Set the .msu file basename"
   ansible.builtin.set_fact:
-    msu_file_basename: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+    msu_file_basename: "{{ msu_file_path | win_basename }}"
+  when: ( msu_file_basename is undefined or not msu_file_basename)
 
 - name: "Set the .msu file installation related parameters"
   ansible.builtin.set_fact:
