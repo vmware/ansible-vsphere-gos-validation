@@ -27,7 +27,7 @@
 26. For FusionOS 22 unattend auto-install, please use files under Fusion.
 27. For FusionOS 23 unattend auto-install, please use file Fusion/server_without_GUI/ks.cfg.
 28. For Kylin Linux Advanced Server V10 unattend auto-install, please use file Kylin/Server/10/ks.cfg.
-29. For CentOS Stream 9.x or later unattend auto-install, please use files under RHEL/8.
+29. For CentOS Stream 8 or later unattend auto-install, please use files under RHEL/8.
 
 # Notes
 ## For Windows

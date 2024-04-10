@@ -70,7 +70,7 @@ This project supports below scenarios for end-to-end guest operating system vali
 |:-------------------------------------------------------| :------------------------------: | :----------------------: | :--------------------------------: |
 | Red Hat Enterprise Linux 7.x, 8.x, 9.x                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | CentOS 7.x, 8.x                                        | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| CentOS Stream 9.x                                      | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| CentOS Stream 8, 9                                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Oracle Linux 7.x, 8.x, 9.x                             | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Rocky Linux 8.x, 9.x                                   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | AlmaLinux 8.x, 9.x                                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
