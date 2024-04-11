@@ -1,10 +1,12 @@
 # Copyright 2023-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+# Parameters:
+#   msu_file_path: the .msu file path in guest OS.
+#
 - name: "Set the .msu file installation related parameters"
   ansible.builtin.set_fact:
-    msu_kb_number: "{{ msu_file_name | regex_search('(?i)KB\\d+') | upper }}"
-    msu_file_dest_path: "{{ msu_dir_path }}\\{{ msu_file_name }}"
+    msu_kb_number: "{{ msu_file_basename | regex_search('(?i)KB\\d+') | upper }}"
     msu_install_timeout: 7200
     msu_become_user: "{{ 'SYSTEM' if guest_os_ansible_architecture == '32-bit' else 'Administrator' }}"
 
@@ -16,7 +18,7 @@
 
 - name: "Install the .msu file"
   ansible.windows.win_shell: >-
-    wusa.exe {{ msu_file_dest_path }} /quiet /norestart
+    wusa.exe {{ msu_file_path }} /quiet /norestart
   delegate_to: "{{ vm_guest_ip }}"
   register: install_msu_result
   become: true
@@ -49,7 +51,7 @@
 
 - name: "The .msu file installation failed"
   ansible.builtin.fail:
-    msg: "Failed to install the .msu file {{ msu_file_name }} in {{ msu_install_timeout }} seconds."
+    msg: "Failed to install the .msu file {{ msu_file_basename }} in {{ msu_install_timeout }} seconds."
   when:
     - win_get_hotfix_result.failed is defined
     - win_get_hotfix_result.failed
@@ -70,5 +72,5 @@
     that:
       - win_powershell_cmd_output.stdout_lines is defined
       - win_powershell_cmd_output.stdout_lines | length != 0
-    fail_msg: "The .msu file {{ msu_file_name }} is not installed in guest OS."
-    success_msg: "The .msu file {{ msu_file_name }} is installed in guest OS."
+    fail_msg: "The .msu file {{ msu_file_basename }} is not installed in guest OS."
+    success_msg: "The .msu file {{ msu_file_basename }} is installed in guest OS."
