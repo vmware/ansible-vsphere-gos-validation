@@ -8,7 +8,7 @@
 # Usage: ovt_installer.sh [configure_options]
 # For example,
 #    ovt_installer.sh
-#    ovt_installer.sh --without-deploy --without-icu
+#    ovt_installer.sh --disable-deploypkg --without-icu
 #
 if [ $# -ge 1 ]; then
     config_opts=$@
