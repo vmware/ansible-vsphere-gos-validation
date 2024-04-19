@@ -49,6 +49,16 @@
             (guest_os_ansible_distribution_major_ver | int == 10 and guest_os_build_num | int < 17763) or
             (guest_os_ansible_distribution_major_ver | int < 10)
 
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg:
+              - "Skip test case due to MDAG is no longer available as a feature and has been announced as deprecated from build 26052."
+              - "This guest OS build number: {{ guest_os_build_num }}."
+              - "Please refer to https://blogs.windows.com/windows-insider/2024/02/08/announcing-windows-11-insider-preview-build-26052-canary-and-dev-channels/"
+            skip_reason: "Not Supported"
+          when: guest_os_build_num | int >= 26052
+
         - name: "Set MDAG feature name"
           ansible.builtin.set_fact:
             mdag_feature_name: "Windows-Defender-ApplicationGuard"
