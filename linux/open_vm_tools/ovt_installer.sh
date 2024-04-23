@@ -30,12 +30,19 @@ commands=("autoreconf -f -i"
           "ldconfig")
 rc=0
 
+# Create the directory path of tools.conf on FreeBSD
+system=$(uname -s)
+if [ "$system" == "FreeBSD" ]; then
+    mkdir -p $INSTALL_PREFIX/share/vmware-tools/
+    chmod a+rx $INSTALL_PREFIX/share/vmware-tools/
+fi
+
 for cmd in  "${commands[@]}"; do
     echo ">>>Beginning of command: $cmd<<<"
     eval "$cmd"
     rc=$?
     if [ $rc -ne 0 ]; then
-        echo "Failed to execute command: $cmd"
+        echo "Failed to execute command: $cmd" >&2
         exit $rc;
     fi
     echo ">>>End of command: $cmd<<<"

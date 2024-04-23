@@ -77,34 +77,38 @@
               include_tasks: ../utils/add_local_dvd_repo.yml
               when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat', 'Rocky',
                                                 'AlmaLinux', 'openSUSE Leap']
-    
+
             - name: "Add known online repos for other Linux OS"
               include_tasks: ../utils/add_official_online_repo.yml
               when: guest_os_ansible_distribution not in ['SLES', 'SLED', 'RedHat']
 
-    - name: "{{ package_manage_op }} packages on VMware Photon OS"
-      when: guest_os_ansible_distribution == "VMware Photon OS"
+    - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }}"
+      when: guest_os_ansible_distribution in ["VMware Photon OS", "FreeBSD"]
       block:
         - name: "Set facts of packages and command for VMware Photon OS"
           ansible.builtin.set_fact:
             package_manage_list_str: "{{ ' '.join(package_manage_list) }}"
+            package_manager: |-
+              {%- if guest_os_ansible_distribution == "VMware Photon OS" -%}tdnf
+              {%- else -%}pkg
+              {%- endif -%}
 
-        - name: "Set the command to {{ package_manage_op | lower }} packages on VMware Photon OS"
+        - name: "Set the command to {{ package_manage_op | lower }} packages on {{ guest_os_ansible_distribution }}"
           ansible.builtin.set_fact:
             package_manage_cmd: |-
               {%- if package_state in [ 'installed', 'present', 'latest' ] -%}
-              tdnf install -y {{ package_manage_list_str }}
+                {{ package_manager }} install -y {{ package_manage_list_str }}
               {%- else -%}
-              tdnf remove -y {{ package_manage_list_str }}
+                {{ package_manager }} remove -y {{ package_manage_list_str }}
               {%- endif -%}
 
         - name: "{{ package_manage_op }} packages on VMware Photon OS"
           ansible.builtin.command: "{{ package_manage_cmd }}"
           delegate_to: "{{ vm_guest_ip }}"
-          register: tdnf_cmd_result
+          register: package_manage_result
 
         - name: "Display the result of '{{ package_manage_cmd }}'"
-          ansible.builtin.debug: var=tdnf_cmd_result
+          ansible.builtin.debug: var=package_manage_result
 
     - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }}"
       when: guest_os_family == "RedHat"
@@ -164,4 +168,3 @@
             state: "{{ package_state }}"
             update_cache: "{{ guest_os_family == 'Debian' }}"
           delegate_to: "{{ vm_guest_ip }}"
-          when: guest_os_family == "Debian"
