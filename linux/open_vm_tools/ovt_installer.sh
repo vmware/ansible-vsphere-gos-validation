@@ -17,9 +17,14 @@ else
 fi
 
 # Cloud-init GOSC requires open-vm-tools binaries under /usr/bin
-# and plugins under /usr/lib. So here sets install prefix to /usr
+# and plugins under /usr/lib. To support cloud-init GOSC, it is
+# recommended to set "--prefix=/usr".
+if [ "X$INSTALL_PREFIX" == "X" ]; then
+    INSTALL_PREFIX="/usr"
+fi
+
 commands=("autoreconf -f -i"
-          "./configure --prefix=/usr $config_opts"
+          "./configure --prefix=$INSTALL_PREFIX $config_opts"
           "make"
           "make install"
           "ldconfig")

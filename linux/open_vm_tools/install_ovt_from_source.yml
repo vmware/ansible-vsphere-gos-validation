@@ -5,6 +5,7 @@
 #
 - name: "Set facts of config files for building and checking open-vm-tools"
   ansible.builtin.set_fact:
+    ovt_install_prefix: "{{ '/usr' if guest_os_ansible_system == 'linux' else '/usr/local' }}"
     ovt_build_config_file_tmpl: "{{ guest_os_ansible_system }}_ovt_build_config.tmpl"
     ovt_build_config_file_path: "{{ current_test_log_folder }}/ovt_build_config.yml"
     ovt_check_config_file_tmpl: "{{ guest_os_ansible_system }}_ovt_check_config.tmpl"
@@ -96,6 +97,8 @@
     src: "ovt_installer.sh"
     dest: "{{ guest_ovt_installer_path }}"
     mode: "0755"
+  environment:
+    INSTALL_PREFIX: "{{ ovt_install_prefix }}"
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Display configure options for installing open-vm-tools from source"
