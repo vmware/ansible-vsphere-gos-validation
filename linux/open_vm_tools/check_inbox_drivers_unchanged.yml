@@ -9,8 +9,9 @@
   ansible.builtin.set_fact:
     guest_inbox_drivers_dir: "/lib/modules/{{ guest_os_ansible_kernel }}/kernel/drivers"
 
-- name: "Get guest OS inbox drivers information"
+- name: "Get guest OS inbox drivers' filenames"
   ansible.builtin.shell: "modinfo -F filename {{ item }}"
+  ignore_errors: true
   delegate_to: "{{ vm_guest_ip }}"
   with_items:
     - vmxnet3
@@ -18,9 +19,16 @@
     - vmw_balloon
   register: modinfo_results
 
+- name: "Check results of getting guest OS inbox drivers' filenames"
+  ansible.builtin.assert:
+    that:
+      - modinfo_results.results is defined
+      - modinfo_results.results | length == 3
+    fail_msg: "Failed to get guest OS inbox drivers' filenames"
+
 - name: "Set facts inbox drivers paths after installing open-vm-tools from source"
   ansible.builtin.set_fact:
-    guest_inbox_drivers: "{{ dict(_keys|zip(_values)) }}"
+    guest_inbox_drivers: "{{ dict(_keys | zip(_values)) }}"
   vars:
     _keys: "{{ modinfo_results.results | map(attribute='item') }}"
     _values: "{{ modinfo_results.results | map(attribute='stdout', default='') | flatten }}"

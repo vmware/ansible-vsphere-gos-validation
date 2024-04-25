@@ -11,9 +11,16 @@
   with_items: "{{ ovt_files }}"
   register: ovt_files_stat_result
 
+- name: "Check stat result of open-vm-tools files"
+  ansible.builtin.assert:
+    that:
+      - ovt_files_stat_result.results is defined
+      - ovt_files_stat_result.results | length == ovt_files | length
+    fail_msg: "Failed to stat all of open-vm-tools files"
+
 - name: "Set facts of open-vm-tools files checking result"
   ansible.builtin.set_fact:
-    ovt_files_exist_result: "{{ dict(_keys|zip(_values)) }}"
+    ovt_files_exist_result: "{{ dict(_keys | zip(_values)) }}"
   vars:
     _keys: "{{ ovt_files_stat_result.results | map(attribute='item') }}"
     _values: "{{ ovt_files_stat_result.results | map(attribute='stat', default={}) | map(attribute='exists', default=false) }}"
