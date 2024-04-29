@@ -1,0 +1,38 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for updating Windows guest OS
+# through Windows Update.
+#
+- name: windows_online_update
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+
+        - name: "Get guest OS version build before installing updates"
+          include_tasks: ../utils/win_get_os_version.yml
+        - name: "Display the guest OS version build before installing updates"
+          ansible.builtin.debug: var=win_os_version_build
+
+        - name: "Install online updates in guest OS"
+          include_tasks: install_online_updates.yml
+
+        - name: "Get guest OS version after installing updates"
+          include_tasks: ../utils/win_get_os_version.yml
+        - name: "Display the guest OS version build after installing updates"
+          ansible.builtin.debug: var=win_os_version_build
+
+        - name: "Reset base snapshot after installing updates"
+          include_tasks: ../../common/reset_base_snapshot.yml
+          vars:
+            base_snapshot_description: "{{ win_os_version_build }}"
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true
