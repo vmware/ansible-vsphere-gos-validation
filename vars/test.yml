@@ -279,7 +279,7 @@ windows_has_inbox_driver: true
 # ova_nfs_server_path: "192.168.1.10:/Images"
 # ova_path: "OS/Linux/Photon/3.0/Rev3/photon-hw13_uefi-3.0-a383732.ova"
 
-# 2. Linux: ovt_verify_pkg_install
+# 2. Linux: ovt_verify_pkg_install, ovt_verify_src_install
 #    Windows: wintools_complete_install_verify
 # If VMware Tools status is already installed and running in VM, and this parameter is set to true,
 # will uninstall existing VMware Tools firstly, then install VMware Tools from the source configured below.
@@ -287,14 +287,27 @@ windows_has_inbox_driver: true
 #
 # update_vmtools: true
 
-# In Linux test case 'ovt_verify_pkg_install',
-# if 'linux_ovt_repo_url' is set, a repository will be added from 'linux_ovt_repo_url' for installing open-vm-tools;
-# if 'linux_ovt_repo_url' is not set, a repository will be added from the first ISO image specified in parameter
-# 'os_installation_iso_list' for RHEL/SLES/SLED, if 'os_installation_iso_list' is not configured, this test
-# case result will be 'Failed'. For CentOS/OracleLinux/Photon OS/Ubuntu/Debian, open-vm-tools will be
-# installed from official online repositories.
+# On Linux system, there are two ways to install open-vm-tools: package or source, which can be defined by
+# variable 'linux_ovt_install_type'. Default value is 'package'.
+#
+linux_ovt_install_type: package
+#
+# If 'linux_ovt_install_type' is set to 'package', test case 'ovt_verify_pkg_install' will be executed, which is
+# to test installing open-vm-tools by package managers. And test case 'ovt_verify_src_install' will be skipped.
+# (1) Install from the ISO image or online repository for OS release
+# By default, 'ovt_verify_pkg_install' will install open-vm-tools from local DVD repository or OS release online
+# repositories
+# (2) Install from user-defined online repository
+# If 'linux_ovt_repo_url' is set with a user-defined online repository, it will be added to guest OS, and then
+# open-vm-tools packages will be installed from this user-defined repository.
 #
 # linux_ovt_repo_url: "http://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os"
+
+# If 'linux_ovt_install_type' is set to 'source', test case 'ovt_verify_src_install' will be executed, which is
+# to test installing open-vm-tools from its source tarball. And test case 'ovt_verify_pkg_install' will be skipped.
+# This will require 'linux_ovt_tarball_url' be set with a URL for downloading open-vm-tools source tarball.
+#
+# linux_ovt_tarball_url: "https://github.com/vmware/open-vm-tools/releases/download/stable-12.4.0/open-vm-tools-12.4.0-23259341.tar.gz"
 
 # In Windows test case 'wintools_complete_install_verify', there are 3 methods to configure the source of VMware Tools.
 # (1) ESXi host bundled:

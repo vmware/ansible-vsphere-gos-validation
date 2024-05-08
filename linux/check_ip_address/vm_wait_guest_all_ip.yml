@@ -1,28 +1,34 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- block:
-    - include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
+- name: "Refresh guest networking info with VMware Tools {{ vmtools_version }}"
+  when:
+    - vmtools_version is defined
+    - vmtools_version is version('10.1.0', '>=')
+  block:
+    - name: "Get VMware Tools toolbox command"
+      include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
 
     - name: "Immediately refresh networking information in guest info"
       ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} info update network"
       delegate_to: "{{ vm_guest_ip }}"
-  when:
-    - vmtools_version is defined
-    - vmtools_version is version('10.1.0', '>=')
 
-- block:
-    # Restart VMTools service to refresh networking information in guest info
-    # Restart vmtoolsd to refresh guest info
-    - include_tasks: ../utils/set_ovt_facts.yml
-    - include_tasks: ../utils/service_operation.yml
-      vars:
-        service_name: "{{ ovt_service }}"
-        service_enabled: true
-        service_state: "restarted"
+# VMware Tools ealier than 10.1.0 needs to restart open-vm-tools service
+# to refresh networking information in guest info
+- name: "Refresh guest networking info with VMware Tools {{ vmtools_version }}"
   when:
     - vmtools_version is defined
     - vmtools_version is version('10.1.0', '<')
+  block:
+    - name: "Set open-vm-tools facts"
+      include_tasks: ../utils/set_ovt_facts.yml
+
+    - name: "Restart open-vm-tools service to refresh guest info"
+      include_tasks: ../utils/service_operation.yml
+      vars:
+        service_name: "{{ ovt_service_name }}"
+        service_enabled: true
+        service_state: "restarted"
 
 - name: "Wait for all guest OS IP addresses are collected in guest info"
   community.vmware.vmware_guest_info:
@@ -50,12 +56,14 @@
   ansible.builtin.set_fact:
     all_ip_in_guestinfo: "{{ vm_guestinfo_net.instance.guest.net | map(attribute='ipAddress') | flatten }}"
 
-- ansible.builtin.debug:
+- name: "Display guest OS IP addresses"
+  ansible.builtin.debug:
     msg:
       - "VM IP addresses in guest OS: {{ all_ip_in_guest }}"
       - "VM IP addresses in guest info: {{ all_ip_in_guestinfo }}"
 
-- ansible.builtin.fail:
+- name: "Failed to collect guest OS networking info by VMware Tools"
+  ansible.builtin.fail:
     msg: "Failed to collect all guest OS IP addresses in guest info"
   when: >
     (vm_guestinfo_net is undefined) or

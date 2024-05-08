@@ -1,0 +1,40 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is to verify open-vm-tools installation by building source.
+# If guest OS doesn't have open-vm-tools, this case will install open-vm-tools by building source.
+# The source tarball can be downloaded from URL defined in linux_ovt_tarball_url.
+# If it already has open-vm-tools installed from package and "update_tools" variable is set "true"
+# in vars/test.yml, it will reinstall open-vm-tools.
+# If it already has open-vm-tools installed by other method (like building from source), this
+# test case will be skipped with result "Not Applicable" because of unknown uninstall method.
+#
+- name: ovt_verify_src_install
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Prepare for installing open-vm-tools"
+          include_tasks: pre_ovt_install.yml
+
+        - name: "Install open-vm-tools from source"
+          include_tasks: install_ovt_from_source.yml
+
+        - name: "Post actions after open-vm-tools installation"
+          include_tasks: post_ovt_install.yml
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true
+      always:
+        - name: "Collect open-vm-tools install log"
+          include_tasks: ../utils/fetch_file.yml
+          vars:
+            fetch_file_src_path: "{{ guest_ovt_installer_log }}"
+            fetch_file_dst_path: "{{ current_test_log_folder }}/"
+          when:
+            - guest_ovt_installer_log is defined
+            - guest_ovt_installer_log

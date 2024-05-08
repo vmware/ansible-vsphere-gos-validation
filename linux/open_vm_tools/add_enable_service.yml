@@ -1,0 +1,57 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Add and enable service for open-vm-tools or VGAuthService, so that
+# they can be started automatically
+# Parameters:
+#   service_name: The service name of open-vm-tools or VGAuthService.
+#     For example, vmtoolsd, vgauthd, etc
+#   service_file: The service file of open-vm-tools or VGAuthService
+#   service_file_local_path (optional): The local path to service file downloaded
+#     before uninstalling open-vm-tools
+#
+- name: "Check service_name and service_file are set"
+  ansible.builtin.assert:
+    that:
+      - service_name is defined
+      - service_name
+      - service_file is defined
+      - service_file
+    fail_msg: "'service_name' and 'service_file' must be set for adding guest OS service"
+
+# If there is no open-vm-tools package uninstalled before installing open-vm-tools from source,
+# no originial service file would be downloaded from guest OS. So here the new service file
+# will be added from a template
+- name: "Create a new service file from template for service {{ service_name }}"
+  ansible.builtin.template:
+    src: "templates/{{ service_name }}.tmpl"
+    dest: "{{ service_file }}"
+    mode: "0755"
+  delegate_to: "{{ vm_guest_ip }}"
+  when: service_file_local_path is undefined or not service_file_local_path
+
+# If there is open-vm-tools package uninstalled before installing open-vm-tools from source,
+# originial service file would be downloaded from guest OS. So here the new service file
+# will be copied from original service file downloaded from guest OS.
+- name: "Reuse original service file for service {{ service_name }}"
+  ansible.builtin.copy:
+    src: "{{ service_file_local_path }}"
+    dest: "{{ service_file }}"
+    mode: "0755"
+  delegate_to: "{{ vm_guest_ip }}"
+  when:
+    - service_file_local_path is defined
+    - service_file_local_path
+
+- name: "Enable Linux systemd service {{ service_name }}"
+  when: guest_os_ansible_system == 'linux'
+  block:
+    - name: "Reload systemd manager configuration"
+      ansible.builtin.shell: "systemctl daemon-reload"
+      delegate_to: "{{ vm_guest_ip }}"
+    
+    - name: "Enable and start service {{ service_name }}"
+      include_tasks: ../utils/service_operation.yml
+      vars:
+        service_enabled: true
+        service_state: "started"

@@ -3,12 +3,23 @@
 ---
 # Set the fact of open-vm-tools packages, processes and services
 #
-- name: "Set fact of open-vm-tools service for {{ guest_os_ansible_distribution }}"
+- name: "Set fact of open-vm-tools service name for {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
-    ovt_service: |-
+    ovt_service_name: |-
       {%- if guest_os_family == 'FreeBSD' -%}vmware-guestd
       {%- elif guest_os_family in ['Debian', 'Astra Linux (Orel)'] -%}open-vm-tools
       {%- else  -%}vmtoolsd
+      {%- endif -%}
+
+- name: "Get systemd unit path"
+  include_tasks: get_systemd_unit_path.yml
+  when: guest_systemd_unit_path is undefined or not guest_systemd_unit_path
+
+- name: "Set fact of open-vm-tools service file path"
+  ansible.builtin.set_fact:
+    ovt_service_file:  |-
+      {%- if guest_os_ansible_system == 'freebsd' -%}/usr/local/etc/rc.d/vmware-guestd
+      {%- else -%}{{ guest_systemd_unit_path }}/{{ ovt_service_name }}.service
       {%- endif -%}
 
 - name: "Set facts of open-vm-tools packages and processes for {{ guest_os_ansible_distribution }}"

@@ -1,0 +1,66 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the directory path to Linux systemd system units. 
+# By default, most Linux distributions use /lib/systemd/system for system-wide unit files.
+# However, some distributions may use /usr/lib/systemd/system or have a combination of
+# both directories.
+# Return:
+#   guest_systemd_unit_path: The directory path to Linux systemd system units
+#
+- name: "Initialize systemd unit path"
+  ansible.builtin.set_fact:
+    guest_systemd_unit_path: ""
+
+- name: "Get systemd unit path for Linux system"
+  when: guest_os_ansible_system == "linux"
+  block:
+    - name: "Get systemd 'UnitPath' property"
+      include_tasks: get_systemd_unit_properties.yml
+      vars:
+        guest_systemd_show_properties: "UnitPath"
+
+    - name: "Check systemd 'UnitPath' property"
+      ansible.builtin.assert:
+        that:
+          - guest_systemd_unit_properties.UnitPath is defined
+          - guest_systemd_unit_properties.UnitPath
+        fail_msg: "Failed to get systemd 'UnitPath' property"
+        success_msg: "The systemd 'UnitPath' property value is {{ guest_systemd_unit_properties.UnitPath }}"
+
+    - name: "Get stat information of all systemd unit paths"
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      ignore_errors: true
+      delegate_to: "{{ vm_guest_ip }}"
+      with_items: "{{ guest_systemd_unit_properties.UnitPath.split() | select('search', '/lib/systemd/system') }}"
+      register: unit_paths_stat_result
+
+    - name: "Set facts of checking systemd unit paths existence result"
+      ansible.builtin.set_fact:
+        existing_unit_paths: >-
+          {{
+            dict(_keys|zip(_values)) | dict2items |
+            selectattr('value', 'equalto', true) |
+            map(attribute='key') | flatten
+          }}
+      vars:
+        _keys: "{{ unit_paths_stat_result.results | map(attribute='item') }}"
+        _values: "{{ unit_paths_stat_result.results | map(attribute='stat', default={}) | map(attribute='exists', default=false) }}"
+
+    - name: "Check systemd unit path exists"
+      ansible.builtin.assert:
+        that:
+          - existing_unit_paths | length > 0
+          - existing_unit_paths[0]
+        fail_msg: "There is no existing systemd unit path"
+        success_msg: "The systemd unit path is {{ existing_unit_paths[0] }}"
+
+    - name: "Set fact of systemd unit path"
+      ansible.builtin.set_fact:
+        guest_systemd_unit_path: "{{ existing_unit_paths[0] }}"
+
+- name: "FreeBSD doesn't have systemd"
+  ansible.builtin.debug:
+    msg: "There is no systemd unit path on FreeBSD"
+  when: guest_os_ansible_system == "freebsd"

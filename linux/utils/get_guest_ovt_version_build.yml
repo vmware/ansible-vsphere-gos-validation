@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Get open-vm-tools version, build, and install type
+# Parameter:
+#   ovt_install_type (optional): If ovt_install_type is set, use it to set vmtools_install_type
 #
 
 - name: "Initialize facts about VMware Tools info"
@@ -28,8 +30,11 @@
         vmtools_version: "{{ ovt_version.stdout.split()[0] | regex_search('([0-9]+\\.){2}[0-9]+') }}"
         vmtools_build_number: "{{ ovt_version.stdout.split()[-1] | regex_search('[0-9]+') }}"
 
+    # Neither ovt_verify_pkg_install or ovt_verify_src_install was executed in current testing
     - name: "Get open-vm-tools install type on {{ guest_os_ansible_distribution }}"
-      when: guest_os_ansible_distribution != 'Flatcar'
+      when:
+        - guest_os_ansible_distribution != 'Flatcar'
+        - ovt_install_type is undefined
       block:
         - name: "Get open-vm-tools package info"
           include_tasks: get_installed_package_info.yml
@@ -45,6 +50,12 @@
       ansible.builtin.set_fact:
         vmtools_install_type: "package"
       when: guest_os_ansible_distribution == 'Flatcar'
+
+    # Either ovt_verify_pkg_install or ovt_verify_src_install was executed in current testing
+    - name: "Set fact of open-vm-tools install type to '{{ ovt_install_type }}' for {{ guest_os_ansible_distribution }}"
+      ansible.builtin.set_fact:
+        vmtools_install_type: "{{ ovt_install_type }}"
+      when: ovt_install_type is defined
 
 - name: "Print open-vm-tools version, build and install type"
   ansible.builtin.debug:

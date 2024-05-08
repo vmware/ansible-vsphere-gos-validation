@@ -1,0 +1,38 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Download service files for open-vm-tools and VGAuthService
+# and reuse them after installing open-vm-tools from source
+#
+- name: "Set facts of local paths to downloaded service files"
+  ansible.builtin.set_fact:
+    ovt_service_file_local_path: ""
+    vgauth_service_file_local_path: ""
+
+- name: "Download open-vm-tools service file"
+  when: ovt_service_file
+  block:
+    - name: "Fetch open-vm-tools service file from guest OS"
+      include_tasks: ../utils/fetch_file.yml
+      vars:
+        fetch_file_src_path: "{{ ovt_service_file }}"
+        fetch_file_dst_path: "{{ current_test_log_folder }}/"
+    
+    - name: "Set fact of local path to open-vm-tools service file"
+      ansible.builtin.set_fact:
+        ovt_service_file_local_path: "{{ fetch_file_local_path }}"
+      when: fetch_file_local_path
+
+- name: "Download VGAuthService service file"
+  when: vgauth_service_file
+  block:
+    - name: "Fetch VGAuthService service file from guest OS"
+      include_tasks: ../utils/fetch_file.yml
+      vars:
+        fetch_file_src_path: "{{ vgauth_service_file }}"
+        fetch_file_dst_path: "{{ current_test_log_folder }}/"
+
+    - name: "Set fact of local path to VGAuthService service file"
+      ansible.builtin.set_fact:
+        vgauth_service_file_local_path: "{{ fetch_file_local_path }}"
+      when: fetch_file_local_path
