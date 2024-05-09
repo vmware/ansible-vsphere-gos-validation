@@ -1,0 +1,36 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+#
+- name: "Set the online Windows updates reject list"
+  ansible.builtin.set_fact:
+    win_updates_reject_list: "{{ windows_updates_reject_list.split(',') | map('trim') }}"
+  when:
+    - windows_updates_reject_list is defined
+    - windows_updates_reject_list
+
+- name: "Install online Windows Updates"
+  include_tasks: ../utils/win_install_online_updates.yml
+  vars:
+    win_updates_ignore_errors: true
+
+- name: "Check if online Windows Updates log file exists in guest OS"
+  include_tasks: ../utils/win_check_file_exist.yml
+  vars:
+    win_check_file_exist_file: "{{ win_updates_log_file }}"
+
+- name: "Fetch the online Windows Updates log file to local machine and delete it from guest OS"
+  when: win_check_file_exist_result
+  block:
+    - name: "Get online Windows Updates log file from guest OS to local machine"
+      include_tasks: ../utils/win_get_file.yml
+      vars:
+        win_get_file_src_path: "{{ win_updates_log_file }}"
+        win_get_file_dst_path: "{{ current_test_log_folder }}"
+
+    - name: "Delete online Windows Updates log file from guest OS"
+      ansible.windows.win_file:
+        path: "{{ win_updates_log_file }}"
+        state: absent
+      delegate_to: "{{ vm_guest_ip }}"
+      register: delete_file_result
+      ignore_errors: true
