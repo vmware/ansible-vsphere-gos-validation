@@ -1,0 +1,44 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Try to remove C:\Windows.old folder in guest OS after Windows online update to
+# avoid following test case failure due to this folder takes large disk space
+#
+- name: "Set fact of the path of Windows.old folder in guest OS"
+  ansible.builtin.set_fact:
+    windows_old_path: "C:\\Windows.old"
+
+- name: "Check if Windows.old folder exists"
+  include_tasks: ../utils/win_check_file_exist.yml
+  vars:
+    win_check_file_exist_file: "{{ windows_old_path }}"
+- name: "Set fact of Windows.old folder existence state"
+  ansible.builtin.set_fact:
+    windows_old_exists: "{{ win_check_file_exist_result }}"
+
+- name: "Remove Windows.old folder"
+  when: windows_old_exists
+  block:
+    - name: "Execute cleanmgr commands to remove Windows.old folder"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: >-
+          $win_remove_old="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Previous Installations";
+          New-ItemProperty -Path $win_remove_old -Name StateFlags0001 -Value 2 -PropertyType DWord -Force;
+          Start-Process -FilePath CleanMgr.exe -ArgumentList '/sagerun:1'
+    - name: "Get Windows.old folder state after removing"
+      include_tasks: ../utils/win_check_file_exist.yml
+      vars:
+        win_check_file_exist_file: "{{ windows_old_path }}"
+    - name: "Check if Windows.old folder is removed"
+      ansible.builtin.assert:
+        that:
+          - not win_check_file_exist_result
+        fail_msg: >-
+          After removing Windows previous installations by cleanmgr.exe, folder '{{ windows_old_path }}'
+          still exists or getting the state of this folder after removing failed.
+
+- name: "Did not get the state of Windows.old folder"
+  ansible.builtin.debug:
+    msg: "Skip removing Windows.old folder since '{{ windows_old_path }}' does not exist or getting the state of this folder failed."
+  when: not windows_old_exists

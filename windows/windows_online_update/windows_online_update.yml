@@ -11,6 +11,15 @@
   tasks:
     - name: "Test case block"
       block:
+        - name: "Check parameter 'windows_updated_build_num' value"
+          ansible.builtin.assert:
+            that:
+              - windows_updated_build_num is regex("^[0-9]{5}$")
+            fail_msg: >-
+              Parameter 'windows_updated_build_num' is not set to a valid value: "{{ windows_updated_build_num }}",
+              please set it to a valid build number like '12345'.
+          when: windows_updated_build_num is defined
+
         - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
 
@@ -26,6 +35,16 @@
           include_tasks: ../utils/win_get_os_version.yml
         - name: "Display guest OS version build after installing Windows updates"
           ansible.builtin.debug: var=win_os_version_build
+
+        - name: "Check OS build number after installing Windows updates"
+          ansible.builtin.assert:
+            that:
+              -
+            fail_msg: ""
+          when: windows_updated_build_num is defined
+
+        - name: "Remove Windows.old folder after installing Windows updates"
+          include_tasks: remove_windows_old.yml
 
         - name: "Reset base snapshot after installing Windows updates"
           include_tasks: ../../common/reset_base_snapshot.yml
