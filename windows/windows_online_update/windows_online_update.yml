@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is used for updating Windows guest OS
-# through Windows Update.
+#   This test case is used for installing Windows online updates in
+# guest OS through Windows Update.
 #
 - name: windows_online_update
   hosts: localhost
@@ -14,10 +14,10 @@
         - name: "Check parameter 'windows_updated_build_num' value"
           ansible.builtin.assert:
             that:
-              - windows_updated_build_num is regex("^[0-9]{5}$")
+              - windows_updated_build_num is regex("^[0-9]{5}(\.[0-9]+)?$")
             fail_msg: >-
               Parameter 'windows_updated_build_num' is not set to a valid value: "{{ windows_updated_build_num }}",
-              please set it to a valid build number like '12345'.
+              please set it to a valid build number, e.g., '22000', '22000.1', '22000.1234'.
           when: windows_updated_build_num is defined
 
         - name: "Test setup"
@@ -39,8 +39,10 @@
         - name: "Check OS build number after installing Windows updates"
           ansible.builtin.assert:
             that:
-              -
-            fail_msg: ""
+              - '.'.join(win_os_version_build.split('.')[2:]) is version(windows_updated_build_num, '>=')
+            fail_msg: >-
+              After installing Windows updates guest OS build number is "{{ '.'.join(win_os_version_build.split('.')[2:]) }}",
+              which is not newer than the expected build '{{ windows_updated_build_num }}'.
           when: windows_updated_build_num is defined
 
         - name: "Remove Windows.old folder after installing Windows updates"
