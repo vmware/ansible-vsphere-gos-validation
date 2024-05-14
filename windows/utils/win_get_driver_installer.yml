@@ -24,19 +24,26 @@
       {%- elif win_get_driver_installer_name == 'vmxnet3' -%}vmxnet3ndis6
       {%- else -%}{%- endif -%}
 
+# Get-ItemPropertyValue cmdlet is not contained in Windows Server 2012 R2
 - name: "Get driver installer registry info"
   include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: |-
       if ($(Test-Path -Path "HKLM:\System\CurrentControlSet\Services\{{ win_driver_service }}")) {
-          Get-ItemPropertyValue -Path "HKLM:\System\CurrentControlSet\Services\{{ win_driver_service }}" -Name 'vwdk.installers'
+        reg query "HKLM\System\CurrentControlSet\Services\{{ win_driver_service }}" /v 'vwdk.installers' | findstr 'REG'
       }
+
+#   win_powershell_cmd: |-
+#     if ($(Test-Path -Path "HKLM:\System\CurrentControlSet\Services\{{ win_driver_service }}")) {
+#         Get-ItemPropertyValue -Path "HKLM:\System\CurrentControlSet\Services\{{ win_driver_service }}" -Name 'vwdk.installers'
+#     }
+
 - name: "Set fact of the driver installer info list"
   ansible.builtin.set_fact:
-    win_driver_installer_list: "{{ win_powershell_cmd_output.stdout_lines | select }}"
+    win_driver_installer_list: "{{ win_powershell_cmd_output.stdout_lines[0].split(' ')[-1] }}"
   when:
     - win_powershell_cmd_output.stdout_lines is defined
-    - win_powershell_cmd_output.stdout_lines | length != 0
+    - win_powershell_cmd_output.stdout_lines | length == 1
 
 - name: "Display the driver installer info list"
   ansible.builtin.debug:
