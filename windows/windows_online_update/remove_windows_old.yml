@@ -1,7 +1,7 @@
 # Copyright 2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Try to remove C:\Windows.old folder in guest OS after Windows online update to
+# Remove "C:\Windows.old" folder in guest OS after Windows online update to
 # avoid following test case failure due to this folder takes large disk space
 #
 - name: "Set fact of the path of Windows.old folder in guest OS"
@@ -26,6 +26,9 @@
           $win_remove_old="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Previous Installations";
           New-ItemProperty -Path $win_remove_old -Name StateFlags0001 -Value 2 -PropertyType DWord -Force;
           Start-Process -FilePath CleanMgr.exe -ArgumentList '/sagerun:1'
+    - name: "Pause 5 seconds after removing Windows.old folder"
+      ansible.builtin.pause:
+        seconds: 5
     - name: "Get Windows.old folder state after removing"
       include_tasks: ../utils/win_check_file_exist.yml
       vars:
