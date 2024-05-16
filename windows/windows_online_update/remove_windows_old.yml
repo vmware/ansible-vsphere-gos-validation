@@ -15,9 +15,12 @@
 - name: "Set fact of Windows.old folder existence state"
   ansible.builtin.set_fact:
     windows_old_exists: "{{ win_check_file_exist_result }}"
+    windows_old_size: "{{ win_check_file_info.stat.size | default(0) }}"
 
 - name: "Remove Windows.old folder"
-  when: windows_old_exists
+  when:
+    - windows_old_exists
+    - windows_old_size | int != 0
   block:
     - name: "Execute cleanmgr commands to remove Windows.old folder"
       include_tasks: ../utils/win_execute_cmd.yml
@@ -43,5 +46,7 @@
 
 - name: "Did not get the state of Windows.old folder"
   ansible.builtin.debug:
-    msg: "Skip removing Windows.old folder since '{{ windows_old_path }}' does not exist or getting the state of this folder failed."
-  when: not windows_old_exists
+    msg: >-
+      Skip removing folder '{{ windows_old_path }}' due to it does not exist or it's size is 0,
+      or getting the state info of this folder failed.
+  when: not windows_old_exists or windows_old_size | int == 0
