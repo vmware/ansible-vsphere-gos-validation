@@ -25,13 +25,15 @@
     fail_msg: "VMware Tools installation setup files are not in D:\\"
     success_msg: "VMware Tools installation setup files are in D:\\"
 
+# In Windows Server 2012 R2 guest OS, need to set 'become' to run
+# VMware Tools install command
 - name: "Execute VMware Tools silent install command in guest"
   ansible.windows.win_shell: "{{ vmtools_install_cmd }}"
   delegate_to: "{{ vm_guest_ip }}"
   ignore_errors: true
-  become: true
+  become: "{{ true if ('Windows Server 2012 R2' in guest_os_ansible_distribution) else false }}"
   become_method: runas
-  become_user: Administrator
+  become_user: "{{ 'Administrator' if ('Windows Server 2012 R2' in guest_os_ansible_distribution) else omit }}"
   register: wintools_install_result
   async: 600
   poll: 0
