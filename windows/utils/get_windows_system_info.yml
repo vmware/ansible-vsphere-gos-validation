@@ -30,15 +30,9 @@
     - (guest_os_product_type | lower == 'server' and guest_os_build_num | int >= 20348) or (guest_os_product_type | lower == 'client' and guest_os_build_num | int >= 22449)
 
 - name: "Get Windows guest OS edition from distribution info"
-  block:
-    - name: "Set fact of Windows guest OS edition info"
-      ansible.builtin.set_fact:
-        guest_os_edition_info: >-
-          {{ guest_os_ansible_distribution | regex_search('Microsoft Windows( Server)? ([0-9]+) (R2 )?(.*)', '\4') }}
-    - name: "Set fact of Windows guest OS edition info"
-      ansible.builtin.set_fact:
-        guest_os_edition: "{{ guest_os_edition_info[0].strip() }}"
-      when: guest_os_edition_info and guest_os_edition_info | length > 0
+  ansible.builtin.set_fact:
+    guest_os_edition: >-
+      {{ guest_os_ansible_distribution | regex_search('Microsoft Windows( Server)? ([0-9]+) (R2 )?(.*)', '\4') | first }}
   when: guest_os_ansible_distribution
 
 - name: "Print Windows guest OS information"
