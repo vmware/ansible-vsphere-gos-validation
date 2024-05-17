@@ -77,12 +77,17 @@
       Get usernames of 'vmtoolsd' processes:
       {{ win_powershell_cmd_output.stdout_lines }}.
 
-- name: "Get problem device after VMware Tools install"
-  include_tasks: ../utils/win_get_problem_device.yml
-- name: "Check no problem device listed"
-  ansible.builtin.assert:
-    that:
-      - gos_has_problem_device is defined
-      - not gos_has_problem_device
-    fail_msg: "Problem devices were found in guest OS, please check listed problem devices: {{ gos_problem_device_list }}"
-    success_msg: "No problem device is found in guest OS."
+# In Windows Server 2012 R2 or older OS there is no cmdlet 'Get-PnpDevice',
+# so here only check in newer OS
+- name: "Check if there is problem device in Device Manager"
+  when: guest_os_ansible_distribution_ver is version('6.3.9600.0', '>')
+  block:
+    - name: "Get problem device after VMware Tools install"
+      include_tasks: ../utils/win_get_problem_device.yml
+    - name: "Check no problem device listed"
+      ansible.builtin.assert:
+        that:
+          - gos_has_problem_device is defined
+          - not gos_has_problem_device
+        fail_msg: "Problem devices were found in guest OS, please check listed problem devices: {{ gos_problem_device_list }}"
+        success_msg: "No problem device is found in guest OS."
