@@ -1,0 +1,19 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Remove registry items configured when pausing Windows Update
+# to resume getting Windows online updates
+- name: "Remove pause Windows Update registry items"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings' -Name "Pause*";
+      Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Setting' -Name 'ExcludeWUDriversInQualityUpdate';
+      Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\PolicyManager\default\Update' -Name 'ExcludeWUDriversInQualityUpdate';
+      Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate' -Name 'ExcludeWUDriversInQualityUpdate';
+      Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\PolicyManager\current\device\Update' -Name 'ExcludeWUDriversInQualityUpdate'
+
+- name: "Restart guest OS after configuration"
+  include_tasks: win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
