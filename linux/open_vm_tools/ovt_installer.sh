@@ -30,9 +30,9 @@ commands=("autoreconf -f -i"
           "ldconfig")
 rc=0
 
-# Create the directory path of tools.conf on FreeBSD
 system=$(uname -s)
 if [ "$system" == "FreeBSD" ]; then
+    # Create the directory path of tools.conf on FreeBSD
     mkdir -p $INSTALL_PREFIX/share/vmware-tools/
     chmod a+rx $INSTALL_PREFIX/share/vmware-tools/
 
