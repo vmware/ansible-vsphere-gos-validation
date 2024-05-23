@@ -44,10 +44,36 @@
       when: guest_os_ansible_distribution_major_ver | int >= 9
   when: guest_os_ansible_distribution == "Rocky"
 
-- name: "Set default RPM GPG key file for VMware Photon OS"
-  ansible.builtin.set_fact:
-    guest_rpm_gpg_key_path: "/etc/pki/rpm-gpg/VMWARE-RPM-GPG-KEY"
+- name: "Set RPM GPG key file for VMware Photon OS"
   when: guest_os_ansible_distribution == "VMware Photon OS"
+  block:
+    - name: "Set command for updating GPG key file"
+      ansible.builtin.set_fact:
+        guest_gpg_key_update_cmd: |-
+          {%- if guest_os_ansible_distribution_major_ver | int == 3 -%}tdnf update -y photon-repos-3.0-8.ph3 --refresh
+          {%- elif guest_os_ansible_distribution_major_ver | int == 4 -%}tdnf update -y photon-repos-4.0-3.ph4 --enablerepo=photon --refresh
+          {%- endif -%}
+
+    - name: "Update and set RPM GPG key for VMware Photon OS {{ guest_os_ansible_distribution_ver }}"
+      when: guest_gpg_key_update_cmd
+      block:
+        - name: "Update RPM GPG key on VMware Photon OS {{ guest_os_ansible_distribution_ver }}"
+          ansible.builtin.shell: "{{ guest_gpg_key_update_cmd }}"
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - name: "Update RPM GPG key files in repo files"
+          ansible.builtin.shell: "sed -r -i 's#gpgkey=(file:///etc/pki/rpm-gpg/VMWARE-RPM-GPG-KEY)$#gpgkey=\\1 \\1-4096#' /etc/yum.repos.d/*.repo"
+          delegate_to: "{{ vm_guest_ip }}"
+          ignore_errors: true
+
+        - name: "Set default RPM GPG key file for VMware Photon OS {{ guest_os_ansible_distribution_ver }}"
+          ansible.builtin.set_fact:
+            guest_rpm_gpg_key_path: "/etc/pki/rpm-gpg/VMWARE-RPM-GPG-KEY-4096"
+
+    - name: "Set default RPM GPG key file for VMware Photon OS {{ guest_os_ansible_distribution_ver }}"
+      ansible.builtin.set_fact:
+        guest_rpm_gpg_key_path: "/etc/pki/rpm-gpg/VMWARE-RPM-GPG-KEY"
+      when: not guest_gpg_key_update_cmd
 
 - name: "Set default RPM GPG key file for ProLinux"
   ansible.builtin.set_fact:
