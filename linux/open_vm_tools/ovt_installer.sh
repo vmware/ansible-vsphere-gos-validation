@@ -35,6 +35,24 @@ system=$(uname -s)
 if [ "$system" == "FreeBSD" ]; then
     mkdir -p $INSTALL_PREFIX/share/vmware-tools/
     chmod a+rx $INSTALL_PREFIX/share/vmware-tools/
+
+    # Workaround for compiliing error on FreeBSD 14
+    freebsd_version=$(freebsd-version | cut -d '.' -f 1)
+    echo "FreeBSD release version is $freebsd_version"
+    if [ $freebsd_version -ge 14 ]; then
+        vmmemctl_patch="/usr/ports/emulators/open-vm-tools/files/patch-modules_freebsd_vmmemctl_os.c"
+        vmblock_patch="/usr/ports/emulators/open-vm-tools/files/patch-modules_freebsd_vmblock_vfsops.c"
+
+        if [ -e "$vmmemctl_patch" ]; then
+            echo "Applying patch $vmmemctl_patch"
+            patch < $vmmemctl_patch
+        fi
+
+        if [ -e "$vmblock_patch" ]; then
+            echo "Applying patch $vmblock_patch"
+            patch < $vmblock_patch
+        fi
+    fi
 fi
 
 for cmd in  "${commands[@]}"; do
