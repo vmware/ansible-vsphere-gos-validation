@@ -54,6 +54,8 @@
           {%- elif guest_os_ansible_distribution_major_ver | int == 4 -%}tdnf update -y photon-repos-4.0-3.ph4 --enablerepo=photon --refresh
           {%- endif -%}
 
+    # 1024bit GPG key expired on VMware Photon OS 3.0 & 4.0, we need to get 4096 bit GPG key
+    # VMware Photon 5.0 already has 4096 bit GPG key, no need to update
     - name: "Update and set RPM GPG key for VMware Photon OS {{ guest_os_ansible_distribution_ver }}"
       when: guest_gpg_key_update_cmd
       block:
@@ -66,14 +68,10 @@
           delegate_to: "{{ vm_guest_ip }}"
           ignore_errors: true
 
-        - name: "Set default RPM GPG key file for VMware Photon OS {{ guest_os_ansible_distribution_ver }}"
-          ansible.builtin.set_fact:
-            guest_rpm_gpg_key_path: "/etc/pki/rpm-gpg/VMWARE-RPM-GPG-KEY-4096"
-
+    # Use 4096 bit GPG key on VMware Photon OS
     - name: "Set default RPM GPG key file for VMware Photon OS {{ guest_os_ansible_distribution_ver }}"
       ansible.builtin.set_fact:
-        guest_rpm_gpg_key_path: "/etc/pki/rpm-gpg/VMWARE-RPM-GPG-KEY"
-      when: not guest_gpg_key_update_cmd
+        guest_rpm_gpg_key_path: "/etc/pki/rpm-gpg/VMWARE-RPM-GPG-KEY-4096"
 
 - name: "Set default RPM GPG key file for ProLinux"
   ansible.builtin.set_fact:
@@ -81,6 +79,7 @@
   when: guest_os_ansible_distribution == "ProLinux"
 
 - name: "Check GPG key file '{{ guest_rpm_gpg_key_path }}' exists or not"
+  when: guest_rpm_gpg_key_path
   block:
     - name: "Check GPG key file '{{ guest_rpm_gpg_key_path }}' exists or not"
       include_tasks: get_file_stat_info.yml
@@ -90,29 +89,36 @@
     - name: "Set fact of RPM GPG key file exists or not"
       ansible.builtin.set_fact:
         guest_rpm_gpg_key_exists: "{{ guest_file_exists }}"
-  when: guest_rpm_gpg_key_path
 
-- name: "Look for an alternative RPM GPG key file"
-  block:
-    - name: "Look for RPM GPG key files"
-      ansible.builtin.command: "ls /etc/pki/rpm-gpg/RPM-GPG-KEY-*"
-      delegate_to: "{{ vm_guest_ip }}"
-      register: list_rpm_gpg_keys
-      changed_when: false
-      ignore_errors: true
-
-    - name: "Set default GPG key file for {{ guest_os_ansible_distribution }}"
-      ansible.builtin.set_fact:
-        guest_rpm_gpg_key_path: "{{ list_rpm_gpg_keys.stdout_lines[0] }}"
-        guest_rpm_gpg_key_exists: true
-      when:
-        - list_rpm_gpg_keys.stdout_lines is defined
-        - list_rpm_gpg_keys.stdout_lines | length > 0
-
-    - name: "Set RPM GPG key file to empty as no RPM GPG key file found"
-      ansible.builtin.set_fact:
-        guest_rpm_gpg_key_path: ""
-      when: >
-        list_rpm_gpg_keys.stdout_lines is undefined or
-        list_rpm_gpg_keys.stdout_lines | length == 0
+- name: "GPG key file doesn't exist"
   when: not (guest_rpm_gpg_key_exists | bool)
+  block:
+    - name: "No RPM GPG key file on VMware Photon OS"
+      ansible.builtin.fail:
+        msg: "Not found RPM GPG key file {{ guest_rpm_gpg_key_path }} VMware Photon OS"
+      when: guest_os_ansible_distribution == "VMware Photon OS"
+
+    - name: "Look for an alternative RPM GPG key file for {{ guest_os_ansible_distribution }}"
+      when: guest_os_ansible_distribution != "VMware Photon OS"
+      block:
+        - name: "Look for RPM GPG key files"
+          ansible.builtin.command: "ls /etc/pki/rpm-gpg/RPM-GPG-KEY-*"
+          delegate_to: "{{ vm_guest_ip }}"
+          register: list_rpm_gpg_keys
+          changed_when: false
+          ignore_errors: true
+
+        - name: "Set default GPG key file for {{ guest_os_ansible_distribution }}"
+          ansible.builtin.set_fact:
+            guest_rpm_gpg_key_path: "{{ list_rpm_gpg_keys.stdout_lines[0] }}"
+            guest_rpm_gpg_key_exists: true
+          when:
+            - list_rpm_gpg_keys.stdout_lines is defined
+            - list_rpm_gpg_keys.stdout_lines | length > 0
+
+        - name: "Set RPM GPG key file to empty as no RPM GPG key file found"
+          ansible.builtin.set_fact:
+            guest_rpm_gpg_key_path: ""
+          when: >
+            list_rpm_gpg_keys.stdout_lines is undefined or
+            list_rpm_gpg_keys.stdout_lines | length == 0
