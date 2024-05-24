@@ -33,23 +33,24 @@
     # Neither ovt_verify_pkg_install or ovt_verify_src_install was executed in current testing
     - name: "Get open-vm-tools install type on {{ guest_os_ansible_distribution }}"
       when:
-        - guest_os_ansible_distribution != 'Flatcar'
+        - guest_os_ansible_distribution not in ['Flatcar', 'RHCOS']
         - ovt_install_type is undefined
       block:
-        - name: "Get open-vm-tools package info"
-          include_tasks: get_installed_package_info.yml
-          vars:
-            package_name: "{{ 'open-vm-tools-nox11' if guest_os_family == 'FreeBSD' and not guest_os_with_gui else 'open-vm-tools' }}"
+        - name: "Get installed packages on guest OS"
+          include_tasks: get_installed_packages.yml
     
+        # Check whether open-vm-tools or open-vm-tools-nox11 (for FreeBSD without GUI) is installed
         - name: "Set fact of open-vm-tools install type to 'package' for {{ guest_os_ansible_distribution }}"
           ansible.builtin.set_fact:
             vmtools_install_type: "package"
-          when: package_info | length > 0
+          when:
+            - guest_installed_packages | length > 0
+            - guest_installed_packages | select('match', 'open-vm-tools(-nox11)?') | length > 0
 
     - name: "Set fact of open-vm-tools install type to 'package' for Flatcar"
       ansible.builtin.set_fact:
         vmtools_install_type: "package"
-      when: guest_os_ansible_distribution == 'Flatcar'
+      when: guest_os_ansible_distribution in ['Flatcar', 'RHCOS']
 
     # Either ovt_verify_pkg_install or ovt_verify_src_install was executed in current testing
     - name: "Set fact of open-vm-tools install type to '{{ ovt_install_type }}' for {{ guest_os_ansible_distribution }}"

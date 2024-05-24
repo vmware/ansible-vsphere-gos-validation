@@ -7,6 +7,7 @@
 #   clean_cache_cmd: The command to clean all cache and metadata
 #
 - name: "Update package metadata"
+  when: check_update_cmd is defined and check_update_cmd
   block:
     # Clean all cache and metadata if necessary
     - name: "Clean all cache and metadata"
@@ -21,8 +22,6 @@
     # This issue may cause open-vm-tools installation fail.
     - name: "Get OS packages updates"
       ansible.builtin.command: "{{ check_update_cmd }}"
-      vars:
-        ansible_async_dir: /tmp/.ansible_async/
       async: 300
       poll: 10
       ignore_errors: true
@@ -31,23 +30,19 @@
       register: repo_update_result
 
     - name: "Asnyc task to check OS packages update status"
+      when:
+        - repo_update_result.ansible_job_id is defined
+        - repo_update_result.finished is undefined or repo_update_result.finished != 1
       block:
         - name: "Check OS packages updates status"
           ansible.builtin.async_status:
             jid: "{{ repo_update_result.ansible_job_id }}"
           register: job_result
-          vars:
-            ansible_async_dir: /tmp/.ansible_async/
           delegate_to: "{{ vm_guest_ip }}"
           until: job_result.finished == 1
           retries: 20
           delay: 15
           ignore_errors: true
-          when: repo_update_result.ansible_job_id is defined
 
         - name: "Print check update result"
           ansible.builtin.debug: var=repo_update_result
-      when:
-        - repo_update_result is defined
-        - repo_update_result.finished is undefined or repo_update_result.finished != 1
-  when: check_update_cmd is defined and check_update_cmd
