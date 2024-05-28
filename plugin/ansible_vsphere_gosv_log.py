@@ -930,26 +930,24 @@ class CallbackModule(CallbackBase):
                 str(task.action) == "ansible.builtin.set_fact"):
             ansible_facts = task_result.get('ansible_facts', None)
             if ansible_facts:
-                non_empty_facts = dict(filter(lambda item: item[1] != '',
-                                              ansible_facts.items()))
-                self._ansible_gosv_facts.update(non_empty_facts)
-                if ("current_testcase_name" in non_empty_facts and
+                self._ansible_gosv_facts.update(ansible_facts)
+                if ("current_testcase_name" in ansible_facts and
+                    ansible_facts["current_testcase_name"] and
                     self._last_test_id and
                     self._last_test_id in self.test_runs):
                     # Update deploy_vm test case name
-                    self.test_runs[self._last_test_id].name = non_empty_facts['current_testcase_name']
+                    self.test_runs[self._last_test_id].name = ansible_facts['current_testcase_name']
 
-                if (self._ansible_gosv_facts.get('esxi_build','') and
-                    self._ansible_gosv_facts.get('vm_hardware_version','') and
-                    self._ansible_gosv_facts.get('guestinfo_vmtools_info', '')):
-                    # Save guest info
-                    vm_guest_info = VmGuestInfo(self._ansible_gosv_facts)
-                    guestinfo_hash = str(hash("{}{}{}".format(vm_guest_info.ESXi_Build,
-                                                              vm_guest_info.VMTools_Version,
-                                                              vm_guest_info.Hardware_Version)))
-
-                    if guestinfo_hash not in self.collected_guest_info:
-                        self.collected_guest_info[guestinfo_hash] = vm_guest_info
+                if task_file == 'vm_get_guest_info.yml':
+                    esxi_build = self._ansible_gosv_facts.get('esxi_build','')
+                    vm_hw_version = self._ansible_gosv_facts.get('vm_hardware_version','')
+                    vmtools_version = self._ansible_gosv_facts.get('guestinfo_vmtools_info','')
+                    if (esxi_build and vm_hw_version and vmtools_version):
+                        guestinfo_hash = str(hash("{}{}{}".format(esxi_build, vm_hw_version, vmtools_version)))
+                        if guestinfo_hash not in self.collected_guest_info:
+                            # Save guest info
+                            vm_guest_info = VmGuestInfo(self._ansible_gosv_facts)
+                            self.collected_guest_info[guestinfo_hash] = vm_guest_info
 
         elif (task_file in ["deploy_vm.yml", "test_setup.yml"] and
               str(task.action) == "ansible.builtin.debug"):
