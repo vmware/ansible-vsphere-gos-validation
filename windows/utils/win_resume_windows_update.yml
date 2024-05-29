@@ -6,6 +6,7 @@
 - name: "Remove pause Windows Update registry items"
   include_tasks: win_execute_cmd.yml
   vars:
+    win_execute_cmd_ignore_error: true
     win_powershell_cmd: >-
       Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings' -Name "Pause*";
       Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Setting' -Name 'ExcludeWUDriversInQualityUpdate';
@@ -17,3 +18,6 @@
   include_tasks: win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"
+  when:
+    - win_powershell_cmd_output.failed is defined
+    - not win_powershell_cmd_output.failed
