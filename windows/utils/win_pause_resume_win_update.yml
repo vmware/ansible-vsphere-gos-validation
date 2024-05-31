@@ -1,0 +1,58 @@
+# Copyright 2022-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Disable Windows auto update and pause Windows Update 7 days,
+# or delete this pauing Windows Update config in registry to
+# resume Windows Update.
+# Paramters:
+#   win_update_ops: valid values are 'pause' or 'resume'.
+#
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - win_update_ops is defined
+      - win_update_ops in ['pause', 'resume']
+    fail_msg: "Please set parameter 'win_update_ops': {{ win_update_ops | default('') }}, valid value is 'pause' or 'resume'."
+
+- name: "Set fact of PowerShell script file name"
+  ansible.builtin.set_fact:
+    win_update_script: |-
+      {%- if win_update_ops == 'pause' -%}pause_windows_update.ps1
+      {%- elif win_update_ops == 'resume' -%}resume_windows_update.ps1
+      {%- endif -%}
+
+# Transfer PowerShell script to guest OS
+- name: "Set fact of PowerShell script file path"
+  ansible.builtin.set_fact:
+    local_ps_file: "scripts/{{ win_update_script }}"
+    remote_ps_file: "C:\\{{ win_update_script }}"
+- name: "Copy file from local to guest OS"
+  include_tasks: win_copy_file_from_local.yml
+  vars:
+    src_path_local: "{{ local_ps_file }}"
+    dest_path_remote: "C:\\"
+- name: "Check if file {{ remote_ps_file }} exists"
+  include_tasks: win_check_file_exist.yml
+  vars:
+    win_check_file_exist_file: "{{ remote_ps_file }}"
+
+# Pause Windows Update is not a demand task, so ignore errors
+- name: "Execute PowerShell script in guest OS"
+  when:
+    - win_check_file_exist_result is defined
+    - win_check_file_exist_result | bool
+  block:
+    - name: "Execute {{ win_update_ops }} Windows Update script in guest OS"
+      ansible.windows.win_command: "powershell.exe -ExecutionPolicy bypass -File {{ remote_ps_file }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: "{{ win_update_ops == 'pause' }}"
+      register: win_update_ops_result
+    - name: "Display the script execute result"
+      ansible.builtin.debug: var=win_update_ops_result
+      when: enable_debug
+
+- name: "Restart guest OS after configuration"
+  include_tasks: win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+  when: win_update_ops == 'resume'
