@@ -1,0 +1,121 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for test host verified SAML token in guest operations
+#
+- name: host_verify_saml_token
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Skip test case due to missing vCenter Server variables"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case {{ ansible_play_name }} is because of missing vCenter Server variables."
+            skip_reason: "Not Applicable"
+          when: >
+            (vcenter_is_defined is undefined or not vcenter_is_defined) or
+            (vcenter_ssh_username is undefined or not vcenter_ssh_username) or
+            (vcenter_ssh_password is undefined or not vcenter_ssh_password)
+
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            skip_test_no_vmtools: true
+
+        - name: "Skip test case for {{ guest_os_ansible_distribution }}"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case {{ ansible_play_name }} because {{ guest_os_ansible_distribution }}
+              {{ guest_os_ansible_distribution_ver }} doesn't have VGAuthService.
+            skip_reason: "Not Supported"
+          when: >-
+            (guest_os_ansible_distribution == 'FreeBSD' or
+             (guest_os_ansible_distribution == 'Flatcar' and
+              guest_os_ansible_distribution_ver is version('3760.2.0', '<')))
+
+        - name: "Skip test case for old ESXi server or VMware Tools"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case {{ ansible_play_name }} because ESXi version is {{ esxi_version }} < 8.0.2 or
+              VMware Tools version is {{ vmtools_version }} < 12.3.0.
+            skip_reason: "Not Supported"
+          when:
+            - esxi_version is version('8.0.2', '<')
+            - vmtools_version is version('12.3.0', '<')
+
+        - name: "Check VMware Tools capability exists for host verified SAML token"
+          include_tasks: check_tools_capability.yml
+
+        - name: "Initialize facts about domain user information"
+          ansible.builtin.set_fact:
+            vcenter_admin_user_name: "{{ vcenter_username.split('@')[0] }}"
+            vcenter_domain_name: "{{ vcenter_username.split('@')[-1] }}"
+            vcenter_domain_user_name: "vcuser_{{ current_test_timestamp }}"
+            vcenter_domain_user_password: "VP@ssw0rd"
+            vcenter_domain_user_group: "DCAdmins"
+            vm_guest_user_name: "gosuser_{{ current_test_timestamp }}"
+            vm_guest_user_password: "GP@ssw0rd"
+
+        - name: "Add domain user '{{ vcenter_domain_user_name }}'"
+          include_tasks: ../../common/vcenter_manage_domain_user.yml
+          vars:
+            vcenter_domain_user_op: "add"
+
+        - name: "Add a new guest user '{{ vm_guest_user_name }}'"
+          include_tasks: ../utils/add_user.yml
+          vars:
+            guest_user_name: "{{ vm_guest_user_name }}"
+            guest_user_password: "{{ vm_guest_user_password }}"
+
+        - name: "Enable debug logging for VGAuthService"
+          include_tasks: ../utils/enable_vgauth_logging.yml
+
+        - name: "Enable debug logging for VMware Tools"
+          include_tasks: ../utils/enable_vmtools_logging.yml
+
+        - name: "Test guest operation with VC SSO user's SAML token"
+          include_tasks: test_guest_ops_with_token.yml
+
+        - name: "Collect VGAuthServcie log"
+          include_tasks: ../utils/collect_vgauth_logs.yml
+          vars:
+            vgauth_log_file_src: "{{ vgauth_latest_log_file }}"
+
+        - name: "Check VGAuthService log file is collected successfully"
+          ansible.builtin.assert:
+            that:
+              - vgauth_log_file_exists
+              - vgauth_log_is_collected
+              - vgauth_log_file_dest
+            fail_msg: "Failed to collect VGAuthService log."
+            success_msg: "The VGAuthService log is collected to {{ vgauth_log_file_dest }}"
+
+        - name: "Check VC SSO user's SAML token is verified by host"
+          include_tasks: check_host_verified_token.yml
+          vars:
+            vgauth_log_path_local: "{{ vgauth_log_file_dest }}"
+
+        - name: "Delete domain user '{{ vcenter_domain_user_name }}'"
+          include_tasks: ../../common/vcenter_manage_domain_user.yml
+          vars:
+            vcenter_domain_user_op: "delete"
+      rescue:
+        - name: "Test rescue"
+          include_tasks: ../../common/test_rescue.yml
+      always:
+        - name: "Collect VGAuthServcie log"
+          include_tasks: ../utils/collect_vgauth_logs.yml
+          vars:
+            vgauth_log_file_src: "{{ vgauth_latest_log_file }}"
+          when:
+            - vgauth_log_is_collected is undefined or not vgauth_log_is_collected
+            - vgauth_latest_log_file is defined
+            - vgauth_latest_log_file
+
+        - name: "Collect VMware Tools logs"
+          include_tasks: ../utils/collect_vmtools_logs.yml

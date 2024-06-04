@@ -1,0 +1,24 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Check VMware Tools capability for host verified SAML token is TRUE in VM
+# advanced settings
+#
+- name: "Initialize fact of VMware Tools capability for host verified SAML token"
+  ansible.builtin.set_fact:
+    vmtools_capability_key: "tools.capability.verifiedSamlToken"
+
+- name: "Get VM's extra configs"
+  include_tasks: ../../common/vm_get_extra_config.yml
+
+- name: "Check VMware Tools capability {{ vmtools_capability_key }} is TRUE"
+  ansible.builtin.assert:
+    that:
+      - vmtools_capability_key in vm_extra_config
+      - vm_extra_config[vmtools_capability_key] == "TRUE"
+    fail_msg: >-
+      VMware Tools capability '{{ vmtools_capability_key }} = TRUE' doesn't exsit in VM's advance settings.
+      Current {{ vmtools_capability_key }} is {{ vm_extra_config[vmtools_capability_key] | default('undefined') }}
+    success_msg: >-
+      VMware Tools capability '{{ vmtools_capability_key }}' is TRUE in VM's advance settings

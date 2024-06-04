@@ -10,8 +10,9 @@
     vgauth_log_file_src: "/var/log/vmware-vgauthsvc.log.0"
   when: vgauth_log_file_src is undefined or not vgauth_log_file_src
 
-- name: "Initialize facts of collected VGAuthService log path at localhost"
+- name: "Initialize facts for collecting VGAuthService log file"
   ansible.builtin.set_fact:
+    vgauth_log_file_exists: false
     vgauth_log_file_dest: ""
     vgauth_log_is_collected: false
 
@@ -24,7 +25,8 @@
   ansible.builtin.set_fact:
     vgauth_log_file_exists: "{{ guest_file_exists }}"
 
-- name: "Collect VGAuthService log file"
+- name: "Collect VGAuthService log file to localhost"
+  when: vgauth_log_file_exists | bool
   block:
     - name: "Collect VGAuthServce log to test case log dir"
       include_tasks: fetch_file.yml
@@ -35,8 +37,7 @@
     - name: "Set facts of VGAuthService file collected at localhost"
       ansible.builtin.set_fact:
         vgauth_log_file_dest: "{{ fetch_file_local_path }}"
-        vgauth_log_is_collected: True
+        vgauth_log_is_collected: true
       when:
         - fetch_file_local_path is defined
         - fetch_file_local_path
-  when: vgauth_log_file_exists | bool
