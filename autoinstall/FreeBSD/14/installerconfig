@@ -65,9 +65,9 @@ env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
 machtype=$(uname -m)
 echo "Machine type is $machtype" > /dev/ttyu0
 if [ "$machtype" == "amd64" ] || [ "$machtype" == "x86_64" ]; then
-    packages_to_install='bash sudo xorg kde5 xf86-video-vmware'
+    packages_to_install='bash sudo xorg kde5 xf86-video-vmware sddm open-vm-tools xf86-input-vmmouse wget curl e2fsprogs iozone lsblk'
 else
-    packages_to_install='bash sudo'
+    packages_to_install='bash sudo open-vm-tools-nox11 wget curl e2fsprogs iozone lsblk'
 fi
 
 failed_packages=""
@@ -80,33 +80,20 @@ do
     then 
         echo "Succeed to install the package($package_to_install)" > /dev/ttyu0
     else
-        if [ "$failed_packages" == "" ]; then
-            failed_packages="$package_to_install"
-        else
-            failed_packages="$failed_packages $package_to_install"
-        fi
+        failed_packages="$failed_packages $package_to_install"
         echo "Failed to install the package($package_to_install)" > /dev/ttyu0
     fi
 done
 
-if [ "$failed_packages" == "" ]; then
-    echo "Failed to install the packages from ISO repo: $failed_packages" > /dev/ttyu0
-fi
 # Disable ISO repo and enable default repo
 rm -rf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
 env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
-if [ "$machtype" == "amd64" ] || [ "$machtype" == "x86_64" ]; then
-    packages_to_install='sddm open-vm-tools xf86-input-vmmouse wget curl e2fsprogs iozone lsblk'
-else
-    packages_to_install='open-vm-tools-nox11 wget curl e2fsprogs iozone lsblk'
-fi
 
 if [ "$failed_packages" != "" ]; then
-    packages_to_install="$failed_packages $packages_to_install"
+    echo "To install the failed packages from offical repo: $failed_packages" > /dev/ttyu0
 fi
-echo "To install the packages from offical repo: $packages_to_install" > /dev/ttyu0
 
-for package_to_install in $packages_to_install
+for package_to_install in $failed_packages
 do
     ret=1
     try_count=1
