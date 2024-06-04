@@ -93,25 +93,27 @@ if [ "$failed_packages" != "" ]; then
     echo "To install the following packages from offical repo: $failed_packages" > /dev/ttyu0
 fi
 
-for package_to_install in $failed_packages
-do
-    ret=1
-    try_count=1
-    until [ $ret -eq 0 ] || [ $try_count -ge 10 ]
+if [ "$failed_packages" != "" ]; then
+    for package_to_install in $failed_packages
     do
-        echo "Install package $package_to_install (try $try_count time) ..." > /dev/ttyu0
-        env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install
-        ret=$?
-        try_count=$((try_count+1))
-        if [ $ret -eq 0 ]; then
-             echo "Successfully installed the package $package_to_install from online repo" > /dev/ttyu0
+        ret=1
+        try_count=1
+        until [ $ret -eq 0 ] || [ $try_count -ge 10 ]
+        do
+            echo "Install package $package_to_install (try $try_count time) ..." > /dev/ttyu0
+            env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install
+            ret=$?
+            try_count=$((try_count+1))
+            if [ $ret -eq 0 ]; then
+                echo "Successfully installed the package $package_to_install from online repo" > /dev/ttyu0
+            fi
+        done
+
+        if [ $ret -ne 0 ] && [ $try_count -ge 10 ]; then
+            echo "Error: Failed to install $package_to_install from ISO and online repo" > /dev/ttyu0
         fi
     done
-
-    if [ $ret -ne 0 ] && [ $try_count -ge 10 ]; then
-        echo "Error: Failed to install $package_to_install from ISO and online repo" > /dev/ttyu0
-    fi
-done
+fi
 
 # Add new user. 
 {% if new_user is defined and new_user != 'root' %}
