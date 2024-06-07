@@ -17,11 +17,26 @@
       when: decrypt_wait_time is undefined or not decrypt_wait_time
 
     - name: "Decrypt the BitLocker volumes"
-      include_tasks: win_execute_cmd.yml
-      vars:
-        win_powershell_cmd: >-
-          $BLV = Get-BitLockerVolume;
-          Disable-BitLocker -MountPoint $BLV
+      ansible.windows.win_shell: >-
+        $BLV = Get-BitLockerVolume;
+        Disable-BitLocker -MountPoint $BLV
+      register: decrypt_volume_cmd_result
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      until:
+        - decrypt_volume_cmd_result.stderr_lines is defined
+        - decrypt_volume_cmd_result.stderr_lines | length == 0
+      retries: 3
+      delay: 120
+
+    - name: "Check if decrypt command succeeds"
+      ansible.builtin.assert:
+        that:
+          - decrypt_volume_cmd_result.stderr_lines is defined
+          - decrypt_volume_cmd_result.stderr_lines | length == 0
+        fail_msg: >-
+          Disable bitlocker volume failed. The stderr_lines of the command is: 
+          {{ decrypt_volume_cmd_result.stderr_lines | default('') }}
 
     - name: "Check if Decryption is completed"
       ansible.windows.win_shell: "(Get-BitLockerVolume | Where-Object { $_.EncryptionPercentage -GT 0 } | measure).Count"
