@@ -63,21 +63,25 @@ env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
 # We install packages from ISO image
 # Different packages between the 32bit image and 64bit image
 machtype=$(uname -m)
+echo "Machine type is $machtype" > /dev/ttyu0
+packages_to_install="bash sudo wget curl e2fsprogs iozone lsblk"
 if [ "$machtype" == "amd64" ] || [ "$machtype" == "x86_64" ]; then
-    packages_to_install='bash sudo xorg xf86-video-vmware'
+    packages_to_install="$packages_to_install xorg kde5 xf86-video-vmware sddm open-vm-tools xf86-input-vmmouse"
 else
-    packages_to_install='bash sudo'
+    packages_to_install="$packages_to_install open-vm-tools-nox11"
 fi
+
+failed_packages=""
 for package_to_install in $packages_to_install
 do
     echo "Install package $package_to_install ..." > /dev/ttyu0
     env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install
     ret=$?
     if [ $ret == 0 ]
-    then    
-        echo "Succeed to install the package($package_to_install)" > /dev/ttyu0
+    then 
+        echo "Successfully installed the package $package_to_install from ISO repo" > /dev/ttyu0
     else
-        echo "Failed to install the package($package_to_install)" > /dev/ttyu0
+        failed_packages="$failed_packages $package_to_install"
     fi
 done
 
@@ -97,26 +101,28 @@ FreeBSD_latest: {
 EOF
 
 env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
-echo "Machine type is $machtype" > /dev/ttyu0
-if [ "$machtype" == "amd64" ] || [ "$machtype" == "x86_64" ]; then
-    packages_to_install='sddm kde5 open-vm-tools xf86-input-vmmouse wget curl e2fsprogs iozone lsblk'
-else 
-    packages_to_install='open-vm-tools-nox11 wget curl e2fsprogs iozone lsblk'
-fi
-
-for package_to_install in $packages_to_install
-do
-    ret=1
-    try_count=1
-    until [ $ret -eq 0 ]
+if [ "$failed_packages" != "" ]; then
+    echo "To install the following packages from offical repo: $failed_packages" > /dev/ttyu0
+    for package_to_install in $failed_packages
     do
-        echo "Install package $package_to_install (try $try_count time) ..." > /dev/ttyu0
-        env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install
-        ret=$?
-        try_count=$((try_count+1))
+        ret=1
+        try_count=1
+        until [ $ret -eq 0 ] || [ $try_count -ge 10 ]
+        do
+            echo "Install package $package_to_install (try $try_count time) ..." > /dev/ttyu0
+            env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install
+            ret=$?
+            try_count=$((try_count+1))
+            if [ $ret -eq 0 ]; then
+                echo "Successfully installed the package $package_to_install from online repo" > /dev/ttyu0
+            fi
+        done
+
+        if [ $ret -ne 0 ] && [ $try_count -ge 10 ]; then
+            echo "Error: Failed to install $package_to_install from ISO and online repo" > /dev/ttyu0
+        fi
     done
-    echo "The package($package_to_install) is already installed" > /dev/ttyu0
-done
+fi
 
 # Add new user. 
 {% if new_user is defined and new_user != 'root' %}
