@@ -1,24 +1,25 @@
 # Copyright 2023-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Search and list Windows Updates in specified categories
+# Search and list the online Windows Updates in all or specified categories.
 # Parameter:
 #   win_updates_category_names (optional): a list of categories to get updates from.
 #     Some possible categories are: Application, Connectors, Critical Updates, Definition Updates, Developer Kits,
 #     Feature Packs, Guidance, Security Updates, Service Packs, Tools, Update Rollups, Updates, and Upgrades.
 #     Default value is '*', means matching all categories.
-#   win_get_updates_categories (optional): a list of update categories. If configured,
-#     returned 'win_updates_list' must contain one of the category in this list.
+#   win_expect_updates_categories (optional): a list of expected update categories. If configured,
+#     returned 'win_updates_list' must contain at least one of the category in this list.
 #     Default value is '[]'.
-#   win_get_updates_timeout (optional): the timeout for getting updates. Default value is 60 seconds.
+#   win_get_updates_timeout (optional): the timeout for getting expected update categories.
+#     Default value is 600 seconds.
 # Return:
-#   win_updates_list: the list of avaliable Windows Updates
+#   win_updates_list: the list of avaliable online Windows Updates.
 #
 - name: "Initialize the facts of getting Windows Updates"
   ansible.builtin.set_fact:
     win_updates_category_names: "{{ win_updates_category_names | default('*') }}"
-    win_get_updates_categories: "{{ win_get_updates_categories | default([]) }}"
-    win_get_updates_retries: "{{ win_get_updates_timeout | default(60) }}"
+    win_expect_updates_categories: "{{ win_expect_updates_categories | default([]) }}"
+    win_get_updates_timeout: "{{ win_get_updates_timeout | default(600) }}"
 
 - name: "Get the list of available Windows Updates"
   ansible.windows.win_updates:
@@ -28,15 +29,14 @@
     state: "searched"
   delegate_to: "{{ vm_guest_ip }}"
   register: get_win_updates_result
-  ignore_errors: "{{ win_updates_ignore_errors | default(false) }}"
-  retries: "{{ win_get_updates_timeout | int / 5 }}"
+  ignore_errors: true
+  retries: "{{ (win_get_updates_timeout | int / 5) | int }}"
   delay: 5
   until:
-    - get_win_updates_result is defined
     - get_win_updates_result.failed is defined
     - not get_win_updates_result.failed
     - get_win_updates_result.found_update_count is defined
     - get_win_updates_result.found_update_count | int != 0
 
 - name: "Print the list of Windows Updates"
-  ansible.builtin.debug: var=win_updates_list
+  ansible.builtin.debug: var=get_win_updates_result

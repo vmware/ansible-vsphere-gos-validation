@@ -28,31 +28,37 @@
         - name: "Display guest OS version build before installing Windows updates"
           ansible.builtin.debug: var=win_os_version_build
 
-        - name: "Install online updates in guest OS"
+        - name: "Install Windows online updates in guest OS"
           include_tasks: install_online_updates.yml
 
-        - name: "Get guest OS version build after installing Windows updates"
-          include_tasks: ../utils/win_get_os_version.yml
-        - name: "Display guest OS version build after installing Windows updates"
-          ansible.builtin.debug: var=win_os_version_build
+        - name: "Windows online updates installed in guest OS"
+          when: win_online_updates_installed
+          block:
+            - name: "Get guest OS version build after installing Windows updates"
+              include_tasks: ../utils/win_get_os_version.yml
+            - name: "Display guest OS version build after installing Windows updates"
+              ansible.builtin.debug: var=win_os_version_build
+            - name: "Set fact of the guest OS build number after installing Windows updates"
+              ansible.builtin.set_fact:
+                win_os_build_after_update: "{{ ('.').join(win_os_version_build.split('.')[2:]) }}"
 
-        - name: "Check OS build number after installing Windows updates"
-          ansible.builtin.assert:
-            that:
-              - ('.').join(win_os_version_build.split('.')[2:]) is version(windows_updated_build_num, '>=')
-            fail_msg: >-
-              After installing Windows updates guest OS build number is "{{ ('.').join(win_os_version_build.split('.')[2:]) }}",
-              which is not newer than the expected build '{{ windows_updated_build_num }}'.
-          when: windows_updated_build_num is defined
+            - name: "Check OS build number after installing Windows updates"
+              ansible.builtin.assert:
+                that:
+                  - win_os_build_after_update is version(windows_updated_build_num, '>=')
+                fail_msg: >-
+                  After installing Windows updates, guest OS build number is '{{ win_os_build_after_update }}',
+                  which is not newer than the configured expected build '{{ windows_updated_build_num }}'.
+              when: windows_updated_build_num is defined
 
-        - name: "Remove Windows.old folder after installing Windows updates"
-          include_tasks: remove_windows_old.yml
+            - name: "Remove Windows.old folder after installing Windows updates"
+              include_tasks: remove_windows_old.yml
 
-        - name: "Reset base snapshot after installing Windows updates"
-          include_tasks: ../../common/reset_base_snapshot.yml
-          vars:
-            remove_old_base_snapshot: true
-            base_snapshot_description: "{{ win_os_version_build }}"
+            - name: "Reset base snapshot after installing Windows updates"
+              include_tasks: ../../common/reset_base_snapshot.yml
+              vars:
+                remove_old_base_snapshot: true
+                base_snapshot_description: "{{ win_os_build_after_update }}"
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
