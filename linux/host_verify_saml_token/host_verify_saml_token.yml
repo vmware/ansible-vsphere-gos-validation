@@ -44,12 +44,10 @@
               Skip test case {{ ansible_play_name }} because ESXi version is {{ esxi_version }} < 8.0.2 or
               VMware Tools version is {{ vmtools_version }} < 12.3.0.
             skip_reason: "Not Supported"
-          when:
-            - esxi_version is version('8.0.2', '<')
-            - vmtools_version is version('12.3.0', '<')
+          when: esxi_version is version('8.0.2', '<') or vmtools_version is version('12.3.0', '<')
 
         - name: "Check VMware Tools capability exists for host verified SAML token"
-          include_tasks: check_tools_capability.yml
+          include_tasks: ../../common/vm_check_vmtools_capability.yml
 
         - name: "Initialize facts about domain user information"
           ansible.builtin.set_fact:
@@ -86,13 +84,13 @@
           vars:
             vgauth_log_file_src: "{{ vgauth_latest_log_file }}"
 
-        - name: "Check VGAuthService log file is collected successfully"
+        - name: "Check VGAuthService log is collected successfully"
           ansible.builtin.assert:
             that:
               - vgauth_log_file_exists
               - vgauth_log_is_collected
               - vgauth_log_file_dest
-            fail_msg: "Failed to collect VGAuthService log."
+            fail_msg: "Failed to collect VGAuthService log"
             success_msg: "The VGAuthService log is collected to {{ vgauth_log_file_dest }}"
 
         - name: "Check VC SSO user's SAML token is verified by host"
@@ -111,11 +109,8 @@
         - name: "Collect VGAuthServcie log"
           include_tasks: ../utils/collect_vgauth_logs.yml
           vars:
-            vgauth_log_file_src: "{{ vgauth_latest_log_file }}"
-          when:
-            - vgauth_log_is_collected is undefined or not vgauth_log_is_collected
-            - vgauth_latest_log_file is defined
-            - vgauth_latest_log_file
+            vgauth_log_file_src: "{{ vgauth_latest_log_file | default('') }}"
+          when: vgauth_log_is_collected is undefined or not vgauth_log_is_collected
 
         - name: "Collect VMware Tools logs"
           include_tasks: ../utils/collect_vmtools_logs.yml

@@ -8,13 +8,19 @@
     vgauth_log_file_src: "C:\\ProgramData\\VMware\\VMware VGAuth\\logfile.txt.0"
     vgauth_log_file_dest: ""
     vgauth_log_is_collected: false
+    vgauth_log_file_exists: false
 
 - name: "Check VGAuthService log file exists or not"
   include_tasks: ../utils/win_check_file_exist.yml
   vars:
     win_check_file_exist_file: "{{ vgauth_log_file_src }}"
 
+- name: "Set fact of VGAuthService log file existence"
+  ansible.builtin.set_fact:
+    vgauth_log_file_exists: "{{ win_check_file_exist_result }}"
+
 - name: "Collect VGAuthService log file"
+  when: vgauth_log_file_exists
   block:
     - name: "Get VGAuthService status"
       include_tasks: win_get_service_status.yml
@@ -53,4 +59,3 @@
         - not fetch_file.failed
         - fetch_file.dest is defined
         - fetch_file.dest
-  when: win_check_file_exist_result

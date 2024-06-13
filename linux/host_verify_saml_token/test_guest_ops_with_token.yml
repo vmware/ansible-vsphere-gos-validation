@@ -43,7 +43,7 @@
       - add_alias_result.rc is defined
       - add_alias_result.rc == 0
       - add_alias_result.stdout_lines is defined
-      - add_alias_result.stdout_lines | select('match', '.*' ~ add_alias_check_msg) | length > 0
+      - add_alias_result.stdout_lines | select('search', add_alias_check_msg) | length > 0
     fail_msg: >-
       Failed to add guest user mapping
       {{ vm_guest_user_name }}:{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}
@@ -63,14 +63,14 @@
 
 - name: "Display the result of reading guest user's environment variables by guest operation"
   debug: var=perform_guestops_result
-  when: enable_debug | bool
+  when: enable_debug
 
 - name: "Set fact of guest user's environment variables retrieved by guest operation"
   ansible.builtin.set_fact:
     guest_env_from_guestops: >-
       {{
         perform_guestops_result.stdout_lines |
-        reject('match', ".*Guest user's environment variables are")
+        reject('search', "Guest user's environment variables are")
       }}
   when:
     - perform_guestops_result.stdout_lines is defined
@@ -110,7 +110,7 @@
       - remove_alias_result.rc is defined
       - remove_alias_result.rc == 0
       - remove_alias_result.stdout_lines is defined
-      - remove_alias_result.stdout_lines | select('match', '.*' ~ remove_alias_check_msg) | length > 0
+      - remove_alias_result.stdout_lines | select('search', remove_alias_check_msg) | length > 0
     fail_msg: >-
       Failed to remove guest user mapping
       {{ vm_guest_user_name }}:{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}

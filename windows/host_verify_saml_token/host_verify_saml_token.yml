@@ -15,7 +15,6 @@
           vars:
             skip_msg: "Skip test case {{ ansible_play_name }} is because of missing vCenter Server variables."
             skip_reason: "Not Applicable"
-
           when: >
             (vcenter_is_defined is undefined or not vcenter_is_defined) or
             (vcenter_ssh_username is undefined or not vcenter_ssh_username) or
@@ -34,12 +33,10 @@
               Skip test case {{ ansible_play_name }} because ESXi version is {{ esxi_version }} < 8.0.2 or
               VMware Tools version is {{ vmtools_version }} < 12.3.0.
             skip_reason: "Not Supported"
-          when:
-            - esxi_version is version('8.0.2', '<')
-            - vmtools_version is version('12.3.0', '<')
+          when: esxi_version is version('8.0.2', '<') or vmtools_version is version('12.3.0', '<')
 
         - name: "Check VMware Tools capability exists for host verified SAML token"
-          include_tasks: ../../linux/host_verify_saml_token/check_tools_capability.yml
+          include_tasks: ../../common/vm_check_vmtools_capability.yml
 
         - name: "Initialize facts about domain user information"
           ansible.builtin.set_fact:
@@ -65,15 +62,19 @@
         - name: "Collect VGAuthService log"
           include_tasks: ../utils/win_collect_vgauth_logs.yml
 
+        - name: "Check VGAuthService log is collected successfully"
+          ansible.builtin.assert:
+            that:
+              - vgauth_log_file_exists
+              - vgauth_log_is_collected
+              - vgauth_log_file_dest
+            fail_msg: "Failed to collect VGAuthService log"
+            success_msg: "The VGAuthService log is collected to {{ vgauth_log_file_dest }}"
+
         - name: "Check VC SSO user's SAML token is verified by host"
           include_tasks: ../../linux/host_verify_saml_token/check_host_verified_token.yml
           vars:
             vgauth_log_path_local: "{{ vgauth_log_file_dest }}"
-          when:
-            - vgauth_log_is_collected is defined
-            - vgauth_log_is_collected
-            - vgauth_log_file_dest is defined
-            - vgauth_log_file_dest
 
         - name: "Delete domain user '{{ vcenter_domain_user_name }}'"
           include_tasks: ../../common/vcenter_manage_domain_user.yml
