@@ -70,19 +70,21 @@
             guest_user_name: "{{ vm_guest_user_name }}"
             guest_user_password: "{{ vm_guest_user_password }}"
 
-        - name: "Enable debug logging for VGAuthService"
-          include_tasks: ../utils/enable_vgauth_logging.yml
+        # Flatcar's filesystem is read-only, which can't enable debug logging"
+        - name: "Enable debug logging for VGAuthService and VMware Tools"
+          when: guest_os_ansible_distribution != 'Flatcar'
+          block:
+            - name: "Enable debug logging for VGAuthService"
+              include_tasks: ../utils/enable_vgauth_logging.yml
 
-        - name: "Enable debug logging for VMware Tools"
-          include_tasks: ../utils/enable_vmtools_logging.yml
+            - name: "Enable debug logging for VMware Tools"
+              include_tasks: ../utils/enable_vmtools_logging.yml
 
         - name: "Test guest operation with VC SSO user's SAML token"
           include_tasks: test_guest_ops_with_token.yml
 
         - name: "Collect VGAuthServcie log"
           include_tasks: ../utils/collect_vgauth_logs.yml
-          vars:
-            vgauth_log_file_src: "{{ vgauth_latest_log_file }}"
 
         - name: "Check VGAuthService log is collected successfully"
           ansible.builtin.assert:
