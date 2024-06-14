@@ -14,7 +14,7 @@
     remove_alias_check_msg: >-
       Successfuly removed guest user mapping:
       {{ vm_guest_user_name }}:{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}
-    guest_env_from_guestops: []
+    guest_user_environment: []
 
 - name: "Set command for testing host verified SAML token"
   ansible.builtin.set_fact:
@@ -51,6 +51,7 @@
       Return code is '{{ add_alias_result.rc | default("") }}'.
       Output is '{{ add_alias_result.stdout | default("") }}'.
       Hit error '{{ add_alias_result.stderr | default("") }}'.
+    success_msg: "{{ add_alias_check_msg }}"
 
 # Test guest operation
 - name: "Perform guest operation of reading guest user's environment variables"
@@ -67,10 +68,10 @@
 
 - name: "Set fact of guest user's environment variables retrieved by guest operation"
   ansible.builtin.set_fact:
-    guest_env_from_guestops: >-
+    guest_user_environment: >-
       {{
         perform_guestops_result.stdout_lines |
-        reject('search', "Guest user's environment variables are")
+        select('match', 'USER(NAME)?=' ~ vm_guest_user_name)
       }}
   when:
     - perform_guestops_result.stdout_lines is defined
@@ -81,14 +82,14 @@
     that:
       - perform_guestops_result.rc is defined
       - perform_guestops_result.rc == 0
-      - guest_env_from_guestops | length > 0
-      - guest_env_from_guestops | select('match', 'USER(NAME)?=' ~ vm_guest_user_name) | length == 1
+      - guest_user_environment | length == 1
     fail_msg: >-
       Failed to read guest user's environment variables by guest operation with VC SSO user
       {{ vcenter_domain_user_name }}@{{ vcenter_domain_name }} on VM {{ vm_name }}.
       Return code is '{{ perform_guestops_result.rc | default("") }}'.
       Output is '{{ perform_guestops_result.stdout | default("") }}'.
       Hit error '{{ perform_guestops_result.stderr | default("") }}'.
+    success_msg: "Successfully read guest user's environment variable {{ guest_user_environment }}"
 
 # Remove guest alias
 - name: "Remove guest user mapping for guest user {{ vm_guest_user_name }}"
@@ -118,3 +119,4 @@
       Return code is '{{ remove_alias_result.rc | default("") }}'.
       Output is '{{ remove_alias_result.stdout | default("") }}'.
       Hit error '{{ remove_alias_result.stderr | default("") }}'.
+    success_msg: "{{ remove_alias_check_msg }}"
