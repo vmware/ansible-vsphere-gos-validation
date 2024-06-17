@@ -34,10 +34,25 @@
   when: unattend_installer in ["Ubuntu-Ubiquity", "Ubuntu-Subiquity", "Photon", "Debian", "Pardus"]
 
 - name: "Rebuild ISO image file for FreeBSD"
-  community.general.iso_customize:
-    src_iso: "{{ src_iso_file_path }}"
-    dest_iso: "{{ rebuilt_unattend_iso_path }}"
-    add_files:
-      - src_file: "{{ new_unattend_install_conf }}"
-        dest_file: "/etc/installerconfig"
   when: unattend_installer == "FreeBSD"
+  block:
+    - name: "Set fact of post-install script"
+      ansible.builtin.set_fact:
+        post_install_script_file: "freebsd_post_config.sh"
+
+    - name: "Create OS post-install script for FreeBSD"
+      ansible.builtin.template:
+        src: "templates/post_install_scripts/{{ post_install_script_file }}"
+        dest: "{{ src_iso_file_dir }}/{{ post_install_script_file }}"
+        mode: "0755"
+
+    - name: "Rebuild ISO image file with autoinstall file for FreeBSD"
+      community.general.iso_customize:
+        src_iso: "{{ src_iso_file_path }}"
+        dest_iso: "{{ rebuilt_unattend_iso_path }}"
+        add_files:
+          - src_file: "{{ new_unattend_install_conf }}"
+            dest_file: "/etc/installerconfig"
+          - src_file: "{{ src_iso_file_dir }}/{{ post_install_script_file }}"
+            dest_file: "/etc/{{ post_install_script_file }}"
+
