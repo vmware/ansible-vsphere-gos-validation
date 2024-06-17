@@ -34,26 +34,29 @@
   ansible.builtin.set_fact:
     package_manage_list: []
 
-- name: "Get installed packages on {{ guest_os_ansible_distribution }}"
-  include_tasks: get_installed_packages.yml
-
-- name: "Set fact of packages which needs to be installed"
-  ansible.builtin.set_fact:
-    package_manage_list: "{{ package_list | difference(guest_installed_packages) }}"
-    package_manage_op: "Install"
-  when: package_state in ['installed', 'present']
-
 - name: "Set fact of packages which needs to be installed with latest version"
   ansible.builtin.set_fact:
     package_manage_list: "{{ package_list }}"
     package_manage_op: "Install latest"
-  when: package_state in ['latest']
+  when: package_state == 'latest'
 
-- name: "Set fact of packages which needs to be uninstalled"
-  ansible.builtin.set_fact:
-    package_manage_list: "{{ package_list | select('in', guest_installed_packages) }}"
-    package_manage_op: "Uninstall"
-  when: package_state in ['absent', 'removed']
+- name: "Get packages to be installed or uninstalled"
+  when: package_state != 'latest'
+  block:
+    - name: "Get installed packages on {{ guest_os_ansible_distribution }}"
+      include_tasks: get_installed_packages.yml
+
+    - name: "Set fact of packages which needs to be installed"
+      ansible.builtin.set_fact:
+        package_manage_list: "{{ package_list | difference(guest_installed_packages) }}"
+        package_manage_op: "Install"
+      when: package_state in ['installed', 'present']
+
+    - name: "Set fact of packages which needs to be uninstalled"
+      ansible.builtin.set_fact:
+        package_manage_list: "{{ package_list | select('in', guest_installed_packages) }}"
+        package_manage_op: "Uninstall"
+      when: package_state in ['absent', 'removed']
 
 - name: "Display the pacakge list and operation"
   ansible.builtin.debug:
