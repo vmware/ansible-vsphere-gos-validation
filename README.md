@@ -104,14 +104,14 @@ This compatible guest operating systems list is used for this project only. For 
 
 ### Docker images
 * Latest (Release v3.1):
-  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
+  * projects.packages.broadcom.com/gos_cert/ansible-vsphere-gos-validation:latest
 * Release v3.1:
-  * projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:v3.1
+  * projects.packages.broadcom.com/gos_cert/ansible-vsphere-gos-validation:v3.1
 
 Launch testing using Docker image
 1. Execute below commands in your machine
 ```
-$ docker pull projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
-$ docker run -it --privileged projects.registry.vmware.com/gos_cert/ansible-vsphere-gos-validation:latest
+$ docker pull projects.packages.broadcom.com/gos_cert/ansible-vsphere-gos-validation:latest
+$ docker run -it --privileged projects.packages.broadcom.com/gos_cert/ansible-vsphere-gos-validation:latest
 ```
 2. Launch testing in the started container following the steps in this section [Steps to Launch Testing](#steps-to-launch-testing)
