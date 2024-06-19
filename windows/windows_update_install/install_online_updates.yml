@@ -1,23 +1,34 @@
 # Copyright 2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
-#
+---
+- name: "Initialize Windows online updates install status"
+  ansible.builtin.set_fact:
+    win_online_updates_installed: false
+
 - name: "Get guest OS version build"
   include_tasks: ../utils/win_get_os_version.yml
-- name: "Display the guest OS version build before online Windows Updates"
-  ansible.builtin.debug:
-    msg: "Before running online Windows Updates, guest OS version build is {{ win_os_version_build }}"
+- name: "Display the guest OS version build before installing Windows online updates"
+  ansible.builtin.debug: var=win_os_version_build
 
-- name: "Set the online Windows Updates reject list"
+- name: "Set the Windows online updates reject list"
   ansible.builtin.set_fact:
     win_updates_reject_list: "{{ windows_updates_reject_list.split(',') | map('trim') }}"
   when:
     - windows_updates_reject_list is defined
     - windows_updates_reject_list
 
-- name: "Install online Windows Updates"
+- name: "Get Windows online updates"
+  include_tasks: ../utils/win_get_online_updates.yml
+  vars:
+    win_updates_ignore_errors: true
+
+- name: "Install Windows online updates"
   include_tasks: ../utils/win_install_online_updates.yml
   vars:
     win_updates_ignore_errors: true
+  when:
+    - win_get_updates_result.found_update_count is defined
+    - win_get_updates_result.found_update_count | int != 0
 
 - name: "Check if online Windows Updates log file exists in guest OS"
   include_tasks: ../utils/win_check_file_exist.yml
@@ -44,7 +55,7 @@
 # For internal existing VM test scenario.
 # If guest OS has been updated, take a new one as base snapshot and remove the old one.
 - name: "Reset base snapshot if online Windows Updates succeeds"
-  when: win_online_updates_succeed | bool
+  when: win_online_updates_installed
   block:
     - name: "Get guest OS version build"
       include_tasks: ../utils/win_get_os_version.yml
@@ -60,4 +71,4 @@
 
 - name: "Revert to the base snapshot when online Windows Updates failed"
   include_tasks: ../../common/base_snapshot_check_revert.yml
-  when: not win_online_updates_succeed | bool
+  when: not win_online_updates_installed

@@ -12,14 +12,13 @@
     that:
       - win_update_ops is defined
       - win_update_ops in ['pause', 'resume']
-    fail_msg: "Please set parameter 'win_update_ops': {{ win_update_ops | default('') }}, valid value is 'pause' or 'resume'."
+    fail_msg: >-
+      Parameter 'win_update_ops': {{ win_update_ops | default('') }} is not set correctly,
+      valid value is 'pause' or 'resume'.
 
 - name: "Set fact of PowerShell script file name"
   ansible.builtin.set_fact:
-    win_update_script: |-
-      {%- if win_update_ops == 'pause' -%}pause_windows_update.ps1
-      {%- elif win_update_ops == 'resume' -%}resume_windows_update.ps1
-      {%- endif -%}
+    win_update_script: "{{ win_update_ops }}_windows_update.ps1"
 
 # Transfer PowerShell script to guest OS
 - name: "Set fact of PowerShell script file path"
@@ -50,9 +49,3 @@
     - name: "Display the script execute result"
       ansible.builtin.debug: var=win_update_ops_result
       when: enable_debug
-
-- name: "Restart guest OS after configuration"
-  include_tasks: win_shutdown_restart.yml
-  vars:
-    set_win_power_state: "restart"
-  when: win_update_ops == 'resume'

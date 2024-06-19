@@ -1,82 +1,54 @@
 # Copyright 2023-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Search and install Windows Updates in specified categories,
-# and skip optional ones in Windows guest OS.
-# Parameter:
-#   win_updates_category_names(optional): A list of categories to install updates from.
-#       Some possible categories are: Application, Connectors, Critical Updates, Definition Updates, Developer Kits,
-#       Feature Packs, Guidance, Security Updates, Service Packs, Tools, Update Rollups, Updates, and Upgrades.
-#       Default value is *. The value * will match all categories
-#   win_updates_reject_list(optional): A list of update titles or KB numbers that can be used to specify
-#       which updates are to be excluded from installation.
-#   win_updates_ignore_errors: Ignore errors when checking and installing Windows Updates. Default is false.
+# Install Windows online updates in specified categories,
+# skip optional ones or in a reject list in Windows guest OS.
+# Parameters:
+#   win_updates_categories (optional): A list of categories to install updates from.
+#     Some possible categories are: Application, Connectors, Critical Updates,
+#     Definition Updates, Developer Kits, Feature Packs, Guidance, Security Updates,
+#     Service Packs, Tools, Update Rollups, Updates, and Upgrades.
+#     Default value is '*', which matches all categories.
+#   win_updates_reject_list (optional): A list of update titles or KB numbers that
+#     can be used to specify which updates are to be excluded from installation.
+#   win_updates_ignore_errors (optional): Ignore errors when installing Windows updates.
+#     Default is false.
+#   win_updates_log_file (optional): The log file path for Windows Update in guest OS.
+#     Default is 'C:\win_updates_log.txt'.
 # Return:
-#   win_updates_log_file: Windows Updates install log file path.
-#   win_online_updates_succeed: Windows Updates install result indicator.
+#   win_online_updates_installed: Windows online updates installed status.
 #
-- name: "Set fact of Windows Updates install log path and initialize online update status"
+- name: "Set fact and initialize Windows online updates install parameters"
   ansible.builtin.set_fact:
-    win_updates_log_file: "C:\\win_updates_log.txt"
-    win_online_updates_succeed: false
+    win_updates_log_file: "{{ win_updates_log_file | default('C:\\win_updates_log.txt') }}"
+    win_online_updates_installed: false
 
-- name: "Get the list of available Windows Updates"
+- name: "Install Windows online updates"
   ansible.windows.win_updates:
     server_selection: "windows_update"
-    category_names: "{{ win_updates_category_names | default('*') }}"
+    category_names: "{{ win_updates_categories | default('*') }}"
+    reject_list: "{{ win_updates_reject_list | default('') }}"
     log_path: "{{ win_updates_log_file }}"
     skip_optional: true
-    state: "searched"
+    state: "installed"
+    reboot: true
+    reboot_timeout: 2700
   delegate_to: "{{ vm_guest_ip }}"
-  register: win_updates_list
+  register: win_updates_install_result
   ignore_errors: "{{ win_updates_ignore_errors | default(false) }}"
-- name: "Print the list of Windows Updates"
-  ansible.builtin.debug: var=win_updates_list
 
-- name: "Install Windows Updates when updates found"
-  when:
-    - win_updates_list.failed is defined
-    - not win_updates_list.failed
-    - win_updates_list.found_update_count is defined
-    - win_updates_list.found_update_count | int != 0
-    - win_updates_list.updates is defined
-    - win_updates_list.updates | length != 0
-  block:
-    - name: "Install Windows Updates"
-      ansible.windows.win_updates:
-        server_selection: "windows_update"
-        category_names: "{{ win_updates_category_names | default('*') }}"
-        reject_list: "{{ win_updates_reject_list | default('') }}"
-        log_path: "{{ win_updates_log_file }}"
-        skip_optional: true
-        state: "installed"
-        reboot: true
-        reboot_timeout: 2700
-      delegate_to: "{{ vm_guest_ip }}"
-      register: win_updates_install_result
-      ignore_errors: "{{ win_updates_ignore_errors | default(false) }}"
-    - name: "Print Windows Updates install result"
-      debug: var=win_updates_install_result
+- name: "Print Windows online updates install result"
+  debug: var=win_updates_install_result
+  when: enable_debug
 
-- name: "No need to install Windows Updates"
-  ansible.builtin.debug:
-    msg: "Will not execute Windows Updates installation task due to no update found or search failed."
-  when: >
-    (win_updates_list.found_update_count is undefined) or
-    (win_updates_list.found_update_count | int == 0)
-
-- name: "Set Windows Updates installation status"
+- name: "Set fact of Windows online updates install status"
   ansible.builtin.set_fact:
-    win_online_updates_succeed: |-
-      {%- if win_updates_list.failed is defined and not win_updates_list.failed and 
-        win_updates_list.found_update_count | int == 0 -%}
-        true
-      {%- elif win_updates_install_result is defined and win_updates_install_result.installed_update_count is defined and 
-        win_updates_install_result.found_update_count | int == win_updates_install_result.installed_update_count | int -%}
-        true
-      {%- else -%}
-        false
-      {%- endif -%}
+    win_online_updates_installed: true
+  when:
+    - win_updates_install_result is defined
+    - win_updates_install_result.installed_update_count is defined
+    - win_updates_install_result.found_update_count is defined
+    - win_updates_install_result.found_update_count | int == win_updates_install_result.installed_update_count | int
 
-- name: "Display Windows Updates installation status"
-  ansible.builtin.debug: var=win_online_updates_succeed
+- name: "Display Windows online updates install status"
+  ansible.builtin.debug: var=win_online_updates_installed

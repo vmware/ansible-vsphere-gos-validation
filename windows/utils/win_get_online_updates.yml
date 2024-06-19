@@ -1,42 +1,61 @@
-# Copyright 2023-2024 VMware, Inc.
+# Copyright 2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Search and list the online Windows Updates in all or specified categories.
-# Parameter:
-#   win_updates_category_names (optional): a list of categories to get updates from.
+# Parameters:
+#   win_updates_categories (optional): a list of categories to get updates from.
 #     Some possible categories are: Application, Connectors, Critical Updates, Definition Updates, Developer Kits,
 #     Feature Packs, Guidance, Security Updates, Service Packs, Tools, Update Rollups, Updates, and Upgrades.
 #     Default value is '*', means matching all categories.
-#   win_expect_updates_categories (optional): a list of expected update categories. If configured,
+#   win_updates_categories_expect (optional): a list of expected update categories. If configured,
 #     returned 'win_updates_list' must contain at least one of the category in this list.
-#     Default value is '[]'.
+#     Default value is '['']'.
 #   win_get_updates_timeout (optional): the timeout for getting expected update categories.
 #     Default value is 600 seconds.
-# Return:
-#   win_updates_list: the list of avaliable online Windows Updates.
+#   win_updates_ignore_errors (optional): whether to ignore errors in searching and checking
+#     Windows online updates, default is false.
+#   win_updates_log_file (optional): the log file path for Windows Update in guest OS.
+#     Default is 'C:\win_updates_log.txt'.
 #
-- name: "Initialize the facts of getting Windows Updates"
+- name: "Initialize the facts of getting Windows online updates"
   ansible.builtin.set_fact:
-    win_updates_category_names: "{{ win_updates_category_names | default('*') }}"
-    win_expect_updates_categories: "{{ win_expect_updates_categories | default([]) }}"
+    win_updates_categories: "{{ win_updates_categories | default('*') }}"
+    win_updates_categories_expect: "{{ win_updates_categories_expect | default(['']) }}"
     win_get_updates_timeout: "{{ win_get_updates_timeout | default(600) }}"
+    win_updates_ignore_errors: "{{ win_updates_ignore_errors | default(false) }}"
+    win_updates_log_file: "{{ win_updates_log_file | default('C:\\win_updates_log.txt') }}"
 
-- name: "Get the list of available Windows Updates"
+- name: "Get the list of available Windows online updates"
   ansible.windows.win_updates:
     server_selection: "windows_update"
-    category_names: "{{ win_updates_category_names }}"
+    category_names: "{{ win_updates_categories }}"
+    log_path: "{{ win_updates_log_file }}"
     skip_optional: true
     state: "searched"
   delegate_to: "{{ vm_guest_ip }}"
-  register: get_win_updates_result
+  register: win_get_updates_result
   ignore_errors: true
   retries: "{{ (win_get_updates_timeout | int / 5) | int }}"
   delay: 5
   until:
-    - get_win_updates_result.failed is defined
-    - not get_win_updates_result.failed
-    - get_win_updates_result.found_update_count is defined
-    - get_win_updates_result.found_update_count | int != 0
+    - win_get_updates_result.failed is defined
+    - not win_get_updates_result.failed
+    - win_get_updates_result.found_update_count is defined
+    - win_get_updates_result.found_update_count | int != 0
+    - win_get_updates_result.updates is defined
+    - win_get_updates_result.updates | length != 0
+    - (win_get_updates_result.updates.values() | map(attribute='categories') | flatten | unique + ['']) | intersect(win_updates_categories_expect) | length != 0
 
-- name: "Print the list of Windows Updates"
-  ansible.builtin.debug: var=get_win_updates_result
+- name: "Print the list of searched Windows online updates"
+  ansible.builtin.debug: var=win_get_updates_result
+  when: enable_debug
+
+- name: "Check getting Windows online updates result"
+  ansible.builtin.fail:
+    msg: >-
+      Failed to search Windows online updates containing specified categories:
+      {{ win_updates_categories_expect }} in {{ win_get_updates_timeout }} seconds.
+  when:
+    - not win_updates_ignore_errors
+    - win_get_updates_result.failed is defined
+    - win_get_updates_result.failed

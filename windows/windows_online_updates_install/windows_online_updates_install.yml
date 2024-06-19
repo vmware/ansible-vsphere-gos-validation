@@ -3,14 +3,21 @@
 ---
 # Description:
 #   This test case is used for installing Windows online updates in
-# guest OS through Windows Update.
+# guest OS through Windows Update. If parameter 'windows_updated_build_num'
+# is not set, this test case will try to search available Windows online updates
+# and install without checking updates categories, updated OS build number.
 #
-- name: windows_online_update
+- name: windows_online_updates_install
   hosts: localhost
   gather_facts: no
   tasks:
     - name: "Test case block"
       block:
+        - name: "Initialize Windows updates log file path and install status"
+          ansible.builtin.set_fact:
+            win_updates_log_file: "C:\\win_updates_log.txt"
+            win_online_updates_installed: false
+
         - name: "Check parameter 'windows_updated_build_num' value"
           ansible.builtin.assert:
             that:
@@ -27,9 +34,31 @@
           include_tasks: ../utils/win_get_os_version.yml
         - name: "Display guest OS version build before installing Windows updates"
           ansible.builtin.debug: var=win_os_version_build
+        - name: "Set fact of guest OS build number before installing Windows updates"
+          ansible.builtin.set_fact:
+            win_os_build_before_update: "{{ ('.').join(win_os_version_build.split('.')[2:]) }}"
+        - name: "Check expected OS build number"
+          ansible.builtin.assert:
+            that:
+              - win_os_build_before_update is version(windows_updated_build_num, '<=')
+            fail_msg: >-
+              Before installing Windows updates, guest OS build number is '{{ win_os_build_before_update }}',
+              which is newer than the configured expected build number '{{ windows_updated_build_num }}',
+              please check and change parameter value 'windows_updated_build_num' in vars/test.yml.
+          when: windows_updated_build_num is defined
 
         - name: "Install Windows online updates in guest OS"
-          include_tasks: install_online_updates.yml
+          include_tasks: install_windows_updates.yml
+
+        - name: "No Windows updates installed in guest OS"
+          ansible.builitin.fail:
+            msg: >-
+              Before installing Windows updates, guest OS build number is '{{ win_os_build_before_update }}',
+              configured expected build number is '{{ windows_updated_build_num }}', while after trying install
+              Windows updates in guest OS, no update installed.
+          when:
+            - windows_updated_build_num is defined
+            - not win_online_updates_installed
 
         - name: "Windows online updates installed in guest OS"
           when: win_online_updates_installed
@@ -64,3 +93,14 @@
           include_tasks: ../../common/test_rescue.yml
           vars:
             exit_testing_when_fail: true
+      always:
+        - name: "Check if file {{ win_updates_log_file }} exists in guest OS"
+          include_tasks: ../utils/win_check_file_exist.yml
+          vars:
+            win_check_file_exist_file: "{{ win_updates_log_file }}"
+        - name: "Fetch log file {{ win_updates_log_file }} from guest OS"
+          include_tasks: ../utils/win_get_file.yml
+          vars:
+            win_get_file_src_path: "{{ win_updates_log_file }}"
+            win_get_file_dst_path: "{{ current_test_log_folder }}"
+          when: win_check_file_exist_result
