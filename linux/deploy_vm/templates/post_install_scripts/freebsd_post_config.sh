@@ -137,3 +137,5 @@ echo 'kern.geom.label.ufsid.enable="1"' >>/boot/loader.conf
 # Reducing boot menu delay
 echo "Reducing boot menu delay ..." > /dev/ttyu0
 echo 'autoboot_delay="3"' >> /boot/loader.conf
+
+exit 0
