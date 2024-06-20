@@ -10,11 +10,6 @@
     post_install_script_file: "preseed_late_command.sh"
   when: unattend_installer in ['Ubuntu-Ubiquity', "Debian", "Pardus"]
 
-- name: "Set fact of post-install script for FreeBSD"
-  ansible.builtin.set_fact:
-    post_install_script_file: "freebsd_post_config.sh"
-  when: unattend_installer == "FreeBSD"
-
 - name: "Create OS pre-install script"
   ansible.builtin.template:
     src: "templates/pre_install_scripts/{{ pre_install_script_file }}"
@@ -32,6 +27,13 @@
   when:
     - post_install_script_file is defined
     - post_install_script_file
+
+- name: "Create OS post-install script for FreeBSD"
+  ansible.builtin.template:
+    src: "templates/post_install_scripts/freebsd_post_config.sh"
+    dest: "linux/deploy_vm/templates/post_install_scripts/freebsd_post_config.sh"
+    mode: "0755"
+  when: unattend_installer == "FreeBSD"
 
 - name: "Create OS unattend install config file"
   ansible.builtin.template:
