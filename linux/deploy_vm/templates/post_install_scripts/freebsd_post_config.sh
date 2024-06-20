@@ -138,3 +138,11 @@ echo 'kern.geom.label.ufsid.enable="1"' >>/boot/loader.conf
 echo "Reducing boot menu delay ..." > /dev/ttyu0
 echo 'autoboot_delay="3"' >> /boot/loader.conf
 
+echo "Display /boot/loader.conf content"
+cat /boot/loader.conf > /dev/ttyu0
+
+echo "End of installerconfig" > /dev/ttyu0
+echo "{{ autoinstall_complete_msg }}" > /dev/ttyu0
+
+# Power off system when autoinstall completes
+poweroff
