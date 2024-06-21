@@ -38,6 +38,10 @@
   include_tasks: ../utils/get_linux_system_info.yml
   when: guest_os_system_info_retrieved is undefined or not guest_os_system_info_retrieved
 
+- name: "Take a base snapshot if it does not exist"
+  include_tasks: create_base_snapshot.yml
+  when: not (base_snapshot_exists | bool)
+
 - name: "Get VMware Tools version and build"
   include_tasks: ../utils/get_guest_ovt_version_build.yml
   when:
@@ -52,12 +56,11 @@
     - vmtools_is_running | bool
     - guestinfo_gathered is undefined or not guestinfo_gathered
 
-- name: "Take a base snapshot if it does not exist"
-  include_tasks: create_base_snapshot.yml
-  when: not (base_snapshot_exists | bool)
-
 # Hit issue in Ubuntu 22.04 casually: Temporary failure in name resolution. Restarting servcie can fix it
 - name: "Check if it needs to restart systemd-resolved or not to get DNS servers"
+  when:
+    - guest_os_ansible_distribution == "Ubuntu"
+    - guest_os_ansible_distribution_ver == "22.04"
   block:
     - name: "Get DNS servers"
       ansible.builtin.command: "resolvectl status"
@@ -71,6 +74,3 @@
         service_enabled: true
         service_state: "restarted"
       when: dns_servers_output.stdout.find("DNS Servers:") == -1
-  when:
-    - guest_os_ansible_distribution == "Ubuntu"
-    - guest_os_ansible_distribution_ver == "22.04"
