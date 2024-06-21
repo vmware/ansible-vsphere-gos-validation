@@ -30,21 +30,21 @@
     - win_get_updates_result.found_update_count is defined
     - win_get_updates_result.found_update_count | int != 0
 
-- name: "Check if online Windows Updates log file exists in guest OS"
+- name: "Check Windows online updates log file in guest OS"
   include_tasks: ../utils/win_check_file_exist.yml
   vars:
     win_check_file_exist_file: "{{ win_updates_log_file }}"
 
-- name: "Fetch the online Windows Updates log file to local machine and delete it from guest OS"
+- name: "Fetch Windows online updates log file"
   when: win_check_file_exist_result
   block:
-    - name: "Get online Windows Updates log file from guest OS to local machine"
+    - name: "Get log file from guest OS to local machine"
       include_tasks: ../utils/win_get_file.yml
       vars:
         win_get_file_src_path: "{{ win_updates_log_file }}"
         win_get_file_dst_path: "{{ current_test_log_folder }}"
 
-    - name: "Delete online Windows Updates log file from guest OS"
+    - name: "Delete Windows online updates log file in guest OS"
       ansible.windows.win_file:
         path: "{{ win_updates_log_file }}"
         state: absent
@@ -53,15 +53,14 @@
       ignore_errors: true
 
 # For internal existing VM test scenario.
-# If guest OS has been updated, take a new one as base snapshot and remove the old one.
-- name: "Reset base snapshot if online Windows Updates succeeds"
+# If guest OS has been updated, take a new base snapshot and remove the old one.
+- name: "Reset base snapshot if Windows online updates installed"
   when: win_online_updates_installed
   block:
     - name: "Get guest OS version build"
       include_tasks: ../utils/win_get_os_version.yml
-    - name: "Display the guest OS version build after online Windows Updates"
-      ansible.builtin.debug:
-        msg: "After running online Windows Updates, guest OS version build is {{ win_os_version_build }}"
+    - name: "Display the guest OS version build after installing Windows online updates"
+      ansible.builtin.debug: var=win_os_version_build
 
     - name: "Reset the base snapshot and remove the old one"
       include_tasks: ../../common/reset_base_snapshot.yml
@@ -69,6 +68,6 @@
         remove_old_base_snapshot: true
         base_snapshot_description: "{{ win_os_version_build }}"
 
-- name: "Revert to the base snapshot when online Windows Updates failed"
+- name: "Revert to the base snapshot when no Windows online update installed"
   include_tasks: ../../common/base_snapshot_check_revert.yml
   when: not win_online_updates_installed

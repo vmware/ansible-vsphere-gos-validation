@@ -1,16 +1,17 @@
 # Copyright 2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Remove "C:\Windows.old" folder in guest OS after installing Windows online
+# Description:
+#   Remove "C:\Windows.old" folder in guest OS after installing Windows online
 # updates to avoid following test case failure due to this folder takes
-# large disk space sometimes
+# large disk space sometimes.
 #
 - name: "Set fact of the path of Windows.old folder in guest OS"
   ansible.builtin.set_fact:
     windows_old_path: "C:\\Windows.old"
 
 - name: "Check if Windows.old folder exists"
-  include_tasks: ../utils/win_check_file_exist.yml
+  include_tasks: win_check_file_exist.yml
   vars:
     win_check_file_exist_file: "{{ windows_old_path }}"
 - name: "Set fact of Windows.old folder existence state"
@@ -24,7 +25,7 @@
     - windows_old_size | int != 0
   block:
     - name: "Execute cleanmgr commands to remove Windows.old folder"
-      include_tasks: ../utils/win_execute_cmd.yml
+      include_tasks: win_execute_cmd.yml
       vars:
         win_powershell_cmd: >-
           $win_remove_old="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Previous Installations";
@@ -34,7 +35,7 @@
       ansible.builtin.pause:
         seconds: 5
     - name: "Get Windows.old folder state after removing"
-      include_tasks: ../utils/win_check_file_exist.yml
+      include_tasks: win_check_file_exist.yml
       vars:
         win_check_file_exist_file: "{{ windows_old_path }}"
     - name: "Check if Windows.old folder is removed"
