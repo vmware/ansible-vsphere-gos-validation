@@ -1,0 +1,53 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Check VC SSO user's SAML token munged (signature value is replaced) and token is verified by host
+# in VGAuthService log file
+# Parameter:
+#   vgauth_log_path_local: The collected VGAuthService log file at localhost
+#
+- name: "Set facts of keywords for host verified SMAL token"
+  ansible.builtin.set_fact:
+    munged_signature: '<ds:SignatureValue>JUhPU1RfVkVSSUZJRURfU0lHTkFUVVJFJQA=</ds:SignatureValue>'
+    host_verified_value: "hostVerified 'TRUE'"
+    host_verified_result: 'VerifySignature: token is hostVerified, skipping signature check'
+
+- name: "Look for keywords about hostVerified value"
+  ansible.builtin.shell:
+    cmd: "grep -o -e \"{{ host_verified_value }}\" '{{ vgauth_log_path_local }}'"
+  ignore_errors: true
+  register: get_host_verified_value
+
+- name: "Check hostVerified is 'TRUE'"
+  ansible.builtin.assert:
+    that:
+      - get_host_verified_value.rc is defined
+      - get_host_verified_value.rc == 0
+      - get_host_verified_value.stdout_lines is defined
+      - get_host_verified_value.stdout_lines | length == 1
+      - get_host_verified_value.stdout_lines[0] == host_verified_value
+    fail_msg: "Failed to find {{ host_verified_value }} in VGAuthService log"
+    success_msg: "Found {{ host_verified_value }} in VGAuthService log"
+
+# Flatcar can't enable debug mode, so no debug log checking
+- name: "Check SAML token is munged and verified by host"
+  when: guest_os_ansible_distribution != 'Flatcar'
+  block:
+    - name: "Look for keywords about host verified SAML token"
+      ansible.builtin.shell:
+        cmd: "grep -o -e '{{ munged_signature }}' -e '{{ host_verified_result }}' '{{ vgauth_log_path_local }}'"
+      ignore_errors: true
+      register: get_host_verified_result
+
+    - name: "Check VC SSO user's SAML token is munged and verified by host"
+      ansible.builtin.assert:
+        that:
+          - get_host_verified_result.rc is defined
+          - get_host_verified_result.rc == 0
+          - get_host_verified_result.stdout_lines is defined
+          - get_host_verified_result.stdout_lines | length == 2
+          - get_host_verified_result.stdout_lines[0] == munged_signature
+          - get_host_verified_result.stdout_lines[1] == host_verified_result
+        fail_msg: "Failed to find munged SAML token or host verified result"
+        success_msg: "VC SSO user's SAML token signature is munged, and verified by host"

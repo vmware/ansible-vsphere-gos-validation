@@ -1,0 +1,122 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Perform guest operation testing with guest user alias to check
+# VC SSO user's SAML token is verified by host.
+#
+- name: "Set log file of testing host verified SAML token and checking messages"
+  ansible.builtin.set_fact:
+    saml_token_test_log: "{{ current_test_log_folder }}/test_saml_token.log"
+    add_alias_check_msg: >-
+      Successfuly added guest user mapping:
+      {{ vm_guest_user_name }}:{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}
+    remove_alias_check_msg: >-
+      Successfuly removed guest user mapping:
+      {{ vm_guest_user_name }}:{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}
+    guest_user_environment: []
+
+- name: "Set command for testing host verified SAML token"
+  ansible.builtin.set_fact:
+    saml_token_test_cmd: >-
+      python ../../tools/vgauth_guestops.py -l {{ saml_token_test_log }}
+      -H {{ vcenter_hostname }} -d '{{ vcenter_domain_name }}' -vm '{{ vm_name }}'
+      -au '{{ vcenter_admin_user_name }}' -ap '{{ vcenter_password }}'
+
+# Add guest alias
+- name: "Add guest user mapping for guest user {{ vm_guest_user_name }}"
+  ansible.builtin.command: >-
+      {{ saml_token_test_cmd }}
+      -tu '{{ vcenter_domain_user_name }}' -tp '{{ vcenter_domain_user_password }}'
+      -gu '{{ vm_guest_user_name }}' -gp '{{ vm_guest_user_password }}'
+      -o AddGuestAlias
+  register: add_alias_result
+  ignore_errors: true
+
+- name: "Display the result of adding guest user mapping"
+  debug: var=add_alias_result
+  when: enable_debug
+
+- name: "Check the result of adding guest user mapping"
+  ansible.builtin.assert:
+    that:
+      - add_alias_result.rc is defined
+      - add_alias_result.rc == 0
+      - add_alias_result.stdout_lines is defined
+      - add_alias_result.stdout_lines | select('search', add_alias_check_msg) | length > 0
+    fail_msg: >-
+      Failed to add guest user mapping
+      {{ vm_guest_user_name }}:{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}
+      on VM {{ vm_name }}.
+      Return code is '{{ add_alias_result.rc | default("") }}'.
+      Output is '{{ add_alias_result.stdout | default("") }}'.
+      Hit error '{{ add_alias_result.stderr | default("") }}'.
+    success_msg: "{{ add_alias_check_msg }}"
+
+# Test guest operation
+- name: "Perform guest operation of reading guest user's environment variables"
+  ansible.builtin.command: >-
+    {{ saml_token_test_cmd }}
+    -tu '{{ vcenter_domain_user_name }}' -tp '{{ vcenter_domain_user_password }}'
+    -gu '{{ vm_guest_user_name }}' -o PerformGuestOps
+  register: perform_guestops_result
+  ignore_errors: true
+
+- name: "Display the result of reading guest user's environment variables by guest operation"
+  debug: var=perform_guestops_result
+  when: enable_debug
+
+- name: "Set fact of guest user's environment variables retrieved by guest operation"
+  ansible.builtin.set_fact:
+    guest_user_environment: >-
+      {{
+        perform_guestops_result.stdout_lines |
+        select('match', 'USER(NAME)?=' ~ vm_guest_user_name)
+      }}
+  when:
+    - perform_guestops_result.stdout_lines is defined
+    - perform_guestops_result.stdout_lines | length > 0
+
+- name: "Check the result of reading guest user's environment variables by guest operation"
+  ansible.builtin.assert:
+    that:
+      - perform_guestops_result.rc is defined
+      - perform_guestops_result.rc == 0
+      - guest_user_environment | length == 1
+    fail_msg: >-
+      Failed to read guest user's environment variables by guest operation with VC SSO user
+      {{ vcenter_domain_user_name }}@{{ vcenter_domain_name }} on VM {{ vm_name }}.
+      Return code is '{{ perform_guestops_result.rc | default("") }}'.
+      Output is '{{ perform_guestops_result.stdout | default("") }}'.
+      Hit error '{{ perform_guestops_result.stderr | default("") }}'.
+    success_msg: "Successfully read guest user's environment variable {{ guest_user_environment }}"
+
+# Remove guest alias
+- name: "Remove guest user mapping for guest user {{ vm_guest_user_name }}"
+  ansible.builtin.command: >-
+      {{ saml_token_test_cmd }}
+      -tu '{{ vcenter_domain_user_name }}' -tp '{{ vcenter_domain_user_password }}'
+      -gu '{{ vm_guest_user_name }}' -gp '{{ vm_guest_user_password }}'
+      -o RemoveGuestAlias
+  register: remove_alias_result
+  ignore_errors: true
+
+- name: "Display the result of removing guest user mapping"
+  debug: var=remove_alias_result
+  when: enable_debug
+
+- name: "Check the result of removing guest user mapping"
+  ansible.builtin.assert:
+    that:
+      - remove_alias_result.rc is defined
+      - remove_alias_result.rc == 0
+      - remove_alias_result.stdout_lines is defined
+      - remove_alias_result.stdout_lines | select('search', remove_alias_check_msg) | length > 0
+    fail_msg: >-
+      Failed to remove guest user mapping
+      {{ vm_guest_user_name }}:{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}
+      on VM {{ vm_name }}.
+      Return code is '{{ remove_alias_result.rc | default("") }}'.
+      Output is '{{ remove_alias_result.stdout | default("") }}'.
+      Hit error '{{ remove_alias_result.stderr | default("") }}'.
+    success_msg: "{{ remove_alias_check_msg }}"

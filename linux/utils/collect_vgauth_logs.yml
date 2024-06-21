@@ -3,40 +3,43 @@
 ---
 # Collect VGAuthService logs to local test case log directory
 # Parameter:
-#   vgauth_log_file_src: The VGAuthService log file path
+#   vgauth_latest_log_file: The VGAuthService log file path
 #
 - name: "Initialize the latest VGAuthService log path in guest OS"
   ansible.builtin.set_fact:
-    vgauth_log_file_src: "/var/log/vmware-vgauthsvc.log.0"
-  when: vgauth_log_file_src is undefined or not vgauth_log_file_src
+    vgauth_latest_log_file: "/var/log/vmware-vgauthsvc.log.0"
+  when: vgauth_latest_log_file is undefined
 
-- name: "Initialize facts of collected VGAuthService log path at localhost"
+- debug: var=vgauth_latest_log_file
+
+- name: "Initialize facts for collecting VGAuthService log file"
   ansible.builtin.set_fact:
+    vgauth_log_file_exists: false
     vgauth_log_file_dest: ""
     vgauth_log_is_collected: false
 
 - name: "Get VGAuthService log file info"
   include_tasks: get_file_stat_info.yml
   vars:
-    guest_file_path: "{{ vgauth_log_file_src }}"
+    guest_file_path: "{{ vgauth_latest_log_file }}"
 
 - name: "Set fact of VGAuthService log exists or not"
   ansible.builtin.set_fact:
     vgauth_log_file_exists: "{{ guest_file_exists }}"
 
-- name: "Collect VGAuthService log file"
+- name: "Collect VGAuthService log file to localhost"
+  when: vgauth_log_file_exists | bool
   block:
     - name: "Collect VGAuthServce log to test case log dir"
       include_tasks: fetch_file.yml
       vars:
-        fetch_file_src_path: "{{ vgauth_log_file_src }}"
+        fetch_file_src_path: "{{ vgauth_latest_log_file }}"
         fetch_file_dst_path: "{{ current_test_log_folder }}/"
 
     - name: "Set facts of VGAuthService file collected at localhost"
       ansible.builtin.set_fact:
         vgauth_log_file_dest: "{{ fetch_file_local_path }}"
-        vgauth_log_is_collected: True
+        vgauth_log_is_collected: true
       when:
         - fetch_file_local_path is defined
         - fetch_file_local_path
-  when: vgauth_log_file_exists | bool
