@@ -16,19 +16,24 @@
     esxi_hostname: "{{ esxi_hostname }}"
     schema: vsphere
     properties:
-      - config.product
+      - config.product.version
+      - config.product.build
       - config.option
   register: gather_host_facts_result
   ignore_errors: true
   no_log: true
 
-- block:
+- name: "Get ESXi server version and build number"
+  when: not gather_host_facts_result.failed
+  block:
     - name: "Set fact of the ESXi server version and build number"
       ansible.builtin.set_fact:
         esxi_version: "{{ gather_host_facts_result.ansible_facts.config.product.version }}"
         esxi_build: "{{ gather_host_facts_result.ansible_facts.config.product.build }}"
 
-    - block:
+    - name: "Get ESXi server update version"
+      when: esxi_version is version('7.0.0', '<')
+      block:
         - name: "Looking for ESXi update level in host config options"
           ansible.builtin.set_fact:
             esxi_update_level: "{{ gather_host_facts_result.ansible_facts.config.option | selectattr('key', 'equalto', 'Misc.HostAgentUpdateLevel') }}"
@@ -37,11 +42,12 @@
           ansible.builtin.set_fact:
             esxi_update_version: "{{ esxi_update_level[0]['value'] }}"
           when: esxi_update_level | length > 0
-      when: esxi_version is version('7.0.0', '<')
-  when: not gather_host_facts_result.failed
 
-- ansible.builtin.debug:
-    msg: "Get ESXi server '{{ esxi_hostname }}' config.product, config.option properties failed"
+- name: "Failed to get ESXi product info"
+  ansible.builtin.fail:
+    msg: >-
+      Failed to get ESXi server properties 'config.product.version', 'config.product.build' and 'config.option'.
+      Caught error: {{ gather_host_facts_result.msg | default('') }}
   when: gather_host_facts_result.failed
 
 # For log plugin to gather ESXi info in result file
