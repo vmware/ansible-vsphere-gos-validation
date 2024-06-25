@@ -13,27 +13,24 @@
 
 - name: "Get network device manager in guest OS"
   include_tasks: get_network_manager.yml
-  when: guest_os_network_manager is undefined or not guest_os_network_manager
+  when: guest_os_network_manager is undefined
 
 - name: "Get network config file from NetworkManager"
+  when: guest_os_network_manager == "NetworkManager"
   block:
     - name: "Get network connections"
-      ansible.builtin.shell: |
-        conn_name=$(nmcli -t -f GENERAL.CONNECTION device show {{ network_adapter_name }} | cut -d ':' -f 2);
-        nmcli -t -f NAME,ACTIVE,FILENAME connection show --active | grep "$conn_name:"
+      ansible.builtin.shell: "nmcli -t -f DEVICE,FILENAME connection show --active | grep '{{ network_adapter_name }}:'"
       delegate_to: "{{ vm_guest_ip }}"
       register: "network_conn_result"
       ignore_errors: true
 
     - name: "Set fact of network config file for '{{ network_adapter_name }}' on {{ guest_os_ansible_distribution }}"
       ansible.builtin.set_fact:
-        network_config_path: "{{ network_conn_result.stdout_lines[0].split(':')[2] }}"
+        network_config_path: "{{ network_conn_result.stdout_lines[0].split(':')[1] }}"
       when:
         - network_conn_result.rc is defined
         - network_conn_result.rc == 0
         - network_conn_result.stdout_lines | length == 1
-        - network_conn_result.stdout_lines[0].split(':') | length == 3
-  when: guest_os_network_manager == "NetworkManager"
 
 # Set fact of network config file in guest OS except VMware Photon OS
 - name: "Set fact of network config file"
