@@ -8,10 +8,15 @@
 # https://kb.vmware.com/s/article/87307
 - name: "Workaround for SYSPREP error caused by Appx package"
   block:
-    - name: "Remove BingSearch Appx package in Windows Client"
+    - name: "Remove Appx packages in Windows Client"
       include_tasks: ../utils/win_remove_appx_package.yml
       vars:
-        win_appx_package: "BingSearch"
+        win_remove_appx_ignore_errors: true
+      loop:
+        - "BingSearch"
+        - "Microsoft.Copilot"
+      loop_control:
+        loop_var: win_appx_package
       when:
         - guest_os_ansible_distribution_ver is version('10.0.22000.0', '>=')
         - guest_os_product_type | lower == 'client'
@@ -19,6 +24,7 @@
       include_tasks: ../utils/win_remove_appx_package.yml
       vars:
         win_appx_package: "Edge.Stable"
+        win_remove_appx_ignore_errors: true
       when: guest_os_product_type | lower == 'server' 
 
 # Parameter 'uninstall_onedrive' is used for internal testing only
