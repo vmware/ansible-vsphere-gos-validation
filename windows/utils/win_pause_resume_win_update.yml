@@ -1,4 +1,4 @@
-# Copyright 2022-2024 VMware, Inc.
+# Copyright 2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Disable Windows auto update and pause Windows Update 7 days,
@@ -16,36 +16,38 @@
       Parameter 'win_update_ops': {{ win_update_ops | default('') }} is not set correctly,
       valid value is 'pause' or 'resume'.
 
-- name: "Set fact of PowerShell script file name"
+- name: "Set fact of the PowerShell script name"
   ansible.builtin.set_fact:
     win_update_script: "{{ win_update_ops }}_windows_update.ps1"
 
-# Transfer PowerShell script to guest OS
-- name: "Set fact of PowerShell script file path"
+- name: "Set fact of the PowerShell script local and remote paths"
   ansible.builtin.set_fact:
     local_ps_file: "scripts/{{ win_update_script }}"
     remote_ps_file: "C:\\{{ win_update_script }}"
-- name: "Copy file from local to guest OS"
+
+- name: "Copy PowerShell script from local to guest OS"
   include_tasks: win_copy_file_from_local.yml
   vars:
     src_path_local: "{{ local_ps_file }}"
     dest_path_remote: "C:\\"
-- name: "Check if file {{ remote_ps_file }} exists"
+
+- name: "Get PowerShell script existence state in guest OS"
   include_tasks: win_check_file_exist.yml
   vars:
     win_check_file_exist_file: "{{ remote_ps_file }}"
+- name: "Make sure PowerShell script exists in guest OS"
+  ansible.builtin.assert:
+    that:
+      - win_check_file_exist_result is defined
+      - win_check_file_exist_result | bool
+    fail_msg: "PowerShell script is not found in guest OS in this path: {{ remote_ps_file }}"
 
 # Pause Windows Update is not a demand task, so ignore errors
-- name: "Execute PowerShell script in guest OS"
-  when:
-    - win_check_file_exist_result is defined
-    - win_check_file_exist_result | bool
-  block:
-    - name: "Execute {{ win_update_ops }} Windows Update script in guest OS"
-      ansible.windows.win_command: "powershell.exe -ExecutionPolicy bypass -File {{ remote_ps_file }}"
-      delegate_to: "{{ vm_guest_ip }}"
-      ignore_errors: "{{ win_update_ops == 'pause' }}"
-      register: win_update_ops_result
-    - name: "Display the script execute result"
-      ansible.builtin.debug: var=win_update_ops_result
-      when: enable_debug
+- name: "Execute {{ win_update_ops }} Windows Update PowerShell script in guest OS"
+  ansible.windows.win_command: "powershell.exe -ExecutionPolicy bypass -File {{ remote_ps_file }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: "{{ win_update_ops == 'pause' }}"
+  register: win_update_ops_result
+- name: "Display the PowerShell script execute result"
+  ansible.builtin.debug: var=win_update_ops_result
+  when: enable_debug
