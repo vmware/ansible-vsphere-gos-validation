@@ -5,13 +5,13 @@
 # Parameters:
 #   win_updates_categories (optional): a list of categories to get updates from.
 #     Some possible categories are: Application, Connectors, Critical Updates, Definition Updates, Developer Kits,
-#     Feature Packs, Guidance, Security Updates, Service Packs, Tools, Update Rollups, Updates, and Upgrades.
+#     Feature Packs, Guidance, Security Updates, Service Packs, Tools, Update Rollups, Updates and Upgrades.
 #     Default value is '*', means matching all categories.
 #   win_updates_categories_expect (optional): a list of expected update categories. If configured,
 #     searched online updates must contain at least one of the category in this list.
 #     Default value is '['']'.
-#   win_get_updates_timeout (optional): the timeout for getting expected update categories.
-#     Default value is 600 seconds.
+#   win_get_updates_retries (optional): the retry times to get expected update categories.
+#     Default value is 1.
 #   win_updates_ignore_errors (optional): whether to ignore errors in searching and checking
 #     Windows online updates, default is false.
 #   win_updates_log_file (optional): the log file path for Windows Update in guest OS.
@@ -21,9 +21,15 @@
   ansible.builtin.set_fact:
     win_updates_categories: "{{ win_updates_categories | default('*') }}"
     win_updates_categories_expect: "{{ win_updates_categories_expect | default(['']) }}"
-    win_get_updates_timeout: "{{ win_get_updates_timeout | default(600) }}"
     win_updates_ignore_errors: "{{ win_updates_ignore_errors | default(false) }}"
     win_updates_log_file: "{{ win_updates_log_file | default('C:\\win_updates_log.txt') }}"
+
+- name: "Set fact of retries when expected update categories is not set"
+  ansible.builtin.set_fact:
+    win_get_updates_retries: 1
+  when: >
+    (win_get_updates_retries is undefined) or
+    (win_updates_categories_expect | length == 0)
 
 - name: "Get the list of available Windows online updates"
   ansible.windows.win_updates:
@@ -35,10 +41,9 @@
   delegate_to: "{{ vm_guest_ip }}"
   register: win_get_updates_result
   ignore_errors: true
-  retries: "{{ (win_get_updates_timeout | int / 5) | int }}"
-  delay: 5
+  retries: "{{ win_get_updates_retries | int }}"
+  delay: 10
   until:
-    - win_get_updates_result is defined
     - win_get_updates_result.found_update_count is defined
     - win_get_updates_result.found_update_count | int != 0
     - win_get_updates_result.updates is defined
@@ -53,7 +58,7 @@
   ansible.builtin.fail:
     msg: >-
       Failed to search Windows online updates containing specified categories:
-      {{ win_updates_categories_expect }} in {{ win_get_updates_timeout }} seconds.
+      {{ win_updates_categories_expect }} after {{ win_get_updates_retries }} retries.
   when:
     - not win_updates_ignore_errors
     - win_get_updates_result.failed is defined

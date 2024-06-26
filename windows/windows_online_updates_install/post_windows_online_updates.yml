@@ -1,0 +1,30 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Get guest OS version build after installing Windows updates"
+  include_tasks: ../utils/win_get_os_version.yml
+
+- name: "Display guest OS version build after installing Windows updates"
+  ansible.builtin.debug: var=win_os_version_build
+
+- name: "Set fact of the guest OS build number after installing Windows updates"
+  ansible.builtin.set_fact:
+    win_os_build_after_update: "{{ ('.').join(win_os_version_build.split('.')[2:]) }}"
+
+- name: "Check OS build number after installing Windows updates"
+  ansible.builtin.assert:
+    that:
+      - win_os_build_after_update is version(windows_updated_build_num, '>=')
+    fail_msg: >-
+      After installing Windows updates, guest OS build number is '{{ win_os_build_after_update }}',
+      which is not expected build '{{ windows_updated_build_num }}' or newer.
+  when: win_check_is_updated
+
+- name: "Remove Windows.old folder after installing Windows updates"
+  include_tasks: ../utils/win_remove_windows_old.yml
+
+- name: "Reset base snapshot after installing Windows updates"
+  include_tasks: ../../common/reset_base_snapshot.yml
+  vars:
+    remove_old_base_snapshot: true
+    base_snapshot_description: "{{ win_os_build_after_update }}"

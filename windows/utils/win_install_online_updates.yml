@@ -1,22 +1,23 @@
 # Copyright 2023-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Install Windows online updates in specified categories,
-# skip optional ones or in a reject list in Windows guest OS.
+# Install Windows online updates in specified categories, skip optional
+# ones or in a reject list in Windows guest OS.
 # Parameters:
 #   win_updates_categories (optional): A list of categories to install updates from.
 #     Some possible categories are: Application, Connectors, Critical Updates,
 #     Definition Updates, Developer Kits, Feature Packs, Guidance, Security Updates,
-#     Service Packs, Tools, Update Rollups, Updates, and Upgrades.
+#     Service Packs, Tools, Update Rollups, Updates and Upgrades.
 #     Default value is '*', which matches all categories.
 #   win_updates_reject_list (optional): A list of update titles or KB numbers that
 #     can be used to specify which updates are to be excluded from installation.
-#   win_updates_ignore_errors (optional): Ignore errors when installing Windows updates.
-#     Default is false.
+#   win_updates_ignore_errors (optional): Whether to ignore errors when installing
+#     Windows updates. Default is false.
 #   win_updates_log_file (optional): The log file path for Windows Update in guest OS.
 #     Default is 'C:\win_updates_log.txt'.
 # Return:
-#   win_online_updates_installed: Windows online updates installed status.
+#   win_online_updates_installed: Indicates if there are Windows online updates
+#     installed in guest OS.
 #
 - name: "Set fact and initialize Windows online updates install parameters"
   ansible.builtin.set_fact:
@@ -45,9 +46,9 @@
   ansible.builtin.set_fact:
     win_online_updates_installed: true
   when:
-    - win_updates_install_result is defined
-    - win_updates_install_result.installed_update_count is defined
     - win_updates_install_result.found_update_count is defined
+    - win_updates_install_result.found_update_count | int != 0
+    - win_updates_install_result.installed_update_count is defined
     - win_updates_install_result.found_update_count | int == win_updates_install_result.installed_update_count | int
 
 - name: "Display Windows online updates install status"
