@@ -13,17 +13,16 @@
     guest_rpm_gpg_key_path: "/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release"
   when: guest_os_ansible_distribution == "RedHat"
 
-- name: "Set default RPM GPG key file for CentOS"
-  block:
-    - name: "Set default RPM GPG key file for CentOS {{ guest_os_ansible_distribution_major_ver }}"
-      ansible.builtin.set_fact:
-        guest_rpm_gpg_key_path: "/etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7"
-      when: guest_os_ansible_distribution_major_ver | int == 7
-
-    - name: "Set default RPM GPG key file for CentOS {{ guest_os_ansible_distribution_major_ver }}"
-      ansible.builtin.set_fact:
-        guest_rpm_gpg_key_path: "/etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
-      when: guest_os_ansible_distribution_major_ver | int >= 8
+- name: "Set default RPM GPG key file for {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    guest_rpm_gpg_key_path: |-
+      {%- if guest_os_ansible_distribution_major_ver | int == 7 -%}
+      /etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+      {%- elif guest_os_ansible_distribution_major_ver | int in [8, 9] -%}
+      /etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
+      {%- elif guest_os_ansible_distribution_major_ver | int >= 10 -%}
+      /etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial-SHA256
+      {%- endif -%}
   when: guest_os_ansible_distribution == "CentOS"
 
 - name: "Set default RPM GPG key file for Oracle Linux"
@@ -32,6 +31,7 @@
   when: guest_os_ansible_distribution == "OracleLinux"
 
 - name: "Set default RPM GPG key file for Rocky Linux"
+  when: guest_os_ansible_distribution == "Rocky"
   block:
     - name: "Set GPG key path for Rocky Linux {{ guest_os_ansible_distribution_ver }}"
       ansible.builtin.set_fact:
@@ -42,7 +42,6 @@
       ansible.builtin.set_fact:
         guest_rpm_gpg_key_path: "/etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-{{ guest_os_ansible_distribution_major_ver }}"
       when: guest_os_ansible_distribution_major_ver | int >= 9
-  when: guest_os_ansible_distribution == "Rocky"
 
 - name: "Set RPM GPG key file for VMware Photon OS"
   when: guest_os_ansible_distribution == "VMware Photon OS"
@@ -102,7 +101,7 @@
       when: guest_os_ansible_distribution != "VMware Photon OS"
       block:
         - name: "Look for RPM GPG key files"
-          ansible.builtin.command: "ls /etc/pki/rpm-gpg/RPM-GPG-KEY-*"
+          ansible.builtin.command: "ls -1 /etc/pki/rpm-gpg/RPM-GPG-KEY-*"
           delegate_to: "{{ vm_guest_ip }}"
           register: list_rpm_gpg_keys
           changed_when: false

@@ -12,63 +12,67 @@
     guest_netmask_success: ""
     guest_gateway_success: ""
 
-# Get IP address and netmask
-- include_tasks: ../../common/vm_shell_in_guest.yml
+- name: "Show guest OS IP address after GOSC"
+  include_tasks: ../../common/vm_shell_in_guest.yml
   vars:
     vm_shell_cmd: "{{ ip_command }}"
     vm_shell_args: "-br addr show"
     vm_shell_out: "/tmp/ip_addr_show.txt"
 
-- include_tasks: ../../common/vm_guest_file_operation.yml
+- name: "Fetch the result file of showing IP address"
+  include_tasks: ../../common/vm_guest_file_operation.yml
   vars:
     operation: "fetch_file"
     src_path: "/tmp/ip_addr_show.txt"
     dest_path: "{{ current_test_log_folder }}/ip_addr_show.txt"
 
-- name: "Get IPv4 address"
+- name: "Get guest OS IPv4 address after GOSC"
   ansible.builtin.set_fact:
     guest_ip_addr_show: "{{ lookup('file', current_test_log_folder ~ '/ip_addr_show.txt').split('\n') | select('search', '^e(n|th).*') }}"
 
-- name: "Set facts of guest network interface names and IPv4 address"
+- name: "Set facts of guest OS network interface name and IPv4 address after GOSC"
   ansible.builtin.set_fact:
     guest_iface_name: "{{ guest_ip_addr_show[0].split()[0] }}"
     guest_ipv4_address: "{{ guest_ip_addr_show[0] | regex_search('(\\d+\\.){3}(\\d+)/(\\d+)') | ansible.utils.ipaddr('address') }}"
     guest_ipv4_netmask: "{{ guest_ip_addr_show[0] | regex_search('(\\d+\\.){3}(\\d+)/(\\d+)') | ansible.utils.ipaddr('netmask') }}"
   when: guest_ip_addr_show | length > 0
 
-# Get default gateway
-- include_tasks: ../../common/vm_shell_in_guest.yml
+- name: "Show guest OS default gateway after GOSC"
+  include_tasks: ../../common/vm_shell_in_guest.yml
   vars:
     vm_shell_cmd: "{{ ip_command }}"
     vm_shell_args: "-4 route show"
     vm_shell_out: "/tmp/ip_route_show.txt"
 
-- include_tasks: ../../common/vm_guest_file_operation.yml
+- name: "Fetch the result file of showing default gateway"
+  include_tasks: ../../common/vm_guest_file_operation.yml
   vars:
     operation: "fetch_file"
     src_path: "/tmp/ip_route_show.txt"
     dest_path: "{{ current_test_log_folder }}/ip_route_show.txt"
 
-- name: "Get default gateway"
+- name: "Get guest OS default gateway after GOSC"
   ansible.builtin.set_fact:
     guest_default_gateway: "{{ lookup('file', current_test_log_folder ~ '/ip_route_show.txt').split('\n') | select('match', '^default') }}"
 
-- name: "Set fact of GOSC network gateway"
+- name: "Set fact of guest OS default gateway after GOSC"
   ansible.builtin.set_fact:
     guest_ipv4_gateway: "{{ guest_default_gateway[0].split()[2] }}"
   when:
     - guest_default_gateway | length > 0
     - guest_default_gateway[0].split() | length >= 3
 
-# Check IP address, netmaks, gateway settings for GOSC with DHCP IP
-- block:
+- name: "Check IP address, netmask, gateway settings for GOSC with DHCP IP"
+  when: ip_assignment == "dhcp"
+  block:
     - name: "Save DHCP GOSC network check result"
       ansible.builtin.set_fact:
         guest_ipv4_success: "{{ guest_ipv4_address != '' }}"
         guest_netmask_success: "{{ guest_ipv4_netmask != '' }}"
         guest_gateway_success: "{{ guest_ipv4_gateway != '' }}"
 
-    - include_tasks: set_gosc_validation_result.yml
+    - name: "Set GOSC validation result for DHCP networking config"
+      include_tasks: set_gosc_validation_result.yml
       vars:
         gosc_check_item: "{{ item.key }}"
         gosc_check_error_msg: "{{ item.value }}"
@@ -79,17 +83,18 @@
           value: "VM DHCP IPv4 netmask is '{{ guest_ipv4_netmask }}', expected IPv4 netmask should not be empty"
         - key: "guest_gateway_success"
           value: "VM DHCP IPv4 gateway is '{{ guest_ipv4_gateway }}', expected IPv4 gateway should not be empty"
-  when: ip_assignment == "dhcp"
 
-# Check static IP address, netmaks, gateway settings for GOSC with static IP
-- block:
+- name: "Check static IP address, netmask, gateway settings for GOSC with static IP"
+  when: ip_assignment == "static"
+  block:
     - name: "Save static GOSC network facts check result"
       ansible.builtin.set_fact:
         guest_ipv4_success: "{{ guest_ipv4_address == linux_gosc_spec['ip'] }}"
         guest_netmask_success: "{{ guest_ipv4_netmask == linux_gosc_spec['netmask'] }}"
         guest_gateway_success: "{{ guest_ipv4_gateway == linux_gosc_spec['gateway'] }}"
 
-    - include_tasks: set_gosc_validation_result.yml
+    - name: "Set GOSC validation result for static networking config"
+      include_tasks: set_gosc_validation_result.yml
       vars:
         gosc_check_item: "{{ item.key }}"
         gosc_check_error_msg: "{{ item.value }}"
@@ -100,7 +105,6 @@
           value: "VM static IPv4 netmask is '{{ guest_ipv4_netmask }}', expected IPv4 netmask is {{ linux_gosc_spec['netmask'] }}"
         - key: "guest_gateway_success"
           value: "VM static IPv4 gateway is '{{ guest_ipv4_gateway }}', expected IPv4 gateway is {{ linux_gosc_spec['gateway'] }}"
-  when: ip_assignment == "static"
 
 - name: "Print GOSC network IP address check result"
   ansible.builtin.debug: var=guest_ipv4_success
@@ -109,10 +113,16 @@
 - name: "Print GOSC network gateway check result"
   ansible.builtin.debug: var=guest_gateway_success
 
-# Collect network config files for non-Photon Linux
 # On Ubuntu Desktop 19.10 and later or Ubuntu Server 17.10 and later, network configure files
 # are /etc/netplan/*.yaml
-- block:
+- name: "Set network configuration file for {{ vm_guest_os_distribution }}"
+  when: >
+    (guest_os_ansible_distribution == "Ubuntu") and
+    (((guest_os_with_gui is undefined or not guest_os_with_gui | bool) and
+      guest_os_ansible_distribution_ver is version('17.10', '>=')) or
+     (guest_os_with_gui is defined and guest_os_with_gui | bool and
+      guest_os_ansible_distribution_ver is version('19.10', '>=')))
+  block:
     - name: "Set traditional GOSC network configuration file on Ubuntu {{ guest_os_ansible_distribution_ver }}"
       ansible.builtin.set_fact:
         src_network_file: "/etc/netplan/99-netcfg-vmware.yaml"
@@ -122,82 +132,116 @@
       ansible.builtin.set_fact:
         src_network_file: "/etc/netplan/50-cloud-init.yaml"
       when: "gosc_workflow == 'cloud-init'"
-  when: >
-    (guest_os_ansible_distribution == "Ubuntu") and
-    (((guest_os_with_gui is undefined or not guest_os_with_gui | bool) and
-      guest_os_ansible_distribution_ver is version('17.10', '>=')) or
-     (guest_os_with_gui is defined and guest_os_with_gui | bool and
-      guest_os_ansible_distribution_ver is version('19.10', '>=')))
 
 # On Debian 10/11 or Ubuntu Desktop eariler than 19.10, the network configure file is
 # /etc/network/interfaces
-- block:
-    - name: "Set traditional GOSC network configuration files on Ubuntu Desktop/Debian OS"
-      ansible.builtin.set_fact:
-        src_network_file: "/etc/network/interfaces"
-      when: "gosc_workflow == 'perl'"
-
-    - block:
-        - name: "Set cloud-init GOSC network configuration files on Ubuntu/Debian OS"
-          ansible.builtin.set_fact:
-            src_network_file: "/etc/network/interfaces.d/50-cloud-init.cfg"
-          when: guest_os_ansible_distribution == "Ubuntu"
-
-        - name: "Set cloud-init GOSC network configuration files on Ubuntu/Debian OS"
-          ansible.builtin.set_fact:
-            src_network_file: "/etc/network/interfaces.d/50-cloud-init"
-          when: guest_os_ansible_distribution == "Debian"
-      when: "gosc_workflow == 'cloud-init'"
+- name: "Set network configuration file for {{ vm_guest_os_distribution }}"
   when: >
     (guest_os_ansible_distribution == "Debian") or
     (guest_os_ansible_distribution == "Ubuntu" and
      guest_os_ansible_distribution_ver is version('19.10', '<') and
      guest_os_with_gui is defined and guest_os_with_gui | bool)
+  block:
+    - name: "Set traditional GOSC network configuration file on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        src_network_file: "/etc/network/interfaces"
+      when: "gosc_workflow == 'perl'"
 
-- name: "Set GOSC network configuration files on RedHat"
-  ansible.builtin.set_fact:
-    src_network_file: "/etc/sysconfig/network-scripts/ifcfg-{{ guest_iface_name }}"
+    - name: "Set cloud-init GOSC network configuration file on {{ vm_guest_os_distribution }}"
+      when: "gosc_workflow == 'cloud-init'"
+      block:
+        - name: "Set cloud-init GOSC network configuration file on {{ vm_guest_os_distribution }}"
+          ansible.builtin.set_fact:
+            src_network_file: "/etc/network/interfaces.d/50-cloud-init.cfg"
+          when: guest_os_ansible_distribution == "Ubuntu"
+
+        - name: "Set cloud-init GOSC network configuration file on {{ vm_guest_os_distribution }}"
+          ansible.builtin.set_fact:
+            src_network_file: "/etc/network/interfaces.d/50-cloud-init"
+          when: guest_os_ansible_distribution == "Debian"
+
+- name: "Collect network configuration file for {{ vm_guest_os_distribution }}"
   when: guest_os_family == "RedHat"
+  block:
+    - name: "Set GOSC network configuration file on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        src_network_file: /etc/sysconfig/network-scripts/ifcfg-{{ guest_iface_name }}
+      when: guest_os_network_manager != "NetworkManager"
 
-- name: "Set GOSC network configuration files on SLE"
+    - name: "Set GOSC network configuration file on {{ vm_guest_os_distribution }}"
+      when: guest_os_network_manager == "NetworkManager"
+      block:
+        - name: "List network configuration files on {{ vm_guest_os_distribution }}"
+          include_tasks: ../../common/vm_shell_in_guest.yml
+          vars:
+            vm_shell_cmd: "/usr/bin/nmcli"
+            vm_shell_args: "-t -f DEVICE,FILENAME connection show --active"
+            vm_shell_out: "/tmp/nmcli_connection_show.txt"
+
+        - name: "Fetch the result of listing network configuration files on {{ vm_guest_os_distribution }}"
+          include_tasks: ../../common/vm_guest_file_operation.yml
+          vars:
+            operation: "fetch_file"
+            src_path: "/tmp/nmcli_connection_show.txt"
+            dest_path: "{{ current_test_log_folder }}/nmcli_connection_show.txt"
+
+        - name: "Get network connection on {{ vm_guest_os_distribution }}"
+          ansible.builtin.set_fact:
+            guest_network_connection: "{{ lookup('file', current_test_log_folder ~ '/nmcli_connection_show.txt').split('\n') |
+                                          select('match', guest_iface_name) }}"
+
+        - name: "Get network configuration file  on {{ vm_guest_os_distribution }}"
+          ansible.builtin.set_fact:
+            src_network_file: "{{ guest_network_connection[0].split(':')[-1] }}"
+          when: guest_network_connection | length == 1
+
+- name: "Set GOSC network configuration file on {{ vm_guest_os_distribution }}"
   ansible.builtin.set_fact:
     src_network_file: "/etc/sysconfig/network/ifcfg-{{ guest_iface_name }}"
   when: guest_os_family == "Suse"
 
-- block:
-    - name: "Print the network configuration file on {{ guest_os_ansible_distribution }}"
+- name: "Collect network configuration file on {{ vm_guest_os_distribution }}"
+  when:
+    - src_network_file is defined
+    - src_network_file
+  block:
+    - name: "Print the network configuration file on {{ vm_guest_os_distribution }}"
       ansible.builtin.debug: var=src_network_file
 
-    - name: "Set GOSC network configuration files on VMware Photon OS"
+    - name: "Set local path to collected GOSC network configuration file"
       ansible.builtin.set_fact:
         network_config_path: "{{ current_test_log_folder }}{{ src_network_file }}"
-    - include_tasks: ../../common/vm_guest_file_operation.yml
+
+    - name: "Fetch network configuration file on {{ vm_guest_os_distribution }}"
+      include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
         src_path: "{{ src_network_file }}"
         dest_path: "{{ network_config_path }}"
-  when:
-    - guest_os_ansible_distribution != "VMware Photon OS"
-    - src_network_file is defined and src_network_file
 
-# Collect network config files for VMware Photon OS
-- block:
-    - include_tasks: ../../common/vm_shell_in_guest.yml
+- name: "Collect network configuration files for {{ vm_guest_os_distribution }}"
+  when: guest_os_ansible_distribution == 'VMware Photon OS'
+  block:
+    - name: "List network configuration files on {{ vm_guest_os_distribution }}"
+      include_tasks: ../../common/vm_shell_in_guest.yml
       vars:
         vm_shell_cmd: "/usr/bin/ls"
         vm_shell_args: "/etc/systemd/network/*.network"
         vm_shell_out: "/tmp/list_network_files.txt"
 
-    - include_tasks: ../../common/vm_guest_file_operation.yml
+    - name: "Fetch the result of listing network configuration files on {{ vm_guest_os_distribution }}"
+      include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
         src_path: "/tmp/list_network_files.txt"
         dest_path: "{{ current_test_log_folder }}/list_network_files.txt"
 
-    - name: "Look for network file on VMware Photon OS"
+    - name: "Get network configuration files on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
         guest_network_files: "{{ lookup('file', current_test_log_folder ~ '/list_network_files.txt').split('\n') }}"
-    - include_tasks: ../../common/vm_guest_file_operation.yml
+
+    - name: "Fetch network configuration files on {{ vm_guest_os_distribution }}"
+      include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
         src_path: "{{ src_network_file }}"
@@ -206,4 +250,3 @@
       loop_control:
         loop_var: "src_network_file"
       when: guest_network_files | length > 0
-  when: guest_os_ansible_distribution == "VMware Photon OS"
