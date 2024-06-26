@@ -1,0 +1,114 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check whether unmapped guest id can be ignored
+# Unmapped guest id could be empty guest id or same as VM configured guest id
+#
+- name: "Initialize the fact of ignoreing unmapped guest id to false"
+  ansible.builtin.set_fact:
+    ignore_unmapped_guest_id: false
+
+- name: "Check VMware Tools {{ vmtools_version }} open-vm-tools package vendor is Rocky Linux or not"
+  when:
+    - guest_os_ansible_distribution == 'Rocky'
+    - vmtools_version is version('12.0.0', '<')
+  block:
+    - name: "Get open-vm-tools package info"
+      include_tasks: ../utils/get_installed_package_info.yml
+      vars:
+        package_name: "open-vm-tools"
+
+    - name: "Set fact whether open-vm-tools vendor is Rocky Linux"
+      ansible.builtin.set_fact:
+        ovt_vendor_is_rocky: "{{ package_info.Vendor | default('') is search('Rocky') }}"
+
+    # Guest id of Rocky Linux is same as VM configured guest id when
+    # VMware Tools version is 11.3.5 or earlier, and open-vm-tools package vendor is Rocky Linux
+    - name: "Set fact to ignore unmapped guest id for Rocky Linux with VMware Tools {{ vmtools_version }}"
+      ansible.builtin.set_fact:
+        ignore_unmapped_guest_id: true
+      when: ovt_vendor_is_rocky
+
+# Guest ids of AlmaLinux and Rocky Linux are mapped to VM configured guest id when
+# VMware Tools version is 12.0.0 or later, and ESXi version is 7.0.3 or earlier
+- name: "Set fact to ignore unmapped guest id for {{ vm_guest_os_distribution }} on ESXi {{ esxi_version }}"
+  ansible.builtin.set_fact:
+    ignore_unmapped_guest_id: true
+  when:
+    - guest_os_ansible_distribution in ['AlmaLinux', 'Rocky']
+    - vmtools_version is version('12.0.0', '>=')
+    - esxi_version is version('7.0.3', '<=')
+
+# Guest idsof ProLinux, MIRACLE LINUX, Pardus, Kylin Linux or FusionOS are mapped to VM configured guest id when
+# VMware Tools version is 12.5.0 or later, and ESXi version is 8.0.3 or earlier
+- name: "Set fact to ignore unmapped guest id for {{ vm_guest_os_distribution }} with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
+  ansible.builtin.set_fact:
+    ignore_unmapped_guest_id: true
+  when:
+    - vmtools_version is version('12.5.0', '>=')
+    - esxi_version is version('8.0.3', '<=')
+    - guest_os_ansible_distribution in ['ProLinux',
+                                        'MIRACLE',
+                                        'FusionOS',
+                                        'Pardus GNU/Linux',
+                                        'Kylin Linux Advanced Server']
+
+- name: "Set fact to ignore unmapped guest id for other Linux {{ guest_os_ansible_kernel }} on ESXi {{ esxi_version }}"
+  ansible.builtin.set_fact:
+    ignore_unmapped_guest_id: true
+  when:
+    - guest_is_otherlinux
+    - (guest_os_ansible_kernel is version('5.0', '>=') and
+       vmtools_version is version('11.2.0', '>=') and
+       esxi_version is version('7.0.0', '<=')) or
+      (guest_os_ansible_kernel is version('6.0', '>=') and
+       vmtools_version is version('12.0.0', '>=') and
+       esxi_version is version('7.0.3', '<='))
+
+- name: "Ignore unmapped guest id"
+  when: ignore_unmapped_guest_id
+  block:
+    # When guest id is empty, the guest full name which at least includes Linux kernel version, OS pretty name
+    # For VM with newer VMware Tools, the unmapped guest full name also includes OS name, version id and build id
+    # Here we only check linux kernel version, OS pretty name or distro name are in guest full name.
+    - name: "Ignore emtpy guest id for {{ vm_guest_os_distribution }} on ESXi {{ esxi_version }}"
+      when:
+        - not guestinfo_guest_id
+        - guest_os_ansible_kernel in guestinfo_guest_full_name
+        - ((guest_os_release.PRETTY_NAME is defined and guest_os_release.PRETTY_NAME and
+          guest_os_release.PRETTY_NAME in guestinfo_guest_full_name) or
+          (guest_os_release.NAME is defined and guest_os_release.NAME and
+          guest_os_release.NAME in guestinfo_guest_full_name))
+      block:
+        - name: "Ignore empty guest id"
+          ansible.builtin.debug:
+            msg: >-
+              The guest id of {{ vm_guest_os_distribution }} with VMware Tools {{ vmtools_version }} is '{{ guestinfo_guest_id }}'
+              on ESXi {{ esxi_version }}, and guest full name is '{{ guestinfo_guest_full_name }}',  which shows
+              guest OS detailed information. This is as expected on ESXi {{ esxi_version }}.
+              Test Passed.
+          tags:
+            - known_issue
+
+        - name: "Test passed for {{ vm_guest_os_distribution }} with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
+          ansible.builtin.meta: end_host
+
+    - name: "Ignore VM configured guest id for {{ vm_guest_os_distribution }} on ESXi {{ esxi_version }}"
+      when:
+        - guestinfo_guest_id
+        - guestinfo_guest_id == vm_guest_id
+        - guestinfo_guest_full_name == vm_guest_os_version
+        - guestinfo_guest_family == vm_guest_family
+      block:
+        - name: "Ignore VM configured guest id"
+          ansible.builtin.debug:
+            msg: >-
+              The guest id of {{ vm_guest_os_distribution }} with VMware Tools {{ vmtools_version }} is '{{ guestinfo_guest_id }}'
+              on ESXi {{ esxi_version }}, and guest full name is '{{ guestinfo_guest_full_name }}',  which is same as VM settings.
+              This is as expected on ESXi {{ esxi_version }}.
+              Test Passed.
+          tags:
+            - known_issue
+
+        - name: "Test passed for {{ vm_guest_os_distribution }} with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
+          ansible.builtin.meta: end_host

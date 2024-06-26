@@ -29,14 +29,30 @@
     - guest_os_ansible_pkg_mgr in ["dnf", "dnf5"]
 
 - name: "Set OS commands for installing or uninstalling packages on {{ guest_os_ansible_distribution }}"
-  ansible.builtin.set_fact:
-    package_install_cmd: "yum install -y"
-    package_uninstall_cmd: "yum remove -y"
-    check_update_cmd: "yum check-update"
-    clean_cache_cmd: "yum clean all"
   when:
     - guest_os_family == "RedHat"
     - guest_os_ansible_pkg_mgr == "yum"
+  block:
+    - name: "Set OS commands for installing or uninstalling packages on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        package_install_cmd: "yum install -y"
+        package_uninstall_cmd: "yum remove -y"
+        check_update_cmd: "yum check-update"
+        clean_cache_cmd: "yum clean all"
+      when: >-
+        guest_os_ansible_distribution != 'ProLinux' or
+        guest_os_ansible_distribution_major_ver | int > 7
+
+    # Disable ProLinux 7 public base repo due to timeout issue
+    - name: "Set OS commands for installing or uninstalling packages on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        package_install_cmd: "yum install -y --disablerepo=base"
+        package_uninstall_cmd: "yum remove -y --disablerepo=base"
+        check_update_cmd: "yum check-update --disablerepo=base"
+        clean_cache_cmd: "yum clean all"
+      when:
+        - guest_os_ansible_distribution == 'ProLinux'
+        - guest_os_ansible_distribution_major_ver | int == 7
 
 - name: "Set OS commands for installing or uninstalling packages on {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:

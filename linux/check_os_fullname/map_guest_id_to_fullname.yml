@@ -1,0 +1,24 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Map guest id to guest full name
+#
+- name: "Get guest id options"
+  include_tasks: ../../common/esxi_get_guest_config_options.yml
+  vars:
+    esxi_hardware_version: "{{ guest_info_latest_hwv }}"
+    guest_id: "{{ expected_guest_id }}"
+
+- name: "Check guest full name is defined for guest id {{ expected_guest_id }}"
+  ansible.builtin.assert:
+    that:
+      - guest_config_options.guest_id is defined
+      - guest_config_options.guest_id == expected_guest_id
+      - guest_config_options.guest_fullname is defined
+      - guest_config_options.guest_fullname
+    fail_msg: >-
+      Failed to find guest full name for guest id {{ expected_guest_id }} on ESXi {{ esxi_version }}
+
+- name: "Set expected guest full name for {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    expected_guest_fullname: "{{ guest_config_options.guest_fullname }}"
