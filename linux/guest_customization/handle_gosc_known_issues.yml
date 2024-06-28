@@ -1,0 +1,68 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Handle guest customization known issues with workarounds
+#
+# Perl GOSC failure on RHEL/CentOS 10 or their varieties on vCenter Server 8.0.3
+- name: "Handle known issue for {{ vm_guest_os_distribution }} on vCenter Server {{ vcenter_version }}"
+  when:
+    - not enable_cloudinit_gosc | bool
+    - vcenter_version is version('8.0.3', '==')
+    - guest_os_family == "RedHat"
+    - guest_os_network_manager == "NetworkManager"
+  block:
+    - name: "Check whether /etc/sysconfig/network-scripts exists"
+      include_tasks: ../utils/get_file_stat_info.yml
+      vars:
+        guest_file_path: "/etc/sysconfig/network-scripts"
+
+    - name: "Add Perl GOSC workaround for {{ vm_guest_os_distribution }} on vCenter Server {{ vcenter_version }}"
+      when: not guest_file_exists
+      block:
+        - name: "Create directory /etc/sysconfig/network-scripts on {{ vm_guest_os_distribution }}"
+          ansible.builtin.shell: "mkdir -p /etc/sysconfig/network-scripts"
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - name: "Known issue - Perl GOSC of {{ vm_guest_os_distribution }} on vCenter Server {{ vcenter_version }}"
+          ansible.builtin.debug:
+            msg:
+              - "Perl guest customization would fail due to not found /etc/sysconfig/network-scripts/ on {{ vm_guest_os_distribution }}."
+              - "Please refer to https://issues.redhat.com/browse/RHEL-40365."
+              - "Created the directory /etc/sysconfig/network-scripts as a workaround."
+          tags:
+            - known_issue
+
+# Cloud-init GOSC failure on Oracle Linux 8.7 and 9.1
+- name: "Handle known issue for {{ vm_guest_os_distribution }} on vCenter Server {{ vcenter_version }}"
+  when:
+    - enable_cloudinit_gosc | bool
+    - guest_os_ansible_distribution == "OracleLinux"
+    - guest_os_ansible_distribution_ver in ['8.7', '9.1']
+  block:
+    - name: "Uninstall current cloud-init"
+      include_tasks: ../utils/install_uninstall_package.yml
+      vars:
+        package_list: ["cloud-init"]
+        package_state: "absent"
+
+    - name: "Remove /etc/cloud dir before install the latest cloud-init"
+      ansible.builtin.shell: |
+        if [ -e "/etc/cloud" ] ; then
+          rm -rf "/etc/cloud";
+        fi
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Install latest cloud-init version"
+      include_tasks: ../utils/install_uninstall_package.yml
+      vars:
+        package_list: ["cloud-init"]
+        package_state: "latest"
+
+    - name: "Known issue - failure of cloud-init GOSC in Oracle Linux 8.7 and 9.1"
+      ansible.builtin.debug:
+        msg:
+          - "Cloud-init guest customization would fail because cloud-init-local.service couldn't start when using cloud-init 22.1-5.0.1."
+          - "The issue has been resolved in cloud-init 22.1-6.0.1. In this case cloud-init is upgraded to latest version as a workaround."
+          - "Please refer to https://bugzilla.oracle.com/bugzilla/show_bug.cgi?id=18115 for details."
+      tags:
+        - known_issue
