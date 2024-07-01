@@ -8,7 +8,7 @@
     pvrdma_server_start_cmd: "rping -s -a {{ pvrdma_server_vm_ipv4 }} -P"
 
 - name: "Start listening process on server VM for RDMA ping-pong test"
-  ansible.builtin.shell: "{{ pvrdma_server_start_cmd }}"
+  ansible.builtin.shell: "{{ pvrdma_server_start_cmd }} &"
   vars:
     ansible_async_dir: /tmp/.ansible_async/
   async: 120
@@ -16,7 +16,16 @@
   delegate_to: "{{ vm_guest_ip }}"
   changed_when: false
   ignore_unreachable: true
+  ignore_errors: true
   register: pvrdma_server_job
+  until:
+    - pvrdma_server_job.started is defined
+    - pvrdma_server_job.started == 1
+  retries: 10
+  delay: 5
+
+- name: "Display async job result"
+  ansible.builtin.debug: var=pvrdma_server_job
 
 - name: "Check async job is started on server VM"
   ansible.builtin.assert:
