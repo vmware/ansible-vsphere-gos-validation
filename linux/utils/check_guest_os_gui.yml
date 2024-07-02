@@ -8,64 +8,67 @@
     guest_os_with_gui: false
     guest_os_display_manager: ""
 
-# Set default guest_os_with_gui by checking Xorg exists or not
-- name: "Check Xorg exists or not"
-  ansible.builtin.shell: "type Xorg"
-  ignore_errors: true
-  delegate_to: "{{ vm_guest_ip }}"
-  register: xorg_result
-
-- name: "Set facts of guest OS desktop environment"
-  when:
-    - xorg_result is defined
-    - xorg_result.rc is defined
-    - xorg_result.rc == 0
+- name: "Check Linux guest OS has desktop environment or not"
+  when: guest_os_ansible_system == "linux"
   block:
-    - name: "Set fact of guest OS having desktop environment"
+    - name: "Get guest OS display manager service detail"
+      ansible.builtin.shell: "systemctl status display-manager.service"
+      register: display_manager_status
+      changed_when: false
+      ignore_errors: true
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Set facts of guest OS desktop environment for {{ guest_os_ansible_distribution }}"
       ansible.builtin.set_fact:
         guest_os_with_gui: true
+        guest_os_display_manager: |-
+          {%- if "GNOME Display Manager" in display_manager_status.stdout_lines[0] -%}gdm
+          {%- elif "Light Display Manager" in display_manager_status.stdout_lines[0] -%}lightdm
+          {%- elif "X Display Manager" in display_manager_status.stdout_lines[0] -%}xdm
+          {%- elif "LXDE Display Manager" in display_manager_status.stdout_lines[0] -%}lxdm
+          {%- elif "Simple Desktop Display Manager" in display_manager_status.stdout_lines[0] -%}sddm
+          {%- elif guest_os_ansible_distribution == 'Astra Linux (Orel)' -%}fly-dm
+          {%- endif -%}
+      when:
+        - display_manager_status.rc is defined
+        - display_manager_status.rc == 0
+        - display_manager_status.stdout_lines is defined
+        - display_manager_status.stdout_lines | length > 0
 
-    - name: "Get guest OS display manager for {{ guest_os_ansible_distribution }}"
-      when: guest_os_ansible_distribution not in ['Astra Linux (Orel)', 'FreeBSD']
+- name: "Check FreeBSD has desktop environment or not"
+  when: guest_os_ansible_system == "freebsd"
+  block:
+    - name: "Check Xorg or Xwayland is running or not"
+      ansible.builtin.shell: "pgrep -l 'Xorg|Xwayland'"
+      ignore_errors: true
+      delegate_to: "{{ vm_guest_ip }}"
+      register: pgrep_result
+
+    - name: "Set facts of guest OS desktop environment for {{ vm_guest_os_distribution }}"
+      when:
+        - pgrep_result.rc is defined
+        - pgrep_result.rc == 0
+        - pgrep_result.stdout_lines is defined
+        - pgrep_result.stdout_lines | length > 0
       block:
-        - name: "Get guest OS display manager service detail"
-          ansible.builtin.shell: "systemctl status display-manager.service"
-          register: "display_manager_status"
-          changed_when: false
+        - name: "Set fact of guest OS having desktop environment"
+          ansible.builtin.set_fact:
+            guest_os_with_gui: true
+
+        - name: "Check display manager on {{ vm_guest_os_distribution }}"
+          ansible.builtin.shell: "grep -io -E '(gdm|lightdm|sddm|xdm)_enable=.*YES' /etc/rc.conf"
           ignore_errors: true
           delegate_to: "{{ vm_guest_ip }}"
+          register: check_dm_result
 
         - name: "Set fact of guest OS display manager"
           ansible.builtin.set_fact:
-            guest_os_display_manager: |-
-              {%- if "GNOME Display Manager" in display_manager_status.stdout_lines[0] -%}gdm
-              {%- elif "Light Display Manager" in display_manager_status.stdout_lines[0] -%}lightdm
-              {%- elif "X Display Manager" in display_manager_status.stdout_lines[0] -%}xdm
-              {%- elif "LXDE Display Manager" in display_manager_status.stdout_lines[0] -%}lxdm
-              {%- elif "Simple Desktop Display Manager" in display_manager_status.stdout_lines[0] -%}sddm
-              {%- endif -%}
+            guest_os_display_manager: "{{ check_dm_result.stdout_lines[0].split('_')[0] }}"
           when:
-            - display_manager_status is defined
-            - display_manager_status.rc is defined
-            - display_manager_status.rc == 0
-            - display_manager_status.stdout_lines is defined
-            - display_manager_status.stdout_lines | length > 0
-
-        # If systemctl status display-manager.service error code is 4, it means
-        # the service doesn't exist, so guest OS doesn't have desktop
-        - name: "Set fact of guest OS having no desktop environment"
-          ansible.builtin.set_fact:
-            guest_os_with_gui: false
-          when: >
-            (display_manager_status.rc is undefined or
-            display_manager_status.rc == 4)
-
-    - name: "Set fact of guest OS display manager for {{ guest_os_ansible_distribution }}"
-      ansible.builtin.set_fact:
-        guest_os_display_manager: "fly-dm"
-      when:
-        - guest_os_with_gui | bool
-        - guest_os_ansible_distribution == 'Astra Linux (Orel)'
+            - check_dm_result.rc is defined
+            - check_dm_result.rc == 0
+            - check_dm_result.stdout_lines is defined
+            - check_dm_result.stdout_lines | length > 0
 
 - name: "Display guest OS desktop facts"
   ansible.builtin.debug:
