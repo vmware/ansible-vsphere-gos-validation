@@ -32,8 +32,12 @@
 - name: "Print VM guest IP address"
   ansible.builtin.debug: var=vm_guest_ip
 
+# Windows Update will cause OS poweroff or restart taking a long time,
+# or GOSC test cases failure, here try to pause Windows Update 7 days
 - name: "Pause Windows Update"
-  include_tasks: ../utils/win_pause_windows_update.yml
+  include_tasks: ../utils/win_pause_resume_win_update.yml
+  vars:
+    win_update_ops: 'pause'
   when: not base_snapshot_exists
 
 - name: "Get VMware Tools status"

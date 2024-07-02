@@ -1,0 +1,58 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of expected Windows online updates categories"
+  ansible.builtin.set_fact:
+    win_updates_categories_expect:
+      - 'Feature Packs'
+      - 'Update Rollups'
+      - 'Updates'
+      - 'Upgrades'
+      - 'Windows Insider Pre-Release'
+  when: win_check_is_updated
+
+- name: "Resume Windows Update in guest OS"
+  include_tasks: ../utils/win_pause_resume_win_update.yml
+  vars:
+    win_update_ops: 'resume'
+
+- name: "Set the reject list of Windows online updates"
+  ansible.builtin.set_fact:
+    win_updates_reject_list: "{{ windows_updates_reject_list.split(',') | map('trim') }}"
+  when:
+    - windows_updates_reject_list is defined
+    - windows_updates_reject_list
+
+# Ignore errors when not expect guest OS to be updated
+- name: "Search Windows online updates"
+  include_tasks: ../utils/win_get_online_updates.yml
+  vars:
+    win_updates_ignore_errors: "{{ not win_check_is_updated }}"
+    win_get_updates_retries: "{{ 5 if win_check_is_updated else 1 }}"
+
+- name: "Try to install Windows online updates"
+  include_tasks: ../utils/win_install_online_updates.yml
+
+# Skip test case when no update installed and not expect guest OS to be updated
+- name: "Skip test case"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      Skip test case due to no Windows update installed and parameter 'windows_updated_build_num'
+      '{{ windows_updated_build_num | default('') }}' is not set to the build number
+      newer than the current build '{{ win_os_build_before_update }}'.
+    skip_reason: "Not Applicable"
+  when:
+    - not win_check_is_updated
+    - not win_online_updates_installed
+
+# Fail test case when no update installed while expect guest OS to be updated
+- name: "No Windows updates installed in guest OS"
+  ansible.builtin.fail:
+    msg: >-
+      Before installing Windows updates, guest OS build number is '{{ win_os_build_before_update }}',
+      configured expected build number is '{{ windows_updated_build_num }}', while after trying to
+      install Windows updates in guest OS, no update installed.
+  when:
+    - win_check_is_updated
+    - not win_online_updates_installed
