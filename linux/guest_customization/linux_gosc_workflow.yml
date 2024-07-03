@@ -21,6 +21,10 @@
     - name: "Check GOSC testing is supported or not"
       include_tasks: check_gosc_support_status.yml
 
+    - name: "Get guest OS network manager"
+      include_tasks: ../utils/get_network_manager.yml
+      when: guest_os_network_manager is undefined
+
     - name: "Prepare for GOSC testing on VMware Photon OS"
       when: guest_os_ansible_distribution == "VMware Photon OS"
       block:
@@ -75,6 +79,9 @@
                 package_list: ["{{ guest_perl_package_name }}"]
                 package_state: "latest"
 
+    - name: "Handle known issues with workarounds"
+      include_tasks: handle_gosc_known_issues.yml
+
     - name: "Prepare for cloud-init GOSC"
       when: enable_cloudinit_gosc
       block:
@@ -109,13 +116,6 @@
           when: >
             (not cloudinit_version) or
             not (cloudinit_version is version(gosc_required_cloudinit_version, '>='))
-
-    - name: "Get guest OS network manager"
-      include_tasks: ../utils/get_network_manager.yml
-      when: guest_os_network_manager is undefined
-
-    - name: "Handle known issues with workarounds"
-      include_tasks: handle_gosc_known_issues.yml
 
     - name: "Get DNS server info before GOSC"
       include_tasks: ../utils/get_system_dns.yml
