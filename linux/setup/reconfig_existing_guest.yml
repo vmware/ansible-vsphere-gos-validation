@@ -48,27 +48,17 @@
       vars:
         service_name: "packagekit.service"
 
-    - name: "Stop and disable 'PackageKit' service"
+    - name: "Mask 'PackageKit' service"
       when:
         - service_info
         - service_info.state is defined
-        - service_info.state in ['active', 'running']
       block:
-        - name: "Stop and disable 'PackageKit' service"
-          ansible.builtin.service:
-            name: 'packagekit.service'
-            state: 'stopped'
-            enabled: false
+        - name: "Mask 'PackageKit' service"
+          ansible.builtin.command: "systemctl mask packagekit"
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "Reboot VM to make sure packagekit.service is disabled and stopped"
           include_tasks: ../utils/reboot.yml
-
-    - name: "Remove 'PackageKit' package from SLED"
-      include_tasks: ../utils/install_uninstall_package.yml
-      vars:
-        package_list: ["PackageKit"]
-        package_state: "absent"
 
 - name: "Reconfigure FreeBSD"
   when: guest_os_family == "FreeBSD"
