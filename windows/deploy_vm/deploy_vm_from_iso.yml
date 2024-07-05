@@ -77,23 +77,24 @@
   vars:
     vm_power_state_set: "powered-on"
 
-- name: "Pause 5 seconds when VM power on"
-  ansible.builtin.pause:
-    seconds: 5
-- name: "Take screenshot after VM power on"
-  include_tasks: ../../common/vm_take_screenshot.yml
-  vars:
-    vm_screenshot_local_dir: "{{ current_test_log_folder }}"
-
-- name: "Send key strokes to VM console"
-  include_tasks: ../../common/vm_guest_send_key.yml
-  vars:
-    keys_send:
-      - DOWNARROW
-      - DOWNARROW
-      - ENTER
-      - ENTER
+- name: "VM firmware is EFI"
   when: firmware | lower == "efi"
+  block:
+    - name: "Pause 5 seconds when VM power on"
+      ansible.builtin.pause:
+        seconds: 5
+    - name: "Take screenshot after VM power on"
+      include_tasks: ../../common/vm_take_screenshot.yml
+      vars:
+        vm_screenshot_local_dir: "{{ current_test_log_folder }}"
+    - name: "Send key strokes to VM console"
+      include_tasks: ../../common/vm_guest_send_key.yml
+      vars:
+        keys_send:
+          - DOWNARROW
+          - DOWNARROW
+          - ENTER
+          - ENTER
 
 - name: "Wait 3 minutes while OS install"
   ansible.builtin.pause:
