@@ -38,21 +38,21 @@
       vars:
         vm_power_state_set: 'restarted'
 
-    - name: "Get client VM's guest IP"
-      block:
-        - name: "Refresh client VM's guest IP till it has different IP with server VM"
-          include_tasks: refresh_pvrdma_client_vm_ip.yml
-          with_list: "{{ range(1, 11) | list }}"
-          loop_control:
-            loop_var: retry_count
-      when: >
-        (not pvrdma_client_vm_guest_ip) or
-        (pvrdma_client_vm_guest_ip == pvrdma_server_vm_guest_ip)
+    - name: "Refresh client VM's guest IP till it has different IP with server VM"
+      include_tasks:
+        file: refresh_pvrdma_client_vm_ip.yml
+        apply:
+          when: >
+             (not pvrdma_client_vm_guest_ip) or
+             (pvrdma_client_vm_guest_ip in pvrdma_client_vm_invalid_ips)
+      with_list: "{{ range(1, 11) | list }}"
+      loop_control:
+        loop_var: retry_count
 
     - name: "Check client VM's guest IP is not same with server VM's guest IP"
       ansible.builtin.assert:
         that:
-          - pvrdma_client_vm_guest_ip != pvrdma_server_vm_guest_ip
+          - pvrdma_client_vm_guest_ip not in pvrdma_client_vm_invalid_ips
         fail_msg: >-
           Client VM '{{ pvrdma_client_vm_name }}' guest IP is '{{ pvrdma_client_vm_guest_ip }}',
           which is same with server VM '{{ pvrdma_server_vm_name }}' guest IP after refreshing 10 times.
@@ -92,6 +92,11 @@
         that:
           - ping_success_after_hotadd | bool
         fail_msg: "Failed to ping gateway from PVRDMA device on client VM {{ vm_name }}"
+
+    - name: "Update client VM guest IP when it changes"
+      ansible.builtin.set_fact:
+        pvrdma_client_vm_guest_ip: "{{ vm_guest_ip }}"
+      when: pvrdma_client_vm_guest_ip != vm_guest_ip
 
     - name: "Check PVRDMA device status and reload it if necessary on client VM"
       include_tasks: check_and_reload_pvrdma.yml
