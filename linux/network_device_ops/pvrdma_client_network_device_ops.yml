@@ -39,7 +39,12 @@
         vm_power_state_set: 'restarted'
 
     - name: "Refresh client VM's guest IP till it has different IP with server VM"
-      include_tasks: refresh_pvrdma_client_vm_ip.yml
+      include_tasks:
+        file: refresh_pvrdma_client_vm_ip.yml
+        apply:
+          when: >
+             (not pvrdma_client_vm_guest_ip) or
+             (pvrdma_client_vm_guest_ip in pvrdma_client_vm_invalid_ips)
       with_list: "{{ range(1, 11) | list }}"
       loop_control:
         loop_var: retry_count

@@ -6,24 +6,19 @@
 #   restart. It needs to take few seconds to refresh its own IP address.
 #   This task file will refresh client VM's IP every 10s.
 #
-- name: "Refresh client VM's guest IP"
-  when: >
-     (not pvrdma_client_vm_guest_ip) or
-     (pvrdma_client_vm_guest_ip in pvrdma_client_vm_invalid_ips)
-  block:
-    - name: "Print retry count for refreshing client VM's guest IP"
-      ansible.builtin.debug: var=retry_count
+- name: "Print retry count for refreshing client VM's guest IP"
+  ansible.builtin.debug: var=retry_count
 
-    - name: "Sleep 10s for client VM's guest IP refreshing"
-      ansible.builtin.pause:
-        seconds: 10
+- name: "Sleep 10s for client VM's guest IP refreshing"
+  ansible.builtin.pause:
+    seconds: 10
 
-    - name: "Get client VM's guest IP"
-      include_tasks: ../../common/vm_get_ip.yml
-      vars:
-        vm_primary_nic_mac: "{{ pvrdma_client_vm_primary_nic_mac }}"
-        vm_get_ip_timeout: "300"
+- name: "Get client VM's guest IP"
+  include_tasks: ../../common/vm_get_ip.yml
+  vars:
+    vm_primary_nic_mac: "{{ pvrdma_client_vm_primary_nic_mac }}"
+    vm_get_ip_timeout: "300"
 
-    - name: "Update the fact of client VM's guest IP"
-      ansible.builtin.set_fact:
-        pvrdma_client_vm_guest_ip: "{{ vm_guest_ip }}"
+- name: "Update the fact of client VM's guest IP"
+  ansible.builtin.set_fact:
+    pvrdma_client_vm_guest_ip: "{{ vm_guest_ip }}"
