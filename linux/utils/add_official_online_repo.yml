@@ -127,16 +127,24 @@
             baseurl: "http://prolinux-repo.tmaxos.com/prolinux/$releasever/os/$basearch/AppStream"
       when: guest_os_ansible_distribution_major_ver | int >= 8
 
-- name: "Add online repositories for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+- name: "Set online repositories for {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    online_repos:
+      - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_OSS"
+        baseurl: "http://download.opensuse.org/distribution/leap/$releasever/repo/oss"
+  when: guest_os_ansible_distribution == "openSUSE Leap"
+
+- name: "Add online repositories for {{ vm_guest_os_distribution }}"
   include_tasks: add_repo_from_baseurl.yml
   vars:
     repo_name: "{{ online_repo.name }}"
     repo_baseurl: "{{ online_repo.baseurl }}"
-    gpg_check: true
+    gpg_check: "{{ guest_os_family == 'RedHat' }}"
   with_list: "{{ online_repos }}"
   loop_control:
     loop_var: "online_repo"
-  when: guest_os_ansible_distribution in ["CentOS", "Rocky", "OracleLinux", "ProLinux"]
+  when: guest_os_ansible_distribution in ["CentOS", "Rocky", "OracleLinux",
+                                          "ProLinux", "openSUSE Leap"]
 
 - name: "Set APT sources list for {{ guest_os_ansible_distribution }}"
   when: guest_os_family == "Debian"
