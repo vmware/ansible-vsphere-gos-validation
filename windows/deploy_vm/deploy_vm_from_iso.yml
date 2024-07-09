@@ -10,7 +10,7 @@
     boot_disk_controller: "{{ boot_disk_controller if (boot_disk_controller is defined and boot_disk_controller) else 'lsilogicsas' }}"
     secureboot_enabled: "{{ secureboot_enabled if (secureboot_enabled is defined and secureboot_enabled) else false }}"
     network_adapter_type: "{{ 'e1000e' if (windows_has_inbox_driver is undefined or not windows_has_inbox_driver) else network_adapter_type }}"
-    firmware: "{{ firmware if (firmware is defined and firmware) else 'efi' }}"
+    firmware: "{{ firmware | lower if (firmware is defined and firmware) else 'efi' }}"
     boot_disk_size_gb: "{{ [64, boot_disk_size_gb | default(64) | int] | max }}"
 
 - name: "Update test case name for deploying VM from ISO image"
@@ -45,7 +45,7 @@
     vm_exists: true
 
 - name: "Handle VM with EFI firmware"
-  when: firmware | lower == "efi"
+  when: firmware == "efi"
   block:
     - name: "Enable secure boot"
       include_tasks: ../../common/vm_set_boot_options.yml
@@ -78,7 +78,7 @@
     vm_power_state_set: "powered-on"
 
 - name: "VM firmware is EFI"
-  when: firmware | lower == "efi"
+  when: firmware == "efi"
   block:
     - name: "Pause 5 seconds when VM power on"
       ansible.builtin.pause:
@@ -115,7 +115,7 @@
     vm_wait_log_ignore_errors: false
     vm_wait_log_hide_output: false
   when:
-    - firmware | lower == 'efi'
+    - firmware == 'efi'
     - secureboot_enabled is defined and secureboot_enabled
 
 - name: "Wait for VM network adapter is connected"
@@ -143,7 +143,7 @@
   when:
     - enable_vbs is defined and enable_vbs | bool
     - guest_id is match('.*64Guest')
-    - firmware | lower == "efi"
+    - firmware == "efi"
   block:
     - name: "Get guest OS system info"
       include_tasks: ../utils/get_windows_system_info.yml

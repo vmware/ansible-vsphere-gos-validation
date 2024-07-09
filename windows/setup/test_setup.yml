@@ -43,21 +43,20 @@
 - name: "Get VMware Tools status"
   include_tasks: ../../common/vm_get_vmtools_status.yml
 
-- name: "Block test case because VMware Toos is not installed or not running"
+- name: "Block test case because VMware Tools is not installed or not running"
   include_tasks: ../../common/skip_test_case.yml
   vars:
-    skip_msg: "Test case is blocked because VMware tools installed: {{ vmtools_is_installed | default(false) }}, running: {{ vmtools_is_running | default(false) }}"
+    skip_msg: "Test case is blocked because VMware Tools installed: {{ vmtools_is_installed }}, running: {{ vmtools_is_running }}"
     skip_reason: "Blocked"
   when:
     - skip_test_no_vmtools is defined
     - skip_test_no_vmtools
-    - not (vmtools_is_running is defined and vmtools_is_running | bool)
+    - not vmtools_is_running
 
 - name: "Get VMware Tools version and build"
   include_tasks: ../utils/win_get_vmtools_version_build.yml
   when:
-    - vmtools_is_installed is defined
-    - vmtools_is_installed | bool
+    - vmtools_is_installed
     - vmtools_info_from_vmtoolsd is undefined or not vmtools_info_from_vmtoolsd
 
 - name: "Get guest OS system info"
@@ -67,8 +66,7 @@
 - name: "Get VM guest info including guest id, full name, family and detailed data"
   include_tasks: ../../common/vm_get_guest_info.yml
   when:
-    - vmtools_is_running is defined
-    - vmtools_is_running | bool
+    - vmtools_is_running
     - guestinfo_gathered is undefined or not guestinfo_gathered
 
 - name: "Take a base snapshot if it does not exist"

@@ -1,21 +1,23 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get VMware Tools product ID from registry
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Get VMware Tools product ID from registry"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Get-ChildItem 'HKLM:\\software\\microsoft\\windows\\currentversion\\uninstall' | where-object {$_.getvalue('DisplayName') -match 'VMware Tools'} | foreach-object {$_.name} | split-path -leaf"
 
 - name: "Set fact of VMware Tools product ID"
   ansible.builtin.set_fact:
     get_product_id: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
-- ansible.builtin.debug:
-    msg: "Get VMware Tools product ID: {{ get_product_id }}"
+
+- name: "Display VMware Tools product ID"
+  ansible.builtin.debug: var=get_product_id
 
 - name: "Uninstall VMware Tools in guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "msiexec.exe /q /x '{{ get_product_id }}' /norestart"
+
 - name: "Verify return code and no error message"
   ansible.builtin.assert:
     that:
@@ -24,17 +26,21 @@
     success_msg: "VMware Tools uninstall operation succeed in guest OS"
     fail_msg: "VMware Tools uninstall operation failed in guest OS"
 
-- include_tasks: ../utils/win_shutdown_restart.yml
+- name: "Pause 5 seconds after executing VMware Tools uninstall command"
+  ansible.builtin.pause:
+    seconds: 5
+
+- name: "Restart guest OS after VMware Tools uninstall"
+  include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"
 
-# Get VMware Tools status after uninstall
-- include_tasks: ../../common/vm_get_vmtools_status.yml
+- name: "Get VMware Tools status after uninstall"
+  include_tasks: ../../common/vm_get_vmtools_status.yml
+
 - name: "Verify VMware Tools is not running and not installed after uninstall"
   ansible.builtin.assert:
     that:
-      - vmtools_is_installed is defined
-      - not vmtools_is_installed | bool
-      - vmtools_is_running is defined
-      - not vmtools_is_running | bool
+      - not vmtools_is_installed
+      - not vmtools_is_running
     fail_msg: "VMware Tools installed and running status: '{{ vmtools_is_installed }}/{{ vmtools_is_running }}', which should be 'false/false' after VMware Tools uninstall."

@@ -15,8 +15,8 @@
         # VMware Tools status got in test_setup before this test
         - name: "Set fact of the VMware Tools status before uninstall"
           ansible.builtin.set_fact:
-            vmtools_is_installed_before: "{{ vmtools_is_installed | default(false) }}"
-            vmtools_is_running_before: "{{ vmtools_is_running | default(false) }}"
+            vmtools_is_installed_before: "{{ vmtools_is_installed }}"
+            vmtools_is_running_before: "{{ vmtools_is_running }}"
         - name: "Display the VMware Tools status before uninstall"
           ansible.builtin.debug:
             msg: "VMware Tools installed: {{ vmtools_is_installed_before }}, running: {{ vmtools_is_running_before }}"
@@ -33,7 +33,7 @@
           when: not vmtools_is_running_before
 
         - include_tasks: prepare_pvscsi_vmxnet3_device.yml
-          when: guest_os_with_inbox_drivers | bool
+          when: guest_os_with_inbox_drivers
 
         # Check no problem device
         - include_tasks: ../utils/win_get_problem_device.yml
@@ -45,8 +45,7 @@
 
         - include_tasks: uninstall_vmtools.yml
         - include_tasks: verify_drivers_status.yml
-          when:
-            - guest_os_with_inbox_drivers | bool
+          when: guest_os_with_inbox_drivers
 
         - name: "Remove added network adapter, portgroup and vSwitch"
           block:
@@ -61,7 +60,7 @@
               vars:
                 vswitch_name: "{{ new_device_vswitch }}"
           when:
-            - guest_os_with_inbox_drivers | bool
+            - guest_os_with_inbox_drivers
             - new_network_adapter_mac is defined
             - new_network_adapter_mac
       rescue:

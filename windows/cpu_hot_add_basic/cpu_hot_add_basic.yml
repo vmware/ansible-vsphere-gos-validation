@@ -15,27 +15,28 @@
     - block:
         - include_tasks: ../setup/test_setup.yml
 
-        - block:
+        - name: "Check VM VBS enablement status"
+          when: guest_os_ansible_architecture == "64-bit"
+          block:
             # Refer to KB article https://knowledge.broadcom.com/external/article?legacyId=52584
             - include_tasks: ../../common/vm_get_vbs_status.yml
             - include_tasks: ../../common/skip_test_case.yml
               vars:
                 skip_msg: "Skip test case due to CPU hotadd not supported for VM with VBS enabled."
                 skip_reason: "Not Supported"
-              when: vm_vbs_enabled is defined and vm_vbs_enabled | bool
-          when: guest_os_ansible_architecture == "64-bit"
+              when: vm_vbs_enabled
 
         - name: Set fact of the initial CPU number and cores per socket
           ansible.builtin.set_fact:
             initial_cpu_num: 2
             initial_cores_num: 2
-          when: guest_os_product_type | lower == "client"
+          when: guest_os_product_type == "client"
 
         - name: Set fact of the initial CPU number and cores per socket
           ansible.builtin.set_fact:
             initial_cpu_num: 2
             initial_cores_num: 1
-          when: guest_os_product_type | lower == "server"
+          when: guest_os_product_type == "server"
         - include_tasks: ../../linux/cpu_hot_add_basic/generate_cpu_hot_add_list.yml
 
         - include_tasks: ../../common/skip_test_case.yml
@@ -54,10 +55,10 @@
           loop: "{{ cpu_hotadd_num_list }}"
           loop_control:
             loop_var: hotadd_num
-          when: guest_os_product_type | lower == "server"
+          when: guest_os_product_type == "server"
 
         - include_tasks: cpu_hot_add_test_client.yml
-          when: guest_os_product_type | lower == "client"
+          when: guest_os_product_type == "client"
         - name: Display the test results
           ansible.builtin.debug: var=cpu_hotadd_results
       rescue:

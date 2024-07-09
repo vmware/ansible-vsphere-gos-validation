@@ -3,10 +3,20 @@
 ---
 # Add Windows guest IP address to in-memory host inventory
 # Parameters:
-#   win_ansible_connection: 'winrm' or 'psrp', default is 'psrp'.
+#   win_ansible_connection (optional): valid values are 'winrm' or 'psrp'.
+#     Default value is 'psrp'.
 #
+- name: "Check parameter 'win_ansible_connection'"
+  ansible.builtin.assert:
+    that:
+      - win_ansible_connection in ['winrm', 'psrp']
+    fail_msg: >-
+      Parameter 'win_ansible_connection' value '{{ win_ansible_connection }}',
+      is not in the current supported connection types list ['winrm', 'psrp'].
+  when: win_ansible_connection is defined
+
 - name: "Add specified Windows IP to the hosts"
-  add_host:
+  ansible.builtin.add_host:
     hostname: "{{ vm_guest_ip }}"
     groups:
       - "{{ vm_guest_group | default('target_vm') }}"
@@ -20,11 +30,11 @@
   register: add_host_result
   when:
     - win_ansible_connection is defined
-    - win_ansible_connection | lower == 'winrm'
+    - win_ansible_connection == 'winrm'
   no_log: "{{ hide_secrets | default(false) }}"
 
 - name: "Add specified Windows IP to the hosts"
-  add_host:
+  ansible.builtin.add_host:
     hostname: "{{ vm_guest_ip }}"
     groups:
       - "{{ vm_guest_group | default('target_vm') }}"
@@ -47,9 +57,9 @@
   register: add_host_result
   when: >
     (win_ansible_connection is undefined) or
-    (win_ansible_connection | lower == 'psrp')
+    (win_ansible_connection == 'psrp')
   no_log: "{{ hide_secrets | default(false) }}"
 
-- ansible.builtin.debug: var=add_host_result
-  when: enable_debug is defined and enable_debug
+- name: "Display the result of adding Windows host"
+  ansible.builtin.debug: var=add_host_result
   no_log: "{{ hide_secrets | default(false) }}"

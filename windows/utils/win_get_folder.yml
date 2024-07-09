@@ -26,16 +26,16 @@
       vars:
         win_get_files_folders_folder: "{{ win_get_folder_src_path }}"
 
-    - name: "Fetch files in source folder from guest OS recusively"
-      include_tasks:
-        file: win_get_file_folder.yml
-        apply:
-          when: win_get_files_folders_list | length != 0
-      vars:
-        win_get_dst_path: "{{ win_get_folder_dst_path }}"
-      with_items: "{{ win_get_files_folders_list }}"
-      loop_control:
-        loop_var: win_get_src_path
+    - name: "Fetch files in source folder from guest OS"
+      when: win_get_files_folders_list | length != 0
+      block:
+        - name: "Fetch files recusively"
+          include_tasks: win_get_file_folder.yml
+          vars:
+            win_get_dst_path: "{{ win_get_folder_dst_path }}"
+          with_items: "{{ win_get_files_folders_list }}"
+          loop_control:
+            loop_var: win_get_src_path
 
     - name: "No files or sub folders in source folder"
       ansible.builtin.debug:

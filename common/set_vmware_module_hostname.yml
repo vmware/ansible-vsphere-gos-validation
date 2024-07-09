@@ -5,6 +5,10 @@
 # When vcenter_hostname defined then use it, else use esxi_hostname
 # as the host name when using Ansible VMware modules
 #
+- name: "Initialize vCenter server info configured status"
+  ansible.builtin.set_fact:
+    vcenter_is_defined: false
+
 - name: "Set vCenter hostname for Ansible VMware modules to connect"
   ansible.builtin.set_fact:
     vsphere_host_name: "{{ vcenter_hostname }}"
@@ -25,7 +29,7 @@
     vsphere_host_user: "{{ esxi_username }}"
     vsphere_host_user_password: "{{ esxi_password }}"
     vsphere_host_datacenter: "ha-datacenter"
-  when: vcenter_is_defined is undefined
+  when: not vcenter_is_defined
   no_log: "{{ hide_secrets | default(false) }}"
 
 - name: "Set default VM folder when it's undefined"
