@@ -38,7 +38,7 @@
   async: 600
   poll: 0
   environment:
-    ANSIBLE_WIN_ASYNC_STARTUP_TIMEOUT: 10
+    ANSIBLE_WIN_ASYNC_STARTUP_TIMEOUT: 15
 - name: "Pause 2 minutes before checking task status"
   ansible.builtin.pause:
     minutes: 2
@@ -47,7 +47,9 @@
     that:
       - wintools_install_result is defined
       - wintools_install_result.ansible_job_id is defined
-    fail_msg: "The result of above VMware Tools installation task executed in guest OS is not returned."
+    fail_msg: >-
+      The async task of VMware Tools installation in guest OS is not started.
+      Task returned message: {{ wintools_install_result.msg | default('') }}.
 
 - name: "Check VMware Tools install task status every 3 seconds"
   ansible.builtin.async_status:
