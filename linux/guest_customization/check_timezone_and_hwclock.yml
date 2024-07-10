@@ -10,54 +10,62 @@
   ansible.builtin.set_fact:
     guest_hwclockUTC: ""
     hwclock_success: ""
-  when: gosc_workflow == "perl"
+  when: not enable_cloudinit_gosc
 
-# Try to get timezone info by 'timedatectl' command
-- include_tasks: ../../common/vm_shell_in_guest.yml
+# Try to get timedatectl status
+- name: "Get the result of 'timedatectl status'"
+  include_tasks: ../../common/vm_shell_in_guest.yml
   vars:
     vm_shell_cmd: "/usr/bin/timedatectl"
     vm_shell_args: "status"
     vm_shell_out: "/tmp/timedatectl_status.txt"
 
-# If 'timedatectl' command succeed
-- block:
-    - include_tasks: ../../common/vm_guest_file_operation.yml
+- name: "Get timezone and hardware clock when 'timedatectl status' succeeded"
+  when:
+    - vm_shell_result.exit_code is defined
+    - vm_shell_result.exit_code == 0
+  block:
+    - name: "Fetch the output file of 'timedatectl status'"
+      include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
         src_path: "/tmp/timedatectl_status.txt"
         dest_path: "{{ current_test_log_folder }}/timedatectl_status.txt"
 
-    - name: "Get time zone from 'timedatectl status'"
+    - name: "Get timezone from 'timedatectl status'"
       ansible.builtin.set_fact:
         guest_timedate_status: "{{ lookup('file', current_test_log_folder ~ '/timedatectl_status.txt') | regex_search('\\s*Time zone:\\s*[^\\n]+\\n?') }}"
 
-    - name: "Set fact of guest time zone after GOSC"
+    - name: "Set fact of guest timezone after GOSC"
       ansible.builtin.set_fact:
         guest_timezone: "{{ guest_timedate_status | regex_replace('.*\\s*Time zone:\\s*([^\\s]+)\\s*.*\\n?', '\\1')}}"
 
-    - block:
-        - name: "Get hwclock from 'timedatectl status'"
+    - name: "Get hardware clock from 'timedatectl status'"
+      when: not enable_cloudinit_gosc
+      block:
+        - name: "Get hardware clock from 'timedatectl status'"
           include_tasks: ../utils/file_content_search.yml
           vars:
             path: "{{ current_test_log_folder }}/timedatectl_status.txt"
             regexp: "^ *RTC in local TZ: no"
           register: hwclock_result
+
         - name: "Save guest hardware clock setting after GOSC"
           ansible.builtin.set_fact:
             guest_hwclockUTC: "{{ regexp_found | int > 0 }}"
-      when: (gosc_workflow == "perl")
-  when: vm_shell_result.exit_code is defined and vm_shell_result.exit_code == 0
 
-# If 'timedatectl' command failed
-# Get timezone by reading symbolic link of /etc/localtime
-- block:
-    - include_tasks: ../../common/vm_shell_in_guest.yml
+- name: "Get timezone and hardware clock when 'timedatectl status' command failed"
+  when: vm_shell_result.exit_code is undefined or vm_shell_result.exit_code != 0
+  block:
+    - name: "Read the symbolic link of /etc/localtime"
+      include_tasks: ../../common/vm_shell_in_guest.yml
       vars:
         vm_shell_cmd: "/usr/bin/readlink"
         vm_shell_args: "/etc/localtime"
         vm_shell_out: "/tmp/readlink_etc_localtime.txt"
 
-    - include_tasks: ../../common/vm_guest_file_operation.yml
+    - name: "Fetch the real file of /etc/localtime"
+      include_tasks: ../../common/vm_guest_file_operation.yml
       vars:
         operation: "fetch_file"
         src_path: "/tmp/readlink_etc_localtime.txt"
@@ -67,30 +75,34 @@
       ansible.builtin.set_fact:
         guest_timezone: "{{ lookup('file', current_test_log_folder ~ '/readlink_etc_localtime.txt') | replace('/usr/share/zoneinfo/','') }}"
 
-    # Get hwclock by running command "hwclock -D" when test perl GOSC
-    - block:
-        - include_tasks: ../../common/vm_shell_in_guest.yml
+    - name: "Get hardware clock by running command 'hwclock -D' for perl GOSC"
+      when: not enable_cloudinit_gosc
+      block:
+        - name: "Execute command 'hwclock -D'"
+          include_tasks: ../../common/vm_shell_in_guest.yml
           vars:
             vm_shell_cmd: "/usr/sbin/hwclock"
             vm_shell_args: "-D"
             vm_shell_out: "/tmp/hwclock_D.txt"
-        - include_tasks: ../../common/vm_guest_file_operation.yml
+
+        - name: "Fetch the output file of 'hwclock -D'"
+          include_tasks: ../../common/vm_guest_file_operation.yml
           vars:
             operation: "fetch_file"
             src_path: "/tmp/hwclock_D.txt"
             dest_path: "{{ current_test_log_folder }}/hwclock_D.txt"
-        - name: "Get hwclock from 'hwclock -D'"
+
+        - name: "Get hardware clock from the output of 'hwclock -D'"
           include_tasks: ../utils/file_content_search.yml
           vars:
             path: "{{ current_test_log_folder }}/hwclock_D.txt"
             regexp: "^Hardware clock is on UTC time"
+
         - name: "Save hardware clock settting after GOSC"
           ansible.builtin.set_fact:
             guest_hwclockUTC: "{{ regexp_found | int > 0 }}"
-      when: gosc_workflow == "perl"
-  when: vm_shell_result.exit_code is undefined or vm_shell_result.exit_code != 0
 
-# Check guest time zone
+# Check guest timezone
 - name: "Check guest timezone is customized"
   ansible.builtin.set_fact:
     timezone_success: "{{ guest_timezone == linux_gosc_spec['timezone'] }}"
@@ -98,22 +110,26 @@
 - name: "Print timezone check result"
   ansible.builtin.debug: var=timezone_success
 
-- include_tasks: set_gosc_validation_result.yml
+- name: "Set validation result for customizing timezone"
+  include_tasks: set_gosc_validation_result.yml
   vars:
     gosc_check_item: "timezone_success"
     gosc_check_error_msg: "VM timezone is {{ guest_timezone }}, expected timezone is {{ linux_gosc_spec['timezone'] }}"
 
 # Check guest hwclock
 # cloud-init GOSC doesn't support hwclock customization
-- block:
-    - name: Check guest hwclock is customized
+- name: "Check guest hardware clock is customized"
+  when: not enable_cloudinit_gosc
+  block:
+    - name: "Check guest hardware clock is customized"
       ansible.builtin.set_fact:
         hwclock_success: "{{ guest_hwclockUTC == linux_gosc_spec['hwclockUTC'] }}"
+
     - name: "Print hardware clock check result"
       ansible.builtin.debug: var=hwclock_success
 
-    - include_tasks: set_gosc_validation_result.yml
+    - name: "Set validation result for customizing hardware clock"
+      include_tasks: set_gosc_validation_result.yml
       vars:
         gosc_check_item: "hwclock_success"
         gosc_check_error_msg: "VM hwclockUTC is {{ guest_hwclockUTC }}, expected hwclockUTC is {{ linux_gosc_spec['hwclockUTC'] }}"
-  when: gosc_workflow == "perl"

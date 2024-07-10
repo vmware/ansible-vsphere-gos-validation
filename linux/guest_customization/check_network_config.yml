@@ -126,12 +126,12 @@
     - name: "Set traditional GOSC network configuration file on Ubuntu {{ guest_os_ansible_distribution_ver }}"
       ansible.builtin.set_fact:
         src_network_file: "/etc/netplan/99-netcfg-vmware.yaml"
-      when: "gosc_workflow == 'perl'"
+      when: not enable_cloudinit_gosc
 
     - name: "Set cloud-init GOSC network configuration file on Ubuntu {{ guest_os_ansible_distribution_ver }}"
       ansible.builtin.set_fact:
         src_network_file: "/etc/netplan/50-cloud-init.yaml"
-      when: "gosc_workflow == 'cloud-init'"
+      when: enable_cloudinit_gosc
 
 # On Debian 10/11 or Ubuntu Desktop eariler than 19.10, the network configure file is
 # /etc/network/interfaces
@@ -145,10 +145,10 @@
     - name: "Set traditional GOSC network configuration file on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
         src_network_file: "/etc/network/interfaces"
-      when: "gosc_workflow == 'perl'"
+      when: not enable_cloudinit_gosc
 
     - name: "Set cloud-init GOSC network configuration file on {{ vm_guest_os_distribution }}"
-      when: "gosc_workflow == 'cloud-init'"
+      when: enable_cloudinit_gosc
       block:
         - name: "Set cloud-init GOSC network configuration file on {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
