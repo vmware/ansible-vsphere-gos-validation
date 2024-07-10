@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is used for check taking quiesce snapshot on VM through VMware tools.
-# When VMware tools is not installed or not running in VM, this test case result is 'No Run'.
+#   This test case is used for checking quiesce snapshot token
+# on VM through VMware Tools. If VMware Tools is not installed
+# or not running in guest OS, this test case result is 'Blocked'.
 #
 - name: check_quiesce_snapshot
   hosts: localhost
@@ -16,61 +17,30 @@
           vars:
             skip_test_no_vmtools: true
 
-        - name: "Set fact of the remote path in guest OS"
-          ansible.builtin.set_fact:
-            quiesce_scripts_freeze_thaw_path: "C:\\Windows\\"
-            quiesce_scripts_tools_path: "C:\\Program Files\\VMware\\VMware Tools\\backupScripts.d\\"
-            quiesce_log_file_path: "C:\\vmbackup.log"
-
-        - name: "Check disk.EnableUUID in VMX file"
+        - name: "Check disk.EnableUUID in VMX file for Windows Server"
           include_tasks: check_vmx_disk_enable_uuid.yml
           when: guest_os_product_type == "server"
 
-        - name: "Enable vss logging"
-          include_tasks: ../utils/win_enable_vss_log.yml
-          vars:
-            win_vmbackup_log_path: "{{ quiesce_log_file_path }}"
-          when:
-            - vmtools_version is defined and vmtools_version
-            - vmtools_version is version('11.0.0', '>=')
-
-        - name: "Get Windows guest OS time"
-          include_tasks: ../utils/win_get_time.yml
-
-        - name: "Set fact of the time before taking snapshot"
-          ansible.builtin.set_fact:
-            before_snapshot_time: "{{ time_variable }}"
-
-        - name: "Set fact of the quiesce snapshot name"
-          ansible.builtin.set_fact:
-            qs_snapshot_name: "quiesce_{{ current_test_timestamp }}"
-
-        - name: "Copy custom scripts to guest OS"
-          include_tasks: copy_custom_scripts_to_guest.yml
-
-        - name: "Get VMware Snapshot Provider service status in guest OS"
-          include_tasks: ../utils/win_get_service_status.yml
-          vars:
-            win_service_name: "vmvss"
-
-        - name: "Set fact of collecting quiesce log file"
-          ansible.builtin.set_fact:
-            collect_vss_logs: true
+        - name: "Preparation for this test case"
+          include_tasks: prepare_quiesce_snapshot.yml
 
         - name: "Take quiesce snapshot of VM"
           include_tasks: ../../common/vm_take_snapshot.yml
           vars:
-            snapshot_name: "{{ qs_snapshot_name }}"
+            snapshot_name: "{{ quiesce_snapshot_name }}"
             is_quiesce: true
             dump_memory: false
 
         - name: "Check custom scripts executed"
           include_tasks: check_custom_scripts_executed.yml
 
+        - name: "Check quiescing type"
+          include_tasks: check_quiescing_type.yml
+
         - name: "Remove quiesce snapshot at test success"
           include_tasks: ../../common/vm_remove_snapshot.yml
           vars:
-            snapshot_name: "{{ qs_snapshot_name }}"
+            snapshot_name: "{{ quiesce_snapshot_name }}"
       rescue:
         - name: "Collect vss logs"
           include_tasks: collect_vss_logs.yml
