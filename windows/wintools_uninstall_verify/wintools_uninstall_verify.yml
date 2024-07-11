@@ -9,8 +9,10 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
 
         # VMware Tools status got in test_setup before this test
         - name: "Set fact of the VMware Tools status before uninstall"
@@ -21,7 +23,8 @@
           ansible.builtin.debug:
             msg: "VMware Tools installed: {{ vmtools_is_installed_before }}, running: {{ vmtools_is_running_before }}"
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case when VMware Tools is not installed"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Test case '{{ ansible_play_name }}' is blocked because VMware Tools installed: {{ vmtools_is_installed_before }}, running: {{ vmtools_is_running_before }}"
             skip_reason: "Blocked"
@@ -32,36 +35,43 @@
             msg: "VMware tools installed: {{ vmtools_is_installed_before }}, running: {{ vmtools_is_running_before }}"
           when: not vmtools_is_running_before
 
-        - include_tasks: prepare_pvscsi_vmxnet3_device.yml
+        - name: "Make sure PVSCSI controller and VMXNET3 network adatper exist"
+          include_tasks: prepare_pvscsi_vmxnet3_device.yml
           when: guest_os_with_inbox_drivers
 
-        # Check no problem device
-        - include_tasks: ../utils/win_get_problem_device.yml
+        - name: "Get problem device list"
+          include_tasks: ../utils/win_get_problem_device.yml
         - name: "Check no problem device listed"
           ansible.builtin.assert:
             that:
               - not gos_has_problem_device
             fail_msg: "Problem devices were found in guest before VMware Tools uninstall, please check listed problem devices: {{ gos_problem_device_list }}"
 
-        - include_tasks: uninstall_vmtools.yml
-        - include_tasks: verify_drivers_status.yml
+        - name: "Uninstall VMware Tools"
+          include_tasks: uninstall_vmtools.yml
+        - name: "Verify PVSCSI and VMXNET3 drivers"
+          include_tasks: verify_drivers_status.yml
           when: guest_os_with_inbox_drivers
 
-        - name: "Remove added network adapter, portgroup and vSwitch"
-          block:
-            - include_tasks: ../../common/vm_remove_network_adapter.yml
-              vars:
-                netadapter_mac_addr: "{{ new_network_adapter_mac }}"
-            - include_tasks: ../../common/esxi_remove_portgroup.yml
-              vars:
-                vswitch_name: "{{ new_device_vswitch }}"
-                portgroup_name: "{{ new_device_pg }}"
-            - include_tasks: ../../common/esxi_remove_vswitch.yml
-              vars:
-                vswitch_name: "{{ new_device_vswitch }}"
+        - name: "Cleanup network configurations for added network adapter"
           when:
             - guest_os_with_inbox_drivers
             - new_network_adapter_mac is defined
             - new_network_adapter_mac
+          block:
+            - name: "Remove added network adapter"
+              include_tasks: ../../common/vm_remove_network_adapter.yml
+              vars:
+                netadapter_mac_addr: "{{ new_network_adapter_mac }}"
+            - name: "Remove added portgroup"
+              include_tasks: ../../common/esxi_remove_portgroup.yml
+              vars:
+                vswitch_name: "{{ new_device_vswitch }}"
+                portgroup_name: "{{ new_device_pg }}"
+            - name: "Remove added vSwitch"
+              include_tasks: ../../common/esxi_remove_vswitch.yml
+              vars:
+                vswitch_name: "{{ new_device_vswitch }}"
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml

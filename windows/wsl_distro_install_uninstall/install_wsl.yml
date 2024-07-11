@@ -14,6 +14,7 @@
     skip_set_wsl_ver: false
 
 - name: "Install WSL for Windows Client"
+  when: guest_os_product_type == 'client'
   block:
     - name: "Set installation command for inbox version of WSL"
       ansible.builtin.set_fact:
@@ -34,9 +35,9 @@
       vars:
         win_powershell_cmd: "{{ wsl_install_cmd }}"
         win_execute_cmd_ignore_error: true
-  when: (guest_os_product_type == 'client')
 
 - name: "Install WSL for Windows Server"
+  when: guest_os_product_type == 'server'
   block:
     # Due to issue https://github.com/microsoft/WSL/issues/9258, install "Debian" for Server.
     - name: "Set the distribution name"
@@ -60,7 +61,6 @@
       ansible.builtin.set_fact:
         skip_set_wsl_ver: true
       when: guest_os_build_num | int <= 23048
-  when: (guest_os_product_type == 'server')
 
 - name: "Process the WSL output message"
   include_tasks: wsl_convert_binary_to_txt.yml
@@ -91,6 +91,9 @@
 
 # Set WSL default version to 2
 - name: "Set WSL default version to 2"
+  when:
+    - wsl_default_version | int != 2
+    - not skip_set_wsl_ver
   block:
     - name: "Set WSL default version to 2"
       include_tasks: ../utils/win_execute_cmd.yml
@@ -113,9 +116,6 @@
 
     - name: "Check WSL version after setting"
       include_tasks: check_wsl_version.yml
-  when:
-    - wsl_default_version | int != 2
-    - not skip_set_wsl_ver
 
 - name: "Validate the WSL version"
   ansible.builtin.assert:

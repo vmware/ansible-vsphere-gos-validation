@@ -1,27 +1,28 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Disable sleep
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Disable power save in Windows guest OS"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "powercfg /change monitor-timeout-ac 0; powercfg /change disk-timeout-ac 0; powercfg /change standby-timeout-ac 0; powercfg /change hibernate-timeout-ac 0;"
 
-# Disable firewall
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Disable firewall in Windows guest OS"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "netsh advfirewall set allprofiles state off"
 
 # By default, Windows will restart automatically when BSOD,
 # diable this automatic reboot when failure
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Disable auto reboot in Windows guest OS"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Get-CimInstance Win32_OSRecoveryConfiguration | Set-CimInstance -Property @{AutoReboot=$False}"
 
-# Disable Microsoft Store service
-- include_tasks: ../utils/win_disable_store_auto_update.yml
+- name: "Disable Microsoft Store service in Windows Client"
+  include_tasks: ../utils/win_disable_store_auto_update.yml
   when: guest_os_product_type == "client"
 
-# Restart guest OS
-- include_tasks: ../utils/win_shutdown_restart.yml
+- name: "Restart guest OS"
+  include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"

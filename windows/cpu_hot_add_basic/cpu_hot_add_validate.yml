@@ -1,40 +1,47 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get current vCPU number from guest facts
-- include_tasks: ../../common/vm_get_guest_facts.yml
-- name: Set fact of vCPU number before hotadd
+- name: "Get VM facts"
+  include_tasks: ../../common/vm_get_guest_facts.yml
+
+- name: "Set fact of vCPU number before hotadd"
   ansible.builtin.set_fact:
     vcpu_before_hotadd: "{{ vm_guest_facts.instance.hw_processor_count }}"
-# Set hotadded vCPU number
-- name: Set fact of hotadd CPU number
-  ansible.builtin.set_fact:
-    vcpu_after_hotadd: "{{( vcpu_before_hotadd | int) + (hotadd_num | int) }}"
 
-- ansible.builtin.debug:
+- name: "Set fact of hotadd CPU number"
+  ansible.builtin.set_fact:
+    vcpu_after_hotadd: "{{ vcpu_before_hotadd | int + hotadd_num | int }}"
+
+- name: "Target CPU number is larger than the maximum number"
+  ansible.builtin.debug:
     msg: "Hotadd '{{ hotadd_num }}', VM vCPU number is '{{ vcpu_after_hotadd }}', greater than '{{ max_num_cpus }}', skip hotadd test"
   when: vcpu_after_hotadd | int > max_num_cpus | int
 
-- block:
-    - include_tasks: ../../common/vm_set_cpu_number.yml
+- name: "Target CPU number not exceed the maximum number"
+  when: vcpu_after_hotadd | int <= max_num_cpus | int
+  block:
+    - name: "Change VM vCPU number"
+      include_tasks: ../../common/vm_set_cpu_number.yml
       vars:
         num_cpus: "{{ vcpu_after_hotadd }}"
         num_cores_per_socket: "{{ initial_cores_num }}"
 
-    - include_tasks: ../utils/win_check_winrm.yml
+    - name: "Check Windows VM winrm connection"
+      include_tasks: ../utils/win_check_winrm.yml
 
-    # In Windows 10 guest OS, use devcon to detect CPU
-    - block:
-        - include_tasks: ../utils/win_get_physical_cpu_devcon.yml
+    - name: "Use devcon to detect CPU in Windows Client"
+      when: guest_os_product_type == "client"
+      block:
+        - name: "Get CPU number in guest OS using devcon"
+          include_tasks: ../utils/win_get_physical_cpu_devcon.yml
           vars:
             target_guest_os_bitness: "{{ guest_os_ansible_architecture }}"
-        - name: Set fact of the CPU detected by devcon
+        - name: "Set fact of the CPU detected by devcon"
           ansible.builtin.set_fact:
             win_cpu_number: "{{ processor_number_devcon }}"
-      when: guest_os_product_type == "client"
 
-    # In Windows Server get CPU number in guest OS directly
-    - include_tasks: ../utils/win_get_cpu_cores_sockets.yml
+    - name: "Get CPU number in Windows Server directly" 
+      include_tasks: ../utils/win_get_cpu_cores_sockets.yml
       when: guest_os_product_type == "server"
 
     # Validate CPU number after hotadd
@@ -45,7 +52,6 @@
           - vm_set_cpu_number_result | int == win_cpu_number | int
         fail_msg: "Hotadd vCPU ({{ vcpu_before_hotadd }}->{{ vcpu_after_hotadd }}) failed"
 
-    - name: Add test result
+    - name: "Add test result"
       ansible.builtin.set_fact:
         cpu_hotadd_results: "{{ cpu_hotadd_results + ['vCPU hotadd succeeds: ' ~ vcpu_before_hotadd ~ '->' ~ vcpu_after_hotadd] }}"
-  when: vcpu_after_hotadd | int <= max_num_cpus | int

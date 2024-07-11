@@ -12,8 +12,10 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
 
         - name: "Check VM VBS enablement status"
           when: guest_os_ansible_architecture == "64-bit"
@@ -26,40 +28,46 @@
                 skip_reason: "Not Supported"
               when: vm_vbs_enabled
 
-        - name: Set fact of the initial CPU number and cores per socket
+        - name: "Set fact of the initial CPU number to 2"
           ansible.builtin.set_fact:
             initial_cpu_num: 2
-            initial_cores_num: 2
-          when: guest_os_product_type == "client"
-
-        - name: Set fact of the initial CPU number and cores per socket
+        - name: "Set fact of the initial cores per socket"
           ansible.builtin.set_fact:
-            initial_cpu_num: 2
-            initial_cores_num: 1
-          when: guest_os_product_type == "server"
-        - include_tasks: ../../linux/cpu_hot_add_basic/generate_cpu_hot_add_list.yml
+            initial_cores_num: |-
+              {%- if guest_os_product_type == 'server' -%}1
+              {%- elif guest_os_product_type == 'client' -%}2
+              {%- endif -%}
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Generate the list of added CPU number for testing"
+          include_tasks: ../../linux/cpu_hot_add_basic/generate_cpu_hot_add_list.yml
+
+        - name: "Skip test case when the list of added CPU number is empty"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Test case '{{ ansible_play_name }}' is blocked because vCPU hotadd test value list is empty"
             skip_reason: "Blocked"
           when: cpu_hotadd_num_list | length == 0
 
-        - name: Initialize the CPU hotadd test result
+        - name: "Initialize the CPU hotadd test result"
           ansible.builtin.set_fact:
             cpu_hotadd_results: []
-        - include_tasks: cpu_hot_add_prepare.yml
+        - name: "Preparation for CPU hotadd test"
+          include_tasks: cpu_hot_add_prepare.yml
           vars:
             enable_vm_cpu_hotadd: true
-        - include_tasks: cpu_hot_add_validate.yml
+        - name: "CPU hotadd test on Windows Server"
+          include_tasks: cpu_hot_add_validate.yml
           loop: "{{ cpu_hotadd_num_list }}"
           loop_control:
             loop_var: hotadd_num
           when: guest_os_product_type == "server"
 
-        - include_tasks: cpu_hot_add_test_client.yml
+        - name: "CPU hotadd test on Windows Client"
+          include_tasks: cpu_hot_add_test_client.yml
           when: guest_os_product_type == "client"
-        - name: Display the test results
+
+        - name: "Display the test results"
           ansible.builtin.debug: var=cpu_hotadd_results
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
