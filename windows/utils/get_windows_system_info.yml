@@ -8,12 +8,15 @@
     vm_guest_os_distribution: ''
     guest_os_edition: ''
 
-- include_tasks: ../../common/get_guest_system_info.yml
+- name: "Get VM guest system info"
+  include_tasks: ../../common/get_guest_system_info.yml
 
 - name: "Set guest OS product type to client"
   ansible.builtin.set_fact:
-    guest_os_product_type: 'client'
-  when: guest_os_product_type | lower == 'workstation'
+    guest_os_product_type: |-
+      {%- if guest_os_product_type | lower == "workstation" -%}client
+      {%- else -%}{{ guest_os_product_type | lower }}
+      {%- endif -%}
 
 - name: "Set fact of guest OS build number"
   ansible.builtin.set_fact:
@@ -27,7 +30,7 @@
     guest_os_with_inbox_drivers: true
   when:
     - guest_os_ansible_distribution_major_ver | int >= 10
-    - (guest_os_product_type | lower == 'server' and guest_os_build_num | int >= 20348) or (guest_os_product_type | lower == 'client' and guest_os_build_num | int >= 22449)
+    - (guest_os_product_type == 'server' and guest_os_build_num | int >= 20348) or (guest_os_product_type == 'client' and guest_os_build_num | int >= 22449)
 
 - name: "Get Windows guest OS edition from distribution info"
   ansible.builtin.set_fact:

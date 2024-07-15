@@ -8,7 +8,7 @@
 - name: "Set fact of default vswitch name for Windows {{ guest_os_product_type }}"
   ansible.builtin.set_fact:
     win_vswitch_name: |-
-      {%- if guest_os_product_type | lower == 'server' -%}EFLOW-Int
+      {%- if guest_os_product_type == 'server' -%}EFLOW-Int
       {%- else -%}Default Switch
       {%- endif -%}
 
@@ -63,12 +63,13 @@
 # Enable Hyper-V
 - name: "Enable Hyper-V in Windows Client"
   include_tasks: ../utils/win_enable_client_hyperv.yml
-  when: guest_os_product_type | lower == 'client'
+  when: guest_os_product_type == 'client'
 - name: "Enable Hyper-V in Windows Server"
   include_tasks: ../utils/win_enable_server_hyperv.yml
-  when: guest_os_product_type | lower == 'server'
+  when: guest_os_product_type == 'server'
 
 - name: "Add vswitch in Windows Server"
+  when: guest_os_product_type == 'server'
   block:
     - name: "Create new Internal vswitch"
       include_tasks: ../utils/win_create_vswitch.yml
@@ -83,7 +84,6 @@
       ansible.builtin.set_fact:
         eflow_vm_static_ip: "{{ ('.').join(win_vswitch_ip.split('.')[0:-1]) ~ '.249' }}"
         eflow_vm_gateway_ip: "{{ win_vswitch_gateway_ip }}"
-  when: guest_os_product_type | lower == 'server'
 
 # Refer to doc: https://learn.microsoft.com/en-us/azure/iot-edge/how-to-provision-single-device-linux-on-windows-symmetric?view=iotedge-1.4&tabs=azure-portal%2Cpowershell
 - name: "Download and install EFLOW in guest OS"
@@ -102,7 +102,7 @@
 - name: "Set fact of deploy EFLOW command"
   ansible.builtin.set_fact:
     deploy_eflow_command: |-
-      {%- if guest_os_product_type | lower == 'server' -%}Deploy-Eflow -vSwitchType 'Internal' -vSwitchName '{{ win_vswitch_name }}' -ip4Address {{ eflow_vm_static_ip }} -ip4GatewayAddress {{ eflow_vm_gateway_ip }} -ip4PrefixLength 24
+      {%- if guest_os_product_type == 'server' -%}Deploy-Eflow -vSwitchType 'Internal' -vSwitchName '{{ win_vswitch_name }}' -ip4Address {{ eflow_vm_static_ip }} -ip4GatewayAddress {{ eflow_vm_gateway_ip }} -ip4PrefixLength 24
       {%- else -%}Deploy-Eflow
       {%- endif -%}
 

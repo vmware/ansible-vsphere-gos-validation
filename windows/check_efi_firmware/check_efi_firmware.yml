@@ -10,27 +10,26 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
-        - name: Check VM configured firmware type
-          include_tasks: ../../common/vm_get_config.yml
-          vars:
-            property_list: ['config.firmware']
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case for VM with {{ vm_firmware }} firmware"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Skip test case '{{ ansible_play_name }}', VM firmware is not EFI: {{ vm_config.config.firmware }}"
+            skip_msg: "Skip test case '{{ ansible_play_name }}', VM firmware is not EFI: {{ vm_firmware }}"
             skip_reason: "Not Applicable"
-          when: vm_config.config.firmware == "bios"
+          when: vm_firmware == "bios"
 
-        - name: Set searching keyword in vmware.log
+        - name: "Set searching keyword in vmware.log"
           ansible.builtin.set_fact:
             vmware_log_keyword: "The EFI ROM is .*{{ guest_os_ansible_architecture }}"
 
-        - name: Get firmware info in guest OS
+        - name: "Get firmware info in guest OS"
           include_tasks: ../utils/win_get_firmware.yml
 
-        - name: Search EFI ROM keyword in vmware.log
+        - name: "Search EFI ROM keyword in vmware.log"
           include_tasks: ../../common/vm_wait_log_msg.yml
           vars:
             vm_wait_log_name: "vmware.log"
@@ -42,8 +41,9 @@
           ansible.builtin.assert:
             that:
               - firmware_os == "efi"
-              - vm_wait_log_msg_success | bool
+              - vm_wait_log_msg_success
             fail_msg: "Firmware got in guest OS is not EFI, or EFI info not found in vmware.log."
             success_msg: "Firmware got in guest OS is EFI, and EFI info got in vmware.log."
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml

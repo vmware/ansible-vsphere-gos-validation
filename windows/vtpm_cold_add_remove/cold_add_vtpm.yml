@@ -46,15 +46,15 @@
   ansible.builtin.set_fact:
     retry_vm_guest_ip: ""
 - name: "Retry to get cloned VM IP address"
-  block:
-    - name: "Get cloned VM IP address"
-      include_tasks: retry_vm_get_ip.yml
-      with_list: "{{ range(1, 11) | list }}"
-      loop_control:
-        loop_var: retry_count
-  when: >
-    (not retry_vm_guest_ip) or
-    (retry_vm_guest_ip == vm_ip_clone_from)
+  include_tasks:
+    file: retry_vm_get_ip.yml
+    apply:
+      when: >
+        (not retry_vm_guest_ip) or 
+        (retry_vm_guest_ip == vm_ip_clone_from)
+  with_list: "{{ range(1, 11) | list }}"
+  loop_control:
+    loop_var: retry_count
 
 - name: "Check cloned VM IP is not the same as parent VM IP address"
   ansible.builtin.assert:

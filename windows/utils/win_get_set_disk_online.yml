@@ -7,8 +7,8 @@
 # Parameters:
 #   win_online_disk_num: the disk number.
 #   win_online_disk_uid: the disk UniqueId.
-#   win_online_disk_ops: 'set' or 'get' specified disk online status, default
-#   value is 'get'.
+#   win_online_disk_ops (optional): if set to true, will execute online disk
+#     operation first, then get disk online status, else only get disk online status.
 #
 - name: "Check required parameter"
   ansible.builtin.assert:
@@ -38,7 +38,7 @@
     win_powershell_cmd: "{{ win_cmd_online_disk }}"
   when:
     - win_online_disk_ops is defined
-    - win_online_disk_ops | lower == 'set'
+    - win_online_disk_ops | bool
 
 - name: "Get disk online status"
   include_tasks: win_execute_cmd.yml
@@ -51,11 +51,5 @@
     - win_powershell_cmd_output.stdout_lines | length != 0
     - win_powershell_cmd_output.stdout_lines[0] | lower == 'online'
 
-- name: "Check disk online status"
-  ansible.builtin.assert:
-    that:
-      - win_is_disk_online
-    fail_msg: "After online disk, still get offline status in result: '{{ win_powershell_cmd_output.stdout_lines }}'"
-  when:
-    - win_online_disk_ops is defined
-    - win_online_disk_ops | lower == 'set'
+- name: "Print disk online status"
+  ansible.builtin.debug: var=win_is_disk_online

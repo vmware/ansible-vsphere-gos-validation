@@ -3,11 +3,12 @@
 ---
 # Check Windows guest BSOD keyword in vmware.log,
 # default timeout is 60s
-- name: Set fact of the key string to be searched
+- name: "Set fact of the key string to be searched"
   ansible.builtin.set_fact:
     guest_bsod_keyword: "WinBSOD:"
 
-- include_tasks: ../../common/vm_wait_log_msg.yml
+- name: "Searching keyword in vmware.log"
+  include_tasks: ../../common/vm_wait_log_msg.yml
   vars:
     vm_wait_log_name: "vmware.log"
     vm_wait_log_msg: "{{ guest_bsod_keyword }}"
@@ -15,8 +16,7 @@
     vm_wait_log_delay: 3
     vm_wait_log_ignore_errors: true
 
-# Fail when get Windows guest BSOD keyword in vmware.log
-- name: VM log info check failure
+- name: "Testing failed when get '{{ guest_bsod_keyword }}' in vmware.log"
   ansible.builtin.fail:
     msg: "Get Windows guest BSOD keyword '{{ guest_bsod_keyword }}' in vmware.log."
-  when: vm_wait_log_msg_success | bool
+  when: vm_wait_log_msg_success

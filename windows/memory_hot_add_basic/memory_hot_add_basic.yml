@@ -10,25 +10,30 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
 
-        - block:
+        - name: "Check if VM VBS is enabled"
+          when: guest_os_ansible_architecture == "64-bit"
+          block:
             # Refer to KB article https://knowledge.broadcom.com/external/article?legacyId=52584
-            - include_tasks: ../../common/vm_get_vbs_status.yml
-            - include_tasks: ../../common/skip_test_case.yml
+            - name: "Get VM VBS status"
+              include_tasks: ../../common/vm_get_vbs_status.yml
+            - name: "Skip test case when VM VBS is enabled"
+              include_tasks: ../../common/skip_test_case.yml
               vars:
                 skip_msg: "Skip test case due to memory hotadd not supported for VM with VBS enabled."
                 skip_reason: "Not Supported"
-              when: vm_vbs_enabled is defined and vm_vbs_enabled | bool
-          when: guest_os_ansible_architecture == "64-bit"
+              when: vm_vbs_enabled
 
         - name: "Set fact of initial memory size 2048MB for 32bit client"
           ansible.builtin.set_fact:
             vm_initial_mem_mb: 2048
           when:
             - guest_os_ansible_architecture == "32-bit"
-            - guest_os_product_type | lower == "client"
+            - guest_os_product_type == "client"
         - name: "Set fact of initial memory size 4096MB for 64bit guest"
           ansible.builtin.set_fact:
             vm_initial_mem_mb: 4096
@@ -36,14 +41,17 @@
 
         # Memory limit for 32bit Windows is 4GB:
         # https://docs.microsoft.com/en-us/windows/win32/memory/memory-limits-for-windows-releases
-        - name: Set fact of memory hotadd list for 32bit Windows
+        - name: "Set fact of memory hotadd list for 32bit Windows"
           ansible.builtin.set_fact:
             memory_hotadd_size_list: [1024, 1024]
           when: guest_os_ansible_architecture == "32-bit"
-        - include_tasks: ../../linux/memory_hot_add_basic/generate_mem_hot_add_list.yml
+
+        - name: "Generate hotadded memory size list for 64bit Windows"
+          include_tasks: ../../linux/memory_hot_add_basic/generate_mem_hot_add_list.yml
           when: guest_os_ansible_architecture == "64-bit"
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case when hotadded memory size list is empty"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Test case '{{ ansible_play_name }}' is blocked because memory hotadd test value list is empty"
             skip_reason: "Blocked"
@@ -53,19 +61,21 @@
         # to try to see if it can decrease the failure rate
         # - include_tasks: generate_cpu_num_list.yml
 
-        - name: Initialize the memory hotadd test result
+        - name: "Initialize the memory hotadd test result"
           ansible.builtin.set_fact:
             mem_hotadd_results: []
 
-        - include_tasks: ../utils/shutdown_vm.yml
-        # Enable memory hotadd
-        - include_tasks: ../../common/vm_enable_memory_hotadd.yml
+        - name: "Shutdown guest OS"
+          include_tasks: ../utils/shutdown_vm.yml
+        - name: "Enable memory hotadd"
+          include_tasks: ../../common/vm_enable_memory_hotadd.yml
 
-        # Do memory hotadd with different vCPU in the list
-        - include_tasks: hotadd_memory_for_vcpu.yml
+        - name: "Do memory hotadd with vCPU number 2"
+          include_tasks: hotadd_memory_for_vcpu.yml
           vars:
             vcpu_number: 2
-        - name: Display the test results
+        - name: "Display the test results"
           ansible.builtin.debug: var=mem_hotadd_results
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml

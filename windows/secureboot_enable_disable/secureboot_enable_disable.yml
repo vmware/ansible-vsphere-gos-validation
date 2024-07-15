@@ -12,24 +12,29 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
-        # Get VM firmware info
-        - include_tasks: ../../common/vm_get_boot_info.yml
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+        - name: "Get VM firmware info"
+          include_tasks: ../../common/vm_get_boot_info.yml
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case when VM hardware version < 13"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Secure boot is not supported on VM of {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} with hardware version {{ vm_hardware_version_num }}"
             skip_reason: "Not Supported"
           when: vm_hardware_version_num | int < 13
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case when VM firmware is {{ vm_firmware }}"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Skip test case due to VM firmware is not EFI: {{ vm_firmware | default('NA') }}"
+            skip_msg: "Skip test case due to VM firmware is '{{ vm_firmware }}', not EFI"
             skip_reason: "Not Applicable"
-          when: vm_firmware is undefined or vm_firmware | lower != 'efi'
+          when: vm_firmware != 'efi'
 
         - name: "Skip {{ current_testcase_name }} if VBS is enabled"
+          when: guest_os_ansible_architecture == "64-bit"
           block:
             - name: "Get VBS status of VM"
               include_tasks: ../../common/vm_get_vbs_status.yml
@@ -38,15 +43,16 @@
               vars:
                 skip_msg: "Skip test case due to secure boot cannot be disabled for VM with VBS enabled."
                 skip_reason: "Not Applicable"
-              when: vm_vbs_enabled | bool
-          when: guest_os_ansible_architecture == "64-bit"
+              when: vm_vbs_enabled
 
-        # Enable, disable secure boot test if VM uses EFI firmware
-        - include_tasks: change_secureboot_config.yml
+        - name: "Enable VM secure boot test"
+          include_tasks: change_secureboot_config.yml
           vars:
             change_secureboot: 'enable'
-        - include_tasks: change_secureboot_config.yml
+        - name: "Disable VM secure boot test"
+          include_tasks: change_secureboot_config.yml
           vars:
             change_secureboot: 'disable'
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml

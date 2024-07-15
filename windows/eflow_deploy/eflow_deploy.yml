@@ -10,25 +10,29 @@
   tasks:
     - name: "Test case block"
       block:
-        - include_tasks: ../setup/test_setup.yml
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
           vars:
             create_current_test_folder: true
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case for not supported OS '{{ guest_os_ansible_architecture }}'"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Skip test case due to Hyper-V compatible hardware is 64bit processor, this guest OS is: {{ guest_os_ansible_architecture }}."
             skip_reason: "Not Supported"
           when: guest_os_ansible_architecture != "64-bit"
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case for not supported OS edition '{{ guest_os_edition }}'"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Skip test case due to EFLOW supported OS edition is 'Pro' or 'Enterprise', this guest OS is: {{ guest_os_edition }}."
             skip_reason: "Not Supported"
           when:
             - guest_os_edition | lower not in ['pro', 'enterprise']
-            - guest_os_product_type | lower == 'client'
+            - guest_os_product_type == 'client'
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case for not supported OS '{{ guest_os_ansible_distribution_major_ver }} {{ guest_os_build_num }}'"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg:
               - "Skip test case due to EFLOW supported version is 'Windows 10/Windows Server 2019 minimum build 17763 with all current cumulative updates installed' and 'Windows 11/Windows Server 2022'."
@@ -38,8 +42,12 @@
             (guest_os_ansible_distribution_major_ver | int == 10 and guest_os_build_num | int < 17763) or
             (guest_os_ansible_distribution_major_ver | int < 10)
 
-        - include_tasks: deploy_eflow_vm.yml
-        - include_tasks: check_eflow_vm.yml
-        - include_tasks: stop_start_eflow_vm.yml
+        - name: "Deploy EFLOW VM"
+          include_tasks: deploy_eflow_vm.yml
+        - name: "Check EFLOW VM"
+          include_tasks: check_eflow_vm.yml
+        - name: "EFLOW VM stop and start test"
+          include_tasks: stop_start_eflow_vm.yml
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
