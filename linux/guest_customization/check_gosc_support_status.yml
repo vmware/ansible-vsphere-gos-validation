@@ -27,12 +27,20 @@
     - vcenter_version is version('8.0.0', '<')
 
 - name: "Check GOSC support status"
+  when:
+    - guest_os_ansible_distribution is defined
+    - guest_os_ansible_distribution_ver is defined
+    - vcenter_version is defined and vcenter_version != 'N/A'
+    - vcenter_build is defined and vcenter_build != 'N/A'
   block:
     - name: "Initialize GOSC support status"
       ansible.builtin.set_fact:
         gosc_is_supported: true
 
     - name: "Check Perl GOSC support status for VMware Photon OS"
+      when:
+        - guest_os_ansible_distribution == 'VMware Photon OS'
+        - not enable_cloudinit_gosc
       block:
         - name: "Get open-vm-tools package info"
           include_tasks: ../utils/get_installed_package_info.yml
@@ -53,9 +61,6 @@
             skip_msg: "Perl GOSC is not applicable for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} with not bundled open-vm-tools {{ vmtools_version }}."
             skip_reason: "Not Applicable"
           when: not gosc_is_supported
-      when:
-        - guest_os_ansible_distribution == 'VMware Photon OS'
-        - not enable_cloudinit_gosc
 
     - name: "Set default guest OS list not support GOSC"
       ansible.builtin.set_fact:
@@ -75,6 +80,10 @@
       when: guest_os_ansible_distribution in gos_not_support_gosc
 
     - name: "Set cloud-init GOSC support status for {{ vm_guest_os_distribution }}"
+      when:
+        - enable_cloudinit_gosc
+        - guest_os_ansible_distribution == "Debian"
+        - guest_os_ansible_distribution_major_ver | int == 12
       block:
         - name: "Set fact of cloud-init GOSC support status to False for {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
@@ -87,10 +96,6 @@
               https://bugs.launchpad.net/ubuntu/+source/cloud-init/+bug/1776452 and
               https://bugs.launchpad.net/cloud-init/+bug/1944946.
               So skip cloud-init GOSC testing for {{ vm_guest_os_distribution }}.
-      when:
-        - enable_cloudinit_gosc
-        - guest_os_ansible_distribution == "Debian"
-        - guest_os_ansible_distribution_major_ver | int == 12
 
     - name: "Check Perl GOSC support status for {{ vm_guest_os_distribution }}"
       when:
@@ -188,8 +193,4 @@
           See https://partnerweb.vmware.com/programs/guestOS/guest-os-customization-matrix.pdf.
         skip_reason: "Not Supported"
       when: not gosc_is_supported
-  when:
-    - guest_os_ansible_distribution is defined
-    - guest_os_ansible_distribution_ver is defined
-    - vcenter_version is defined and vcenter_version != 'N/A'
-    - vcenter_build is defined and vcenter_build != 'N/A'
+
