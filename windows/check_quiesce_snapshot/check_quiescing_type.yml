@@ -5,19 +5,22 @@
   ansible.builtin.set_fact:
     winsrv_app_quiesce_support: false
 
-- name: "Get VM facts"
-  include_tasks: ../../common/vm_get_guest_facts.yml
-
-- name: "Not get VM files info from VM facts"
+# Get *vss_manifests*.zip files in VM folder
+- name: "Get all VM files in VM folder"
+  include_tasks: ../../common/vm_get_config.yml
+  vars:
+    property_list:
+      - 'layoutEx.file'
+- name: "Failed to get VM files in VM folder"
   ansible.builtin.assert:
     that:
-      - vm_guest_facts.instance.hw_files is defined
-      - vm_guest_facts.instance.hw_files | length > 0
-    fail_msg: "No VM files info '{{ vm_guest_facts.instance.hw_files | default('') }}' retrieved from VM facts"
+      - vm_config.layoutEx.file is defined
+      - vm_config.layoutEx.file | length > 0
+    fail_msg: "Can not get VM files info '{{ vm_config.layoutEx.file | default('') }}' after taking snapshot."
 
 - name: "Set fact of the list of vss_manifests zip files"
   ansible.builtin.set_fact:
-    vm_vss_manifests_list_after: "{{ vm_guest_facts.instance.hw_files | select('search', 'vss_manifests') }}"
+    vm_vss_manifests_list_after: "{{ vm_config.layoutEx.file | map(attribute='name') | select('search', 'vss_manifests') }}"
 
 - name: "Display the vss_manifests zip files after taking quiesce snapshot"
   ansible.builtin.debug: var=vm_vss_manifests_list_after
@@ -75,7 +78,7 @@
     fail_msg: >
       One file 'backup.xml' is expected in {{ vm_vss_manifests_new[0] | basename }} when
       taking filesystem consistent quiesce snapshot, while got files: {{ vm_vss_manifests_files.files | default([]) }}.
-  when: guest_os_product_type == 'client' or not winsrv_app_quiesce_support
+  when: not winsrv_app_quiesce_support
 
 - name: "Check application consistent quiescing taken for Windows Server"
   ansible.builtin.assert:
