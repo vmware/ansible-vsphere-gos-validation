@@ -105,25 +105,19 @@
         - name: "Set facts of Perl GOSC support matrix"
           ansible.builtin.set_fact:
             gosc_support_matrix: "{{ lookup('file', 'gosc_support_matrix.yml') | from_yaml }}"
-            guest_gosc_suport_matrix: {}
+
+        - name: "Set facts of Perl GOSC support matrix for {{ guest_os_ansible_distribution }}"
+          ansible.builtin.set_fact:
+            guest_gosc_suport_matrix: "{{ gosc_support_matrix[guest_os_ansible_distribution] | default({}) }}"
 
         # RHEL family OS 9.0 or higher version aligns with GOSC support status for same version of RHEL
-        - name: "Set fact of Perl GOSC matrix for {{ vm_guest_os_distribution }}"
+        - name: "Combine with RedHat family GOSC support status for {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
-            guest_gosc_suport_matrix: "{{ gosc_support_matrix[guest_os_family] | combine(gosc_support_matrix[guest_os_ansible_distribution] | default({})) }}"
+            guest_gosc_suport_matrix: "{{ guest_gosc_suport_matrix | combine(gosc_support_matrix[guest_os_family]) }}"
           when:
             - guest_os_family == "RedHat"
-            - guest_os_ansible_distribution != 'MIRACLE'
+            - guest_os_ansible_distribution not in ['RedHat', 'MIRACLE']
             - guest_os_ansible_distribution_major_ver | int >= 9
-
-        - name: "Set fact of Perl GOSC matrix for {{ vm_guest_os_distribution }}"
-          ansible.builtin.set_fact:
-            guest_gosc_suport_matrix: "{{ gosc_support_matrix[guest_os_ansible_distribution] }}"
-          when:
-            - (guest_os_family != "RedHat" or
-               guest_os_ansible_distribution == 'MIRACLE' or
-               guest_os_ansible_distribution_major_ver | int < 9)
-            - gosc_support_matrix[guest_os_ansible_distribution] is defined
 
         - name: "Check Perl GOSC support status for {{ vm_guest_os_distribution }} in support matrix"
           when: guest_gosc_suport_matrix | length > 0
