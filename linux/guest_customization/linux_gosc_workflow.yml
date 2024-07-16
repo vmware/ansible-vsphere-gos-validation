@@ -11,7 +11,7 @@
   block:
     - name: "Set cloud-init workflow flag"
       ansible.builtin.set_fact:
-        enable_cloudinit_gosc: "{% if gosc_workflow  == 'cloud-init' %}True{% else %}False{% endif %}"
+        enable_cloudinit_gosc: "{{ gosc_workflow  == 'cloud-init' }}"
 
     - name: "Test setup"
       include_tasks: ../setup/test_setup.yml
@@ -43,7 +43,7 @@
             package_list: ["open-vm-tools-gosc-{{ vmtools_version }}"]
             package_state: "present"
           when:
-            - not enable_cloudinit_gosc | bool
+            - not enable_cloudinit_gosc
             - guest_os_ansible_distribution_major_ver | int >= 4
             - vmtools_version is defined
             - vmtools_version is version('11.3.5', '>=')
@@ -51,7 +51,7 @@
     # Install perl if guest OS doesn't have it
     - name: "Prepare for perl GOSC testing on {{ guest_os_ansible_distribution }}"
       when:
-        - not enable_cloudinit_gosc | bool
+        - not enable_cloudinit_gosc
         - guest_os_family == "RedHat"
       block:
         - name: "Check perl existence"
@@ -75,6 +75,13 @@
                 package_list: ["{{ guest_perl_package_name }}"]
                 package_state: "latest"
 
+    - name: "Get guest OS network manager"
+      include_tasks: ../utils/get_network_manager.yml
+      when: guest_os_network_manager is undefined
+
+    - name: "Handle known issues with workarounds"
+      include_tasks: handle_gosc_known_issues.yml
+
     - name: "Prepare for cloud-init GOSC"
       when: enable_cloudinit_gosc
       block:
@@ -85,46 +92,12 @@
             package_state: "present"
           when: guest_os_ansible_distribution != "VMware Photon OS"
 
-        # Need to install the latest cloud-init to Oracle Linux 8.7, 9.1 and pass the GOSC tests in Ansible
-        - name: "Update cloud-init GOSC in OracleLinux 8.7 & 9.1"
-          when:
-            - guest_os_ansible_distribution == "OracleLinux"
-            - guest_os_ansible_distribution_ver in ['8.7', '9.1']
-          block:
-            - name: "Known issue - failure of cloud-init GOSC in Oracle Linux 8.7 and 9.1"
-              ansible.builtin.debug:
-                msg:
-                  - "Cloud-init guest customization would fail because cloud-init-local.service couldn't start when using cloud-init 22.1-5.0.1."
-                  - "The issue has been resolved in cloud-init 22.1-6.0.1. Here will upgrade cloud-init to latest version for resolution."
-                  - "Please refer to https://bugzilla.oracle.com/bugzilla/show_bug.cgi?id=18115 for details."
-              tags:
-                - known_issue
-
-            - name: "Uninstall current cloud-init"
-              include_tasks: ../utils/install_uninstall_package.yml
-              vars:
-                package_list: ["cloud-init"]
-                package_state: "absent"
-
-            - name: "Remove /etc/cloud dir before install the latest cloud-init"
-              ansible.builtin.shell: |
-                if [ -e "/etc/cloud" ] ; then
-                  rm -rf "/etc/cloud";
-                fi
-              delegate_to: "{{ vm_guest_ip }}"
-
-            - name: "Install latest cloud-init version"
-              include_tasks: ../utils/install_uninstall_package.yml
-              vars:
-                package_list: ["cloud-init"]
-                package_state: "latest"
-
         # Check whether cloud-init version meets cloud-init GOSC requirements
         # Debian 10 and 11 cloud-init GOSC requires cloud-init 22.1 or later installed.
         # See https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1008039
         # For Miracle Linux 8.x and 9.x, cloud-init GOSC requires cloud-init 22.1 or later installed.
         # For other Linux, cloud-init GOSC requires cloud-init 18.5 or later installed.
-        # See https://kb.vmware.com/s/article/90331
+        # See https://knowledge.broadcom.com/external/article?legacyId=90331
         - name: "Set fact of cloud-init version for supporting GOSC"
           ansible.builtin.set_fact:
             gosc_required_cloudinit_version: >-
@@ -143,10 +116,6 @@
           when: >
             (not cloudinit_version) or
             not (cloudinit_version is version(gosc_required_cloudinit_version, '>='))
-
-    - name: "Get guest OS network manager"
-      include_tasks: ../utils/get_network_manager.yml
-      when: guest_os_network_manager is undefined
 
     - name: "Get DNS server info before GOSC"
       include_tasks: ../utils/get_system_dns.yml
@@ -232,5 +201,5 @@
     - name: "Colect cloud-init logs"
       include_tasks: ../utils/collect_cloudinit_logs.yml
       when: >
-        (gosc_workflow == "cloud-init") or
+        enable_cloudinit_gosc or
         (guest_os_ansible_distribution == "VMware Photon OS")

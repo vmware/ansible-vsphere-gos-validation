@@ -27,12 +27,20 @@
     - vcenter_version is version('8.0.0', '<')
 
 - name: "Check GOSC support status"
+  when:
+    - guest_os_ansible_distribution is defined
+    - guest_os_ansible_distribution_ver is defined
+    - vcenter_version is defined and vcenter_version != 'N/A'
+    - vcenter_build is defined and vcenter_build != 'N/A'
   block:
     - name: "Initialize GOSC support status"
       ansible.builtin.set_fact:
         gosc_is_supported: true
 
     - name: "Check Perl GOSC support status for VMware Photon OS"
+      when:
+        - guest_os_ansible_distribution == 'VMware Photon OS'
+        - not enable_cloudinit_gosc
       block:
         - name: "Get open-vm-tools package info"
           include_tasks: ../utils/get_installed_package_info.yml
@@ -52,10 +60,7 @@
           vars:
             skip_msg: "Perl GOSC is not applicable for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} with not bundled open-vm-tools {{ vmtools_version }}."
             skip_reason: "Not Applicable"
-          when: not gosc_is_supported | bool
-      when:
-        - guest_os_ansible_distribution == 'VMware Photon OS'
-        - not enable_cloudinit_gosc | bool
+          when: not gosc_is_supported
 
     - name: "Set default guest OS list not support GOSC"
       ansible.builtin.set_fact:
@@ -67,6 +72,7 @@
            - "Fedora"
            - "openSUSE Leap"
            - "RHCOS"
+           - "Amazon"
 
     - name: "Set fact of GOSC support status to False for {{ guest_os_ansible_distribution }}"
       ansible.builtin.set_fact:
@@ -74,6 +80,10 @@
       when: guest_os_ansible_distribution in gos_not_support_gosc
 
     - name: "Set cloud-init GOSC support status for {{ vm_guest_os_distribution }}"
+      when:
+        - enable_cloudinit_gosc
+        - guest_os_ansible_distribution == "Debian"
+        - guest_os_ansible_distribution_major_ver | int == 12
       block:
         - name: "Set fact of cloud-init GOSC support status to False for {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
@@ -86,26 +96,35 @@
               https://bugs.launchpad.net/ubuntu/+source/cloud-init/+bug/1776452 and
               https://bugs.launchpad.net/cloud-init/+bug/1944946.
               So skip cloud-init GOSC testing for {{ vm_guest_os_distribution }}.
-      when:
-        - enable_cloudinit_gosc | bool
-        - guest_os_ansible_distribution == "Debian"
-        - guest_os_ansible_distribution_major_ver | int == 12
 
     - name: "Check Perl GOSC support status for {{ vm_guest_os_distribution }}"
       when:
-        - not enable_cloudinit_gosc | bool
+        - not enable_cloudinit_gosc
         - guest_os_ansible_distribution not in gos_not_support_gosc
       block:
-        - name: "Get GOSC support matrix"
+        - name: "Set fact of Perl GOSC support matrix"
           ansible.builtin.set_fact:
             gosc_support_matrix: "{{ lookup('file', 'gosc_support_matrix.yml') | from_yaml }}"
 
+        - name: "Set fact of Perl GOSC support matrix for {{ guest_os_ansible_distribution }}"
+          ansible.builtin.set_fact:
+            guest_gosc_suport_matrix: "{{ gosc_support_matrix[guest_os_ansible_distribution] | default({}) }}"
+
+        # RHEL family OS 9.0 or higher version aligns with GOSC support status for same version of RHEL
+        - name: "Combine with RedHat family GOSC support status for {{ vm_guest_os_distribution }}"
+          ansible.builtin.set_fact:
+            guest_gosc_suport_matrix: "{{ guest_gosc_suport_matrix | combine(gosc_support_matrix[guest_os_family]) }}"
+          when:
+            - guest_os_family == "RedHat"
+            - guest_os_ansible_distribution not in ['RedHat', 'MIRACLE']
+            - guest_os_ansible_distribution_major_ver | int >= 9
+
         - name: "Check Perl GOSC support status for {{ vm_guest_os_distribution }} in support matrix"
-          when: gosc_support_matrix[guest_os_ansible_distribution] is defined
+          when: guest_gosc_suport_matrix | length > 0
           block:
             - name: "Get {{ guest_os_ansible_distribution }} Perl GOSC testing supported OS versions"
               ansible.builtin.set_fact:
-                gosc_matrix_os_versions: "{{ gosc_support_matrix[guest_os_ansible_distribution] | dict2items | map(attribute='key') }}"
+                gosc_matrix_os_versions: "{{ guest_gosc_suport_matrix | dict2items | map(attribute='key') }}"
                 gosc_matrix_first_os_version: None
 
             - name: "Get the first OS version supporting Perl GOSC testing on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver | int }}.x"
@@ -117,35 +136,38 @@
                 ((guest_os_ansible_distribution_ver | int) > (item | int))
               with_items: "{{ gosc_matrix_os_versions }}"
 
+            - name: "Display the first OS version supporting Perl GOSC testing for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_major_ver }}"
+              ansible.builtin.debug: var=gosc_matrix_first_os_version
+
             - name: "Get Perl GOSC supported VC versions and builds"
               when: gosc_matrix_first_os_version != 'None'
               block:
                 - name: "Get {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} Perl GOSC supported VC versions and builds"
                   ansible.builtin.set_fact:
-                    gosc_matrix_vc_list: "{{ gosc_support_matrix[guest_os_ansible_distribution][gosc_matrix_first_os_version]['vcenter'] | dict2items | map(attribute='key') }}"
+                    gosc_matrix_vc_list: "{{ guest_gosc_suport_matrix[gosc_matrix_first_os_version]['vcenter'] | dict2items | map(attribute='key') }}"
 
                 - name: "Get {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} Perl GOSC support status on VC {{ vcenter_version }} build {{ vcenter_build }}"
                   ansible.builtin.set_fact:
                     gosc_is_supported: false
                   when: >
                     (vcenter_version in gosc_matrix_vc_list and
-                     ((gosc_support_matrix[guest_os_ansible_distribution][gosc_matrix_first_os_version]['vcenter'][vcenter_version] == 'N/A') or
-                     (vcenter_build | int < gosc_support_matrix[guest_os_ansible_distribution][gosc_matrix_first_os_version]['vcenter'][vcenter_version] | int)) or
+                     ((guest_gosc_suport_matrix[gosc_matrix_first_os_version]['vcenter'][vcenter_version] == 'N/A') or
+                     (vcenter_build | int < guest_gosc_suport_matrix[gosc_matrix_first_os_version]['vcenter'][vcenter_version] | int)) or
                     (vcenter_version is version(gosc_matrix_vc_list[0], '<')))
 
                 - name: "Get Perl GOSC supported open-vm-tools version for {{ vm_guest_os_distribution }}"
                   when:
-                    - gosc_support_matrix[guest_os_ansible_distribution][gosc_matrix_first_os_version]['vmtools'] is defined
-                    - gosc_support_matrix[guest_os_ansible_distribution][gosc_matrix_first_os_version]['vmtools']
+                    - guest_gosc_suport_matrix[gosc_matrix_first_os_version]['vmtools'] is defined
+                    - guest_gosc_suport_matrix[gosc_matrix_first_os_version]['vmtools']
                   block:
                     - name: "Get {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} Perl GOSC supported open-vm-tools version"
                       ansible.builtin.set_fact:
-                        gosc_matrix_vmtools_version: "{{ gosc_support_matrix[guest_os_ansible_distribution][gosc_matrix_first_os_version]['vmtools'] }}"
+                        gosc_matrix_vmtools_version: "{{ guest_gosc_suport_matrix[gosc_matrix_first_os_version]['vmtools'] }}"
 
                     - name: "Get {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} Perl GOSC support status with open-vm-tools {{ vmtools_version }}"
                       ansible.builtin.set_fact:
                         gosc_is_supported: false
-                      when: vmtools_version is version(gosc_support_matrix[guest_os_ansible_distribution][gosc_matrix_first_os_version]['vmtools'], '<')
+                      when: vmtools_version is version(guest_gosc_suport_matrix[gosc_matrix_first_os_version]['vmtools'], '<')
 
     - name: "Display GOSC support status for {{ vm_guest_os_distribution }}"
       ansible.builtin.debug:
@@ -153,7 +175,7 @@
           GOSC is supported for {{ vm_guest_os_distribution }} with open-vm-tools {{ vmtools_version }}
           on vCenter Server {{ vcenter_version }} build {{ vcenter_build }}.
           See https://partnerweb.vmware.com/programs/guestOS/guest-os-customization-matrix.pdf.
-      when: gosc_is_supported | bool
+      when: gosc_is_supported
 
     - name: "Skip test case due to GOSC is not supported for {{ vm_guest_os_distribution }}"
       include_tasks: ../../common/skip_test_case.yml
@@ -164,9 +186,4 @@
           vCenter Server {{ vcenter_version }} build {{ vcenter_build }}.
           See https://partnerweb.vmware.com/programs/guestOS/guest-os-customization-matrix.pdf.
         skip_reason: "Not Supported"
-      when: not gosc_is_supported | bool
-  when:
-    - guest_os_ansible_distribution is defined
-    - guest_os_ansible_distribution_ver is defined
-    - vcenter_version is defined and vcenter_version != 'N/A'
-    - vcenter_build is defined and vcenter_build != 'N/A'
+      when: not gosc_is_supported
