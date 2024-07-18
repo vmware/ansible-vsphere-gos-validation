@@ -1,29 +1,30 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Set fact of VMware Tools silent install command for 64bit GOS"
-  ansible.builtin.set_fact:
-    vmtools_install_cmd: "D:\\setup64.exe /s /v ADDLOCAL=ALL /qn REBOOT=R"
-  when:
-    - guest_os_ansible_architecture == "64-bit"
-- name: "Set fact of VMware Tools silent install command for 32bit GOS"
-  ansible.builtin.set_fact:
-    vmtools_install_cmd: "D:\\setup.exe /s /v ADDLOCAL=ALL /qn REBOOT=R"
-  when:
-    - guest_os_ansible_architecture == "32-bit"
-
-- name: "Check the CDROM mounted path folder info"
+- name: "Get the files in the VMware Tools install ISO mounted path"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Get-childitem -path D:\\ -name"
-- name: "Check VMware Tools install files"
+
+- name: "Set fact of VMware Tools setup file"
+  ansible.builtin.set_fact:
+    wintools_setup_exe: |-
+      {%- if guest_os_ansible_architecture == "64-bit" and 'setup64.exe' in win_powershell_cmd_output.stdout_lines | default([]) -%}setup64.exe
+      {%- elif 'setup.exe' in win_powershell_cmd_output.stdout_lines | default([]) -%}setup.exe
+      {%- else -%}N/A
+      {%- endif -%}
+
+- name: "Check VMware Tools setup and upgrader exe files exist"
   ansible.builtin.assert:
     that:
-      - "'setup.exe' in win_powershell_cmd_output['stdout_lines']"
-      - "'setup64.exe' in win_powershell_cmd_output['stdout_lines']"
-      - "'VMwareToolsUpgrader.exe' in win_powershell_cmd_output['stdout_lines']"
-    fail_msg: "VMware Tools installation setup files are not in D:\\"
-    success_msg: "VMware Tools installation setup files are in D:\\"
+      - wintools_setup_exe != 'N/A'
+      - "'VMwareToolsUpgrader.exe' in win_powershell_cmd_output.stdout_lines | default([])"
+    fail_msg: "VMware Tools installation setup file '{{ wintools_setup_exe }}' or 'VMwareToolsUpgrader.exe' not found in D:\\"
+    success_msg: "VMware Tools installation setup file '{{ wintools_setup_exe }}' and 'VMwareToolsUpgrader.exe' are in D:\\"
+
+- name: "Set fact of VMware Tools silent install command"
+  ansible.builtin.set_fact:
+    vmtools_install_cmd: "D:\\{{ wintools_setup_exe }} /s /v ADDLOCAL=ALL /qn REBOOT=R"
 
 # In Windows Server 2012 R2 guest OS, need to set 'become' to run
 # VMware Tools install command
