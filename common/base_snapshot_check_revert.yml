@@ -3,19 +3,17 @@
 ---
 # Check if base snapshot exists when parameter is undefined
 - name: "Check if base snapshot exists"
+  when: base_snapshot_exists is undefined or not base_snapshot_exists
   block:
     - name: "Check if snapshot {{ base_snapshot_name }} exists"
       include_tasks: vm_check_snapshot_exist.yml
       vars:
         snapshot_name: "{{ base_snapshot_name }}"
-      when: >
-        (new_vm is undefined) or
-        (not new_vm | bool)
+      when: not new_vm
 
     - name: "Set fact of base snapshot existence"
       ansible.builtin.set_fact:
         base_snapshot_exists: "{{ snapshot_exist | default(false) }}"
-  when: base_snapshot_exists is undefined or not base_snapshot_exists
 
 - name: "Revert to snapshot {{ base_snapshot_name }}"
   include_tasks: vm_revert_snapshot.yml

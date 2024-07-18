@@ -62,12 +62,20 @@
     list_files: true
   register: vm_vss_manifests_files
 
-- name: "Set fact of not support application consistent quiescing situation"
+# Windows Server 2025 VM with NVMe boot disk controller does not
+# suppport application consistent quiesce snapshot due to a known Windows issue.
+# Please keep track of the 3rd party issue status and vSphere support status.
+- name: "Get boot disk controller type in guest OS"
+  include_tasks: ../utils/win_get_boot_disk_ctl_type.yml
+  when: not new_vm
+
+- name: "Set fact of support application consistent quiescing situation"
   ansible.builtin.set_fact:
     winsrv_app_quiesce_support: true
   when:
     - guestinfo_guest_full_name | regex_search('Windows Server ([0-9]{4})')
     - guestinfo_guest_full_name | regex_search('Windows Server ([0-9]{4})') == guest_os_ansible_distribution | regex_search('Windows Server ([0-9]{4})')
+    - (new_vm and boot_disk_controller != 'nvme') or (not new_vm and win_boot_disk_ctl_type != 'nvme')
 
 - name: "Check filesystem consistent quiescing taken"
   ansible.builtin.assert:
