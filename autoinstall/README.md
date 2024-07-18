@@ -16,7 +16,7 @@
 15. For Debian 10.1x, 11.x or later unattend auto-install, please use file Debian/10/preseed.cfg.
 16. For UnionTech OS Server 20 1050a unattend auto-install, please use file UOS/Server/20/1050a/ks.cfg.
 17. For UnionTech OS Server 20 1050e unattend auto-install, please use file UOS/Server/20/1050e/ks.cfg.
-18. For Fedora 39 Server and Workstation or later unattend auto-install, please use files under Fedora/39.
+18. For Fedora 36 Server and Workstation or later unattend auto-install, please use files under Fedora/36.
 19. For FreeBSD 13 unattend auto-install, please use file FreeBSD/13/installerconfig.
 20. For FreeBSD 14 or later unattend auto-install, please use file FreeBSD/14/installerconfig.
 21. For Pardus 21.2 Server and XFCE Desktop or later unattend auto-install, please use file Pardus/preseed.cfg.
