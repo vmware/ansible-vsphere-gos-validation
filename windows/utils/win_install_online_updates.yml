@@ -17,7 +17,7 @@
 #     Default is 'C:\win_updates_log.txt'.
 # Return:
 #   win_online_updates_installed: Indicates if there are Windows online updates
-#     installed and the installed count is the same as the found count.
+#     installed in guest OS successfully.
 #
 - name: "Set fact and initialize Windows online updates install parameters"
   ansible.builtin.set_fact:
@@ -46,10 +46,12 @@
   ansible.builtin.set_fact:
     win_online_updates_installed: true
   when:
+    - win_updates_install_result.failed is defined
+    - not win_updates_install_result.failed
     - win_updates_install_result.found_update_count is defined
     - win_updates_install_result.found_update_count | int != 0
     - win_updates_install_result.installed_update_count is defined
-    - win_updates_install_result.found_update_count | int == win_updates_install_result.installed_update_count | int
+    - win_updates_install_result.installed_update_count | int != 0
 
 - name: "Display Windows online updates install status"
   ansible.builtin.debug: var=win_online_updates_installed
