@@ -16,13 +16,25 @@
 #   win_updates_log_file (optional): The log file path for Windows Update in guest OS.
 #     Default is 'C:\win_updates_log.txt'.
 # Return:
-#   win_online_updates_installed: Indicates if there are Windows online updates
-#     installed in guest OS successfully.
+#   win_online_updates_succeed: Will be set to 'true' in below conditions:
+#     1. no Windows updates found,
+#     2. there are Windows updates found, and the installed updates count is equal to
+#        the found count,
+#     3. there are Windows updates found, and the installed updates count is not equal
+#        to the found count, but the failure messages of the not installed ones contain
+#        the keywords representing failure can be ignored.
+#        For example, 'failure_msg' is "Operation was not performed because there are
+#        no applicable updates (WU_E_NOT_APPLICABLE 0x80240017)".
+#     Other cases, it will be set to 'false'.
+#   win_online_updates_installed: If set to 'true', there are Windows online updates
+#     installed in guest OS, or it will be 'false'.
 #
 - name: "Set fact and initialize Windows online updates install parameters"
   ansible.builtin.set_fact:
     win_updates_log_file: "{{ win_updates_log_file | default('C:\\win_updates_log.txt') }}"
+    win_online_updates_succeed: false
     win_online_updates_installed: false
+    win_updates_ignore_kws: ["no applicable"]
 
 - name: "Install Windows online updates"
   ansible.windows.win_updates:
@@ -39,19 +51,62 @@
   ignore_errors: "{{ win_updates_ignore_errors | default(false) }}"
 
 - name: "Print Windows online updates install result"
-  debug: var=win_updates_install_result
+  ansible.builtin.debug: var=win_updates_install_result
   when: enable_debug
 
-- name: "Set fact of Windows online updates install status"
-  ansible.builtin.set_fact:
-    win_online_updates_installed: true
+- name: "Windows online updates install task succeeds"
   when:
     - win_updates_install_result.failed is defined
     - not win_updates_install_result.failed
     - win_updates_install_result.found_update_count is defined
-    - win_updates_install_result.found_update_count | int != 0
     - win_updates_install_result.installed_update_count is defined
-    - win_updates_install_result.installed_update_count | int != 0
+  block:
+    # No updates found, so no updates installed
+    - name: "Set fact of Windows online updates install succeeds"
+      ansible.builtin.set_fact:
+        win_online_updates_succeed: true
+      when: win_updates_install_result.found_update_count | int == 0
+
+    # Updates found, updates installed
+    - name: "Installed update count is equal to found update count"
+      ansible.builtin.set_fact:
+        win_online_updates_succeed: true
+        win_online_updates_installed: true
+      when:
+        - win_updates_install_result.found_update_count | int != 0
+        - win_updates_install_result.installed_update_count | int == win_updates_install_result.found_update_count | int
+
+    # Updates found, while some not installed
+    - name: "Installed update count is not equal to found update count"
+      when:
+        - win_updates_install_result.found_update_count | int != 0
+        - win_updates_install_result.found_update_count | int > win_updates_install_result.installed_update_count | int
+      block:
+        - name: "Set fact of Windows online updates install status"
+          ansible.builtin.set_fact:
+            win_online_updates_installed: true
+          when: win_updates_install_result.installed_update_count | int != 0
+
+        - name: "Set fact of not installed updates list"
+          ansible.builtin.set_fact:
+            win_updates_not_installed: "{{ win_updates_install_result.updates.values() | selectattr('installed', 'equalto', false) }}"
+        - name: "Display the not installed updates list"
+          ansible.builtin.debug: var=win_updates_not_installed
+
+        - name: "Set fact of failure messages of not installed updates"
+          ansible.builtin.set_fact:
+            win_updates_failure_msgs: "{{ win_updates_not_installed | map(attribute='failure_msg') }}"
+        - name: "Set fact of failure messages can not be ignored"
+          ansible.builtin.set_fact:
+            win_updates_failure_msgs: "{{ win_updates_failure_msgs | difference(win_updates_failure_msgs | select('search', item)) }}"
+          loop: "{{ win_updates_ignore_kws }}"
+        - name: "Set fact of Windows online updates install status"
+          ansible.builtin.set_fact:
+            win_online_updates_succeed: true
+          when: win_updates_failure_msgs | length == 0
 
 - name: "Display Windows online updates install status"
-  ansible.builtin.debug: var=win_online_updates_installed
+  ansible.builtin.debug:
+    msg:
+      - "Windows online updates install succeeds: {{ win_online_updates_succeed }}"
+      - "There are Windows online updates installed in guest OS : {{ win_online_updates_installed }}"

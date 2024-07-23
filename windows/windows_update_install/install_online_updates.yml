@@ -3,7 +3,7 @@
 ---
 - name: "Initialize Windows online updates install status"
   ansible.builtin.set_fact:
-    win_online_updates_installed: false
+    win_online_updates_succeed: false
 
 - name: "Get guest OS version build"
   include_tasks: ../utils/win_get_os_version.yml
@@ -52,7 +52,9 @@
 # For internal existing VM test scenario.
 # If guest OS has been updated, take a new base snapshot and remove the old one.
 - name: "Reset base snapshot if Windows online updates installed"
-  when: win_online_updates_installed
+  when:
+    - win_online_updates_succeed
+    - win_online_updates_installed
   block:
     - name: "Get guest OS version build"
       include_tasks: ../utils/win_get_os_version.yml
