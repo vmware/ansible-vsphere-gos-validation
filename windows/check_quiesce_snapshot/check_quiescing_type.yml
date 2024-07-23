@@ -62,12 +62,23 @@
     list_files: true
   register: vm_vss_manifests_files
 
-# Windows Server 2025 VM with NVMe boot disk controller does not
-# suppport application consistent quiesce snapshot due to a known Windows issue.
+# Windows Server VM with NVMe boot disk controller (except Windows Server 2022
+# with latest Windows updates installed) does not suppport application consistent
+# quiesce snapshot due to the known Windows issues.
 # Please keep track of the 3rd party issue status and vSphere support status.
 - name: "Get boot disk controller type in guest OS"
   include_tasks: ../utils/win_get_boot_disk_ctl_type.yml
-  when: not new_vm
+  when: win_boot_disk_ctl_type is undefined or not win_boot_disk_ctl_type
+
+- name: "Handle Windows Server 2022 situation"
+  when: guest_os_ansible_distribution is search('Windows Server 2022')
+  block:
+    - name: "Get Windows Server 2022 build number"
+      include_tasks: ../utils/win_get_os_version.yml
+    - name: "Set Windows Server 2022 exception"
+      ansible.builtin.set_fact:
+        winsrv_2022_app_quiesce: true
+      when: win_os_version_build is version('10.0.20348.2582', '>=')
 
 - name: "Set fact of support application consistent quiescing situation"
   ansible.builtin.set_fact:
@@ -75,7 +86,7 @@
   when:
     - guestinfo_guest_full_name | regex_search('Windows Server ([0-9]{4})')
     - guestinfo_guest_full_name | regex_search('Windows Server ([0-9]{4})') == guest_os_ansible_distribution | regex_search('Windows Server ([0-9]{4})')
-    - (new_vm and boot_disk_controller != 'nvme') or (not new_vm and win_boot_disk_ctl_type != 'nvme')
+    - (win_boot_disk_ctl_type != 'nvme') or (win_boot_disk_ctl_type == 'nvme' and winsrv_2022_app_quiesce is defined and winsrv_2022_app_quiesce)
 
 - name: "Check filesystem consistent quiescing taken"
   ansible.builtin.assert:
