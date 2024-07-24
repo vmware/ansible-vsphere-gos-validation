@@ -96,14 +96,24 @@
         - name: "Set fact of failure messages of not installed updates"
           ansible.builtin.set_fact:
             win_updates_failure_msgs: "{{ win_updates_not_installed | map(attribute='failure_msg') }}"
-        - name: "Set fact of failure messages can not be ignored"
-          ansible.builtin.set_fact:
-            win_updates_failure_msgs: "{{ win_updates_failure_msgs | difference(win_updates_failure_msgs | select('search', item)) }}"
-          loop: "{{ win_updates_ignore_kws }}"
-        - name: "Set fact of Windows online updates install status"
-          ansible.builtin.set_fact:
-            win_online_updates_succeed: true
-          when: win_updates_failure_msgs | length == 0
+
+        - name: "No failure message for update"
+          ansible.builtin.debug:
+            msg: "No 'failure_msg' info for not installed updates, so will not ignore these not installed updates."
+          when: win_updates_failure_msgs | length != win_updates_not_installed | length
+
+        - name: "Get failure messages for all not installed updates"
+          when: win_updates_failure_msgs | length == win_updates_not_installed | length
+          block:
+            - name: "Set fact of failure messages can not be ignored"
+              ansible.builtin.set_fact:
+                win_updates_failure_msgs: >
+                  {{ win_updates_failure_msgs | difference(win_updates_failure_msgs | select('search', item)) }}
+              loop: "{{ win_updates_ignore_kws }}"
+            - name: "Set fact of Windows online updates install status"
+              ansible.builtin.set_fact:
+                win_online_updates_succeed: true
+              when: win_updates_failure_msgs | length == 0
 
 - name: "Display Windows online updates install status"
   ansible.builtin.debug:
