@@ -16,18 +16,18 @@
     wintools_setup_exe: |-
       {%- if guest_os_ansible_architecture == "64-bit" and 'setup64.exe' in win_powershell_cmd_output.stdout_lines | default([]) -%}setup64.exe
       {%- elif 'setup.exe' in win_powershell_cmd_output.stdout_lines | default([]) -%}setup.exe
-      {%- else -%}N/A
       {%- endif -%}
 
 - name: "Check VMware Tools setup and upgrader exe files exist"
   ansible.builtin.assert:
     that:
-      - wintools_setup_exe != 'N/A'
+      - wintools_setup_exe
       - "'VMwareToolsUpgrader.exe' in win_powershell_cmd_output.stdout_lines | default([])"
       - "'manifest.txt' in win_powershell_cmd_output.stdout_lines | default([])"
     fail_msg: >
-      VMware Tools installation setup file '{{ wintools_setup_exe }}', upgrade file
-      'VMwareToolsUpgrader.exe' or 'manifest.txt' file are not found in 'D:\' in guest OS.
+      Either VMware Tools installation setup file is not set: '{{ wintools_setup_exe }}',
+      or VMware Tools upgrade program 'VMwareToolsUpgrader.exe',
+      VMware Tools 'manifest.txt' file is not found in 'D:\' in guest OS.
 
 - name: "Get VMware Tools version from manifest.txt file"
   include_tasks: ../utils/win_execute_cmd.yml
@@ -39,7 +39,6 @@
     vmtools_version_manifest: |-
       {%- if win_powershell_cmd_output.stdout_lines | length != 0 -%}
       {{ (win_powershell_cmd_output.stdout_lines | select)[0].split('"')[1] }}
-      {%- else -%}''
       {%- endif -%}
 
 - name: "Not supported VMware Tools version"
