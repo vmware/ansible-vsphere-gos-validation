@@ -26,10 +26,12 @@
       - vm_username == "root"
     fail_msg: "Existing VM must use root to run test"
   when:
-    - new_vm is undefined or not new_vm | bool
+    - not new_vm
     - testing_testcase_file | dirname | basename == "linux"
 
-- block:
+- name: "Check variables when testing on new VM"
+  when: new_vm
+  block:
     - name: "Check VM deploy method"
       ansible.builtin.assert:
         that:
@@ -52,8 +54,9 @@
         fail_msg: "Invalid variables for deploying OVA"
       when: vm_deploy_method is defined and vm_deploy_method == "ova"
 
-    # Check variables for deploying VM from ISO
-    - block:
+    - name: "Check variables for deploying VM from ISO"
+      when: vm_deploy_method is undefined or vm_deploy_method == "iso"
+      block:
         - name: "Check variables for new VM settings"
           ansible.builtin.assert:
             that:
@@ -77,7 +80,6 @@
           when:
             - cpu_number is defined and cpu_number
             - cpu_cores_per_socket is defined and cpu_cores_per_socket
-      when: vm_deploy_method is undefined or vm_deploy_method == "iso"
 
     - name: "Check vCenter is set when create new VM with vTPM"
       ansible.builtin.assert:
@@ -88,4 +90,3 @@
           - datacenter is defined and datacenter
         fail_msg: "vCenter hostname, user account and datacenter info should be set when creating new VM with vTPM device"
       when: virtual_tpm is defined and virtual_tpm | bool
-  when: new_vm is defined and new_vm

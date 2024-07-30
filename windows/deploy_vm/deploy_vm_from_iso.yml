@@ -7,8 +7,8 @@
 # Initialize VM virtual hardware config variables
 - name: "Initialize variables for new VM settings"
   ansible.builtin.set_fact:
-    boot_disk_controller: "{{ boot_disk_controller if (boot_disk_controller is defined and boot_disk_controller) else 'lsilogicsas' }}"
-    secureboot_enabled: "{{ secureboot_enabled if (secureboot_enabled is defined and secureboot_enabled) else false }}"
+    boot_disk_controller: "{{ boot_disk_controller | lower if (boot_disk_controller is defined and boot_disk_controller) else 'lsilogicsas' }}"
+    secureboot_enabled: "{{ secureboot_enabled | bool if (secureboot_enabled is defined and secureboot_enabled) else false }}"
     network_adapter_type: "{{ 'e1000e' if (windows_has_inbox_driver is undefined or not windows_has_inbox_driver) else network_adapter_type }}"
     firmware: "{{ firmware | lower if (firmware is defined and firmware) else 'efi' }}"
     boot_disk_size_gb: "{{ [64, boot_disk_size_gb | default(64) | int] | max }}"
@@ -16,6 +16,10 @@
 - name: "Update test case name for deploying VM from ISO image"
   ansible.builtin.set_fact:
     current_testcase_name: "deploy_vm_{{ firmware }}_{{ boot_disk_controller }}_{{ network_adapter_type }}"
+
+- name: "Set fact of VM boot disk controller type"
+  ansible.builtin.set_fact:
+    win_boot_disk_ctl_type: "{{ boot_disk_controller }}"
 
 - name: "Check configured VM CPU number and cores per socket number"
   include_tasks: check_cpu_socket.yml

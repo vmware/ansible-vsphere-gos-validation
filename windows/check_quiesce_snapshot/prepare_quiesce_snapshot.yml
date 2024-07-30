@@ -1,0 +1,53 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of the remote path in guest OS"
+  ansible.builtin.set_fact:
+    quiesce_scripts_freeze_thaw_path: "C:\\Windows\\"
+    quiesce_scripts_tools_path: "C:\\Program Files\\VMware\\VMware Tools\\backupScripts.d\\"
+    quiesce_log_file_path: "C:\\vmbackup.log"
+    quiesce_snapshot_name: "quiesce_{{ current_test_timestamp }}"
+
+# Get existing *vss_manifests*.zip files in VM folder
+- name: "Get all VM files in VM folder"
+  include_tasks: ../../common/vm_get_config.yml
+  vars:
+    property_list:
+      - 'layoutEx.file'
+- name: "Failed to get VM files in VM folder"
+  ansible.builtin.assert:
+    that:
+      - vm_config.layoutEx.file is defined
+      - vm_config.layoutEx.file | length > 0
+    fail_msg: "Not get VM files info from 'vm_config.layoutEx.file' before taking snapshot."
+
+- name: "Set fact of the list of vss_manifests zip files"
+  ansible.builtin.set_fact:
+    vm_vss_manifests_list_before: "{{ vm_config.layoutEx.file | map(attribute='name') | select('search', 'vss_manifests') }}"
+- name: "Display the vss_manifests zip files before taking quiesce snapshot"
+  ansible.builtin.debug: var=vm_vss_manifests_list_before
+
+- name: "Enable vss logging in guest OS"
+  include_tasks: ../utils/win_enable_vss_log.yml
+  vars:
+    win_vmbackup_log_path: "{{ quiesce_log_file_path }}"
+  when: vmtools_version is version('11.0.0', '>=')
+
+- name: "Get Windows guest OS time"
+  include_tasks: ../utils/win_get_time.yml
+
+- name: "Set fact of the time before taking quiesce snapshot"
+  ansible.builtin.set_fact:
+    before_snapshot_time: "{{ time_variable }}"
+
+- name: "Copy custom scripts to guest OS"
+  include_tasks: copy_custom_scripts_to_guest.yml
+
+- name: "Get VMware Snapshot Provider service status in guest OS"
+  include_tasks: ../utils/win_get_service_status.yml
+  vars:
+    win_service_name: "vmvss"
+
+- name: "Set fact of collecting quiesce log file"
+  ansible.builtin.set_fact:
+    collect_vss_logs: true

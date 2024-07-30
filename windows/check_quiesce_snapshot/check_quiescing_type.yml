@@ -1,0 +1,113 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Initialize not support application consistent quiescing type"
+  ansible.builtin.set_fact:
+    winsrv_app_quiesce_support: false
+
+# Get *vss_manifests*.zip files in VM folder
+- name: "Get all VM files in VM folder"
+  include_tasks: ../../common/vm_get_config.yml
+  vars:
+    property_list:
+      - 'layoutEx.file'
+- name: "Failed to get VM files in VM folder"
+  ansible.builtin.assert:
+    that:
+      - vm_config.layoutEx.file is defined
+      - vm_config.layoutEx.file | length > 0
+    fail_msg: "Not get VM files info from 'vm_config.layoutEx.file' after taking snapshot."
+
+- name: "Set fact of the list of vss_manifests zip files"
+  ansible.builtin.set_fact:
+    vm_vss_manifests_list_after: "{{ vm_config.layoutEx.file | map(attribute='name') | select('search', 'vss_manifests') }}"
+
+- name: "Display the vss_manifests zip files after taking quiesce snapshot"
+  ansible.builtin.debug: var=vm_vss_manifests_list_after
+
+- name: "Set fact of the new vss_manifests zip file"
+  ansible.builtin.set_fact:
+    vm_vss_manifests_new: "{{ vm_vss_manifests_list_after | difference(vm_vss_manifests_list_before) }}"
+
+- name: "Check one new vss_manifests zip file generated"
+  ansible.builtin.assert:
+    that:
+      - vm_vss_manifests_new | length == 1
+    fail_msg: >
+      Before taking quiesce snapshot, the vss_manifests zip files are: {{ vm_vss_manifests_list_before }},
+      after taking quiesce snapshot, the vss_manifests zip files are: {{ vm_vss_manifests_list_after }},
+      not get the new generated zip file.
+
+- name: "Set fact of local path of the new vss_manifests zip file"
+  ansible.builtin.set_fact:
+    vm_vss_manifests_path: "{{ current_test_log_folder }}/{{ vm_vss_manifests_new[0] | basename }}"
+    vm_vss_manifests_unzip_path: "{{ current_test_log_folder }}/{{ (vm_vss_manifests_new[0] | basename).split('.')[0] }}"
+
+- name: "Create local directory for unarchived files"
+  include_tasks: ../../common/create_directory.yml
+  vars:
+    dir_path: "{{ vm_vss_manifests_unzip_path }}"
+
+- name: "Get the new vss_manifests zip file to local"
+  include_tasks: ../../common/esxi_download_datastore_file.yml
+  vars:
+    src_datastore: "{{ datastore }}"
+    src_file_path: "{{ vm_vss_manifests_new[0].split(']')[1].strip() }}"
+    dest_file_path: "{{ vm_vss_manifests_path }}"
+
+- name: "Get the list of files in the new vss_manifests zip file"
+  ansible.builtin.unarchive:
+    src: "{{ vm_vss_manifests_path }}"
+    dest: "{{ vm_vss_manifests_unzip_path }}"
+    list_files: true
+  register: vm_vss_manifests_files
+
+# Windows Server VM with NVMe boot disk controller (except Windows Server 2022
+# with latest Windows updates installed) does not suppport application consistent
+# quiesce snapshot due to the known Windows issues.
+# Please keep track of the 3rd party issue status and vSphere support status.
+- name: "Handle Windows Server guest OS situation"
+  when: guest_os_product_type == 'server'
+  block:
+    - name: "Get boot disk controller type in guest OS"
+      include_tasks: ../utils/win_get_boot_disk_ctl_type.yml
+      when: win_boot_disk_ctl_type is undefined or not win_boot_disk_ctl_type
+
+    - name: "Handle Windows Server 2022 situation"
+      when: guest_os_ansible_distribution is search('Windows Server 2022')
+      block:
+        - name: "Get Windows Server 2022 build number"
+          include_tasks: ../utils/win_get_os_version.yml
+        - name: "Set Windows Server 2022 exception"
+          ansible.builtin.set_fact:
+            winsrv_2022_app_quiesce: true
+          when: win_os_version_build is version('10.0.20348.2582', '>=')
+
+    - name: "Set fact of support application consistent quiescing situation"
+      ansible.builtin.set_fact:
+        winsrv_app_quiesce_support: true
+      when:
+        - guestinfo_guest_full_name | regex_search('Windows Server ([0-9]{4})')
+        - guestinfo_guest_full_name | regex_search('Windows Server ([0-9]{4})') == guest_os_ansible_distribution | regex_search('Windows Server ([0-9]{4})')
+        - (win_boot_disk_ctl_type != 'nvme') or (win_boot_disk_ctl_type == 'nvme' and winsrv_2022_app_quiesce is defined and winsrv_2022_app_quiesce)
+
+- name: "Check filesystem consistent quiescing taken"
+  ansible.builtin.assert:
+    that:
+      - vm_vss_manifests_files.files is defined
+      - vm_vss_manifests_files.files | length == 1
+      - vm_vss_manifests_files.files[0] == "backup.xml"
+    fail_msg: >
+      One file 'backup.xml' is expected in {{ vm_vss_manifests_new[0] | basename }} when
+      taking filesystem consistent quiesce snapshot, while got files: {{ vm_vss_manifests_files.files | default([]) }}.
+  when: not winsrv_app_quiesce_support
+
+- name: "Check application consistent quiescing taken for Windows Server"
+  ansible.builtin.assert:
+    that:
+      - vm_vss_manifests_files.files is defined
+      - vm_vss_manifests_files.files | length > 1
+    fail_msg: >
+      More than one files are expected in {{ vm_vss_manifests_new[0] | basename }} when
+      taking application consistent quiesce snapshot, while got file: {{ vm_vss_manifests_files.files | default([]) }}.
+  when: winsrv_app_quiesce_support

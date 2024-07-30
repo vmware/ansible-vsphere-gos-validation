@@ -10,24 +10,15 @@
     vm_has_pvscsi_ctl: false
     vm_has_vmxnet3_net: false
 
+- name: "Get boot disk controller type in guest OS"
+  include_tasks: ../utils/win_get_boot_disk_ctl_type.yml
+  when: win_boot_disk_ctl_type is undefined or not win_boot_disk_ctl_type
+
 # PVSCSI boot disk controller
-- name: "Set boot disk controller type to PVSCSI for new VM"
+- name: "Set boot disk controller type to PVSCSI"
   ansible.builtin.set_fact:
     vm_has_pvscsi_boot_disk: true
-  when:
-    - new_vm is defined and new_vm | bool
-    - boot_disk_controller is defined and boot_disk_controller == 'paravirtual'
-
-- name: "Set boot disk controller type for existing VM"
-  when: new_vm is undefined or not new_vm | bool
-  block:
-    - name: "Get boot disk controller type in guest OS"
-      include_tasks: ../utils/win_get_boot_disk_ctl_type.yml
-    - name: "Set boot disk controller type to PVSCSI"
-      ansible.builtin.set_fact:
-        vm_has_pvscsi_boot_disk: true
-      when:
-        - win_boot_disk_ctl_type == 'paravirtual'
+  when: win_boot_disk_ctl_type == 'paravirtual'
 
 # Not PVSCSI boot disk controller
 - name: "Check if VM has non-boot PVSCSI controller"
