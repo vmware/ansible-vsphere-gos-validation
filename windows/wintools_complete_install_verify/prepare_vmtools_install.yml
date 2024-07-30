@@ -11,23 +11,28 @@
   vars:
     win_powershell_cmd: "Get-childitem -path D:\\ -name"
 
+- name: "Set fact of the files list"
+  ansible.builtin.set_fact:
+    win_files_vmtools_iso: "{{ win_powershell_cmd_output.stdout_lines | default([]) }}"
+
 - name: "Set fact of VMware Tools setup file"
   ansible.builtin.set_fact:
     wintools_setup_exe: |-
-      {%- if guest_os_ansible_architecture == "64-bit" and 'setup64.exe' in win_powershell_cmd_output.stdout_lines | default([]) -%}setup64.exe
-      {%- elif 'setup.exe' in win_powershell_cmd_output.stdout_lines | default([]) -%}setup.exe
+      {%- if guest_os_ansible_architecture == "64-bit" and 'setup64.exe' in win_files_vmtools_iso -%}setup64.exe
+      {%- elif 'setup.exe' in win_files_vmtools_iso -%}setup.exe
       {%- endif -%}
 
 - name: "Check VMware Tools setup and upgrader exe files exist"
   ansible.builtin.assert:
     that:
       - wintools_setup_exe
-      - "'VMwareToolsUpgrader.exe' in win_powershell_cmd_output.stdout_lines | default([])"
-      - "'manifest.txt' in win_powershell_cmd_output.stdout_lines | default([])"
+      - "'VMwareToolsUpgrader.exe' in win_files_vmtools_iso"
+      - "'manifest.txt' in win_files_vmtools_iso"
     fail_msg: >
       Either VMware Tools installation setup file is not set: '{{ wintools_setup_exe }}',
       or VMware Tools upgrade program 'VMwareToolsUpgrader.exe',
-      VMware Tools 'manifest.txt' file is not found in 'D:\' in guest OS.
+      VMware Tools 'manifest.txt' file is not found in guest OS,
+      the listed files in 'D:\' are '{{ win_files_vmtools_iso }}'.
 
 - name: "Get VMware Tools version from manifest.txt file"
   include_tasks: ../utils/win_execute_cmd.yml
