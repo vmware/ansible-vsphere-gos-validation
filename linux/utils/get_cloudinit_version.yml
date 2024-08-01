@@ -7,18 +7,21 @@
   ansible.builtin.set_fact:
     cloudinit_version: ""
 
+# Some OS might print cloud-init version to stderr
 - name: "Get cloud-init version from package info"
-  include_tasks: get_installed_package_info.yml
-  vars:
-    package_name: "cloud-init"
+  ansible.builtin.shell: "/usr/bin/cloud-init --version 2>&1 | awk '{print $2}'"
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: true
+  register: get_cloudinit_version
 
 - name: "Set fact of cloud-init version"
   ansible.builtin.set_fact:
-    cloudinit_version: "{{ package_info.Version }}"
+    cloudinit_version: "{{ get_cloudinit_version.stdout }}"
   when:
-    - package_info | length > 0
-    - package_info.Version is defined
-    - package_info.Version
+    - get_cloudinit_version.rc is defined
+    - get_cloudinit_version.rc == 0
+    - get_cloudinit_version.stdout is defined
+    - get_cloudinit_version.stdout
 
 - name: "Print the cloud-init version"
   ansible.builtin.debug: var=cloudinit_version
