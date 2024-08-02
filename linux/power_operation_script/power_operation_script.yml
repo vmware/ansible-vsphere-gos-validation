@@ -1,0 +1,77 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check the scripts run in response to power operations
+# When VMware tools is not installed or not running in VM, this test case result is 'Blocked'.
+#
+- name: power_operation_script
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            skip_test_no_vmtools: true
+
+        # When check power on script, we need to disable shutdown script firstly: vmware-toolbox-cmd script shutdown disable
+        # When check shutdown script, we need to disable poweron script firstly: vmware-toolbox-cmd script power disable
+        # When check suspend script, we need to disable resume script firstly: vmware-toolbox-cmd script resume disable
+        # When check resume script, we need to disable suspend script firstly: vmware-toolbox-cmd script suspend disable
+        - name: "Set fact of power operations"
+          ansible.builtin.set_fact:
+            power_operation_list:
+              - name: poweronDefaultScript:
+                setup: vmware-toolbox-cmd script shutdown disable
+                file_path: /etc/vmware-tools/poweron-vm-default
+                cmds:
+                  - vmware-toolbox-cmd script power enable
+                check: vmware-toolbox-cmd script power current
+              - name: poweroffDefaultScript:
+                setup: vmware-toolbox-cmd script power disable
+                file_path: /etc/vmware-tools/poweroff-vm-default
+                cmds:
+                  - vmware-toolbox-cmd script shutdown enable
+                check: vmware-toolbox-cmd script shutdown current
+              - name: poweronCustomeScript:
+                setup: vmware-toolbox-cmd script shutdown disable
+                file_path: /tmp/poweron-vm-custom
+                cmds:
+                  - touch /tmp/poweron-vm-custom
+                  - vmware-toolbox-cmd script power set /tmp/poweron-vm-custom
+                check: vmware-toolbox-cmd script power current
+              - name: poweroffCustomeScript:
+                setup: vmware-toolbox-cmd script power disable
+                file_path: /tmp/poweroff-vm-custom
+                cmds:
+                  - touch /tmp/poweroff-vm-custom
+                  - vmware-toolbox-cmd script shutdown set /tmp/poweroff-vm-custom
+                check: vmware-toolbox-cmd script shutdown current
+              - name: suspendCustomeScript:
+                setup: vmware-toolbox-cmd script resume disable
+                file_path: /tmp/suspend-vm-custom
+                cmds:
+                  - touch /tmp/suspend-vm-custom
+                  - vmware-toolbox-cmd script suspend set /tmp/suspend-vm-custom
+                check: vmware-toolbox-cmd script suspend current
+              - name: resumeCustomeScript:
+                setup: vmware-toolbox-cmd script suspend disable
+                file_path: /tmp/resume-vm-custom
+                cmds:
+                  - touch /tmp/resume-vm-custom
+                  - vmware-toolbox-cmd script resume set /tmp/resume-vm-custom
+                check: vmware-toolbox-cmd script resume current
+
+        - name: "Test power script"
+          include_tasks: set_power_script.yml
+          vars:
+            script_file_path: "{{ power_script_item.file_path }}"
+          with_items: "{{ power_operation_list }}"
+          when: power_script_item
+          loop_control:
+            loop_var: power_script_item
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml

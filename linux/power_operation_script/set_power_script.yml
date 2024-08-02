@@ -1,0 +1,91 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for check the scripts run in response to power operations
+# # Parameters:
+#   power_script_item: dict of the power script
+# 
+- name: "Start testcase {{ power_script_item.name }}"
+  ansible.builtin.debug:
+    msg:
+      - "Start testcase {{ power_script_item.name }}"
+
+- name: "Setup for testcase {{ power_script_item.name }}"
+  ansible.builtin.shell: "{{ power_script_item.setup }}"
+  when: power_script_item.setup
+  register: power_script_setup_result
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Print the result of setup"
+  ansible.builtin.debug: var=power_script_setup_result
+
+# cmds[0]: Create script or Set script for testcase
+- name: "Create script file for testcase {{ power_script_item.name }}"
+  ansible.builtin.shell: "{{ power_script_item.cmds[0] }}"
+  when: power_script_item.cmds.length > 1
+  delegate_to: "{{ vm_guest_ip }}"
+
+# cmds[1]: Add script file content or Set script for testcase
+- name: "Add script file content for testcase {{ power_script_item.name }}"
+  ansible.builtin.shell: "{{ power_script_item.cmds[1] }}"
+  when: power_script_item.cmds.length > 2
+  register: power_script_file
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Modify the mode of script file"
+  ansible.builtin.file:
+    path: "{{ script_file_path }}"
+    state: touch
+    mode: "777"
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Set script file for testcase {{ power_script_item.name }}"
+  ansible.builtin.shell: "{{ power_script_item.cmds[-1] }}"
+  register: power_script_set_result
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Print the result of set script file"
+  ansible.builtin.debug: var=power_script_set_result
+
+# Check the current configuration
+- name: "Check the current configuration for testcase {{ power_script_item.name }}"
+  ansible.builtin.shell: "{{ power_script_item.check }}"
+  register: power_script_result
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Print the current configuration for testcase {{ power_script_item.name }}"
+  ansible.builtin.debug: var=power_script_result.stdout
+
+- name: "Check current configuration is expected"
+  ansible.builtin.assert:
+    that:
+      - power_script_result.stdout.strip() == script_file_path
+    fail_msg: "The configuration for {{ power_script_item.name }} is {{ power_script_result.stdout }}, not as expected {{ script_file_path }}."
+    success_msg: "The configuration for {{ power_script_item.name }} is {{ power_script_result.stdout }}, which is as expected."
+
+- name: "Sleep 15s for configuration to take affect"
+  ansible.builtin.pause:
+    seconds: 15
+
+- name: "Restart geust OS"
+  include_tasks: ../utils/reboot.yml
+
+- name: "Get content of file tools.conf"
+  ansible.builtin.shell: "cat /etc/vmware-tools/tools.conf"
+  register: tools_conf_content_result
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Check the configuration is expected in tools.conf"
+  ansible.builtin.assert:
+    that:
+      - tools_conf_content_result.stdout is defined
+      - tools_conf_content_result.stdout is match(script_file_path)
+    fail_msg: "Not found the {{ script_file_path }} in tool.conf for {{ power_script_item.name }}, which is not as expected"
+    success_msg: "Found the {{ script_file_path }} in tool.conf for {{ power_script_item.name }}, which is as expected."
+
+- name: "End of testcase {{ power_script_item.name }}"
+  ansible.builtin.debug:
+    msg:
+      - "End of testcase {{ power_script_item.name }}"
+
