@@ -40,8 +40,18 @@
   include_tasks: ../../common/get_iso_file_list.yml
 
 - name: "Prepare for Ubuntu installation"
-  include_tasks: ubuntu/prepare_ubuntu_iso_install.yml
   when: guest_id is match('ubuntu.*')
+  block:
+    - name: "Check upgrade_kernel_version when upgrade_kernel_version is defined"
+      when: upgrade_kernel_version is defined and upgrade_kernel_version
+      block:
+        - name: "Set the base url for kernel version check"
+          ansible.builtin.set_fact:
+            mainline_kernel_url: "https://kernel.ubuntu.com/mainline"
+        - name: "Check the kernel version exists"
+          include_tasks: ubuntu/get_mainline_kernel.yml
+    - name: "Prepare for Ubuntu installation"
+      include_tasks: ubuntu/prepare_ubuntu_iso_install.yml
 
 - name: "Set default unattend install conf file"
   when: unattend_install_conf is undefined or not unattend_install_conf
@@ -301,60 +311,11 @@
         service_name: "{{ wait_service_name }}"
         wait_service_status: "running"
 
-- name: "Upgrade Oracle Linux 9.0 kernel from UEK R7 GA to latest UEK R7"
-  when:
-    - guest_os_ansible_distribution == "OracleLinux"
-    - guest_os_ansible_distribution_ver == "9.0"
-    - "'uek' in guest_os_ansible_kernel"
-  block:
-    - name: "Take a snapshot before upgrading UEK"
-      include_tasks: ../../common/vm_take_snapshot.yml
-      vars:
-        snapshot_name: "OL_9.0GA_UEK"
-
-    - name: "Get Oracle Linux 9.0 UEK R7 version before upgrading"
-      ansible.builtin.set_fact:
-        ol9_uekr7_is_upgraded: false
-        ol9_uekr7_before_upgrade: "{{ guest_os_ansible_kernel }}"
-
-    - name: "Add Oracle Linux online repos for upgrading kernel"
-      include_tasks: ../utils/add_official_online_repo.yml
-
-    - name: "Update Oracle Linux 9.0 to latest UEK R7"
-      ansible.builtin.shell: "yum update --nogpgcheck -y"
-      register: ol9_uekr7_upgrade_result
-      delegate_to: "{{ vm_guest_ip }}"
-
-    - name: "Set the fact of that Oracle Linux 9.0 UEK R7 is upgraded"
-      ansible.builtin.set_fact:
-        ol9_uekr7_is_upgraded: true
-      when:
-        - ol9_uekr7_upgrade_result is defined
-        - ol9_uekr7_upgrade_result.rc is defined
-        - ol9_uekr7_upgrade_result.rc == 0
-
-    - name: "Check Oracle Linux 9.0 kernel UEK R7 is upgraded"
-      when: ol9_uekr7_is_upgraded
-      block:
-        - name: "Reboot Oracle Linux"
-          include_tasks: ../utils/reboot.yml
-
-        - name: "Update VM guest IPv4 address in in-memory inventory"
-          include_tasks: ../../common/update_inventory.yml
-
-        - name: "Refresh Linux system info"
-          include_tasks: ../utils/get_linux_system_info.yml
-
-        - name: "Get Oracle Linux 9.0 UEK R7 version after upgrading"
-          ansible.builtin.set_fact:
-            ol9_uekr7_after_upgrade: "{{ guest_os_ansible_kernel }}"
-
-        - name: "Check Oracle Linux 9.0 kernel UEK R7 is upgraded successfully"
-          ansible.builtin.assert:
-            that:
-              - ol9_uekr7_after_upgrade is version(ol9_uekr7_before_upgrade, '>')
-            fail_msg: >-
-              Oracle Linux 9.0 UEK R7 upgrading failed. Before upgrade, the UEK R7
-              version is '{{ ol9_uekr7_before_upgrade }}', after upgrade the UEK R7
-              version is '{{ ol9_uekr7_after_upgrade }}'.
-
+- name: "Upgrade kernel for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+  include_tasks: upgrade_vm_kernel.yml
+  when: >
+    ((upgrade_kernel_version is defined and upgrade_kernel_version and 
+    guest_os_ansible_distribution == "Ubuntu") or
+    (guest_os_ansible_distribution == "OracleLinux" and
+    guest_os_ansible_distribution_ver == "9.0" and
+    "'uek' in guest_os_ansible_kernel"))

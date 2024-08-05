@@ -1,0 +1,74 @@
+# Copyright 2022-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Take a snapshot before upgrading kernel"
+  include_tasks: ../../common/vm_take_snapshot.yml
+  vars:
+    snapshot_name: "kernel_before_upgrade"
+
+- name: "Get kernel version before upgrading"
+  ansible.builtin.set_fact:
+    kernel_is_upgraded: false
+    kernel_before_upgrade: "{{ guest_os_ansible_kernel }}"
+
+- name: "Upgrade Kernel for Oracle"
+  when: guest_os_ansible_distribution == "OracleLinux"
+  block:
+    - name: "Add Oracle Linux online repos for upgrading kernel"
+      include_tasks: ../utils/add_official_online_repo.yml
+    - name: "Update Oracle Linux 9.0 to latest UEK R7"
+      ansible.builtin.shell: "yum update --nogpgcheck -y"
+      register: kernel_upgrade_result
+      delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Update mainline kernel to {{ upgrade_kernel_version }} for Ubuntu"
+  ansible.builtin.shell: |
+    packages="nfs-common curl"
+    for package in $packages; do dpkg -l | grep -qw $package || apt install -y $package; done
+    wget -c -- $(curl -s {{ mainline_kernel_url }}/v{{ upgrade_kernel_version }}/amd64/ | sed 's/"\|>\|</\n/g' | grep deb | uniq | while read line; do echo "{{ mainline_kernel_url }}/v{{ upgrade_kernel_version }}/amd64/${line}";done)
+    if [ $? -eq 0 ]; then dpkg -i linux*.deb; rm -rf linux*.deb; fi
+    sed -i 's/#WaylandEnable=false/WaylandEnable=false/'  /etc/gdm3/custom.conf
+  register: kernel_upgrade_result
+  delegate_to: "{{ vm_guest_ip }}"
+  when: guest_os_ansible_distribution == "Ubuntu"
+
+- name: "Set the fact of that kernel is upgraded"
+  ansible.builtin.set_fact:
+    kernel_is_upgraded: true
+  when:
+    - kernel_upgrade_result is defined
+    - kernel_upgrade_result.rc is defined
+    - kernel_upgrade_result.rc == 0
+
+- name: "Check kernel is upgraded"
+  when: kernel_is_upgraded
+  block:
+    - name: "Reboot Linux Guest"
+      include_tasks: ../utils/reboot.yml
+
+    - name: "Update VM guest IPv4 address in in-memory inventory"
+      include_tasks: ../../common/update_inventory.yml
+
+    - name: "Refresh Linux system info"
+      include_tasks: ../utils/get_linux_system_info.yml
+
+    - name: "Get kernel version after upgrading"
+      ansible.builtin.set_fact:
+        kernel_after_upgrade: "{{ guest_os_ansible_kernel }}"
+
+    - name: "Check kernel is upgraded successfully"
+      ansible.builtin.assert:
+        that:
+          - kernel_after_upgrade is version(kernel_before_upgrade, '>')
+        fail_msg: >-
+          Kernel upgrading failed. Before upgrade, the kernel
+          version is '{{ kernel_before_upgrade }}', after upgrade the kernel
+          version is '{{ kernel_after_upgrade }}'.
+
+    - name: "Check gcc version in ubuntu {{ kernel_after_upgrade }}"
+      ansible.builtin.shell: |
+        gcc_ver=$(cat /proc/version | grep -Po 'gcc-\d+')
+        if ! dpkg-query -W -f='${Status}' "$gcc_ver"  | grep "ok installed"; then apt install -y "$gcc_ver"; fi 
+      register: check_gcc_result
+      delegate_to: "{{ vm_guest_ip }}"
+      when: guest_os_ansible_distribution == "Ubuntu"

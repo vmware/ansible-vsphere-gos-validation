@@ -1,0 +1,41 @@
+# Copyright 2022-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Check the kernel version exists"
+  ansible.builtin.uri:
+    url: "{{ mainline_kernel_url }}/v{{ upgrade_kernel_version }}/amd64"
+    return_content: true
+  register: check_kernel_result
+  ignore_errors: yes
+  when: upgrade_kernel_version is match('[0-9]+.[0-9a-z.-]+')
+
+- name: "Get the latest kernel version"
+  when: >
+    (upgrade_kernel_version | lower == 'latest' or
+     upgrade_kernel_version is not match('[0-9]+.[0-9a-z.-]+') or
+     check_kernel_result.status is undefined or check_kernel_result.status != 200)
+  block:
+    - name: "Get the latest kernel with amd64"
+      ansible.builtin.shell: |
+        versions=`curl -s '{{ mainline_kernel_url }}/?C=N;O=D' | sed 's/>/\\n/g' |grep -Po '(?<=v)[0-9]+.[0-9a-z.-]+'|head -10`
+        for version in $versions; do
+          if wget --spider "{{ mainline_kernel_url }}/v$version/amd64"; then
+            echo "$version"
+            break
+          else
+            continue
+          fi
+        done
+      register: get_kernel_version_result
+    - name: "Check the kernel version result"
+      ansible.builtin.assert:
+        that:
+          - get_kernel_version_result is defined
+          - get_kernel_version_result.stdout_lines is defined
+          - get_kernel_version_result.stdout_lines | length >= 1
+          - get_kernel_version_result.stdout_lines[0] is match('[0-9]+.[0-9a-z.-]+')
+        fail_msg: "Failed to get the latest version: {{ get_kernel_version_result.stderr }}"
+        success_msg: "Get the latest version: get_kernel_version_result.stdout_lines[0]"
+    - name: "Set the kernel version"
+      ansible.builtin.set_fact:
+        upgrade_kernel_version: "{{ get_kernel_version_result.stdout_lines[0] }}"
