@@ -6,7 +6,7 @@
 required_pkgs="open-vm-tools"
 {% if unattend_installer == 'Ubuntu-Ubiquity' %}
 # Ubuntu Desktop required packages
-required_pkgs="$required_pkgs open-vm-tools-desktop build-essential openssh-server vim locales cloud-init rdma-core rdmacm-utils ibverbs-utils"
+required_pkgs="$required_pkgs open-vm-tools-desktop build-essential openssh-server vim locales cloud-init rdma-core rdmacm-utils ibverbs-utils nfs-common curl"
 {% elif unattend_installer == 'Debian' %}
 # Debian required packages
 required_pkgs="$required_pkgs open-vm-tools-desktop cloud-init debconf-utils rdma-core rdmacm-utils ibverbs-utils"

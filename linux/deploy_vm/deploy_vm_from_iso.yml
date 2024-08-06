@@ -42,14 +42,9 @@
 - name: "Prepare for Ubuntu installation"
   when: guest_id is match('ubuntu.*')
   block:
-    - name: "Check upgrade_kernel_version when upgrade_kernel_version is defined"
+    - name: "Check and get upgrade_kernel_version when upgrade_kernel_version is defined"
+      include_tasks: ubuntu/get_mainline_kernel.yml
       when: upgrade_kernel_version is defined and upgrade_kernel_version
-      block:
-        - name: "Set the base url for kernel version check"
-          ansible.builtin.set_fact:
-            mainline_kernel_url: "https://kernel.ubuntu.com/mainline"
-        - name: "Check the kernel version exists"
-          include_tasks: ubuntu/get_mainline_kernel.yml
     - name: "Prepare for Ubuntu installation"
       include_tasks: ubuntu/prepare_ubuntu_iso_install.yml
 
@@ -312,7 +307,7 @@
         wait_service_status: "running"
 
 - name: "Upgrade kernel for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-  include_tasks: upgrade_vm_kernel.yml
+  include_tasks: upgrade_linux_kernel.yml
   when: >
     ((upgrade_kernel_version is defined and upgrade_kernel_version and 
     guest_os_ansible_distribution == "Ubuntu") or

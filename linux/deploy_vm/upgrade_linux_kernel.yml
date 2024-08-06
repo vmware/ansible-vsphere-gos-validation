@@ -23,8 +23,6 @@
 
 - name: "Update mainline kernel to {{ upgrade_kernel_version }} for Ubuntu"
   ansible.builtin.shell: |
-    packages="nfs-common curl"
-    for package in $packages; do dpkg -l | grep -qw $package || apt install -y $package; done
     wget -c -- $(curl -s {{ mainline_kernel_url }}/v{{ upgrade_kernel_version }}/amd64/ | sed 's/"\|>\|</\n/g' | grep deb | uniq | while read line; do echo "{{ mainline_kernel_url }}/v{{ upgrade_kernel_version }}/amd64/${line}";done)
     if [ $? -eq 0 ]; then dpkg -i linux*.deb; rm -rf linux*.deb; fi
     sed -i 's/#WaylandEnable=false/WaylandEnable=false/'  /etc/gdm3/custom.conf
