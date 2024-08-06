@@ -1,0 +1,58 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Mount VMware Tools ISO file to VM CDROM"
+  include_tasks: ../../common/vm_connect_cdrom_to_iso.yml
+  vars:
+    vm_cdrom_iso_file: "{{ vmtools_iso_path }}"
+
+- name: "Get the files in the VMware Tools install ISO mounted path"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-childitem -path D:\\ -name"
+
+- name: "Set fact of the files list"
+  ansible.builtin.set_fact:
+    win_files_vmtools_iso: "{{ win_powershell_cmd_output.stdout_lines | default([]) }}"
+
+- name: "Set fact of VMware Tools setup file"
+  ansible.builtin.set_fact:
+    wintools_setup_exe: |-
+      {%- if guest_os_ansible_architecture == "64-bit" and 'setup64.exe' in win_files_vmtools_iso -%}setup64.exe
+      {%- elif 'setup.exe' in win_files_vmtools_iso -%}setup.exe
+      {%- endif -%}
+
+- name: "Check VMware Tools setup and upgrader exe files exist"
+  ansible.builtin.assert:
+    that:
+      - wintools_setup_exe
+      - "'VMwareToolsUpgrader.exe' in win_files_vmtools_iso"
+      - "'manifest.txt' in win_files_vmtools_iso"
+    fail_msg: >
+      Either VMware Tools installation setup file is not set: '{{ wintools_setup_exe }}',
+      or VMware Tools upgrade program 'VMwareToolsUpgrader.exe',
+      VMware Tools 'manifest.txt' file is not found in guest OS,
+      the listed files in 'D:\' are '{{ win_files_vmtools_iso }}'.
+
+- name: "Get VMware Tools version from manifest.txt file"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Select-String -Path D:\\manifest.txt -Pattern 'monolithic.version'"
+
+- name: "Set fact of VMware Tools version from manifest.txt file"
+  ansible.builtin.set_fact:
+    vmtools_version_manifest: |-
+      {%- if win_powershell_cmd_output.stdout_lines | length != 0 -%}
+      {{ (win_powershell_cmd_output.stdout_lines | select)[0].split('"')[1] }}
+      {%- endif -%}
+
+- name: "Not supported VMware Tools version"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+     skip_msg: >
+       Skip test case '{{ ansible_play_name }}' because VMware Tools version '{{ vmtools_version_manifest }}'
+       does not support this Windows OS bitness '{{ guest_os_ansible_architecture }}'.
+     skip_reason: "Not Supported"
+  when:
+    - guest_os_ansible_architecture == "32-bit"
+    - vmtools_version_manifest is version('12.4.5', '>')

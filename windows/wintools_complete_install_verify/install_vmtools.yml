@@ -1,26 +1,17 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Get the files in the VMware Tools install ISO mounted path"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "Get-childitem -path D:\\ -name"
+- name: "Uninstall VMware Tools firstly when it's installed"
+  include_tasks: ../wintools_uninstall_verify/uninstall_vmtools.yml
+  when:
+    - update_vmtools | bool
+    - vmtools_is_installed
 
-- name: "Set fact of VMware Tools setup file"
-  ansible.builtin.set_fact:
-    wintools_setup_exe: |-
-      {%- if guest_os_ansible_architecture == "64-bit" and 'setup64.exe' in win_powershell_cmd_output.stdout_lines | default([]) -%}setup64.exe
-      {%- elif 'setup.exe' in win_powershell_cmd_output.stdout_lines | default([]) -%}setup.exe
-      {%- else -%}N/A
-      {%- endif -%}
-
-- name: "Check VMware Tools setup and upgrader exe files exist"
-  ansible.builtin.assert:
-    that:
-      - wintools_setup_exe != 'N/A'
-      - "'VMwareToolsUpgrader.exe' in win_powershell_cmd_output.stdout_lines | default([])"
-    fail_msg: "VMware Tools installation setup file '{{ wintools_setup_exe }}' or 'VMwareToolsUpgrader.exe' not found in D:\\"
-    success_msg: "VMware Tools installation setup file '{{ wintools_setup_exe }}' and 'VMwareToolsUpgrader.exe' are in D:\\"
+- name: "Enable test signing"
+  include_tasks: enable_test_signing.yml
+  when:
+    - is_development_tools is defined
+    - is_development_tools | bool
 
 - name: "Set fact of VMware Tools silent install command"
   ansible.builtin.set_fact:
