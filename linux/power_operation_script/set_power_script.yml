@@ -26,11 +26,10 @@
   when: power_script_item.cmds.length > 1
   delegate_to: "{{ vm_guest_ip }}"
 
-# cmds[1]: Add script file content or Set script for testcase
-- name: "Add script file content for testcase {{ power_script_item.name }}"
-  ansible.builtin.shell: "{{ power_script_item.cmds[1] }}"
-  when: power_script_item.cmds.length > 2
-  register: power_script_file
+# cmd[-1]: Set script for testcase
+- name: "Set script file for testcase {{ power_script_item.name }}"
+  ansible.builtin.shell: "{{ power_script_item.cmds[-1] }}"
+  register: power_script_set_result
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Modify the mode of script file"
@@ -38,11 +37,6 @@
     path: "{{ script_file_path }}"
     state: touch
     mode: "777"
-  delegate_to: "{{ vm_guest_ip }}"
-
-- name: "Set script file for testcase {{ power_script_item.name }}"
-  ansible.builtin.shell: "{{ power_script_item.cmds[-1] }}"
-  register: power_script_set_result
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Print the result of set script file"
@@ -70,6 +64,20 @@
 
 - name: "Restart geust OS"
   include_tasks: ../utils/reboot.yml
+  when: power_script_item.name is match('^(poweron|poweroff)')
+
+- name: "Suspended guest of target vm and then resumed"
+  when: power_script_item.name is match('^(suspend|resume)')
+  block:
+    - name: "Suspend the VM"
+      include_tasks: ../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'suspended'
+
+    - name: "Power on VM"
+      include_tasks: ../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: "powered-on"
 
 - name: "Get content of file tools.conf"
   ansible.builtin.shell: "cat /etc/vmware-tools/tools.conf"
@@ -88,4 +96,3 @@
   ansible.builtin.debug:
     msg:
       - "End of testcase {{ power_script_item.name }}"
-
