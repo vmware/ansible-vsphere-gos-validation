@@ -26,8 +26,8 @@
 #        For example, 'failure_msg' is "Operation was not performed because there are
 #        no applicable updates (WU_E_NOT_APPLICABLE 0x80240017)".
 #     Other cases, it will be set to 'false'.
-#   win_online_updates_installed: If set to 'true', there are Windows online updates
-#     installed in guest OS, or it will be 'false'.
+#   win_online_updates_installed: If set to 'true', there are at least one Windows online
+#    updates installed in guest OS, or it will be 'false'.
 #
 - name: "Set fact and initialize Windows online updates install parameters"
   ansible.builtin.set_fact:
@@ -96,14 +96,20 @@
         - name: "Set fact of failure messages of not installed updates"
           ansible.builtin.set_fact:
             win_updates_failure_msgs: "{{ win_updates_not_installed | map(attribute='failure_msg') }}"
+        - name: "Set fact of the lengths of failure messages and not installed updates lists"
+          ansible.builtin.set_fact:
+            win_updates_failure_msgs_len: "{{ win_updates_failure_msgs | length }}"
+            win_updates_not_installed_len: "{{ win_updates_not_installed | length }}"
 
-        - name: "No failure message for update"
+        - name: "No failure messages for not installed updates"
           ansible.builtin.debug:
-            msg: "No 'failure_msg' info for not installed updates, so will not ignore these not installed updates."
-          when: win_updates_failure_msgs | length != win_updates_not_installed | length
+            msg: >-
+              {{ win_updates_not_installed_len - win_updates_failure_msgs_len }} updates
+              are not installed and without failure messages, which can not be ignored.
+          when: win_updates_failure_msgs_len != win_updates_not_installed_len
 
         - name: "Get failure messages for all not installed updates"
-          when: win_updates_failure_msgs | length == win_updates_not_installed | length
+          when: win_updates_failure_msgs_len == win_updates_not_installed_len
           block:
             - name: "Set fact of failure messages can not be ignored"
               ansible.builtin.set_fact:
