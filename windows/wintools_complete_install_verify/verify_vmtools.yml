@@ -56,9 +56,16 @@
     win_vmtoolsd_username_list: ["NT AUTHORITY\\SYSTEM", "{{ guest_os_hostname }}\\{{ vm_username }}"]
 
 - name: "Get usernames of VMware Tools processes in guest OS"
-  include_tasks: ../utils/win_execute_cmd.yml
+  include_tasks:
+    file: ../utils/win_execute_cmd.yml
+    apply:
+      when: >
+        (win_powershell_cmd_output.stdout_lines is undefined) or
+        (win_powershell_cmd_output.stdout_lines | length != 2) or
+        (win_powershell_cmd_output.stdout_lines | sort != win_vmtoolsd_username_list | sort)
   vars:
     win_powershell_cmd: "(Get-Process vmtoolsd -IncludeUserName).UserName"
+  with_list: "{{ range(1, 11) | list }}"
 
 - name: "Check usernames of VMware Tools processes"
   ansible.builtin.assert:
