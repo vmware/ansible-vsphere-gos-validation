@@ -14,8 +14,10 @@
   include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: >-
+      $os_version_reg = "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Update\\TargetingInfo\\Installed";
+      if (Test-Path $os_version_reg) {
       (Get-ChildItem -Path
-      "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Update\\TargetingInfo\\Installed\\*.OS.*").Name
+      "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Update\\TargetingInfo\\Installed\\*.OS.*").Name }
     win_execute_cmd_ignore_error: true
 
 - name: "Set fact of registry key path for getting OS version"
@@ -34,7 +36,7 @@
       include_tasks: win_execute_cmd.yml
       vars:
         win_powershell_cmd: >-
-          Get-ItemPropertyValue -Path "{{ win_os_version_reg_path }}" -Name Version
+          (Get-ItemProperty -Path "{{ win_os_version_reg_path }}").Version
         win_execute_cmd_ignore_error: true
     - name: "Set fact of Windows OS version"
       ansible.builtin.set_fact:
@@ -52,10 +54,15 @@
       include_tasks: win_execute_cmd.yml
       vars:
         win_powershell_cmd: >-
-          $majorver = Get-ItemPropertyValue -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion" -Name CurrentMajorVersionNumber;
-          $minorver = Get-ItemPropertyValue -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion" -Name CurrentMinorVersionNumber;
-          $buildnum = (Get-ItemPropertyValue -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion" -Name BuildLabEx) -match "\d{5}\.\d{4}";
-          Write-Host($majorver, $minorver, $matches[0] -join '.')
+          $os_version = Get-ItemProperty -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion";
+          $majorver = $os_version.CurrentMajorVersionNumber;
+          $minorver = $os_version.CurrentMinorVersionNumber;
+          $currentver = $os_version.CurrentVersion;
+          $buildnum = ($os_version.BuildLabEx) -match "\d{5}\.\d{4}";
+          if ($majorver and $minorver) {
+            Write-Host($majorver, $minorver, $matches[0] -join '.')
+          } elseif ($currentver) {
+            Write-Host($currentver, $matches[0] -join '.') }
         win_execute_cmd_ignore_error: true
     - name: "Set fact of Windows OS version"
       ansible.builtin.set_fact:
