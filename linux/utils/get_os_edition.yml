@@ -11,6 +11,7 @@
     guest_os_edition: ""
 
 - name: "Get Ubuntu edition"
+  when: guest_os_ansible_distribution == "Ubuntu"
   block:
     - name: "Get installed packages on {{ guest_os_ansible_distribution }}"
       include_tasks: get_installed_packages.yml
@@ -19,13 +20,13 @@
       ansible.builtin.set_fact:
         guest_os_edition: |-
           {%- if 'linux-image-virtual' in guest_installed_packages -%}CloudImage
-          {%- elif 'ubuntu-server' in guest_installed_packages -%}Server
-          {%- elif 'ubuntu-desktop' in guest_installed_packages -%}Desktop
-          {%- else -%}{%- endif -%}
+          {%- elif guest_installed_packages | select('search', 'ubuntu-server') | length > 0 -%}Server
+          {%- elif guest_installed_packages | select('search', 'ubuntu-desktop') | length > 0 -%}Desktop
+          {%- endif -%}
       when: guest_installed_packages | length > 0
-  when: guest_os_ansible_distribution == "Ubuntu"
 
 - name: "Get Pardus edition"
+  when: guest_os_ansible_distribution is match("Pardus.*")
   block:
     - name: "Get display manager on {{ guest_os_ansible_distribution }}"
       include_tasks: check_guest_os_gui.yml
@@ -38,7 +39,6 @@
           {%- elif guest_os_display_manager == 'gdm' -%}GNOME
           {%- else -%}Server
           {%- endif -%}
-  when: guest_os_ansible_distribution is match("Pardus.*")
 
 - name: "Get Fedora Edition"
   ansible.builtin.set_fact:
