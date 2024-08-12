@@ -5,6 +5,21 @@
 - name: "Update VM guest info after installing VMware Tools"
   include_tasks: ../../common/vm_get_guest_info.yml
 
+# Check user logon
+- name: "Query user in guest OS"
+  ansible.windows.win_shell: "query user {{ vm_username }}"
+  register: query_user_result
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_unreachable: true
+  retries: 5
+  delay: 3
+  until:
+    - query_user_result.stdout_lines is defined
+    - query_user_result.stdout_lines | length != 0
+- name: "Display query user result"
+  ansible.builtin.debug: var=query_user_result
+
 # Get VMware Tools version
 - name: "Get VMware Tools version and build number"
   include_tasks: ../utils/win_get_vmtools_version_build.yml
