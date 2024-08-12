@@ -44,15 +44,28 @@
     skip_reason: "Not Applicable"
   when:
     - not win_check_is_updated
+    - win_online_updates_succeed
     - not win_online_updates_installed
 
-# Fail test case when no update installed while expect guest OS to be updated
-- name: "No Windows updates installed in guest OS"
+# Fail test case when not all updates installed and not expect guest OS to be updated
+- name: "Not all Windows updates installed in guest OS"
+  ansible.builtin.fail:
+    msg: >-
+      Test case failed due to not all Windows updates installed, while parameter 'windows_updated_build_num'
+      '{{ windows_updated_build_num | default('') }}' is not set to the build number
+      newer than the current build '{{ win_os_build_before_update }}', please check the
+      failure messages of not installed updates.
+  when:
+    - not win_check_is_updated
+    - not win_online_updates_succeed
+
+# Fail test case when no or not all updates installed while expect guest OS to be updated
+- name: "No or not all Windows updates installed in guest OS"
   ansible.builtin.fail:
     msg: >-
       Before installing Windows updates, guest OS build number is '{{ win_os_build_before_update }}',
       configured expected build number is '{{ windows_updated_build_num }}', while after trying to
-      install Windows updates in guest OS, no update installed.
+      install Windows updates in guest OS, no update or not all updates installed.
   when:
     - win_check_is_updated
-    - not win_online_updates_installed
+    - not win_online_updates_installed or not win_online_updates_succeed
