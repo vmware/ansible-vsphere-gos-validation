@@ -24,45 +24,65 @@
           ansible.builtin.set_fact:
             power_operation_list:
               - name: poweronDefaultScript
-                setup: vmware-toolbox-cmd script shutdown disable
-                file_path: /etc/vmware-tools/poweron-vm-default
+                file_path: /etc/vmware-tools/poweron-vm-defaul
+                setup: 
+                  - vmware-toolbox-cmd script shutdown disable
                 cmds:
                   - vmware-toolbox-cmd script power enable
-                check: vmware-toolbox-cmd script power current
+                check: 
+                  - vmware-toolbox-cmd script power current
               - name: poweroffDefaultScript
-                setup: vmware-toolbox-cmd script power disable
                 file_path: /etc/vmware-tools/poweroff-vm-default
+                setup: 
+                  - vmware-toolbox-cmd script power disable
                 cmds:
                   - vmware-toolbox-cmd script shutdown enable
-                check: vmware-toolbox-cmd script shutdown current
+                check: 
+                  - vmware-toolbox-cmd script shutdown current
               - name: poweronCustomeScript
-                setup: vmware-toolbox-cmd script shutdown disable
                 file_path: /tmp/poweron-vm-custom
+                setup: 
+                  - vmware-toolbox-cmd script shutdown disable
+                  - rm -rf /tmp/poweron.tag && rm -rf /tmp/poweron-vm-custom
                 cmds:
                   - echo 'touch /tmp/poweron.tag' >> /tmp/poweron-vm-custom
                   - vmware-toolbox-cmd script power set /tmp/poweron-vm-custom
-                check: vmware-toolbox-cmd script power current
+                check: 
+                  - vmware-toolbox-cmd script power current
+                  - ls /tmp/poweron.tag
               - name: poweroffCustomeScript
-                setup: vmware-toolbox-cmd script power disable
                 file_path: /tmp/poweroff-vm-custom
+                setup: 
+                  - vmware-toolbox-cmd script power disable
+                  - rm -rf /tmp/poweroff.tag && rm -rf /tmp/poweroff-vm-custom
                 cmds:
                   - echo 'touch /tmp/poweroff.tag' >> /tmp/poweroff-vm-custom
                   - vmware-toolbox-cmd script shutdown set /tmp/poweroff-vm-custom
-                check: vmware-toolbox-cmd script shutdown current
+                check: 
+                  - vmware-toolbox-cmd script shutdown current
+                  - ls /tmp/poweroff.tag
               - name: suspendCustomeScript
-                setup: vmware-toolbox-cmd script resume disable
                 file_path: /tmp/suspend-vm-custom
+                setup: 
+                  - vmware-toolbox-cmd script resume disable
+                  - rm -rf /tmp/suspend.tag && rm -rf /tmp/suspend-vm-custom
                 cmds:
                   - echo 'touch /tmp/suspend.tag' >> /tmp/suspend-vm-custom
                   - vmware-toolbox-cmd script suspend set /tmp/suspend-vm-custom
-                check: vmware-toolbox-cmd script suspend current
+                check: 
+                  - vmware-toolbox-cmd script suspend current
+                  - ls /tmp/suspend.tag
               - name: resumeCustomeScript
-                setup: vmware-toolbox-cmd script suspend disable
                 file_path: /tmp/resume-vm-custom
+                setup: 
+                  - vmware-toolbox-cmd script suspend disable
+                  - rm -rf /tmp/resume.tag && rm -rf /tmp/resume-vm-custom
                 cmds:
                   - echo 'touch /tmp/resume.tag' >> /tmp/resume-vm-custom
                   - vmware-toolbox-cmd script resume set /tmp/resume-vm-custom
-                check: vmware-toolbox-cmd script resume current
+                check: 
+                  - vmware-toolbox-cmd script resume current
+                  - ls /tmp/resume.tag
 
         - name: "Test power script"
           include_tasks: set_power_script.yml

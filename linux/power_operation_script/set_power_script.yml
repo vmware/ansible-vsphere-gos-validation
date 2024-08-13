@@ -12,10 +12,18 @@
       - "Start testcase {{ power_script_item.name }}"
 
 - name: "Setup for testcase {{ power_script_item.name }}"
-  ansible.builtin.shell: "{{ power_script_item.setup }}"
   when: power_script_item.setup
-  register: power_script_setup_result
-  delegate_to: "{{ vm_guest_ip }}"
+  block:
+    - name: "Clean the configuration for testcase {{ power_script_item.name }}"
+      ansible.builtin.shell: "{{ power_script_item.setup[0] }}"
+      register: power_script_setup_result
+      delegate_to: "{{ vm_guest_ip }}"
+    
+    - name: "Clean the existing script files for testcase {{ power_script_item.name }}"
+      ansible.builtin.shell: "{{ power_script_item.setup[1] }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      when: power_script_item.setup | length > 1
 
 - name: "Print the result of setup"
   ansible.builtin.debug: var=power_script_setup_result
@@ -44,7 +52,7 @@
 
 # Check the current configuration
 - name: "Check the current configuration for testcase {{ power_script_item.name }}"
-  ansible.builtin.shell: "{{ power_script_item.check }}"
+  ansible.builtin.shell: "{{ power_script_item.check[0] }}"
   register: power_script_result
   delegate_to: "{{ vm_guest_ip }}"
 
@@ -94,6 +102,11 @@
       - tools_conf_content_result.stdout is match(script_file_path.split('/')[-1].strip())
     fail_msg: "Not found the {{ script_file_path }} in tool.conf for {{ power_script_item.name }}, which is not as expected"
     success_msg: "Found the {{ script_file_path }} in tool.conf for {{ power_script_item.name }}, which is as expected."
+
+- name: "Check the script running"
+  ansible.builtin.shell: "{{ power_script_item.check[1] }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  when: power_script_item.check | length > 1
 
 - name: "End of testcase {{ power_script_item.name }}"
   ansible.builtin.debug:
