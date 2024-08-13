@@ -92,7 +92,7 @@
   register: tools_conf_content_result
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Set fact of power script filename"
+- name: "Set fact of power script config in tools.conf"
   ansible.builtin.set_fact:
     power_script_filename: "{{ script_file_path.split('/')[-1].strip() }}"
 
@@ -100,7 +100,7 @@
   ansible.builtin.assert:
     that:
       - tools_conf_content_result.stdout is defined
-      - tools_conf_content_result.stdout is match('.*' + power_script_filename)
+      - tools_conf_content_result.stdout.find(power_script_filename) != -1
     fail_msg: "Not found the {{ script_file_path }} in tool.conf for {{ power_script_item.name }}, which is not as expected"
     success_msg: "Found the {{ script_file_path }} in tool.conf for {{ power_script_item.name }}, which is as expected."
 
