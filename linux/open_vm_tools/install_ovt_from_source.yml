@@ -11,14 +11,11 @@
     ovt_check_config_file_tmpl: "{{ guest_os_ansible_system }}_ovt_check_config.tmpl"
     ovt_check_config_file_path: "{{ current_test_log_folder }}/ovt_check_config.yml"
 
-- name: "Create config files for installing open-vm-tools from source"
+- name: "Create build config file for installing open-vm-tools from source"
   ansible.builtin.template:
-    src: "templates/{{ item[0] }}"
-    dest: "{{ item[1] }}"
+    src: "templates/{{ ovt_build_config_file_tmpl }}"
+    dest: "{{ ovt_build_config_file_path }}"
     mode: "0755"
-  with_list:
-    - ["{{ ovt_build_config_file_tmpl }}", "{{ ovt_build_config_file_path }}"]
-    - ["{{ ovt_check_config_file_tmpl }}", "{{ ovt_check_config_file_path }}"]
 
 - name: "Set facts of dependencies and configure options to install open-vm-tools from source"
   ansible.builtin.set_fact:
@@ -121,6 +118,12 @@
   until: ovt_install_job_result.finished
   retries: 60
   delay: 10
+
+- name: "Create check config file after installing open-vm-tools from source"
+  ansible.builtin.template:
+    src: "templates/{{ ovt_check_config_file_tmpl }}"
+    dest: "{{ ovt_check_config_file_path }}"
+    mode: "0755"
 
 - name: "Set facts of open-vm-tools files and plugins should be installed from source"
   ansible.builtin.set_fact:
