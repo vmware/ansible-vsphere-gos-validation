@@ -70,9 +70,25 @@
   ansible.builtin.pause:
     seconds: 15
 
-- name: "Restart geust OS"
+- name: "Restart guest OS"
   include_tasks: ../utils/reboot.yml
-  when: power_script_item.name is match('^(poweron|poweroff)')
+  when: power_script_item.name is match('^poweron')
+
+- name: "Poweroff and then powerOn guest OS"
+  when: power_script_item.name is match('^poweroff')
+  block:
+    - name: "Power on VM"
+      include_tasks: ../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: "powered-off"
+
+    - name: "Power on VM"
+      include_tasks: ../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: "powered-on"
+
+    - name: "Update inventory"
+      include_tasks: ../../common/update_inventory.yml
 
 - name: "Suspended guest of target vm and then resumed"
   when: power_script_item.name is match('^(suspend|resume)')
@@ -86,6 +102,9 @@
       include_tasks: ../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: "powered-on"
+    
+    - name: "Update inventory"
+      include_tasks: ../../common/update_inventory.yml
 
 - name: "Get content of file tools.conf"
   ansible.builtin.shell: "cat /etc/vmware-tools/tools.conf"
