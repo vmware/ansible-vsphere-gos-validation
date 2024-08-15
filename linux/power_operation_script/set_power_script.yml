@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is used for check the scripts run in response to power operations
+#   Set and check soft power operation
 # # Parameters:
-#   power_script_item: dict of the power script
+#   power_script_item: item of dict including env setup, set and check soft power operation
+#   script_file_path: script file path
 # 
 - name: "Start testcase {{ power_script_item.name }}"
   ansible.builtin.debug:
@@ -66,10 +67,6 @@
     fail_msg: "The configuration for {{ power_script_item.name }} is {{ power_script_result.stdout }}, not as expected {{ script_file_path }}."
     success_msg: "The configuration for {{ power_script_item.name }} is {{ power_script_result.stdout }}, which is as expected."
 
-# - name: "Sleep 10s for configuration to take affect"
-#   ansible.builtin.pause:
-#     seconds: 10
-
 # Won't works with untils/reboot.yml for poweroff event
 - name: "Shutdown and then powerOn guest OS"
   when: power_script_item.name is match('^(poweroff|poweron)')
@@ -121,7 +118,7 @@
     fail_msg: "Not found the {{ script_file_path }} in tool.conf for {{ power_script_item.name }}, which is not as expected"
     success_msg: "Found the {{ script_file_path }} in tool.conf for {{ power_script_item.name }}, which is as expected."
 
-- name: "Check the script running"
+- name: "Check the script running as expected"
   ansible.builtin.shell: "{{ power_script_item.check[1] }}"
   delegate_to: "{{ vm_guest_ip }}"
   when: power_script_item.check | length > 1
