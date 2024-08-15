@@ -1,32 +1,41 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get VMware tools related services in Windows guest OS
+# Get VMware Tools installed services in Windows guest OS
+# Parameters:
+#   win_get_vmtools_service_retries: the retry time to get services list,
+#     default value is 1.
+#   win_get_vmtools_service_expect: the expected services list to get,
+#     default value is [].
 # Return:
-#   vmtools_service_dict: service and service status dict
+#   vmtools_service_dict: VMware Tools services and service status dict.
 #
-- name: Initialize the service and service status result
+- name: "Initialize VMware Tools services and status result"
   ansible.builtin.set_fact:
-    vmtools_service_list: []
     vmtools_service_dict: {}
 
-# Get VMware tools installed service list in Windows guest OS
-- include_tasks: win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "get-service | where-object {$_.displayname -match 'VMware'} | select Name, Status | ft -hide"
+- name: "Retry to get VMware Tools services and status"
+  ansible.windows.win_shell: "Get-Service | where-object {$_.displayname -match 'VMware'} | select Name, Status | ft -hide"
+  register: get_vmtools_ser_result
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_unreachable: true
+  retries: "{{ win_get_vmtools_service_retries | default(1) }}"
+  delay: 5
+  until:
+    - get_vmtools_ser_result.stdout is defined
+    - get_vmtools_ser_result.stdout
+    - (win_get_vmtools_service_expect | default([]) | reject('in', get_vmtools_ser_result.stdout)) | length == 0
 
-- name: Set fact of service list
-  ansible.builtin.set_fact:
-    vmtools_service_list: "{{ win_powershell_cmd_output.stdout_lines }}"
+- name: "Got VMware Tools services list"
+  block:
+    - name: "Set fact of VMware Tools services and status dict"
+      ansible.builtin.set_fact:
+        vmtools_service_dict: "{{ vmtools_service_dict | combine({item.split()[0]: item.split()[1]}) }}"
+      with_items: "{{ get_vmtools_ser_result.stdout_lines | select }}"
   when:
-    - win_powershell_cmd_output is defined
-    - win_powershell_cmd_output.stdout_lines is defined
-    - win_powershell_cmd_output.stdout_lines | length != 0
+    - get_vmtools_ser_result.stdout_lines is defined
+    - get_vmtools_ser_result.stdout_lines | length != 0
 
-- name: Set fact of the service and service status dict
-  ansible.builtin.set_fact:
-    vmtools_service_dict: "{{ vmtools_service_dict | combine({item.split()[0]: item.split()[1]}) }}"
-  when: item
-  with_items: "{{ vmtools_service_list }}"
-- ansible.builtin.debug:
-    msg: "Get VMware tools installed service dict: {{ vmtools_service_dict | to_yaml }}"
+- name: "Display VMware Tools services and status"
+  ansible.builtin.debug: var=vmtools_service_dict

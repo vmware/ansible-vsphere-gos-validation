@@ -1,60 +1,33 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+- name: "Set fact of expected VMware Tools services and process usernames list"
+  ansible.builtin.set_fact:
+    win_tools_services: ['VGAuthService', 'VMTools', 'vmvss']
+    win_vmtoolsd_username_list: ["NT AUTHORITY\\SYSTEM", "{{ guest_os_hostname }}\\{{ vm_username }}"]
+
 # Refresh VM guest info
 - name: "Update VM guest info after installing VMware Tools"
   include_tasks: ../../common/vm_get_guest_info.yml
-
-# Check user logon
-- name: "Query user in guest OS"
-  ansible.windows.win_shell: "query user {{ vm_username }}"
-  register: query_user_result
-  ignore_errors: true
-  delegate_to: "{{ vm_guest_ip }}"
-  ignore_unreachable: true
-  retries: 5
-  delay: 3
-  until:
-    - query_user_result.stdout_lines is defined
-    - query_user_result.stdout_lines | length != 0
-- name: "Display query user result"
-  ansible.builtin.debug: var=query_user_result
 
 # Get VMware Tools version
 - name: "Get VMware Tools version and build number"
   include_tasks: ../utils/win_get_vmtools_version_build.yml
 
-# Get VMware Tools services
-- name: "Set fact of VMware Tools services list"
-  ansible.builtin.set_fact:
-    win_tools_services: ['VGAuthService', 'VMTools', 'vmvss']
-
-- name: "Get 'VMTools' service status"
-  include_tasks: ../utils/win_get_service_status.yml
-  vars:
-    win_service_name: "VMTools"
-
-- name: "Verify 'VMTools' service status is running"
-  ansible.builtin.assert:
-    that:
-      - service_status == "Running"
-    fail_msg: "VMTools service status: {{ service_status }}, which is not 'Running'."
-    success_msg: "VMTools service status is 'Running'."
-
 - name: "Get VMware Tools services list"
   include_tasks: ../utils/win_get_vmtools_service_list.yml
-
-# Not all services are running, e.g., vmvss
-- name: "Display VMware Tools services status"
-  ansible.builtin.debug:
-    msg: "Service '{{ item.key }}' status is: {{ item.value }}"
-  with_dict: "{{ vmtools_service_dict }}"
+  vars:
+    win_get_vmtools_service_retries: 6
+    win_get_vmtools_service_expect: "{{ win_tools_services }}"
 
 - name: "Check VMware Tools services"
   ansible.builtin.assert:
     that:
       - win_tools_services_missing == []
-    fail_msg: "Check VMware Tools services '{{ win_tools_services }}' in guest OS, not find services '{{ win_tools_services_missing }}' after VMware Tools install."
+      - vmtools_service_dict['VMTools'] == "Running"
+    fail_msg: >
+      Services '{{ win_tools_services_missing }}' are not found, or 'VMTools' service
+      is not 'Running': {{ vmtools_service_dict['VMTools'] }} after VMware Tools install.
   vars:
     win_tools_services_missing: "{{ win_tools_services | difference(vmtools_service_dict.keys() | default([])) }}"
   when:
@@ -64,11 +37,6 @@
 # Get VMware drivers
 - name: "Get VMware drivers list"
   include_tasks: ../utils/win_get_vmtools_driver_list.yml
-
-# Get VMware Tools processes
-- name: "Set fact of expected usernames of VMware Tools processes"
-  ansible.builtin.set_fact:
-    win_vmtoolsd_username_list: ["NT AUTHORITY\\SYSTEM", "{{ guest_os_hostname }}\\{{ vm_username }}"]
 
 - name: "Get usernames of VMware Tools processes in guest OS"
   include_tasks: ../utils/win_execute_cmd.yml

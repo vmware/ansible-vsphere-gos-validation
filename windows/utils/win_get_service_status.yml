@@ -7,17 +7,19 @@
 # Return:
 #   service_status: the service status
 #
-- name: Check required parameter
+- name: "Check required parameter"
   ansible.builtin.fail:
     msg: "win_service_name must be defined before get service status"
   when: win_service_name is undefined or not win_service_name
 
-- include_tasks: win_execute_cmd.yml
+- name: "Get service status"
+  include_tasks: win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "get-service -Name {{ win_service_name }} | foreach {$_.Status}"
+    win_powershell_cmd: "Get-Service -Name {{ win_service_name }} | foreach {$_.Status}"
 
-- name: Set fact of the service status
+- name: "Set fact of the service status"
   ansible.builtin.set_fact:
     service_status: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
-- ansible.builtin.debug:
-    msg: "Get service '{{ win_service_name }}' status: {{ service_status }}"
+
+- name: "Display service status"
+  ansible.builtin.debug: var=service_status
