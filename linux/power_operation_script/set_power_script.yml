@@ -66,18 +66,15 @@
     fail_msg: "The configuration for {{ power_script_item.name }} is {{ power_script_result.stdout }}, not as expected {{ script_file_path }}."
     success_msg: "The configuration for {{ power_script_item.name }} is {{ power_script_result.stdout }}, which is as expected."
 
-- name: "Sleep 15s for configuration to take affect"
-  ansible.builtin.pause:
-    seconds: 15
+# - name: "Sleep 10s for configuration to take affect"
+#   ansible.builtin.pause:
+#     seconds: 10
 
-- name: "Restart guest OS"
-  include_tasks: ../utils/reboot.yml
-  when: power_script_item.name is match('^poweron')
-
-- name: "Poweroff and then powerOn guest OS"
-  when: power_script_item.name is match('^poweroff')
+# Won't works with untils/reboot.yml for poweroff event
+- name: "Shutdown and then powerOn guest OS"
+  when: power_script_item.name is match('^(poweroff|poweron)')
   block:
-    - name: "Power on VM"
+    - name: "Shutdown VM"
       include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: "shutdown-guest"
