@@ -7,6 +7,10 @@
 # Return:
 #   service_status: the service status
 #
+- name: "Initialize the service status"
+  ansible.builtin.set_fact:
+    service_status: ''
+
 - name: "Check required parameter"
   ansible.builtin.fail:
     msg: "win_service_name must be defined before get service status"
@@ -20,6 +24,9 @@
 - name: "Set fact of the service status"
   ansible.builtin.set_fact:
     service_status: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length == 1
 
 - name: "Display service status"
   ansible.builtin.debug: var=service_status

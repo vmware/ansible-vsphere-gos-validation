@@ -3,7 +3,12 @@
 ---
 - name: "Set fact of expected VMware Tools services and process usernames list"
   ansible.builtin.set_fact:
-    win_tools_services: ['VGAuthService', 'VMTools', 'vmvss']
+    win_tools_services: |-
+      {%- if vmtools_version is defined and vmtools_version is version('10.3.0', '>=') -%}
+      ['VGAuthService', 'VMTools', 'vmvss']
+      {%- else -%}
+      ['VMTools']
+      {% endif %}
     win_vmtoolsd_username_list: ["NT AUTHORITY\\SYSTEM", "{{ guest_os_hostname }}\\{{ vm_username }}"]
 
 # Refresh VM guest info
@@ -20,19 +25,11 @@
     win_get_vmtools_service_retries: 6
     win_get_vmtools_service_expect: "{{ win_tools_services }}"
 
-- name: "Check VMware Tools services"
+- name: "Check VMware Tools service is running"
   ansible.builtin.assert:
     that:
-      - win_tools_services_missing == []
       - vmtools_service_dict['VMTools'] == "Running"
-    fail_msg: >
-      Services '{{ win_tools_services_missing }}' are not found, or 'VMTools' service
-      is not 'Running': {{ vmtools_service_dict['VMTools'] }} after VMware Tools install.
-  vars:
-    win_tools_services_missing: "{{ win_tools_services | difference(vmtools_service_dict.keys() | default([])) }}"
-  when:
-    - vmtools_version is defined
-    - vmtools_version is version('10.3.0', '>=')
+    fail_msg: "'VMTools' service is not 'Running' after VMware Tools install: {{ vmtools_service_dict['VMTools'] }}"
 
 # Get VMware drivers
 - name: "Get VMware drivers list"
