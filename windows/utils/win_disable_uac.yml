@@ -1,0 +1,50 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Disable the User Account Control (UAC) in Windows guest OS,
+# restarting guest OS is required.
+# Return:
+#   win_uac_disable_set: if set to 'true', UAC registry value is set to '0',
+#     and restarting guest OS is required, if set to 'false', then the UAC
+#     registry value is as expected, no need to set it and restart guest OS.
+#
+- name: "Set fact of the registry path for UAC"
+  ansible.builtin.set_fact:
+    win_uac_disable_set: false
+    win_uac_reg_path: "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
+
+- name: "Get UAC registry current value"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: |-
+      if (Test-Path '{{ win_uac_reg_path }}') {
+        (Get-ItemProperty {{ win_uac_reg_path }}).EnableLUA
+      } else {
+        Write-Host 1
+      }
+    win_execute_cmd_ignore_error: true
+
+- name: "Set fact of the result of getting UAC registry value"
+  ansible.builtin.set_fact:
+    win_uac_reg_result: "{{ win_powershell_cmd_output }}"
+
+- name: "UAC registry value is not expected"
+  when: >
+    not (win_uac_reg_result.stdout_lines is defined and
+    win_uac_reg_result.stdout_lines | length == 1 and
+    win_uac_reg_result.stdout_lines[0] | int == 0)
+  block:
+    - name: "Disable UAC in guest OS"
+      include_tasks: win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "New-ItemProperty -Path {{ win_uac_reg_path }} -Name EnableLUA -PropertyType DWord -Value 0 -Force"
+    - name: "Set fact of require restarting guest OS"
+      ansible.builtin.set_fact:
+        win_uac_disable_set: true
+
+- name: "Print this task result"
+  ansible.builtin.debug:
+    msg: >
+      {%- if win_uac_disable_set -%}"Disable UAC by setting registry value to '0', please restart guest OS."
+      {%- else -%}"UAC registry value is already set to '0', not execute disable operation in guest OS."
+      {%- endif -%}
