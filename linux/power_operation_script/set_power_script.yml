@@ -4,42 +4,51 @@
 # Description:
 #   Set and check soft power operation
 # # Parameters:
-#   power_script_item: item of dict including env setup, set and check soft power operation
-#   script_file_path: script file path
-# 
-- name: "Start testcase {{ power_script_item.name }}"
+#   power_script_ops: power script operation which reprent the testcase
+
+- name: "Start testcase {{ power_script_ops }}"
   ansible.builtin.debug:
     msg:
-      - "Start testcase {{ power_script_item.name }}"
+      - "Start testcase {{ power_script_ops }}"
 
-- name: "Setup for testcase {{ power_script_item.name }}"
-  when: power_script_item.setup
+- name: "Set fact of power operation"
+  ansible.builtin.set_fact:
+    power_ops: "{{ power_script_ops.split('_')[0] }}"
+    power_script_type: "{{ power_script_ops.split('_')[1] }}"
+    script_file_path: |-
+      {%- if power_script_type == 'default' -%}/etc/vmware-tools/{{ power_ops }}-vm-{{ power_script_type }}
+      {%- else -%}/var/{{ power_ops }}-vm-{{ power_script_type }}
+      {%- endif -%}
+    power_cmd_ops_type: |-
+      {%- if power_ops == 'poweron' -%}power
+      {%- elif power_ops == 'poweroff' -%}shutdown
+      {%- else -%}{{ power_ops }}
+      {%- endif %}
+
+# When check power on script, we need to disable shutdown script firstly
+# When check shutdown script, we need to disable poweron script firstly
+# When check suspend script, we need to disable resume script firstly
+# When check resume script, we need to disable suspend script firstly
+- name: "Setup for testcase {{ power_script_ops }}"
   block:
-    - name: "Clean the configuration for testcase {{ power_script_item.name }}"
-      ansible.builtin.shell: "{{ power_script_item.setup[0] }}"
-      register: power_script_setup_result
+    - name: "Clean the configuration for testcase {{ power_script_ops }}"
+      ansible.builtin.shell: |-
+        {%- if power_ops == 'poweron' -%}vmware-toolbox-cmd script shutdown disable
+        {%- elif power_ops == 'poweroff' -%}vmware-toolbox-cmd script power disable
+        {%- else -%}vmware-toolbox-cmd script {{ power_ops }} disable
+        {%- endif %}
       delegate_to: "{{ vm_guest_ip }}"
     
-    - name: "Clean the existing script files for testcase {{ power_script_item.name }}"
-      ansible.builtin.shell: "{{ power_script_item.setup[1] }}"
+    - name: "Clean the existing script files for testcase {{ power_script_ops }}"
+      ansible.builtin.shell: "rm -rf /var/{{ power_ops }}.tag && rm -rf /var/{{ power_ops }}-vm-{{ power_script_type }}"
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: true
-      when: power_script_item.setup | length > 1
+      when: power_script_type == "custom"
 
-- name: "Print the result of setup"
-  ansible.builtin.debug: var=power_script_setup_result
-
-# cmds[0]: Create script or Set script for testcase
-- name: "Create script file for testcase {{ power_script_item.name }}"
-  ansible.builtin.shell: "{{ power_script_item.cmds[0] }}"
-  when: power_script_item.cmds | length > 1
+- name: "Create script file for testcase {{ power_script_ops }}"
+  ansible.builtin.shell: "echo 'touch /var/{{ power_ops }}.tag' >> /var/{{ power_ops }}-vm-custom"
   delegate_to: "{{ vm_guest_ip }}"
-
-# cmd[-1]: Set script for testcase
-- name: "Set script file for testcase {{ power_script_item.name }}"
-  ansible.builtin.shell: "{{ power_script_item.cmds[-1] }}"
-  register: power_script_set_result
-  delegate_to: "{{ vm_guest_ip }}"
+  when: power_script_type == "custom"
 
 - name: "Modify the mode of script file"
   ansible.builtin.file:
@@ -48,28 +57,31 @@
     mode: "777"
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Print the result of set script file"
-  ansible.builtin.debug: var=power_script_set_result
+- name: "Set script file for testcase {{ power_script_ops }}"
+  ansible.builtin.shell: |-
+      {%- if power_script_type == 'custom' -%}vmware-toolbox-cmd script power set {{ script_file_path }}
+      {%- else -%}vmware-toolbox-cmd script {{ power_cmd_ops_type }} enable
+      {%- endif -%}
+  delegate_to: "{{ vm_guest_ip }}"
 
-# Check the current configuration
-- name: "Check the current configuration for testcase {{ power_script_item.name }}"
-  ansible.builtin.shell: "{{ power_script_item.check[0] }}"
+- name: "Check the current configuration for testcase {{ power_script_ops }}"
+  ansible.builtin.shell: vmware-toolbox-cmd script {{ power_cmd_ops_type }} current
   register: power_script_result
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Print the current configuration for testcase {{ power_script_item.name }}"
+- name: "Print the current configuration for testcase {{ power_script_ops }}"
   ansible.builtin.debug: var=power_script_result.stdout
 
 - name: "Check current configuration is expected"
   ansible.builtin.assert:
     that:
       - power_script_result.stdout.strip() == script_file_path
-    fail_msg: "The configuration for {{ power_script_item.name }} is {{ power_script_result.stdout }}, not as expected {{ script_file_path }}."
-    success_msg: "The configuration for {{ power_script_item.name }} is {{ power_script_result.stdout }}, which is as expected."
+    fail_msg: "The configuration for {{ power_script_ops }} is {{ power_script_result.stdout }}, not as expected {{ script_file_path }}."
+    success_msg: "The configuration for {{ power_script_ops }} is {{ power_script_result.stdout }}, which is as expected."
 
 # Won't works with untils/reboot.yml for poweroff event
 - name: "Shutdown and then powerOn guest OS"
-  when: power_script_item.name is match('^(poweroff|poweron)')
+  when: power_ops is match('^(poweroff|poweron)')
   block:
     - name: "Shutdown VM"
       include_tasks: ../../common/vm_set_power_state.yml
@@ -85,7 +97,7 @@
       include_tasks: ../../common/update_inventory.yml
 
 - name: "Suspended guest of target vm and then resumed"
-  when: power_script_item.name is match('^(suspend|resume)')
+  when: power_ops is match('^(suspend|resume)')
   block:
     - name: "Suspend the VM"
       include_tasks: ../../common/vm_set_power_state.yml
@@ -115,15 +127,18 @@
     that:
       - tools_conf_content_result.stdout is defined
       - tools_conf_content_result.stdout.find(power_script_filename) != -1
-    fail_msg: "Not found the {{ script_file_path }} in tool.conf for {{ power_script_item.name }}, which is not as expected"
-    success_msg: "Found the {{ script_file_path }} in tool.conf for {{ power_script_item.name }}, which is as expected."
+    fail_msg: "Not found the {{ script_file_path }} in tool.conf for {{ power_script_ops }}, which is not as expected"
+    success_msg: "Found the {{ script_file_path }} in tool.conf for {{ power_script_ops }}, which is as expected."
 
 - name: "Check the script running as expected"
-  ansible.builtin.shell: "{{ power_script_item.check[1] }}"
+  ansible.builtin.shell: "ls /var/{{ power_ops }}.tag"
   delegate_to: "{{ vm_guest_ip }}"
-  when: power_script_item.check | length > 1
+  when: 
+    - power_script_type == "custom"
+    - power_ops != "suspend"
 
-- name: "End of testcase {{ power_script_item.name }}"
+- name: "End of testcase {{ power_script_ops }}"
   ansible.builtin.debug:
     msg:
-      - "End of testcase {{ power_script_item.name }}"
+      - "End of testcase {{ power_script_ops }}"
+

@@ -16,82 +16,19 @@
           vars:
             skip_test_no_vmtools: true
 
-        # When check power on script, we need to disable shutdown script firstly: vmware-toolbox-cmd script shutdown disable
-        # When check shutdown script, we need to disable poweron script firstly: vmware-toolbox-cmd script power disable
-        # When check suspend script, we need to disable resume script firstly: vmware-toolbox-cmd script resume disable
-        # When check resume script, we need to disable suspend script firstly: vmware-toolbox-cmd script suspend disable
-        - name: "Set fact of power operations"
-          ansible.builtin.set_fact:
-            power_operation_list:
-              - name: poweronDefaultScript
-                file_path: /etc/vmware-tools/poweron-vm-default
-                setup: 
-                  - vmware-toolbox-cmd script shutdown disable
-                cmds:
-                  - vmware-toolbox-cmd script power enable
-                check: 
-                  - vmware-toolbox-cmd script power current
-              - name: poweroffDefaultScript
-                file_path: /etc/vmware-tools/poweroff-vm-default
-                setup: 
-                  - vmware-toolbox-cmd script power disable
-                cmds:
-                  - vmware-toolbox-cmd script shutdown enable
-                check: 
-                  - vmware-toolbox-cmd script shutdown current
-              - name: poweronCustomScript
-                file_path: /var/poweron-vm-custom
-                setup: 
-                  - vmware-toolbox-cmd script shutdown disable
-                  - rm -rf /var/poweron.tag && rm -rf /var/poweron-vm-custom
-                cmds:
-                  - echo 'touch /var/poweron.tag' >> /var/poweron-vm-custom
-                  - vmware-toolbox-cmd script power set /var/poweron-vm-custom
-                check: 
-                  - vmware-toolbox-cmd script power current
-                  - ls /var/poweron.tag
-              - name: poweroffCustomScript
-                file_path: /var/poweroff-vm-custom
-                setup: 
-                  - vmware-toolbox-cmd script power disable
-                  - rm -rf /var/poweroff.tag && rm -rf /var/poweroff-vm-custom
-                cmds:
-                  - echo 'touch /var/poweroff.tag' >> /var/poweroff-vm-custom
-                  - vmware-toolbox-cmd script shutdown set /var/poweroff-vm-custom
-                check: 
-                  - vmware-toolbox-cmd script shutdown current
-                  - ls /var/poweroff.tag
-              - name: suspendCustomScript
-                file_path: /var/suspend-vm-custom
-                setup: 
-                  - vmware-toolbox-cmd script resume disable
-                  - rm -rf /var/suspend.tag && rm -rf /var/suspend-vm-custom
-                cmds:
-                  - echo 'touch /var/suspend.tag' >> /var/suspend-vm-custom
-                  - vmware-toolbox-cmd script suspend set /var/suspend-vm-custom
-                check: 
-                  - vmware-toolbox-cmd script suspend current
-                  #- ls /var/suspend.tag
-              - name: resumeCustomScript
-                file_path: /var/resume-vm-custom
-                setup: 
-                  - vmware-toolbox-cmd script suspend disable
-                  - rm -rf /var/resume.tag && rm -rf /var/resume-vm-custom
-                cmds:
-                  - echo 'touch /var/resume.tag' >> /var/resume-vm-custom
-                  - vmware-toolbox-cmd script resume set /var/resume-vm-custom
-                check: 
-                  - vmware-toolbox-cmd script resume current
-                  - ls /var/resume.tag
-
-        - name: "Test power script"
+        - name: "Test soft power script"
           include_tasks: set_power_script.yml
           vars:
-            script_file_path: "{{ power_script_item.file_path }}"
-          with_items: "{{ power_operation_list }}"
-          when: power_script_item
-          loop_control:
-            loop_var: power_script_item
+            power_script_ops: item.rsplit('_', 1)[-1]
+          with_items:
+            - poweron_default_script
+            - poweroff_default_script
+            - poweron_custom_script
+            - poweroff_custom_script
+            - suspend_default_script
+            - resume_default_script
+            - suspend_custom_script
+            - resume_custom_script
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
