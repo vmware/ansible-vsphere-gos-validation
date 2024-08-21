@@ -1,0 +1,29 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Set and check default soft power operation
+# # Parameters:
+#   power_ops: power operation from command vmware-toolbox-cmd
+# # Return:
+#   script_file_path: path of customized script file
+
+- name: "Get default power script file path"
+  ansible.builtin.shell: vmware-toolbox-cmd script <power_operation> default
+  register: power_script_path_result
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Check script file exists"
+  ansible.builtin.stat:
+    path: "{{ power_script_path_result.stdout.strip() }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: script_file_exist_result
+  failed_when: not script_file_exist_result.stat.exists
+
+- name: "Set fact of default power script file path"
+  ansible.builtin.set_fact:
+    script_file_path: "{{ power_script_path_result.stdout.strip() }}"
+
+- name: "Set default script file for testcase {{ power_script_ops }}"
+  ansible.builtin.shell: vmware-toolbox-cmd script {{ power_ops }} enable
+  delegate_to: "{{ vm_guest_ip }}"

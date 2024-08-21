@@ -1,0 +1,42 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Set and check customized soft power operation
+# # Parameters:
+#   power_ops: power operation
+# # Return:
+#   script_file_path: path of customized script file
+#   script_tag_path: path of tag file produced by customized script file
+
+- name: "Set fact of customized script file"
+  ansible.builtin.set_fact:
+    script_file_path: /var/{{ power_ops }}-vm-custom
+    script_tag_path: /var/{{ power_ops }}.tag
+    
+- name: "Remove the existing script files for testcase {{ power_script_ops }}"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - "{{ script_file_path }}"
+    - "{{ script_tag_path }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: true
+
+- name: "Create script file for testcase {{ power_script_ops }}"
+  ansible.builtin.file:
+    path: "{{ script_file_path }}"
+    state: touch
+    mode: 0777
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Add content to file {{ script_file_path }}"
+  ansible.builtin.lineinfile:
+    path: "{{ script_file_path }}"
+    line: "touch {{ script_tag_path }}"
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Set script file for testcase {{ power_script_ops }}"
+  ansible.builtin.shell: vmware-toolbox-cmd script power set {{ script_file_path }}
+  delegate_to: "{{ vm_guest_ip }}"

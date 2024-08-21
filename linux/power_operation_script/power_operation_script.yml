@@ -16,19 +16,31 @@
           vars:
             skip_test_no_vmtools: true
 
+        - name: "Enable debug logging for VMware Tools"
+          include_tasks: ../utils/enable_vmtools_logging.yml
+
+        - name: "Disable all soft power operations"
+          ansible.builtin.shell: vmware-toolbox-cmd script {{ item }} disable
+          with_items:
+            - power
+            - shutdown
+            - suspend
+            - resume
+
         - name: "Test soft power script"
           include_tasks: set_power_script.yml
           vars:
             power_script_ops: item.rsplit('_', 1)[-1]
           with_items:
-            - poweron_default_script
-            - poweroff_default_script
-            - poweron_custom_script
-            - poweroff_custom_script
+            - power_default_script
+            - shutdown_default_script
             - suspend_default_script
             - resume_default_script
+            - power_custom_script
+            - shutdown_custom_script
             - suspend_custom_script
             - resume_custom_script
+
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
