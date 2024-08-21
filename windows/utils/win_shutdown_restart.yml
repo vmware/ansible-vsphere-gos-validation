@@ -9,6 +9,7 @@
 #     Default value is 600 seconds.
 #
 - name: "Shutdown guest OS inside OS"
+  when: set_win_power_state == "shutdown"
   block:
     - name: "Execute shutdown OS command"
       ansible.builtin.raw: 'stop-computer -Force'
@@ -16,9 +17,9 @@
     - name: "Set fact of the expected status"
       ansible.builtin.set_fact:
         expected_power_state: "poweredOff"
-  when: set_win_power_state == "shutdown"
 
 - name: "Restart guest OS inside OS"
+  when: set_win_power_state == "restart"
   block:
     - name: "Restart OS using win_reboot module"
       ansible.windows.win_reboot:
@@ -31,16 +32,36 @@
     - name: "Set fact of the expected status"
       ansible.builtin.set_fact:
         expected_power_state: "poweredOn"
-  when: set_win_power_state == "restart"
 
 - name: "Wait 15 seconds to before checking power status"
   ansible.builtin.pause:
     seconds: 15
 
-- include_tasks: ../../common/vm_wait_power_state.yml
+- name: "Check VM power state '{{ expected_power_state }}'"
+  include_tasks: ../../common/vm_wait_power_state.yml
   vars:
     expected_power_status: "{{ expected_power_state }}"
 
-- name: "Check winrm connectable after OS restart"
-  include_tasks: win_check_winrm.yml
+- name: "Check OS restarted"
   when: set_win_power_state == "restart"
+  block:
+    - name: "Check winrm connectable after OS restart"
+      include_tasks: win_check_winrm.yml
+    # Check user logon in console session
+    - name: "Query user in guest OS after OS restart"
+      ansible.windows.win_shell: "query user console"
+      register: query_user_result
+      ignore_errors: true
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_unreachable: true
+      retries: 5
+      delay: 3
+      until:
+        - query_user_result.stdout_lines is defined
+        - query_user_result.stdout_lines | length != 0
+    - name: "Check query user result"
+      ansible.builtin.assert:
+        that:
+          - query_user_result.stdout_lines is defined
+          - query_user_result.stdout_lines | length != 0
+        fail_msg: "Not get logon user in console session after 15 seconds: {{ query_user_result }}"
