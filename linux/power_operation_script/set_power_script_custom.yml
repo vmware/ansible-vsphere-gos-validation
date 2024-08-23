@@ -11,9 +11,13 @@
 
 - name: "Set fact of customized script file"
   ansible.builtin.set_fact:
-    script_file_path: /var/{{ power_ops }}-vm-custom
-    script_tag_path: /var/{{ power_ops }}.tag
-    
+    script_file_folder: |-
+      {%- if guest_os_ansible_distribution == "Flatcar" -%}/var
+      {%- else -%}/tmp
+      {%- endif -%}
+    script_file_path: "{{ script_file_folder }}/{{ power_ops }}-vm-custom"
+    script_tag_path: "{{ script_file_folder }}/{{ power_ops }}.tag"
+
 - name: "Remove the existing script files for testcase {{ power_script_ops }}"
   ansible.builtin.file:
     path: "{{ item }}"

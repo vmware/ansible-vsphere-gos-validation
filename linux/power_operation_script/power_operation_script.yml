@@ -24,25 +24,16 @@
 
         - name: "Disable all soft power operations"
           ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} script {{ item }} disable"
-          with_items:
-            - power
-            - shutdown
-            - suspend
-            - resume
+          with_items: ['power', 'shutdown', 'suspend', 'resume']
 
         - name: "Test soft power script"
           include_tasks: set_power_script.yml
           vars:
-            power_script_ops: item.rsplit('_', 1)[-1]
-          with_items:
-            - power_default_script
-            - shutdown_default_script
-            - suspend_default_script
-            - resume_default_script
-            - power_custom_script
-            - shutdown_custom_script
-            - suspend_custom_script
-            - resume_custom_script
+            power_script_type: "{{ item.0 }}"
+            power_ops: "{{ item.1 }}"
+          with_nested:
+            - ['default', 'custom']
+            - ['power', 'shutdown', 'suspend', 'resume'] 
 
       rescue:
         - name: "Test case failure"
