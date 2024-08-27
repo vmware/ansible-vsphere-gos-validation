@@ -2,23 +2,20 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   Set and check customized soft power operation
+#   Set and check customized power operation script
 # # Parameters:
-#   power_ops: power operation
+#   power_script_op: power operation
 # # Return:
 #   script_file_path: path of customized script file
-#   script_tag_path: path of tag file produced by customized script file
+#   script_tag_path: path of tag file created by customized script file
 
 - name: "Set fact of customized script file"
   ansible.builtin.set_fact:
-    script_file_folder: |-
-      {%- if guest_os_ansible_distribution == "Flatcar" -%}/var
-      {%- else -%}/tmp
-      {%- endif -%}
-    script_file_path: "{{ script_file_folder }}/{{ power_ops }}-vm-custom"
-    script_tag_path: "{{ script_file_folder }}/{{ power_ops }}.tag"
+    script_file_folder: /var
+    script_file_path: "{{ script_file_folder }}/{{ power_script_op }}-vm-custom"
+    script_tag_path: "{{ script_file_folder }}/{{ power_script_op }}.tag"
 
-- name: "Remove the existing script files for testcase {{ power_script_ops }}"
+- name: "Remove the existing script and tag files for {{ power_script_op }} script"
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
@@ -28,7 +25,7 @@
   delegate_to: "{{ vm_guest_ip }}"
   ignore_errors: true
 
-- name: "Create script file for testcase {{ power_script_ops }}"
+- name: "Create script file for {{ power_script_op }} script"
   ansible.builtin.file:
     path: "{{ script_file_path }}"
     state: touch
@@ -41,6 +38,6 @@
     line: "touch {{ script_tag_path }}"
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Set script file for testcase {{ power_script_ops }}"
+- name: "Set script file for {{ power_script_op }} script"
   ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} script power set {{ script_file_path }}"
   delegate_to: "{{ vm_guest_ip }}"

@@ -5,7 +5,7 @@
 #   This test case is used for checking soft power operations
 #   When VMware tools is not installed or not running in VM, this test case result is 'Blocked'.
 #
-- name: power_operation_script
+- name: power_operation_scripts
   hosts: localhost
   gather_facts: false
   tasks:
@@ -19,32 +19,31 @@
         - name: "Enable debug logging for VMware Tools"
           include_tasks: ../utils/enable_vmtools_logging.yml
 
+        - name: "Set fact of customized script file"
+          ansible.builtin.set_fact:
+            power_cmd_ops: ['power', 'shutdown', 'suspend', 'resume']
+
         - name: "Get path of vmware-toolbox-cmd"
           include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
 
         - name: "Disable all soft power operations"
           ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} script {{ item }} disable"
           delegate_to: "{{ vm_guest_ip }}"
-          with_items: ['power', 'shutdown', 'suspend', 'resume']
+          with_items: power_cmd_ops
 
         - name: "Test soft power script"
           include_tasks: set_power_script.yml
           vars:
             power_script_type: "{{ item.0 }}"
-            power_ops: "{{ item.1 }}"
+            power_script_op: "{{ item.1 }}"
           with_nested:
             - ['default', 'custom']
-            - ['power', 'shutdown', 'suspend', 'resume'] 
+            - power_cmd_ops
 
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
       always:
-        - name: "Collect vmware tools log"
-          include_tasks: ../utils/fetch_file.yml
-          vars:
-            fetch_file_src_path: "{{ vmtools_vmtoolsd_log_file }}"
-            fetch_file_dst_path: "{{ current_test_log_folder }}/"
-          when:
-            - vmtools_vmtoolsd_log_file is defined
-            - vmtools_vmtoolsd_log_file
+        - name: "Collect VMware Tools logs"
+          include_tasks: ../utils/collect_vmtools_logs.yml
+
