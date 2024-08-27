@@ -28,11 +28,11 @@
 - name: "Check current configuration is expected"
   ansible.builtin.assert:
     that:
-      - script_file_in_conf_file
+      - script_file_path
       - power_script_result.stdout is defined
-      - power_script_result.stdout.strip() == script_file_in_conf_file
-    fail_msg: "Failed to find the {{ script_file_path }}, {{ power_script_result.stdout | default('') }} is not expected."
-    success_msg: "Successfuly found the {{ power_script_result.stdout | default('') }} for {{ power_script_op }} script."
+      - power_script_result.stdout.strip() == script_file_path
+    fail_msg: "The {{ power_script_op }} script is {{ power_script_result.stdout | default('') }}, not expected {{ script_file_path }}."
+    success_msg: "The {{ power_script_op }} script is {{ power_script_result.stdout | default('') }}, which is expected {{ script_file_path }}."
 
 - name: "Get content of file tools.conf"
   ansible.builtin.command: "cat /etc/vmware-tools/tools.conf"
@@ -42,10 +42,11 @@
 - name: "Check the configuration is expected in tools.conf"
   ansible.builtin.assert:
     that:
+      - script_file_in_conf_file
       - tools_conf_content_result.stdout is defined
       - tools_conf_content_result.stdout.find(power_script_file) != -1
-    fail_msg: "Failed to find the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }}."
-    success_msg: "Successfully found the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }}."
+    fail_msg: "Failed to find the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
+    success_msg: "Successfully found the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
 
 - name: "Shutdown and then power on guest OS"
   when: power_script_op in ['power', 'shutdown']
