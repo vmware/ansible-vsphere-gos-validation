@@ -38,20 +38,13 @@
   register: tools_conf_content_result
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Set fact of power script config in tools.conf"
-  ansible.builtin.set_fact:
-    power_script_file: |-
-      {%- power_script_type == 'custom' -%}{{ script_file_path.split('/')[-1].strip() }}
-      {%- else -%}{{ script_file_path }}
-      {%- endif -%}
-
 - name: "Check the configuration is expected in tools.conf"
   ansible.builtin.assert:
     that:
       - tools_conf_content_result.stdout is defined
       - tools_conf_content_result.stdout.find(power_script_file) != -1
-    fail_msg: "Not found the {{ script_file_path }} in tool.conf for {{ power_script_op }}, which is not as expected"
-    success_msg: "Found the {{ script_file_path }} in tool.conf for {{ power_script_op }}, which is as expected."
+    fail_msg: "Not found the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }}, which is not as expected"
+    success_msg: "Found the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }}, which is as expected."
 
 - name: "Shutdown and then powerOn guest OS"
   when: power_script_op in ['power', 'shutdown']

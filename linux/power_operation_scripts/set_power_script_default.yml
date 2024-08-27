@@ -7,22 +7,25 @@
 #   power_script_op: power operation from command vmware-toolbox-cmd
 # # Return:
 #   script_file_path: path of default script file
+#   script_file_in_conf_file: script file in tools.conf
 
 - name: "Get default power script file path"
   ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} script {{ power_script_op }} default"
   register: power_script_path_result
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Check script file exists"
-  ansible.builtin.stat:
-    path: "{{ power_script_path_result.stdout.strip() }}"
-  delegate_to: "{{ vm_guest_ip }}"
-  register: script_file_exist_result
-  failed_when: script_file_exist_result.stat.exists is undefined or not script_file_exist_result.stat.exists
-
 - name: "Set fact of default power script file path"
   ansible.builtin.set_fact:
     script_file_path: "{{ power_script_path_result.stdout.strip() }}"
+    script_file_in_conf_file: "{{ power_script_path_result.stdout.strip() | basename }}"
+  when: power_script_path_result.stdout is defined
+
+- name: "Check script file exists"
+  ansible.builtin.stat:
+    path: "{{ script_file_path }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: script_file_exist_result
+  failed_when: script_file_exist_result.stat.exists is undefined or not script_file_exist_result.stat.exists
 
 - name: "Set default script file for {{ power_script_op }} script"
   ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} script {{ power_script_op }} enable"
