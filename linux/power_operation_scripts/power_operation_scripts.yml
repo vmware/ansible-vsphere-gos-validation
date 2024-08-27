@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is used for checking soft power operations
-#   When VMware tools is not installed or not running in VM, this test case result is 'Blocked'.
+#   This test case is used for checking power operation scripts
+#   When VMware Tools is not installed or not running in VM, this test case result is 'Blocked'.
 #
 - name: power_operation_scripts
   hosts: localhost
@@ -19,26 +19,26 @@
         - name: "Enable debug logging for VMware Tools"
           include_tasks: ../utils/enable_vmtools_logging.yml
 
-        - name: "Set fact of customized script file"
+        - name: "Set fact of power operations"
           ansible.builtin.set_fact:
-            power_cmd_ops: ['power', 'shutdown', 'suspend', 'resume']
+            power_script_ops: ['power', 'shutdown', 'suspend', 'resume']
 
         - name: "Get path of vmware-toolbox-cmd"
           include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
 
-        - name: "Disable all soft power operations"
+        - name: "Disable all power operation scripts"
           ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} script {{ item }} disable"
           delegate_to: "{{ vm_guest_ip }}"
-          with_items: power_cmd_ops
+          with_items: power_script_ops
 
-        - name: "Test soft power script"
+        - name: "Test power operation scripts"
           include_tasks: set_power_script.yml
           vars:
             power_script_type: "{{ item.0 }}"
             power_script_op: "{{ item.1 }}"
           with_nested:
             - ['default', 'custom']
-            - power_cmd_ops
+            - power_script_ops
 
       rescue:
         - name: "Test case failure"
