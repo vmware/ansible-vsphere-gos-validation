@@ -34,8 +34,15 @@
     fail_msg: "The {{ power_script_op }} script is {{ power_script_result.stdout | default('') }}, not expected {{ script_file_path }}."
     success_msg: "The {{ power_script_op }} script is {{ power_script_result.stdout | default('') }}, which is expected {{ script_file_path }}."
 
+- name: "Set fact of tools.conf path"
+  ansible.builtin.set_fact:
+    tools_conf_path: |-
+      {%- if  guest_os_ansible_distribution == "FreeBSD" -%}/usr/local/share/vmware-tools/tools.conf
+      {%- else -%}/etc/vmware-tools/tools.conf
+      {%- endif -%}
+
 - name: "Get content of file tools.conf"
-  ansible.builtin.command: "cat /etc/vmware-tools/tools.conf"
+  ansible.builtin.command: "cat {{ tools_conf_path }}"
   register: tools_conf_content_result
   delegate_to: "{{ vm_guest_ip }}"
 
