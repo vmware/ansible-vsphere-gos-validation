@@ -19,10 +19,8 @@
         - name: "Enable debug logging for VMware Tools"
           include_tasks: ../utils/enable_vmtools_logging.yml
           vars:
-            vmtools_log_dir: |-
-              {%- if  guest_os_ansible_distribution == 'Flatcar' -%}/tmp/vmware-tools
-              {%- else -%}/var/log/vmware-tools
-              {%- endif -%}
+            vmtools_log_dir: /var/log/vmware-tools
+          when: guest_os_ansible_distribution != 'Flatcar'
 
         - name: "Set fact of power operations"
           ansible.builtin.set_fact:
@@ -51,4 +49,5 @@
       always:
         - name: "Collect VMware Tools logs"
           include_tasks: ../utils/collect_vmtools_logs.yml
+          when: guest_os_ansible_distribution != 'Flatcar'
 
