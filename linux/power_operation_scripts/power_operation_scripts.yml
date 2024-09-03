@@ -16,11 +16,17 @@
           vars:
             skip_test_no_vmtools: true
 
+        - name: "Skip testcase '{{ ansible_play_name }}' for {{ guest_os_ansible_distribution }}"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip testcase '{{ ansible_play_name }}', it is not supported by {{ guest_os_ansible_distribution }}"
+            skip_reason: "Not Supported"
+          when: guest_os_ansible_distribution == 'Flatcar'
+
         - name: "Enable debug logging for VMware Tools"
           include_tasks: ../utils/enable_vmtools_logging.yml
           vars:
             vmtools_log_dir: /var/log/vmware-tools
-          when: guest_os_ansible_distribution != 'Flatcar'
 
         - name: "Set fact of power operations"
           ansible.builtin.set_fact:
@@ -49,5 +55,5 @@
       always:
         - name: "Collect VMware Tools logs"
           include_tasks: ../utils/collect_vmtools_logs.yml
-          when: guest_os_ansible_distribution != 'Flatcar'
+
 

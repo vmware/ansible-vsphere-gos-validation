@@ -34,22 +34,19 @@
     fail_msg: "The {{ power_script_op }} script is {{ power_script_result.stdout | default('') }}, not expected {{ script_file_path }}."
     success_msg: "The {{ power_script_op }} script is {{ power_script_result.stdout | default('') }}, which is expected {{ script_file_path }}."
 
-- name: "Check the configuration of file tool.conf"
-  when: guest_os_ansible_distribution != 'Flatcar'
-  block:
-    - name: "Get content of file tools.conf"
-      ansible.builtin.command: "cat {{ vmtools_config_file }}"
-      register: tools_conf_content_result
-      delegate_to: "{{ vm_guest_ip }}"
+- name: "Get content of file tools.conf"
+  ansible.builtin.command: "cat {{ vmtools_config_file }}"
+  register: tools_conf_content_result
+  delegate_to: "{{ vm_guest_ip }}"
 
-    - name: "Check the configuration is expected in tools.conf"
-      ansible.builtin.assert:
-        that:
-          - script_file_in_conf_file
-          - tools_conf_content_result.stdout is defined
-          - tools_conf_content_result.stdout.find(script_file_in_conf_file) != -1
-        fail_msg: "Failed to find the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
-        success_msg: "Successfully found the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
+- name: "Check the configuration is expected in tools.conf"
+  ansible.builtin.assert:
+    that:
+      - script_file_in_conf_file
+      - tools_conf_content_result.stdout is defined
+      - tools_conf_content_result.stdout.find(script_file_in_conf_file) != -1
+    fail_msg: "Failed to find the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
+    success_msg: "Successfully found the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
 
 - name: "Shutdown and then power on guest OS"
   when: power_script_op in ['power', 'shutdown']
@@ -91,10 +88,9 @@
     - script_tag_path is defined and script_tag_path
     - power_script_type == "custom"
     - power_script_op != "suspend"
-    - guest_os_ansible_distribution != 'Flatcar'
 
 - name: "Check the log file"
-  when: not (power_script_op == "suspend" or guest_os_ansible_distribution == 'Flatcar')
+  when: power_script_op != "suspend"
   block:
     - name: "Search the log file"
       ansible.builtin.shell: "grep '{{ script_file_path }}' *.log"
