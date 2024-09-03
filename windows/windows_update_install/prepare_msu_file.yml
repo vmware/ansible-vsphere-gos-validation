@@ -21,10 +21,16 @@
     msu_file_basename: ""
     msu_file_path: ""
     msu_nfs_path_list: []
-    drive_letter_new: "T"
 
-#- name: "Get unused driver letter"
-#  include_tasks: ../utils/win_get_unused_drive_letter.yml
+# For OS older than 17763 (Windows 1809 or Windows Server 2019), it has very high frequency of timeout for the command.
+- name: "Get unused driver letter"
+  include_tasks: ../utils/win_get_unused_drive_letter.yml
+  when: guest_os_build_num | int >= 17763
+
+- name: "Set the new driver letter for older OS"
+  ansible.builtin.set_fact:
+    drive_letter_new: "T"
+  when: guest_os_build_num | int < 17763
 
 - name: "Set the facts of the .msu file source and destination directory"
   ansible.builtin.set_fact:
