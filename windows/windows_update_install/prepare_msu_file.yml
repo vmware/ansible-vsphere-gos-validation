@@ -24,6 +24,14 @@
 
 - name: "Get unused driver letter"
   include_tasks: ../utils/win_get_unused_drive_letter.yml
+  when: guest_os_build_num | int >= 17763
+
+# For OS build number older than 17763 (Windows 10 v1809 or Windows Server 2019), it has very high frequency of timeout
+# for executing command to get unused drive letter. Hence here specify one for them.
+- name: "Set the new drive letter for guest OS build number older than 17763"
+  ansible.builtin.set_fact:
+    drive_letter_new: "T"
+  when: guest_os_build_num | int < 17763
 
 - name: "Set the facts of the .msu file source and destination directory"
   ansible.builtin.set_fact:
