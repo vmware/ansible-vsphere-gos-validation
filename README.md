@@ -80,7 +80,7 @@ This project supports below scenarios for end-to-end guest operating system vali
 | Flatcar 2592.0.0 and later                             |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Debian 10.10 and later, 11.x, 12.x                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Windows 10, 11                                         | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Windows Server 2019, 2022                              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Windows Server 2019, 2022, 2025                        | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | UnionTech OS Server 20 1050a                           | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Fedora 36 Server, Workstation and later                | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | ProLinux Server 7.9, 8.5                               | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
@@ -99,10 +99,10 @@ This project supports below scenarios for end-to-end guest operating system vali
 This compatible guest operating systems list is used for this project only. For guest operating system support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
 
 ### Docker images
-* Latest (Release v3.1):
+* Latest (Release v3.2):
   * projects.packages.broadcom.com/gos_cert/ansible-vsphere-gos-validation:latest
-* Release v3.1:
-  * projects.packages.broadcom.com/gos_cert/ansible-vsphere-gos-validation:v3.1
+* Release v3.2:
+  * projects.packages.broadcom.com/gos_cert/ansible-vsphere-gos-validation:v3.2
 
 Launch testing using Docker image
 1. Execute below commands in your machine

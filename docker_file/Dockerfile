@@ -1,6 +1,6 @@
 # ansible-vsphere-gos-validation
 # For users launch guest OS validation test on vSphere
-# version: 3.1
+# version: 3.2
 
 # Use latest Photon OS docker image as parent image
 FROM photon:latest
@@ -14,7 +14,7 @@ RUN tdnf makecache && \
     pip3 install pycdlib pywinrm pyvmomi pypsrp passlib
 
 # Install ansible-core
-RUN pip3 install ansible-core==2.15.8
+RUN pip3 install ansible-core==2.15.12
 
 # Install Ansible collections
 # You can set https proxy if collections are failed to install from Galaxy server, e.g.,
