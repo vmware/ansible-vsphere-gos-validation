@@ -3,7 +3,7 @@
 ---
 # Description:
 #   Set and check soft power operation
-# # Parameters:
+#   Parameters:
 #   power_script_op: power script operation
 #   power_script_type: default or custom
 
@@ -32,7 +32,7 @@
       - power_script_result.stdout is defined
       - power_script_result.stdout.strip() == script_file_path
     fail_msg: "The {{ power_script_op }} script is {{ power_script_result.stdout | default('') }}, not expected {{ script_file_path }}."
-    success_msg: "The {{ power_script_op }} script is {{ power_script_result.stdout | default('') }}, which is expected {{ script_file_path }}."
+    success_msg: "The {{ power_script_op }} script is set to the expected one {{ power_script_result.stdout }}."
 
 - name: "Get content of file tools.conf"
   ansible.builtin.command: "cat {{ vmtools_config_file }}"
@@ -83,7 +83,7 @@
     path: "{{ script_tag_path }}"
   delegate_to: "{{ vm_guest_ip }}"
   register: tag_path_exist_result
-  failed_when: not tag_path_exist_result.stat.exists
+  failed_when: tag_path_exist_result.stat.exists is undefined or not tag_path_exist_result.stat.exists
   when:
     - script_tag_path is defined and script_tag_path
     - power_script_type == "custom"
