@@ -16,26 +16,19 @@
     script_tag_path: "/var/{{ power_cmd_op }}.tag"
     script_file_in_conf_file: "/var/{{ power_cmd_op }}-vm-custom"
 
-- name: "Remove the existing script and tag files for {{ power_cmd_op }} script"
+- name: "Remove the existing tag files for {{ power_cmd_op }} script"
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ script_tag_path }}"
     state: absent
-  with_items:
-    - "{{ script_file_path }}"
-    - "{{ script_tag_path }}"
-  delegate_to: "{{ vm_guest_ip }}"
-  ignore_errors: true
-
-- name: "Create script file for {{ power_cmd_op }} script"
-  ansible.builtin.file:
-    path: "{{ script_file_path }}"
-    state: touch
-    mode: 0777
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Add content to file {{ script_file_path }}"
+- name: "Create and add/replace content for file {{ script_file_path }}"
   ansible.builtin.lineinfile:
     path: "{{ script_file_path }}"
+    state: present
+    create: yes
+    mode: '0777'
+    regexp: '^touch.*'
     line: "touch {{ script_tag_path }}"
   delegate_to: "{{ vm_guest_ip }}"
 
