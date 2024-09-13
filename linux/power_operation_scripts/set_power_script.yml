@@ -3,9 +3,9 @@
 ---
 # Description:
 #   Set and check soft power operation
-#   Parameters:
-#     power_script_op: power script operation
-#     power_script_type: default or custom
+# Parameters:
+#   power_script_op: power script operation
+#   power_script_type: default or custom
 
 - name: "Start to test {{ power_script_type }} {{ power_script_op }} script"
   ansible.builtin.debug:
@@ -23,7 +23,7 @@
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Print the current configuration for {{ power_script_op }} script"
-  ansible.builtin.debug: var=power_script_result.stdout
+  ansible.builtin.debug: var=power_script_result
 
 - name: "Check current configuration is expected"
   ansible.builtin.assert:
@@ -32,7 +32,7 @@
       - power_script_result.stdout is defined
       - power_script_result.stdout.strip() == script_file_path
     fail_msg: "The {{ power_script_op }} script is {{ power_script_result.stdout | default('') }}, not expected {{ script_file_path }}."
-    success_msg: "The {{ power_script_op }} script is set to the expected one {{ power_script_result.stdout }}."
+    success_msg: "The {{ power_script_op }} script is set to the expected one {{ power_script_result.stdout | default('') }}."
 
 - name: "Get content of file tools.conf"
   ansible.builtin.command: "cat {{ vmtools_config_file }}"
@@ -93,9 +93,7 @@
   when: power_script_op != "suspend"
   block:
     - name: "Search the log file"
-      ansible.builtin.shell: "grep '{{ script_file_path }}' *.log"
-      args:
-        chdir: "{{ vmtools_vmsvc_log_file | dirname }}"
+      ansible.builtin.shell: "grep '{{ script_file_path }}' /var/log/vmware-tools/*.log"
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: true
       register: result_search_str
