@@ -1,0 +1,118 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Set and check soft power operation
+#   Parameters:
+#     power_script_op: power script operation
+#     power_script_type: default or custom
+
+- name: "Start to test {{ power_script_type }} {{ power_script_op }} script"
+  ansible.builtin.debug:
+    msg:
+      - "Start to test {{ power_script_type }} {{ power_script_op }} script"
+
+- name: "Set {{ power_script_type }} {{ power_script_op }} script"
+  include: set_power_script_{{ power_script_type }}.yml
+  vars:
+    power_cmd_op: "{{ power_script_op }}"
+
+- name: "Check the current configuration for {{ power_script_op }} script"
+  ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} script {{ power_script_op }} current"
+  register: power_script_result
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Print the current configuration for {{ power_script_op }} script"
+  ansible.builtin.debug: var=power_script_result.stdout
+
+- name: "Check current configuration is expected"
+  ansible.builtin.assert:
+    that:
+      - script_file_path
+      - power_script_result.stdout is defined
+      - power_script_result.stdout.strip() == script_file_path
+    fail_msg: "The {{ power_script_op }} script is {{ power_script_result.stdout | default('') }}, not expected {{ script_file_path }}."
+    success_msg: "The {{ power_script_op }} script is set to the expected one {{ power_script_result.stdout }}."
+
+- name: "Get content of file tools.conf"
+  ansible.builtin.command: "cat {{ vmtools_config_file }}"
+  register: tools_conf_content_result
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Check the configuration is expected in tools.conf"
+  ansible.builtin.assert:
+    that:
+      - script_file_in_conf_file
+      - tools_conf_content_result.stdout is defined
+      - tools_conf_content_result.stdout.find(script_file_in_conf_file) != -1
+    fail_msg: "Failed to find the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
+    success_msg: "Successfully found the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
+
+- name: "Shutdown and then power on guest OS"
+  when: power_script_op in ['power', 'shutdown']
+  block:
+    - name: "Shutdown VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: "shutdown-guest"
+
+    - name: "Power on VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: "powered-on"
+
+- name: "Suspend and resume VM"
+  when: power_script_op in ['suspend', 'resume']
+  block:
+    - name: "Suspend the VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'suspended'
+
+    - name: "Resume VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: "powered-on"
+        force: true
+
+- name: "Update inventory"
+  include_tasks: ../../common/update_inventory.yml
+
+- name: "Check the script file running as expected"
+  ansible.builtin.stat:
+    path: "{{ script_tag_path }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: tag_path_exist_result
+  failed_when: tag_path_exist_result.stat.exists is undefined or not tag_path_exist_result.stat.exists
+  when:
+    - script_tag_path is defined and script_tag_path
+    - power_script_type == "custom"
+    - power_script_op != "suspend"
+
+- name: "Check the log file"
+  when: power_script_op != "suspend"
+  block:
+    - name: "Search the log file"
+      ansible.builtin.shell: "grep '{{ script_file_path }}' *.log"
+      args:
+        chdir: "{{ vmtools_vmsvc_log_file | dirname }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      register: result_search_str
+
+    - name: "Check the serching result"
+      ansible.builtin.assert:
+        that:
+          - result_search_str.rc is defined
+          - result_search_str.rc == 0
+        fail_msg: "Failed to find the {{ script_file_path }} in {{ vmtools_vmsvc_log_file }} for {{ power_script_op }}."
+        success_msg: "Successfully found the {{ script_file_path }} in {{ vmtools_vmsvc_log_file }} for {{ power_script_op }}."
+
+- name: "Cleanup current {{ power_script_op }} script configuration"
+  ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} script {{ power_script_op }} disable"
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "End of test {{ power_script_type }} {{ power_script_op }} script"
+  ansible.builtin.debug:
+    msg:
+      - "End of test {{ power_script_type }} {{ power_script_op }} script"

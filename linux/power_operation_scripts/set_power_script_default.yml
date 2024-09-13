@@ -1,0 +1,39 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Set and check default power operation script
+#   Parameters:
+#     power_cmd_op: power operation: power/shutdown/supend/resume
+#   Return:
+#     script_file_path: path of default script file
+#     script_file_in_conf_file: script file in tools.conf
+
+- name: "Initialize facts of default power script file"
+  ansible.builtin.set_fact:
+    script_file_path: ""
+    script_file_in_conf_file: ""
+
+- name: "Get default power script file path"
+  ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} script {{ power_cmd_op }} default"
+  register: power_script_path_result
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Set fact of default power script file path"
+  ansible.builtin.set_fact:
+    script_file_path: "{{ power_script_path_result.stdout.strip() }}"
+    script_file_in_conf_file: "{{ power_script_path_result.stdout.strip() | basename }}"
+  when: 
+    - power_script_path_result.stdout is defined
+    - power_script_path_result.stdout
+
+- name: "Check script file exists"
+  ansible.builtin.stat:
+    path: "{{ script_file_path }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: script_file_exist_result
+  failed_when: script_file_exist_result.stat.exists is undefined or not script_file_exist_result.stat.exists
+
+- name: "Set default script file for {{ power_cmd_op }} script"
+  ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} script {{ power_cmd_op }} enable"
+  delegate_to: "{{ vm_guest_ip }}"

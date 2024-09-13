@@ -1,0 +1,59 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for checking power operation scripts
+# When VMware Tools is not installed or not running in VM, this test case result is 'Blocked'.
+#
+- name: power_operation_scripts
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            skip_test_no_vmtools: true
+
+        - name: "Skip testcase '{{ ansible_play_name }}' for {{ guest_os_ansible_distribution }}"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip testcase '{{ ansible_play_name }}', it is not supported by {{ guest_os_ansible_distribution }}"
+            skip_reason: "Not Supported"
+          when: guest_os_ansible_distribution == 'Flatcar'
+
+        - name: "Enable debug logging for VMware Tools"
+          include_tasks: ../utils/enable_vmtools_logging.yml
+          vars:
+            vmtools_log_dir: /var/log/vmware-tools
+
+        - name: "Set fact of power operations"
+          ansible.builtin.set_fact:
+            power_script_ops: ['power', 'shutdown', 'suspend', 'resume']
+
+        - name: "Get path of vmware-toolbox-cmd"
+          include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
+
+        - name: "Disable all power operation scripts"
+          ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} script {{ item }} disable"
+          delegate_to: "{{ vm_guest_ip }}"
+          with_items: "{{ power_script_ops }}"
+
+        - name: "Test power operation scripts"
+          include_tasks: set_power_script.yml
+          vars:
+            power_script_type: "{{ item.0 }}"
+            power_script_op: "{{ item.1 }}"
+          with_nested:
+            - ['default', 'custom']
+            - "{{ power_script_ops }}"
+
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+      always:
+        - name: "Collect VMware Tools logs"
+          include_tasks: ../utils/collect_vmtools_logs.yml
+
+
