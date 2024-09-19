@@ -33,6 +33,7 @@
 - name: "Initialize variables for installing or uninstalling package"
   ansible.builtin.set_fact:
     package_manage_list: []
+    package_manage_list_str: ''
 
 - name: "Set fact of packages which needs to be installed with latest version"
   ansible.builtin.set_fact:
@@ -57,6 +58,10 @@
         package_manage_list: "{{ package_list | select('in', guest_installed_packages) }}"
         package_manage_op: "Uninstall"
       when: package_state in ['absent', 'removed']
+
+- name: "Set fact of packages for {{ guest_os_ansible_distribution }} package manage command"
+  ansible.builtin.set_fact:
+    package_manage_list_str: "{{ ' '.join(package_manage_list) }}"
 
 - name: "Display the pacakge list and operation"
   ansible.builtin.debug:
@@ -90,7 +95,6 @@
       block:
         - name: "Set facts of packages and command for {{ guest_os_ansible_distribution }}"
           ansible.builtin.set_fact:
-            package_manage_list_str: "{{ ' '.join(package_manage_list) }}"
             package_manager: |-
               {%- if guest_os_ansible_distribution == "VMware Photon OS" -%}tdnf
               {%- else -%}pkg
@@ -130,34 +134,24 @@
             allow_downgrade: true
             state: "{{ package_state }}"
           delegate_to: "{{ vm_guest_ip }}"
-          when: guest_os_ansible_pkg_mgr | lower == "yum"
+          when: guest_os_ansible_pkg_mgr == "yum"
 
+        # Ansible has dnf and dnf5 modules based on different dnf version. Fedora 41 has bumped to dnf5, but Ansible dnf5 module
+        # could not work well on Fedora 41. So here replaces dnf modules with dnf commands to manage packages
         - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-          when: guest_os_ansible_pkg_mgr | lower == "dnf"
+          when: guest_os_ansible_pkg_mgr in ['dnf', 'dnf5']
           block:
-            - name: "Get DNF version on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-              ansible.builtin.shell: "dnf --version | head -n 1 | cut -d '.' -f 1"
-              register: dnf_major_version_result
-              ignore_errors: true
-              delegate_to: "{{ vm_guest_ip }}"
-
-            - name: "Set fact of DNF major version"
+            - name: "Set facts of packages and command for {{ guest_os_ansible_distribution }}"
               ansible.builtin.set_fact:
-                dnf_major_version: "{{ dnf_major_version_result.stdout }}"
-              when:
-                - dnf_major_version_result.rc is defined
-                - dnf_major_version_result.rc | int == 0
-                - dnf_major_version_result.stdout is defined
-                - dnf_major_version_result.stdout
+                package_manage_cmd: |-
+                  {%- if package_state in [ 'installed', 'present', 'latest' ] -%}
+                    dnf install -y {{ package_manage_list_str }}
+                  {%- else -%}
+                    dnf remove -y {{ package_manage_list_str }}
+                  {%- endif -%}
 
             - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-              ansible.builtin.dnf:
-                name: "{{ package_manage_list }}"
-                allow_downgrade: true
-                state: "{{ package_state }}"
-                use_backend: |-
-                  {%- if dnf_major_version | default('') and dnf_major_version | int >= 4 -%}{{ 'dnf' + dnf_major_version }}
-                  {%- else -%}auto{%- endif -%}
+              ansible.builtin.shell: "{{ package_manage_cmd }}"
               delegate_to: "{{ vm_guest_ip }}"
 
     - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"

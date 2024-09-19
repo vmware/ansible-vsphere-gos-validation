@@ -868,9 +868,7 @@ class CallbackModule(CallbackBase):
         :return:
         """
         json_file_path = os.path.join(self.log_dir, self.guest_info_json_file)
-        if len(self.collected_guest_info) == 0:
-            self._display.display("Guest info is not collected", color=C.COLOR_DEBUG)
-        else:
+        if len(self.collected_guest_info) > 0:
             with open(json_file_path, 'w') as json_file:
                 json_objs = []
                 for guest_info in self.collected_guest_info.values():
@@ -947,8 +945,6 @@ class CallbackModule(CallbackBase):
                     if (esxi_build and vm_hw_version and vmtools_version):
                         guestinfo_hash = str(hash("{}{}{}".format(esxi_build, vm_hw_version, vmtools_version)))
                         if guestinfo_hash not in self.collected_guest_info:
-                            self.logger.debug(f"Collect guest info on ESXi build {esxi_build}, " +
-                                               "VM hardware version {vm_hw_version} and VMTools {vmtools_version}")
                             # Save guest info
                             vm_guest_info = VmGuestInfo(self._ansible_gosv_facts)
                             self.collected_guest_info[guestinfo_hash] = vm_guest_info
