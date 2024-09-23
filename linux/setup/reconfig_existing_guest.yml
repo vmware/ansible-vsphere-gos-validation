@@ -12,6 +12,22 @@
   include_tasks: ../utils/disable_auto_update.yml
   when: guest_os_ansible_distribution in ["Ubuntu"]
 
+# 'python3-libdnf5' is required by dnf5 module
+- name: "Install 'python3-libdnf5' on {{ guest_os_ansible_distribution }}"
+  include_tasks: ../utils/install_uninstall_package.yml
+  vars:
+    package_list: ["python3-libdnf5"]
+    package_state: "latest"
+  when: guest_os_ansible_pkg_mgr == 'dnf5'
+
+# Install python3-rpm on RedHat family OS and VMware Photon OS
+- name: "Install 'python3-rpm' on {{ guest_os_ansible_distribution }}"
+  include_tasks: ../utils/install_uninstall_package.yml
+  vars:
+    package_list: ["python3-rpm"]
+    package_state: "latest"
+  when: guest_os_ansible_pkg_mgr is search('yum|dnf')
+
 - name: "Reconfigure VMware Photon OS"
   when: guest_os_ansible_distribution == "VMware Photon OS"
   block:
@@ -34,10 +50,10 @@
       vars:
         check_update_cmd: "tdnf makecache"
 
-    - name: "Install 'sudo', 'gawk', 'python3-rpm', 'tar' on VMware Photon OS"
+    - name: "Install 'sudo', 'gawk', 'tar' on VMware Photon OS"
       include_tasks: ../utils/install_uninstall_package.yml
       vars:
-        package_list: ["sudo", "gawk", "python3-rpm", "tar"]
+        package_list: ["sudo", "gawk", "tar"]
         package_state: "latest"
 
 - name: "Reconfigure {{ guest_os_ansible_distribution }}"
