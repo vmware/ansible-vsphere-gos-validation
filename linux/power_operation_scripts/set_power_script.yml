@@ -89,7 +89,7 @@
     - power_script_type == "custom"
     - power_script_op != "suspend"
   block:
-    - name: "Get the status of file {{ script_tag_path }}"
+    - name: "Get the status of file {{ script_tag_path }} for {{ power_script_type }} {{ power_script_op }} "
       ansible.builtin.stat:
         path: "{{ script_tag_path }}"
       delegate_to: "{{ vm_guest_ip }}"
@@ -97,7 +97,7 @@
       until:
         - tag_path_exist_result.stat.exists is defined
         - tag_path_exist_result.stat.exists
-      retries: 20
+      retries: 100
       delay: 5
 
     - name: "Check the serching result"
@@ -111,7 +111,7 @@
 - name: "Check the log file"
   when: power_script_op != "suspend"
   block:
-    - name: "Search the log file"
+    - name: "Search the log file {{ script_file_path }}"
       ansible.builtin.shell: "grep {{ script_file_path }} /var/log/vmware-tools/*.log"
       delegate_to: "{{ vm_guest_ip }}"
       register: result_search_str
