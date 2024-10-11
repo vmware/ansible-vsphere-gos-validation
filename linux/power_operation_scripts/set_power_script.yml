@@ -49,7 +49,7 @@
     success_msg: "Successfully found the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
 
 - name: "Shutdown and then power on guest OS"
-  when: power_script_op in ['power', 'shutdown']
+  when: power_script_op in ['power']
   block:
     - name: "Shutdown VM"
       include_tasks: ../../common/vm_set_power_state.yml
@@ -60,6 +60,14 @@
       include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: "powered-on"
+
+- name: "Reboot guest OS"
+  when: power_script_op in ['shutdown']
+  block:
+    - name: "Shutdown VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: "reboot-guest"
 
 - name: "Suspend and resume VM"
   when: power_script_op in ['suspend', 'resume']
