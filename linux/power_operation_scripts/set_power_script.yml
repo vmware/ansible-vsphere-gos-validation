@@ -39,9 +39,6 @@
   register: tools_conf_content_result
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Print content of file tools.conf"
-  ansible.builtin.debug: var=tools_conf_content_result
-
 - name: "Check the configuration is expected in tools.conf"
   ansible.builtin.assert:
     that:
@@ -50,6 +47,10 @@
       - tools_conf_content_result.stdout.find(script_file_in_conf_file) != -1
     fail_msg: "Failed to find the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
     success_msg: "Successfully found the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
+
+- name: "Pause 10 seconds to wait configure take affected"
+  ansible.builtin.pause:
+    seconds: 10
 
 - name: "Shutdown and then Poweron guest OS for {{ power_script_type }} {{ power_script_op }}"
   when: power_script_op in ['power', 'shutdown']
@@ -90,9 +91,6 @@
   ansible.builtin.command: "cat {{ vmtools_config_file }}"
   register: tools_conf_content_result
   delegate_to: "{{ vm_guest_ip }}"
-
-- name: "Print content of file tools.conf after {{ power_script_type }} {{ power_script_op }}"
-  ansible.builtin.debug: var=tools_conf_content_result
 
 - name: "Check the script file running as expected"
   when:
