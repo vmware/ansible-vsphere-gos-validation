@@ -51,13 +51,18 @@
     fail_msg: "Failed to find the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
     success_msg: "Successfully found the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
 
-- name: "Reboot guest OS for {{ power_script_type }} {{ power_script_op }}"
+- name: "Shutdown and then Poweron guest OS for {{ power_script_type }} {{ power_script_op }}"
   when: power_script_op in ['power', 'shutdown']
   block:
-    - name: "Reboot VM for {{ power_script_type }} {{ power_script_op }}"
+    - name: "Shutdown VM for {{ power_script_type }} {{ power_script_op }}"
       include_tasks: ../../common/vm_set_power_state.yml
       vars:
-        vm_power_state_set: "reboot-guest"
+        vm_power_state_set: "shutdown-guest"
+
+    - name: "Poweron VM for {{ power_script_type }} {{ power_script_op }}"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: "powered-on"
 
 - name: "Suspend and resume VM for {{ power_script_type }} {{ power_script_op }}"
   when: power_script_op in ['suspend', 'resume']
