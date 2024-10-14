@@ -48,7 +48,7 @@
     fail_msg: "Failed to find the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
     success_msg: "Successfully found the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
 
-- name: "Pause 10 seconds to wait configure take affected"
+- name: "Pause 10 seconds to wait configure take effect"
   ansible.builtin.pause:
     seconds: 10
 
@@ -60,7 +60,7 @@
       vars:
         vm_power_state_set: "shutdown-guest"
 
-    - name: "Poweron VM for {{ power_script_type }} {{ power_script_op }}"
+    - name: "Power on VM for {{ power_script_type }} {{ power_script_op }}"
       include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: "powered-on"
@@ -81,11 +81,6 @@
 
 - name: "Update inventory"
   include_tasks: ../../common/update_inventory.yml
-
-- name: "Wait for VMware Tools running"
-  include_tasks: ../../common/vm_wait_vmtools_status.yml
-  vars:
-    vm_wait_vmtools_running: true
 
 - name: "Get content of file tools.conf after {{ power_script_type }} {{ power_script_op }}"
   ansible.builtin.command: "cat {{ vmtools_config_file }}"
@@ -109,7 +104,7 @@
       retries: 30
       delay: 5
 
-    - name: "Check the serching result"
+    - name: "Check the searching result"
       ansible.builtin.assert:
         that:
           - tag_path_exist_result.stat.exists is defined
@@ -121,7 +116,7 @@
   when: power_script_op != "suspend"
   block:
     - name: "Search the log file {{ script_file_path }}"
-      ansible.builtin.shell: "grep {{ script_file_path | basename }} *.log"
+      ansible.builtin.shell: "grep {{ script_file_path }} *.log"
       args:
         chdir: "/var/log/vmware-tools"
       delegate_to: "{{ vm_guest_ip }}"
