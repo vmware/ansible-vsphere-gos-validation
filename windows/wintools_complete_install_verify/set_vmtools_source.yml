@@ -15,14 +15,19 @@
     vmtools_esxi_bundled: "{{ (vmtools_url_path is undefined or not vmtools_url_path) and (vmtools_iso_path is undefined or not vmtools_iso_path) }}"
   when: vmtools_esxi_bundled is undefined
 
+- name: "Skip test case"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: "Skip test case due to bundled VMware Tools does not support 32bit Windows VM on ESXi {{ esxi_version }}."
+    skip_reason: "Not Supported"
+  when:
+    - esxi_version is version('8.0.3', '>')
+    - vmtools_esxi_bundled | bool
+    - guest_os_ansible_architecture == '32-bit'
+
 - name: "Set ESXi bundled VMware Tools ISO path"
   ansible.builtin.set_fact:
-    vmtools_iso_path: |-
-      {%- if guest_os_ansible_architecture == '32-bit' and esxi_version is version('8.0.3', '>') -%}
-      [] /vmimages/tools-isoimages/windows-x86.iso
-      {%- else -%}
-      [] /vmimages/tools-isoimages/windows.iso
-      {%- endif -%}
+    vmtools_iso_path: "[] /vmimages/tools-isoimages/windows.iso"
   when: vmtools_esxi_bundled | bool
 
 - name: "Download VMware Tools ISO from URL"
