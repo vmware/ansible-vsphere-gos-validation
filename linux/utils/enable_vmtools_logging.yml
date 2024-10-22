@@ -22,10 +22,13 @@
 # VMware Tools config file on FreeBSD with open-vm-tools 10.1.x or later
 - name: "Set fact of VMware Tools config file for FreeBSD"
   ansible.builtin.set_fact:
-    vmtools_config_file: "/usr/local/share/vmware-tools/tools.conf"
+    vmtools_config_file: |-
+      {%- if vmtools_version is version('12.5.0', '>=') -%}/etc/vmware-tools/tools.conf
+      {%- elif vmtools_version is version('10.1.0', '>=') -%}/usr/local/share/vmware-tools/tools.conf
+      {%- else -%}unknown
+      {%- endif -%}
   when:
     - guest_os_ansible_distribution == 'FreeBSD'
-    - vmtools_version is version('10.1.0', '>=')
 
 - name: "Set facts of VMware Tools log files"
   ansible.builtin.set_fact:
