@@ -1,0 +1,50 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# Unmount a CDROM device in guest OS
+# Parameters:
+#   guest_cdrom_device: The CDROM device. For example, /dev/sr0.
+#   guest_cdrom_mount: The CDROM device mount point. For example, /mnt/cdrom
+#   guest_fstab_path (Optional): The path of fstab in guest OS.
+#     Default is /etc/fstab.
+#
+- name: "Set fact of the default path of fstab"
+  ansible.builtin.set_fact:
+    guest_fstab_path: "/etc/fstab"
+  when: guest_fstab_path is undefined or not guest_fstab_path
+
+# The mount of CDROM device might be present in fstab, remove it firstly
+# Ignore errors if it doesn't exist
+- name: "Remove the CDROM device entry from {{ guest_fstab_path }}"
+  ansible.posix.mount:
+    src: "{{ guest_cdrom_device }}"
+    path: "{{ guest_cdrom_mount }}"
+    state: absent_from_fstab
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: true
+
+- name: "Umount the CDROM device {{ guest_cdrom_device }}"
+  ansible.posix.mount:
+    src: "{{ guest_cdrom_device }}"
+    path: "{{ guest_cdrom_mount }}"
+    state: unmounted
+  delegate_to: "{{ vm_guest_ip }}"
+  register: unmount_cdrom_result
+
+- name: "Print the result of unmounting CDROM device {{ guest_cdrom_device }}"
+  debug: var=unmount_cdrom_result
+
+- name: "Wait for CDROM is unmounted"
+  ansible.builtin.setup:
+    filter: "ansible_mounts"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: wait_cdrom_unmounted
+  until:
+    - wait_cdrom_unmounted.ansible_mounts is defined
+    - wait_cdrom_unmounted.ansible_mounts | selectattr('device', 'equalto', guest_cdrom_device) | length == 0
+  retries: 10
+  delay: 5
+  ignore_errors: true
+
+- name: "Print the result of waiting for CDROM unmounted"
+  ansible.builtin.debug: var=wait_cdrom_unmounted
