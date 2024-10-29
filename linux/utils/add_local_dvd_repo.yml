@@ -80,23 +80,22 @@
 - name: "Print CDROM device mount fact"
   ansible.builtin.debug: var=guest_cdrom_mount_fact
 
-- name: "Umount CDROM device if it has been mounted"
-  ansible.posix.mount:
-    path: "{{ item.mount }}"
-    state: absent
-  delegate_to: "{{ vm_guest_ip }}"
+- name: "Umount auto mounted CDROM device"
+  include_tasks: set_mount_point.yml
+  vars:
+    mount_point_path: "{{ item.mount }}"
+    mount_point_src: "{{ item.device }}"
+    mount_state: "unmounted"
   with_items: "{{ guest_cdrom_mount_fact }}"
   when: guest_cdrom_mount_fact | length >= 1
 
 - name: "Mount CDROM device to {{ guest_cdrom_mount_path }}"
-  ansible.posix.mount:
-    path: "{{ guest_cdrom_mount_path }}"
-    src: "/dev/{{ guest_cdrom_device_name }}"
-    fstype: iso9660
-    state: ephemeral
-  register: guest_cdrom_mount_result
-  become: true
-  delegate_to: "{{ vm_guest_ip }}"
+  include_tasks: set_mount_point.yml
+  vars:
+    mount_point_path: "{{ guest_cdrom_mount_path }}"
+    mount_point_src: "/dev/{{ guest_cdrom_device_name }}"
+    mount_state: "mounted"
+    mount_fstype: "iso9660"
 
 - name: "Set the local DVD repository name"
   ansible.builtin.set_fact:

@@ -6,8 +6,7 @@
 # Parameters:
 #   mount_point_path: The path to mount or unmount
 #   mount_point_src: The source device or volume to mount
-#   mount_state: The state of mount point, which could be absent, mounted,
-#                present, unmounted, or remounted.
+#   mount_state: The state of mount point, which could be: mounted or unmounted
 #   mount_fstype: The filesystem type of mount point
 #   mount_opts: The mount options
 #
@@ -17,7 +16,7 @@
       - mount_point_path is defined
       - mount_point_path
       - mount_state is defined
-      - mount_state in ['absent', 'mounted', 'present', 'unmounted', 'remounted']
+      - mount_state in ['mounted', 'unmounted']
     fail_msg: "Either mount_point_path or mount_state is incorrect."
 
 - name: "Check mount_point_src is set for mounting"
@@ -28,7 +27,7 @@
       - mount_fstype is defined
       - mount_fstype
     fail_msg: "Either mount_point_src or mount_fstype is not set for mounting"
-  when: mount_state in ['mounted', 'present', 'remounted']
+  when: mount_state == 'mounted'
 
 - name: "Check {{ mount_point_path }} exists"
   include_tasks: get_file_stat_info.yml
@@ -44,12 +43,12 @@
         state: directory
         mode: "0755"
       delegate_to: "{{ vm_guest_ip }}"
-      when: mount_state in ['mounted', 'present', 'remounted']
+      when: mount_state == 'mounted'
 
     - name: "Can't unmount not existing mount point {{ mount_point_path }}"
       ansible.builtin.fail:
         msg: "The mount point path {{ mount_point_path }} doesn't exist, which can't be unmounted"
-      when: mount_state in ['absent', 'unmounted']
+      when: mount_state == 'unmounted'
 
 - name: "Set mount point {{ mount_point_path }} to {{ mount_state }}"
   ansible.posix.mount:
@@ -57,10 +56,28 @@
     src: "{{ mount_point_src | default(omit) }}"
     fstype: "{{ mount_fstype | default(omit) }}"
     opts: "{{ mount_opts | default(omit) }}"
-    state: "{{ mount_state }}"
+    state: "{{ 'ephemeral' if mount_state == 'mounted' else mount_state }}"
   delegate_to: "{{ vm_guest_ip }}"
   register: set_mount_point_result
 
 - name: "Print the result of setting mount point {{ mount_point_path }} to {{ mount_state }}"
   ansible.builtin.debug: var=set_mount_point_result
   when: enable_debug
+
+- name: "Wait for device unmounted"
+  when: mount_state == 'unmounted'
+  block:
+    - name: "Wait for device unmounted"
+      ansible.builtin.setup:
+        filter: "ansible_mounts"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: wait_device_unmounted
+      until:
+        - wait_device_unmounted.ansible_facts.ansible_mounts is defined
+        - wait_device_unmounted.ansible_facts.ansible_mounts | selectattr('mount', 'equalto', mount_point_path) | length == 0
+      retries: 10
+      delay: 5
+      ignore_errors: true
+    
+    - name: "Print the result of waiting for device unmounted"
+      ansible.builtin.debug: var=wait_device_unmounted
