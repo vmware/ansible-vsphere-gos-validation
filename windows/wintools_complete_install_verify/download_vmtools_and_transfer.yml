@@ -1,18 +1,24 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Download VMware tools from specified URL and transfer to ESXi host datastore
-- name: Set fact of VMware tools ISO file name
+# Download VMware Tools from specified URL and transfer to ESXi host
+- name: "Set fact of VMware Tools ISO file name"
   ansible.builtin.set_fact:
-    win_vmtools_iso_download: "{{ vmtools_url_path.split('/')[-1] }}"
-- name: Set fact of the VMware tools ISO path on ESXi host datatore
-  ansible.builtin.set_fact:
-    vmtools_iso_path: "[{{ datastore }}] {{ win_vmtools_iso_download }}"
+    win_vmtools_iso_name: "{{ vmtools_url_path.split('/')[-1] }}"
 
-- name: Download VMware tools ISO file
+- name: "Set facts of VMware Tools ISO file paths"
+  ansible.builtin.set_fact:
+    vmtools_iso_local_path: "{{ local_cache }}/{{ win_vmtools_iso_name }}"
+    vmtools_iso_ds_path: "{{ vm_dir_name }}/{{ win_vmtools_iso_name }}"
+
+- name: "Set fact of VMware Tools ISO datatore path on ESXi host"
+  ansible.builtin.set_fact:
+    vmtools_iso_path: "[{{ datastore }}] {{ vmtools_iso_ds_path }}"
+
+- name: "Download VMware Tools ISO file to local"
   get_url:
     url: "{{ vmtools_url_path }}"
-    dest: "{{ local_cache }}/{{ win_vmtools_iso_download }}"
+    dest: "{{ vmtools_iso_local_path }}"
     validate_certs: false
     use_proxy: "{{ use_localhost_proxy | default(false) }}"
   environment:
@@ -20,12 +26,13 @@
     HTTP_PROXY: "{{ http_proxy_localhost | default(omit) }}"
     FTP_PROXY: "{{ http_proxy_localhost | default(omit) }}"
 
-# Copy downloaded VMware tools ISO file to ESXi host
-- include_tasks: ../../common/esxi_upload_datastore_file.yml
+- name: "Copy downloaded VMware Tools ISO file to ESXi host"
+  include_tasks: ../../common/esxi_upload_datastore_file.yml
   vars:
-    src_file_path: "{{ local_cache }}/{{ win_vmtools_iso_download }}"
-    dest_file_path: "{{ win_vmtools_iso_download }}"
+    src_file_path: "{{ vmtools_iso_local_path }}"
+    dest_file_path: "{{ vmtools_iso_ds_path }}"
     upload_file_timeout: 900
 
-- ansible.builtin.debug:
-    msg: "VMware tools ISO file is uploaded to ESXi host: {{ vmtools_iso_path }}"
+- name: "Print VMware Tools ISO file path"
+  ansible.builtin.debug:
+    msg: "VMware Tools ISO file path on ESXi host: {{ vmtools_iso_path }}"
