@@ -1,22 +1,25 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get the driver list installed via VMware tools in Windows guest OS
+# Get the driver list installed via VMware Tools in Windows guest OS
 #
-- name: Initialize the VMware driver list
+- name: "Initialize the driver list"
   ansible.builtin.set_fact:
     vmtools_driver_list: []
 
-- include_tasks: win_execute_cmd.yml
+- name: "Get the list of drivers with VMware or Broadcom manufacturer"
+  include_tasks: win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "get-wmiobject win32_pnpsigneddriver | where-object {$_.Manufacturer -match 'VMware'} | select DeviceName, DriverVersion, IsSigned | ft -hide"
+    win_powershell_cmd: "Get-WmiObject Win32_PnpSignedDriver | where-object {$_.Manufacturer -match 'VMware|Broadcom'} | select DeviceName, DriverVersion, IsSigned | ft -hide"
 
-- name: Set fact of the driver list
+- name: "Set fact of the driver list"
   ansible.builtin.set_fact:
     vmtools_driver_list: "{{ win_powershell_cmd_output.stdout_lines }}"
   when:
     - win_powershell_cmd_output is defined
     - win_powershell_cmd_output.stdout_lines is defined
     - win_powershell_cmd_output.stdout_lines | length != 0
-- ansible.builtin.debug:
-    msg: "Get VMware driver list: {{ vmtools_driver_list }}"
+
+- name: "Display the driver list"
+  ansible.builtin.debug:
+    msg: "Drivers with VMware or Broadcom manufacturer: {{ vmtools_driver_list }}"
