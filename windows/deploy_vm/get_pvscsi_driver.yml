@@ -2,20 +2,20 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # This task is used for getting VMware PVSCSI driver from the
-# downloaded VMware tools installation package from this path:
+# downloaded VMware Tools installation package from this path:
 # https://packages.vmware.com/tools/releases/latest/windows
 # Notes:
-# 2022-05-26, change to use VMware tools 11.3.5 due to there are
-# some changes from VMware tools 12.0.0 for pvscsi driver.
+# 2022-05-26, change to use VMware Tools 11.3.5 due to there are
+# some changes from VMware Tools 12.0.0 for pvscsi driver.
 #
 - name: Set fact of the guest OS bitness
   ansible.builtin.set_fact:
     win_vmtools_bit: "{{ 'amd64' if guest_id is search('64') else 'i386' }}"
 
-# - name: Set fact of the latest VMware tools download URL
+# - name: Set fact of the latest VMware Tools download URL
 #   ansible.builtin.set_fact:
 #     win_vmtools_url: "https://packages.vmware.com/tools/releases/latest/windows"
-# - name: Get VMware tools ISO file URL for Windows
+# - name: Get VMware Tools ISO file URL for Windows
 #   get_url:
 #     url: "{{ win_vmtools_url }}"
 #     dest: "{{ local_cache }}/windows_iso_page"
@@ -24,25 +24,25 @@
 #   environment:
 #     HTTPS_PROXY: "{{ http_proxy_localhost | default(omit) }}"
 
-# - name: Get VMware tools ISO file name
+# - name: Get VMware Tools ISO file name
 #   command: "cat {{ local_cache }}/windows_iso_page"
 #   register: get_vmtools_iso_file_result
-# - name: Set fact of the full path of VMware tools ISO URL
+# - name: Set fact of the full path of VMware Tools ISO URL
 #   ansible.builtin.set_fact:
 #     win_vmtools_iso: "{{ ((get_vmtools_iso_file_result.stdout | regex_findall('<A HREF=.*.iso'))[0].split('/')[1]) }}"
 
-- name: Set fact of the VMware tools download URL
+- name: Set fact of the VMware Tools download URL
   ansible.builtin.set_fact:
     download_vmtools_url: "https://packages.vmware.com/tools/releases/11.3.5/windows/VMware-tools-windows-11.3.5-18557794.iso"
-- name: Set fact of the VMware tools ISO file name
+- name: Set fact of the VMware Tools ISO file name
   ansible.builtin.set_fact:
     win_vmtools_iso: "{{ download_vmtools_url.split('/')[-1] }}"
 - ansible.builtin.debug:
-    msg: "Will download VMware tools install ISO file from: {{ download_vmtools_url }}, for '{{ win_vmtools_bit }}' guest OS"
-- name: Set fact of VMware tools ISO file path
+    msg: "Will download VMware Tools install ISO file from: {{ download_vmtools_url }}, for '{{ win_vmtools_bit }}' guest OS"
+- name: Set fact of VMware Tools ISO file path
   ansible.builtin.set_fact:
     download_vmtools_iso_path: "{{ local_cache }}/{{ win_vmtools_iso }}"
-- name: Download latest VMware tools ISO to local
+- name: Download latest VMware Tools ISO to local
   get_url:
     url: "{{ download_vmtools_url }}"
     dest: "{{ download_vmtools_iso_path }}"
@@ -51,17 +51,17 @@
   environment:
     HTTPS_PROXY: "{{ http_proxy_localhost | default(omit) }}"
 
-- name: Get downloaded VMware tools ISO file status
+- name: Get downloaded VMware Tools ISO file status
   ansible.builtin.stat:
     path: "{{ download_vmtools_iso_path }}"
   register: vmtools_iso_status
-- name: Check downloaded VMware tools ISO file status
+- name: Check downloaded VMware Tools ISO file status
   ansible.builtin.assert:
     that:
       - "'exists' in vmtools_iso_status.stat"
       - vmtools_iso_status.stat.exists
-    fail_msg: "Downloaded VMware tools ISO file not exist {{ download_vmtools_iso_path }}"
-    success_msg: "Downloaded VMware tools ISO file exists {{ download_vmtools_iso_path }}"
+    fail_msg: "Downloaded VMware Tools ISO file not exist {{ download_vmtools_iso_path }}"
+    success_msg: "Downloaded VMware Tools ISO file exists {{ download_vmtools_iso_path }}"
 
 - name: Extract ISO file to get PVSCSI driver
   community.general.iso_extract:
@@ -73,7 +73,7 @@
       - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/pvscsi.sys"
       - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/txtsetup.oem"
   register: vmtools_iso_extract
-- name: Display the VMware tools ISO file extract result
+- name: Display the VMware Tools ISO file extract result
   ansible.builtin.debug: var=vmtools_iso_extract
   when: enable_debug is defined and enable_debug
 

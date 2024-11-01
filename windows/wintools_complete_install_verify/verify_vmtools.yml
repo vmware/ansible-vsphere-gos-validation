@@ -34,9 +34,14 @@
       - vmtools_service_dict['VMTools'] == "Running"
     fail_msg: "'VMTools' service is not 'Running' after VMware Tools install: {{ vmtools_service_dict['VMTools'] }}"
 
-# Get VMware drivers
-- name: "Get VMware drivers list"
+- name: "Get drivers with VMware or Broadcom manufacturer"
   include_tasks: ../utils/win_get_vmtools_driver_list.yml
+
+- name: "Check drivers list not empty"
+  ansible.builtin.assert:
+    that:
+      - vmtools_driver_list | length != 0
+    fail_msg: "Not get installed drivers with VMware or Broadcom manufacturer after VMware Tools install."
 
 - name: "Get usernames of VMware Tools processes in guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
