@@ -56,30 +56,18 @@
         service_enabled: true
         service_state: "started"
 
-- name: "Enable FreeBSD service {{ service_name }}"
+- name: "Update tools.conf path and enable FreeBSD service {{ service_name }}"
   when:
     - guest_os_family == 'FreeBSD'
     - service_name == 'vmware-guestd'
   block:
-    - name: "Update tools.conf path for FreeBSD when tools is installed from source code"
+    - name: "Update tools.conf path to /etc/vmware-tools/tools.conf when tools is installed from source code"
+      ansible.builtin.replace:
+        path: "{{ service_file }}"
+        regexp: '/usr/local/share/vmware-tools/tools.conf'
+        replace: '/etc/vmware-tools/tools.conf'
+      delegate_to: "{{ vm_guest_ip }}"
       when: linux_ovt_install_type == 'source'
-      block:
-        - name: "Check file /etc/vmware-tools/tools.conf exists"
-          ansible.builtin.stat:
-            path: "/etc/vmware-tools/tools.conf"
-          register: tools_config_file_stat_result
-          delegate_to: "{{ vm_guest_ip }}"
-          ignore_errors: true
-
-        - name: "Update tools.conf path to /etc/vmware-tools/tools.conf if exists"
-          ansible.builtin.replace:
-            path: "{{ service_file }}"
-            regexp: '/usr/local/share/vmware-tools/tools.conf'
-            replace: '/etc/vmware-tools/tools.conf'
-          delegate_to: "{{ vm_guest_ip }}"
-          when:
-            - tools_config_file_stat_result.stat.exists is defined
-            - tools_config_file_stat_result.stat.exists
 
     - name: "Enable FreeBSD service {{ service_name }}"
       include_tasks: ../utils/replace_or_add_line_in_file.yml
