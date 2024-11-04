@@ -11,21 +11,20 @@
     vmtools_log_dir: "/tmp/vmware-tools"
   when: vmtools_log_dir is undefined or not vmtools_log_dir
 
-# VMware Tools config file on Linux or FreeBSD with open-vm-tools eariler than 10.1.x
+# VMware Tools config file on Linux
 - name: "Set fact of VMware Tools config file for {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
     vmtools_config_file: "/etc/vmware-tools/tools.conf"
-  when: >-
-    guest_os_ansible_distribution != 'FreeBSD' or
-    vmtools_version is version('10.1.0', '<')
+  when: guest_os_ansible_distribution != 'FreeBSD'
 
-# VMware Tools config file on FreeBSD with open-vm-tools 10.1.x or later
+# VMware Tools config file on FreeBSD
 - name: "Set fact of VMware Tools config file for FreeBSD"
   ansible.builtin.set_fact:
-    vmtools_config_file: "/usr/local/share/vmware-tools/tools.conf"
-  when:
-    - guest_os_ansible_distribution == 'FreeBSD'
-    - vmtools_version is version('10.1.0', '>=')
+    vmtools_config_file: |-
+      {%- if vmtools_install_type == 'package' -%}/usr/local/share/vmware-tools/tools.conf
+      {%- else -%}/etc/vmware-tools/tools.conf
+      {%- endif -%}
+  when: guest_os_ansible_distribution == 'FreeBSD'
 
 - name: "Set facts of VMware Tools log files"
   ansible.builtin.set_fact:

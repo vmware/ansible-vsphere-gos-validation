@@ -56,11 +56,21 @@
         service_enabled: true
         service_state: "started"
 
-- name: "Enable FreeBSD service {{ service_name }}"
+- name: "Update tools.conf path and enable FreeBSD service {{ service_name }}"
   when:
     - guest_os_family == 'FreeBSD'
     - service_name == 'vmware-guestd'
   block:
+    - name: "Update tools.conf path to /etc/vmware-tools/tools.conf when tools is installed from source code"
+      ansible.builtin.replace:
+        path: "{{ service_file }}"
+        regexp: '-c .*tools.conf'
+        replace: '-c /etc/vmware-tools/tools.conf'
+      delegate_to: "{{ vm_guest_ip }}"
+      when:
+        - service_file_local_path is defined
+        - service_file_local_path
+
     - name: "Enable FreeBSD service {{ service_name }}"
       include_tasks: ../utils/replace_or_add_line_in_file.yml
       vars:
