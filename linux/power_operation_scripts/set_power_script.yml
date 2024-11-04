@@ -115,54 +115,26 @@
 - name: "Check the log file"
   when: power_script_op != "suspend"
   block:
-    - name: "Check the log file in {{ guest_os_ansible_distribution }}"
-      when: guest_os_ansible_distribution != 'FreeBSD'
-      block:
-        - name: "Search the log file {{ script_file_path }} in {{ guest_os_ansible_distribution }}"
-          ansible.builtin.shell: "grep {{ script_file_path }} *.log"
-          args:
-            chdir: "/var/log/vmware-tools"
-          delegate_to: "{{ vm_guest_ip }}"
-          register: result_search_str
-          until:
-            - result_search_str.rc is defined
-            - result_search_str.rc == 0
-          retries: 30
-          delay: 5
-          ignore_errors: true
+    - name: "Search the log file {{ script_file_path }} in {{ guest_os_ansible_distribution }}"
+      ansible.builtin.shell: "grep {{ script_file_path }} *.log"
+      args:
+        chdir: "/var/log/vmware-tools"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: result_search_str
+      until:
+        - result_search_str.rc is defined
+        - result_search_str.rc == 0
+      retries: 30
+      delay: 5
+      ignore_errors: true
 
-        - name: "Check the serching result"
-          ansible.builtin.assert:
-            that:
-              - result_search_str.rc is defined
-              - result_search_str.rc == 0
-            fail_msg: "Failed to find the {{ script_file_path }} in {{ vmtools_vmsvc_log_file }} for {{ power_script_type }} {{ power_script_op }}."
-            success_msg: "Successfully found the {{ script_file_path }} in {{ vmtools_vmsvc_log_file }} for {{ power_script_type }} {{ power_script_op }}."
-   
-    - name: "Check the log file in {{ guest_os_ansible_distribution }}"
-      when: guest_os_ansible_distribution == 'FreeBSD'
-      block:
-        - name: "Search the log file {{ script_file_path }} in {{ guest_os_ansible_distribution }}"
-          ansible.builtin.shell: "grep {{ script_file_path }} *vmsvc*.log ./vmware-tools/*.log"
-          args:
-            chdir: "/var/log"
-          delegate_to: "{{ vm_guest_ip }}"
-          register: result_search_str
-          until:
-            - result_search_str.failed_when_result is defined
-            - not result_search_str.failed_when_result
-          retries: 30
-          delay: 5
-          ignore_errors: true
-          failed_when: result_search_str.stdout is undefined or result_search_str.stdout is not search(script_file_path)
-
-        - name: "Check the serching result"
-          ansible.builtin.assert:
-            that:
-              - result_search_str.failed_when_result is defined
-              - not result_search_str.failed_when_result
-            fail_msg: "Failed to find the {{ script_file_path }} in /var/log or /var/log/vmware-tools for {{ power_script_type }} {{ power_script_op }}."
-            success_msg: "Successfully found the {{ script_file_path }} in /var/log or /var/log/vmware-tools for {{ power_script_type }} {{ power_script_op }}."
+    - name: "Check the serching result"
+      ansible.builtin.assert:
+        that:
+          - result_search_str.rc is defined
+          - result_search_str.rc == 0
+        fail_msg: "Failed to find the {{ script_file_path }} in {{ vmtools_vmsvc_log_file }} for {{ power_script_type }} {{ power_script_op }}."
+        success_msg: "Successfully found the {{ script_file_path }} in {{ vmtools_vmsvc_log_file }} for {{ power_script_type }} {{ power_script_op }}."
 
 - name: "Cleanup current {{ power_script_op }} script configuration"
   ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} script {{ power_script_op }} disable"
