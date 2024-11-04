@@ -64,10 +64,12 @@
     - name: "Update tools.conf path to /etc/vmware-tools/tools.conf when tools is installed from source code"
       ansible.builtin.replace:
         path: "{{ service_file }}"
-        regexp: '/usr/local/share/vmware-tools/tools.conf'
-        replace: '/etc/vmware-tools/tools.conf'
+        regexp: '-c .*tools.conf'
+        replace: '-c /etc/vmware-tools/tools.conf'
       delegate_to: "{{ vm_guest_ip }}"
-      when: linux_ovt_install_type == 'source'
+      when:
+        - service_file_local_path is defined
+        - service_file_local_path
 
     - name: "Enable FreeBSD service {{ service_name }}"
       include_tasks: ../utils/replace_or_add_line_in_file.yml
