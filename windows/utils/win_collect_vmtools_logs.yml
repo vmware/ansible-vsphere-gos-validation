@@ -1,0 +1,27 @@
+# Copyright 2023-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Collect VMWare tools logs to local test case log directory
+#
+- name: "Initialize facts for collecting VMware Tools logs"
+  ansible.builtin.set_fact:
+    vmtools_log_file_src: "{{ vmtools_log_file }}"
+    vmtools_log_file_exists: false
+
+- name: "Check log file exists or not"
+  include_tasks: ../utils/win_check_file_exist.yml
+  vars:
+    win_check_file_exist_file: "{{ vmtools_log_file_src }}"
+
+- name: "Set fact of VMware Tools log file existence"
+  ansible.builtin.set_fact:
+    vmtools_log_file_exists: "{{ win_check_file_exist_result }}"
+
+- name: "Collect VMware Tools log file"
+  when: vmtools_log_file_exists
+  block:
+    - name: "Get VMWare tools log file"
+      include_tasks: win_get_file.yml
+      vars:
+        win_get_file_src_path: "{{ vmtools_log_file_src }}"
+        win_get_file_dst_path: "{{ current_test_log_folder }}"

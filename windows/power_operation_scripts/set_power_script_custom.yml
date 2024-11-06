@@ -1,0 +1,38 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Set and check customized power operation script
+# Parameters:
+#   power_cmd_op: power operation
+# Return:
+#   script_file_path: path of customized script file
+#   script_tag_path: path of tag file created by customized script file
+#   script_file_in_conf_file: the script file in tools.conf
+
+- name: "Set fact of customized script file"
+  ansible.builtin.set_fact:
+    script_file_path: "C:\\Users\\Administrator\\AppData\\Local\\Temp\\{{ power_cmd_op }}-vm-custom.bat"
+    script_tag_path: "C:\\Users\\Administrator\\AppData\\Local\\Temp\\{{ power_cmd_op }}.tag"
+    script_file_in_conf_file: "C:\\Users\\Administrator\\AppData\\Local\\Temp\\{{ power_cmd_op }}-vm-custom.bat"
+
+- name: "Remove the existing tag files for {{ power_cmd_op }} script"
+  ansible.builtin.file:
+    path: "{{ script_tag_path }}"
+    state: absent
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Create and add/replace content for file {{ script_file_path }}"
+  ansible.builtin.lineinfile:
+    path: "{{ script_file_path }}"
+    state: present
+    create: yes
+    mode: '0777'
+    regexp: '^type.*'
+    line: "type nul >> {{ script_tag_path }}"
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Set script file for {{ power_cmd_op }} script"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "& '{{ vmware_toolbox_cmd_path }}' script {{ power_cmd_op }} set '{{ script_file_path }}'"
