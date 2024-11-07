@@ -30,7 +30,7 @@
     that:
       - script_file_path
       - power_script_result.stdout is defined
-      - power_script_result.stdout.strip() == script_file_path
+      - power_script_result.stdout.rstrip() == script_file_path
     fail_msg: "The {{ power_script_op }} script is {{ power_script_result.stdout | default('') }}, not expected {{ script_file_path }}."
     success_msg: "The {{ power_script_op }} script is set to the expected one {{ power_script_result.stdout | default('') }}."
 
@@ -44,7 +44,7 @@
     that:
       - script_file_in_conf_file
       - tools_conf_content_result.stdout is defined
-      - tools_conf_content_result.stdout.find(script_file_in_conf_file | basename) != -1
+      - tools_conf_content_result.stdout.find(script_file_in_conf_file) != -1
     fail_msg: "Failed to find the '{{ script_file_in_conf_file }}' in tool.conf for {{ power_script_op }} script."
     success_msg: "Successfully found the '{{ script_file_in_conf_file }}' in tool.conf for {{ power_script_op }} script."
 
@@ -118,7 +118,7 @@
     - name: "Search the log file {{ script_file_path }} in {{ guest_os_ansible_distribution }}"
       ansible.windows.win_shell: "& grep {{ script_file_path | basename }} *.log"
       args:
-        chdir: "C:\\ProgramData\\VMware\\logs"
+        chdir: "C:\\ProgramData\\VMware\\VMware Tools\\logs"
       delegate_to: "{{ vm_guest_ip }}"
       register: result_search_str
       until:

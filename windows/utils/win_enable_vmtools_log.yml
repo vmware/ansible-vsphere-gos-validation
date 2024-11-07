@@ -4,16 +4,16 @@
 # Enable debug logging for vmtools within Windows guest OS
 # See https://knowledge.broadcom.com/external/article?legacyId=1007873 for details.
 #
-- name: "Set facts of VGAuthService config file"
+- name: "Set fact of VMware tools config file"
   ansible.builtin.set_fact:
     vmtools_config_file: "C:\\ProgramData\\VMware\\VMware Tools\\tools.conf"
 
-- name: "Check vmtools config file exists or not"
+- name: "Check VMware tools config file exists or not"
   include_tasks: win_check_file_exist.yml
   vars:
     win_check_file_exist_file: "{{ vmtools_config_file }}"
 
-- name: "Add vmtools config file with logging options"
+- name: "Add VMware tools config file with logging options"
   include_tasks: win_write_to_file.yml
   vars:
     write_file_path: "{{ vmtools_config_file }}"
@@ -30,10 +30,4 @@
       vmsvc.level = debug
       vmsvc.handler = file
       vmsvc.data = C:\\ProgramData\\VMware\\VMware Tools\\vmsvc.log
-  when: not win_check_file_exist_result
-
-- name: "Save vmtools config file to local log directory"
-  include_tasks: win_get_file.yml
-  vars:
-    win_get_file_src_path: "{{ vmtools_config_file }}"
-    win_get_file_dst_path: "{{ current_test_log_folder }}"
+  when: win_check_file_exist_result
