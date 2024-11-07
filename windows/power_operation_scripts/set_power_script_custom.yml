@@ -17,18 +17,17 @@
     script_file_in_conf_file: "C:\\Users\\Administrator\\AppData\\Local\\Temp\\{{ power_cmd_op }}-vm-custom.bat"
 
 - name: "Remove the existing tag files for {{ power_cmd_op }} script"
-  ansible.builtin.file:
+  ansible.windows.win_file:
     path: "{{ script_tag_path }}"
     state: absent
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Create and add/replace content for file {{ script_file_path }}"
-  ansible.builtin.lineinfile:
+  community.windows.win_lineinfile:
     path: "{{ script_file_path }}"
     state: present
     create: yes
-    mode: '0777'
-    regexp: '^fsutil.*'
+    regex: '^fsutil.*'
     line: "fsutil file createNew '{{ script_tag_path }}' 10"
   delegate_to: "{{ vm_guest_ip }}"
 
