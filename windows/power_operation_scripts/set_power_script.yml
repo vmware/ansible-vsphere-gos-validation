@@ -4,8 +4,8 @@
 # Description:
 #   Set and check soft power operation
 # Parameters:
-#   power_script_op: power script operation
-#   power_script_type: default or custom
+#   power_script_op: power script operation: power/shutdown/suspend/resume
+#   power_script_type: power script type: default/custom
 
 - name: "Start to test {{ power_script_type }} {{ power_script_op }} script"
   ansible.builtin.debug:
@@ -18,33 +18,33 @@
     power_cmd_op: "{{ power_script_op }}"
 
 - name: "Check the current configuration for {{ power_script_op }} script"
-  ansible.windows.win_shell: "& '{{ vmware_toolbox_cmd_path }}' script {{ power_script_op }} current"
-  register: power_script_result
-  delegate_to: "{{ vm_guest_ip }}"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "& '{{ vmware_toolbox_cmd_path }}' script {{ power_script_op }} current"
 
 - name: "Print the current configuration for {{ power_script_op }} script"
-  ansible.builtin.debug: var=power_script_result
+  ansible.builtin.debug: var=win_powershell_cmd_output
 
 - name: "Check current configuration is expected"
   ansible.builtin.assert:
     that:
       - script_file_path
-      - power_script_result.stdout is defined
-      - power_script_result.stdout.rstrip() == script_file_path
-    fail_msg: "The {{ power_script_op }} script is {{ power_script_result.stdout | default('') }}, not expected {{ script_file_path }}."
-    success_msg: "The {{ power_script_op }} script is set to the expected one {{ power_script_result.stdout | default('') }}."
+      - win_powershell_cmd_output.stdout is defined
+      - win_powershell_cmd_output.stdout.rstrip() == script_file_path
+    fail_msg: "The {{ power_script_op }} script is {{ win_powershell_cmd_output.stdout | default('') }}, not expected {{ script_file_path }}."
+    success_msg: "The {{ power_script_op }} script is set to the expected one {{ win_powershell_cmd_output.stdout | default('') }}."
 
 - name: "Get content of file tools.conf"
-  ansible.windows.win_shell: "& type '{{ vmtools_config_file }}'"
-  register: tools_conf_content_result
-  delegate_to: "{{ vm_guest_ip }}"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "& type '{{ vmtools_config_file }}'"
 
 - name: "Check the configuration is expected in tools.conf"
   ansible.builtin.assert:
     that:
       - script_file_in_conf_file
-      - tools_conf_content_result.stdout is defined
-      - tools_conf_content_result.stdout.find(script_file_in_conf_file | win_basename) != -1
+      - win_powershell_cmd_output.stdout is defined
+      - win_powershell_cmd_output.stdout.find(script_file_in_conf_file | win_basename) != -1
     fail_msg: "Failed to find the '{{ script_file_in_conf_file | win_basename }}' in tools.conf for {{ power_script_op }} script."
     success_msg: "Successfully found the '{{ script_file_in_conf_file | win_basename }}' in tools.conf for {{ power_script_op }} script."
 
@@ -86,11 +86,6 @@
   include_tasks: ../utils/win_wait_service_status.yml
   vars:
     win_service_name: 'VMTools'
-
-- name: "Get content of file tools.conf after {{ power_script_type }} {{ power_script_op }}"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "& type '{{ vmtools_config_file }}'"
 
 - name: "Check the script file running as expected"
   when:
