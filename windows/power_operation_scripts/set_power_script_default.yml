@@ -11,22 +11,28 @@
     script_file_in_conf_file: ""
 
 - name: "Get default power script file path"
-  ansible.windows.win_shell: "& '{{ vmware_toolbox_cmd_path }}' script {{ power_cmd_op }} default"
-  register: power_script_path_result
-  delegate_to: "{{ vm_guest_ip }}"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "& '{{ vmware_toolbox_cmd_path }}' script {{ power_cmd_op }} default"
 
 - name: "Set fact of default power script file path"
   ansible.builtin.set_fact:
-    script_file_path: "{{ power_script_path_result.stdout.rstrip() }}"
-    script_file_in_conf_file: "{{ power_script_path_result.stdout.rstrip() | win_basename }}"
+    script_file_path: "{{ win_powershell_cmd_output.stdout.rstrip() }}"
+    script_file_in_conf_file: "{{ win_powershell_cmd_output.stdout.rstrip() | win_basename }}"
   when: 
-    - power_script_path_result.stdout is defined
-    - power_script_path_result.stdout
+    - win_powershell_cmd_output.stdout is defined
+    - win_powershell_cmd_output.stdout
 
 - name: "Check script file exists"
   include_tasks: ../utils/win_check_file_exist.yml
   vars:
     win_check_file_exist_file: "{{ script_file_path }}"
+
+- name: "Make sure default script script exists in guest OS"
+  ansible.builtin.assert:
+    that:
+      - win_check_file_exist_result
+    fail_msg: "The default script script_file_path is not found in guest OS"
 
 - name: "Set default script file for {{ power_cmd_op }} script"
   include_tasks: ../utils/win_execute_cmd.yml
