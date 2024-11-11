@@ -3,10 +3,7 @@
 ---
 # Description:
 #   Set and check soft power operation
-# Parameters:
-#   power_script_op: power script operation: power/shutdown/suspend/resume
-#   power_script_type: power script type: default/custom
-
+#
 - name: "Start to test {{ power_script_type }} {{ power_script_op }} script"
   ansible.builtin.debug:
     msg:
@@ -103,6 +100,7 @@
         - tag_path_exist_result.stat.exists
       retries: 30
       delay: 5
+      ignore_errors: true
 
     - name: "Check the searching result"
       ansible.builtin.assert:
@@ -116,7 +114,7 @@
   when: power_script_op != "suspend"
   block:
     - name: "Search the log file {{ script_file_path }} in {{ guest_os_ansible_distribution }}"
-      ansible.windows.win_shell: "& findstr '.*{{ script_file_path | win_basename }}' *.log"
+      ansible.windows.win_shell: "& findstr '.*{{ script_file_path | win_basename }}' vmsvc.log"
       args:
         chdir: "C:\\ProgramData\\VMware\\VMware Tools"
       delegate_to: "{{ vm_guest_ip }}"
