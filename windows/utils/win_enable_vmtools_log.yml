@@ -4,35 +4,20 @@
 # Enable debug logging for vmtools within Windows guest OS
 # See https://knowledge.broadcom.com/external/article?legacyId=1007873 for details.
 #
-- name: "Set fact of VMware tools config file"
-  ansible.builtin.set_fact:
-    vmtools_config_file: "C:\\ProgramData\\VMware\\VMware Tools\\tools.conf"
+- name: "Check and create VMware Tools config file"
+  include_tasks: win_check_create_vmtools_conf.yml
 
-- name: "Check VMware Tools config file exists or not"
-  include_tasks: win_check_file_exist.yml
-  vars:
-    win_check_file_exist_file: "{{ vmtools_config_file }}"
-
-- name: "Create VMware Tools config file if it doesn't exists"
-  include_tasks: win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "& fsutil file createNew '{{ vmtools_config_file }}' 10000"
-  when: not win_check_file_exist_result
-
-- name: "Add VMware Tools config file with logging options"
-  include_tasks: win_write_to_file.yml
-  vars:
-    write_file_path: "{{ vmtools_config_file }}"
-    write_file_content: |
-      [logging]
-      log = true
-
-      # Enable VMware Tools service logging to a file.
-      vmtoolsd.level = debug
-      vmtoolsd.handler = file
-      vmtoolsd.data = C:\\ProgramData\\VMware\\VMware Tools\\vmtoolsd.log
-
-      # Enable "vmsvc" service logging to a file.
-      vmsvc.level = debug
-      vmsvc.handler = file
-      vmsvc.data = C:\\ProgramData\\VMware\\VMware Tools\\vmsvc.log
+- name: "Enable vss log in VMware Tools config file"
+  community.windows.win_lineinfile:
+    path: "{{ vmtools_conf_path }}"
+    regexp: "{{ item.key }}"
+    line: "{{ item.value }}"
+  loop:
+    - {key: '^#log = true.*', value: 'log = true'}
+    - {key: '^#vmtoolsd.level.*', value: 'vmtoolsd.level = debug'}
+    - {key: '^#vmtoolsd.handler.*', value: 'vmtoolsd.handler = file'}
+    - {key: '^#vvmtoolsd.data.*', value: 'vmtoolsd.data = C:\\ProgramData\\VMware\\VMware Tools\\vmtoolsd.log'}
+    - {key: '^#vmsvc.level.*', value: 'vmsvc.level = debug'}
+    - {key: '^#vmsvc.handler.*', value: 'vmsvc.handler = file'}
+    - {key: '^#vmsvc.data.*', value: 'vmsvc.data = C:\\ProgramData\\VMware\\VMware Tools\\vmsvc.log'}
+  delegate_to: "{{ vm_guest_ip }}"
