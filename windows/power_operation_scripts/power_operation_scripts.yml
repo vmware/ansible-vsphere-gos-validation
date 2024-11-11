@@ -1,0 +1,63 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for checking power operation scripts are executed as expected in Windows guest OS with VMware Tools installed.
+# When VMware Tools is not installed or not running in VM, this test case result is 'Blocked'.
+#
+- name: power_operation_scripts
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            skip_test_no_vmtools: true
+
+        - name: "Enable debug logging for VMware Tools"
+          include_tasks: ../utils/win_enable_vmtools_log.yml
+        
+        - name: "Remove the existing log files"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "& del 'C:\\ProgramData\\VMware\\VMware Tools\\vmsvc*.log'"
+            win_execute_cmd_ignore_error: true
+
+        - name: "Set fact of the path of VMwareToolboxCmd.exe"
+          ansible.builtin.set_fact:
+            vmware_toolbox_cmd_path: "C:\\Program Files\\VMware\\VMware Tools\\VMwareToolboxCmd.exe"
+
+        - name: "Set fact of power operations"
+          ansible.builtin.set_fact:
+            power_script_ops: ['power', 'shutdown', 'suspend', 'resume']
+
+        - name: "Disable all power operation scripts"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "& '{{ vmware_toolbox_cmd_path }}' script {{ item }} disable"
+          with_items: "{{ power_script_ops }}"
+
+        - name: "Test power operation scripts"
+          include_tasks: set_power_script.yml
+          vars:
+            power_script_type: "{{ item.0 }}"
+            power_script_op: "{{ item.1 }}"
+          with_nested:
+            - ['default', 'custom']
+            - "{{ power_script_ops }}"
+
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+      always:
+         - name: "Collect VMware Tools log"
+           include_tasks: ../utils/win_get_file.yml
+           vars:
+             win_get_file_src_path: "{{ item }}"
+             win_get_file_dst_path: "{{ current_test_log_folder }}"
+           with_items:
+             - "{{ vmtools_conf_path }}"
+             - "C:\\ProgramData\\VMware\\VMware Tools\\vmtoolsd"
+             - "C:\\ProgramData\\VMware\\VMware Tools\\vmsvc"
