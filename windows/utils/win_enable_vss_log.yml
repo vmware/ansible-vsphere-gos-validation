@@ -12,21 +12,8 @@
       - win_vmbackup_log_path
     fail_msg: "Parameter 'win_vmbackup_log_path' is required to be defined as the vmbackup log file path."
 
-- name: "Set fact of VMware Tools config file path"
-  ansible.builtin.set_fact:
-    vmtools_conf_path: "C:\\ProgramData\\VMware\\VMware Tools\\tools.conf"
-    vmtools_conf_template: "C:\\ProgramData\\VMware\\VMware Tools\\tools.conf.example"
-
-- name: "Check if VMware Tools config file exists"
-  include_tasks: win_check_file_exist.yml
-  vars:
-    win_check_file_exist_file: "{{ vmtools_conf_path }}"
-
-- name: "Copy VMware Tools config file from template file"
-  include_tasks: win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "Copy-Item '{{ vmtools_conf_template }}' -Destination '{{ vmtools_conf_path }}'"
-  when: not win_check_file_exist_result
+- name: "Check and create VMware Tools config file"
+  include_tasks: win_check_create_vmtools_conf.yml
 
 - name: "Enable vss log in VMware Tools config file"
   community.windows.win_lineinfile:

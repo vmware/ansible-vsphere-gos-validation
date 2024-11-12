@@ -1,0 +1,131 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Set and check soft power operation
+#
+- name: "Start to test {{ power_script_type }} {{ power_script_op }} script"
+  ansible.builtin.debug:
+    msg:
+      - "Start to test {{ power_script_type }} {{ power_script_op }} script"
+
+- name: "Set {{ power_script_type }} {{ power_script_op }} script"
+  include: set_power_script_{{ power_script_type }}.yml
+  vars:
+    power_cmd_op: "{{ power_script_op }}"
+
+- name: "Check the current configuration for {{ power_script_op }} script"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "& '{{ vmware_toolbox_cmd_path }}' script {{ power_script_op }} current"
+
+- name: "Print the current configuration for {{ power_script_op }} script"
+  ansible.builtin.debug: var=win_powershell_cmd_output
+
+- name: "Check current configuration is expected"
+  ansible.builtin.assert:
+    that:
+      - script_file_path
+      - win_powershell_cmd_output.stdout is defined
+      - win_powershell_cmd_output.stdout.rstrip() == script_file_path
+    fail_msg: "The {{ power_script_op }} script is {{ win_powershell_cmd_output.stdout | default('') }}, not expected {{ script_file_path }}."
+    success_msg: "The {{ power_script_op }} script is set to the expected one {{ win_powershell_cmd_output.stdout | default('') }}."
+
+- name: "Pause 10 seconds to wait configure take effect"
+  ansible.builtin.pause:
+    seconds: 10
+
+- name: "Shutdown and then power on guest OS for {{ power_script_type }} {{ power_script_op }}"
+  when: power_script_op in ['power', 'shutdown']
+  block:
+    - name: "Shutdown VM for {{ power_script_type }} {{ power_script_op }}"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: "shutdown-guest"
+
+    - name: "Power on VM for {{ power_script_type }} {{ power_script_op }}"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: "powered-on"
+
+- name: "Suspend and resume VM for {{ power_script_type }} {{ power_script_op }}"
+  when: power_script_op in ['suspend', 'resume']
+  block:
+    - name: "Suspend the VM for {{ power_script_type }} {{ power_script_op }}"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'suspended'
+
+    - name: "Resume VM for {{ power_script_type }} {{ power_script_op }}"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: "powered-on"
+        force: true
+
+- name: "Update inventory"
+  include_tasks: ../utils/win_update_inventory.yml
+
+- name: "Wait for VMware Tools service is running"
+  include_tasks: ../utils/win_wait_service_status.yml
+  vars:
+    win_service_name: 'VMTools'
+
+- name: "Check the script file running as expected"
+  when:
+    - script_tag_path is defined and script_tag_path
+    - power_script_type == "custom"
+    - power_script_op != "suspend"
+  block:
+    - name: "Get the status of file {{ script_tag_path }} for {{ power_script_type }} {{ power_script_op }}"
+      ansible.windows.win_stat:
+        path: "{{ script_tag_path }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: tag_path_exist_result
+      until:
+        - tag_path_exist_result.stat.exists is defined
+        - tag_path_exist_result.stat.exists
+      retries: 30
+      delay: 5
+      ignore_errors: true
+
+    - name: "Check the searching result"
+      ansible.builtin.assert:
+        that:
+          - tag_path_exist_result.stat.exists is defined
+          - tag_path_exist_result.stat.exists
+        fail_msg: "Failed to find '{{ script_tag_path }}' for {{ power_script_type }} {{ power_script_op }}."
+        success_msg: "Successfully found the '{{ script_tag_path }}' for {{ power_script_type }} {{ power_script_op }}."
+
+- name: "Check the log file"
+  when: power_script_op != "suspend"
+  block:
+    - name: "Search the log file {{ script_file_path }} in {{ guest_os_ansible_distribution }}"
+      ansible.windows.win_shell: "& findstr '.*{{ script_file_path | win_basename }}' *.log"
+      args:
+        chdir: "C:\\ProgramData\\VMware\\VMware Tools"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: result_search_str
+      until:
+        - result_search_str.rc is defined
+        - result_search_str.rc == 0
+      retries: 30
+      delay: 5
+      ignore_errors: true
+
+    - name: "Check the serching result"
+      ansible.builtin.assert:
+        that:
+          - result_search_str.rc is defined
+          - result_search_str.rc == 0
+        fail_msg: "Failed to find the {{ script_file_path }} in log file for {{ power_script_type }} {{ power_script_op }}."
+        success_msg: "Successfully found the {{ script_file_path }} in log file for {{ power_script_type }} {{ power_script_op }}."
+
+- name: "Cleanup current {{ power_script_op }} script configuration"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "& '{{ vmware_toolbox_cmd_path }}' script {{ power_script_op }} disable"
+
+- name: "End of test {{ power_script_type }} {{ power_script_op }} script"
+  ansible.builtin.debug:
+    msg:
+      - "End of test {{ power_script_type }} {{ power_script_op }} script"

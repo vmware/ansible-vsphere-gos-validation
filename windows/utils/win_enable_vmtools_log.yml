@@ -1,0 +1,23 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Enable debug logging for VMware Tools within Windows guest OS
+# See https://knowledge.broadcom.com/external/article?legacyId=1007873 for details.
+#
+- name: "Check and create VMware Tools config file"
+  include_tasks: win_check_create_vmtools_conf.yml
+
+- name: "Enable VMware Tools log in VMware Tools config file"
+  community.windows.win_lineinfile:
+    path: "{{ vmtools_conf_path }}"
+    regexp: "{{ item.key }}"
+    line: "{{ item.value }}"
+  loop:
+    - {key: '^#log\s*=\s*true\s*', value: 'log = true'}
+    - {key: '^#vmtoolsd.level\s*', value: 'vmtoolsd.level = debug'}
+    - {key: '^#vmtoolsd.handler\s*', value: 'vmtoolsd.handler = file'}
+    - {key: '^#vmtoolsd.data\s*', value: 'vmtoolsd.data = C:\\ProgramData\\VMware\\VMware Tools\\vmtoolsd.log'}
+    - {key: '^#vmsvc.level\s*', value: 'vmsvc.level = debug'}
+    - {key: '^#vmsvc.handler\s*', value: 'vmsvc.handler = file'}
+    - {key: '^#vmsvc.data\s*', value: 'vmsvc.data = C:\\ProgramData\\VMware\\VMware Tools\\vmsvc.log'}
+  delegate_to: "{{ vm_guest_ip }}"
