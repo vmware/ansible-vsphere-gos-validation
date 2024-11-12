@@ -31,20 +31,6 @@
     fail_msg: "The {{ power_script_op }} script is {{ win_powershell_cmd_output.stdout | default('') }}, not expected {{ script_file_path }}."
     success_msg: "The {{ power_script_op }} script is set to the expected one {{ win_powershell_cmd_output.stdout | default('') }}."
 
-- name: "Get content of file tools.conf"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "& type '{{ vmtools_conf_path }}'"
-
-- name: "Check the configuration is expected in tools.conf"
-  ansible.builtin.assert:
-    that:
-      - script_file_in_conf_file
-      - win_powershell_cmd_output.stdout is defined
-      - win_powershell_cmd_output.stdout.find(script_file_in_conf_file | win_basename) != -1
-    fail_msg: "Failed to find the '{{ script_file_in_conf_file | win_basename }}' in tools.conf for {{ power_script_op }} script."
-    success_msg: "Successfully found the '{{ script_file_in_conf_file | win_basename }}' in tools.conf for {{ power_script_op }} script."
-
 - name: "Pause 10 seconds to wait configure take effect"
   ansible.builtin.pause:
     seconds: 10
