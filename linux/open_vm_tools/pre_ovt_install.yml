@@ -50,17 +50,6 @@
     fail_msg: "The value of 'linux_ovt_install_type' must be 'package' or 'source'"
     success_msg: "The open-vm-tools install type is {{ linux_ovt_install_type }}"
 
-- name: "Block test case because of missing linux_ovt_tarball_url for open-vm-tools source install"
-  include_tasks: ../../common/skip_test_case.yml
-  vars:
-    skip_msg: >-
-      Skip test case {{ ansible_play_name }} because 'linux_ovt_tarball_url' is not set, which is
-      required when open-vm-tools install type is {{ linux_ovt_install_type }}.
-    skip_reason: "Blocked"
-  when:
-    - linux_ovt_install_type == 'source'
-    - linux_ovt_tarball_url is undefined or not linux_ovt_tarball_url
-
 - name: "Skip test case when open-vm-tools install type is not applicable"
   include_tasks: ../../common/skip_test_case.yml
   vars:
@@ -71,6 +60,17 @@
   when: >-
     (ansible_play_name == 'ovt_verify_pkg_install' and linux_ovt_install_type != 'package') or
     (ansible_play_name == 'ovt_verify_src_install' and linux_ovt_install_type != 'source')
+
+- name: "Block test case because of missing linux_ovt_tarball_url for open-vm-tools source install"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      Skip test case {{ ansible_play_name }} because 'linux_ovt_tarball_url' is not set, which is
+      required when open-vm-tools install type is {{ linux_ovt_install_type }}.
+    skip_reason: "Blocked"
+  when:
+    - linux_ovt_install_type == 'source'
+    - linux_ovt_tarball_url is undefined or not linux_ovt_tarball_url
 
 # At present, only Debian, Ubuntu, Pardus and FreeBSD are supported to
 # install open-vm-tools from source.
