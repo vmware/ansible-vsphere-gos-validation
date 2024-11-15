@@ -11,9 +11,10 @@ import sys
 import importlib
 import shutil
 import logging
+import yaml
+import re
 from collections import OrderedDict
 from textwrap import TextWrapper
-import yaml
 from ansible import context
 from ansible import constants as C
 from ansible.playbook.task_include import TaskInclude
@@ -727,15 +728,21 @@ class CallbackModule(CallbackBase):
             self._display.display(msg, color=C.COLOR_VERBOSE)
             return
 
-        # Block test cases when deploy_vm failed
-        deploy_vm_failed = False
+        # Block test cases when deploy_vm or installing tools failed
+        testcase_blocked = False
+        if self._play_name == 'env_setup':
+            # Test cases are blocked by env_setup failure
+            testcase_blocked = True
+
+        blocker_pattern = r'deploy_vm|ovt_verify_.*_install|wintools_complete_install_verify'
         for test_id in self.test_runs:
-            if 'deploy_vm' in self.test_runs[test_id].name:
-                deploy_vm_failed = (self.test_runs[test_id].status == 'Failed')
+            if (self.test_runs[test_id].status in ['Failed', 'Blocked'] and
+                re.search(blocker_pattern, self.test_runs[test_id].name)):
+                testcase_blocked = True
                 continue
 
-            # For test cases after deploy_vm, set their status to 'Blocked'
-            if deploy_vm_failed:
+            # For test cases after blocker, set their status to 'Blocked'
+            if testcase_blocked and self.test_runs[test_id].status == 'No Run':
                 self.test_runs[test_id].status = 'Blocked'
 
 
