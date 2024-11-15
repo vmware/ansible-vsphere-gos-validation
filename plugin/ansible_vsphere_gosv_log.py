@@ -734,8 +734,8 @@ class CallbackModule(CallbackBase):
             # Test cases are blocked by env_setup failure
             testcase_blocked = True
 
+        blocker_pattern = r'deploy_vm|ovt_verify_.*_install|wintools_complete_install_verify'
         for test_id in self.test_runs:
-            blocker_pattern = r'deploy_vm|ovt_verify_.*_install|wintools_complete_install_verify'
             if (self.test_runs[test_id].status in ['Failed', 'Blocked'] and
                 re.search(blocker_pattern, self.test_runs[test_id].name)):
                 testcase_blocked = True
