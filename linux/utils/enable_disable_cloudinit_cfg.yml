@@ -27,10 +27,6 @@
 - name: "Update cloud-init configs"
   when: guest_cloud_cfg_exists | bool
   block:
-    - name: "Get cloud-init version"
-      include_tasks: get_cloudinit_version.yml
-      when: cloudinit_version is undefined or not cloudinit_version
-
     - name: "Set keyword for searching network config in cloud-init config files"
       ansible.builtin.set_fact:
         network_config_keyword: "network: *{config: *disabled}"
@@ -45,24 +41,14 @@
     - name: "Enable cloud-init GOSC for cloud-init workflow"
       when: enable_cloudinit_gosc
       block:
-        - name: "Set fact of cloud-init services for version {{ cloudinit_version }}"
-          ansible.builtin.set_fact:
-            cloud_init_services:
-              - cloud-init-local
-              - cloud-init
-              - cloud-config
-              - cloud-final
-          when: cloudinit_version is version('24.3', '<')
+        - name: "Get facts of all services"
+          ansible.builtin.service_facts:
+          register: service_facts_result
+          delegate_to: "{{ vm_guest_ip }}"
 
-        - name: "Set fact of cloud-init services for version {{ cloudinit_version }}"
+        - name: "Get all cloud-init services on {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
-            cloud_init_services:
-              - cloud-init-local
-              - cloud-init-network
-              - cloud-config
-              - cloud-final
-              - cloud-init-main
-          when: cloudinit_version is version('24.3', '>=')
+            cloud_init_services: "{{ service_facts_result.ansible_facts.services.keys() | select('match', 'cloud-.*.service') }}"
 
         - name: "Stop cloud-init services"
           ansible.builtin.shell: "systemctl stop {{ service_name }}"
