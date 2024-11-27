@@ -46,6 +46,13 @@
           register: service_facts_result
           delegate_to: "{{ vm_guest_ip }}"
 
+        - name: "Check guest OS services are retrieved"
+          ansible.builtin.assert:
+            that:
+              - service_facts_result.ansible_facts.services is defined
+              - service_facts_result.ansible_facts.services | length > 0
+            fail_msg: "Failed to get guest OS services"
+
         - name: "Get all cloud-init services on {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
             cloud_init_services: "{{ service_facts_result.ansible_facts.services.keys() | select('match', 'cloud-.*.service') }}"
