@@ -1,0 +1,68 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check C: drive used space is encrypted, protection is on,
+# and encryption key protector is TPM after enabling BitLocker
+#
+- name: "Check and install BitLocker feature in Windows Server"
+  when: guest_os_product_type == 'server'
+  block:
+    - name: "Check if BitLocker is installed"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "(Get-WindowsFeature -Name BitLocker).InstallState"
+    - name: "Set fact of BitLocker install state"
+      ansible.builtin.set_fact:
+        win_srv_bitlocker: "{{ win_powershell_cmd_output.stdout_lines[0].strip() }}"
+
+    - name: "BitLocker is already installed"
+      ansible.builtin.debug: var=win_srv_bitlocker
+      when: win_srv_bitlocker in ['Installed', 'Enabled']
+
+    - name: "BitLocker is not installed"
+      when: win_srv_bitlocker not in ['Installed', 'Enabled']     
+      block:
+        - name: "Install BitLocker"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "Install-WindowsFeature BitLocker"
+        - name: "Restart guest OS after BitLocker install"
+          include_tasks: ../utils/win_shutdown_restart.yml
+          vars:
+            set_win_power_state: "restart"
+
+- name: "Enable Bitlocker on 'C:' drive"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Enable-BitLocker -MountPoint 'C:' -UsedSpaceOnly -TpmProtector -SkipHardwareTest"
+
+- name: "Retry to get 'C:' drive encryption state"
+  ansible.windows.win_shell: "manage-bde -status 'C:'"
+  register: get_encrypt_result
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_unreachable: true
+  retries: 60
+  delay: 5
+  until:
+    - get_encrypt_result.stdout is defined
+    - "'Used Space Only Encrypted' in get_encrypt_result.stdout"
+    - "'Protection On' in get_encrypt_result.stdout"
+
+- name: "Check 'C:' drive encryption state"
+  ansible.builtin.assert:
+    that:
+      - get_encrypt_result.failed is defined
+      - not get_encrypt_result.failed
+    fail_msg: "Not get 'Used Space Only Encrypted' and/or 'Protection On' result after 300 seconds."
+
+- name: "Get 'C:' drive encryption key protector"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "manage-bde -protectors -get 'C:'"
+
+- name: "Check 'C:' drive is encrypted and key protector is TPM"
+  ansible.builtin.assert:
+    that:
+      - "'TPM' in win_powershell_cmd_output.stdout"
+    fail_msg: "Not found 'TPM' in the output: {{ win_powershell_cmd_output.stdout }}"
