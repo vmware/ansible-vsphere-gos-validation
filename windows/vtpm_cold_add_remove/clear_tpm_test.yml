@@ -1,0 +1,27 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check OS still work well after executing Clear-Tpm cmdlet
+#
+- name: "Execute Clear-Tpm cmdlet in guest OS"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Clear-Tpm"
+
+- name: "Restart guest OS after reset TPM"
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+
+- name: "Get TPM info after reset"
+  include_tasks: ../utils/win_get_tpm_status.yml
+
+- name: "Make sure TPM device is present and ready in guest OS"
+  ansible.builtin.assert:
+    that:
+      - win_tpm_info['TpmPresent'] | bool
+      - win_tpm_info['TpmReady'] | bool
+      - win_tpm_info['TpmEnabled'] | bool
+      - win_tpm_info['TpmActivated'] | bool
+      - win_tpm_info['ManufacturerIdTxt'] | trim == 'VMW'
+    fail_msg: "TPM device status got in Windows guest OS: {{ win_tpm_info }}, which contains unexpected values."
