@@ -4,6 +4,20 @@
 # Check C: drive used space is encrypted, protection is on,
 # and encryption key protector is TPM after enabling BitLocker
 #
+# From this doc https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-bitlocker,
+# Windows 11 v24H2 hardware requirements for Automatic Device Encryption are:
+# TPM 2.0 and UEFI secure boot.
+- name: "Get VM firmware info for Windows client VM"
+  include_tasks: ../../common/vm_get_boot_info.yml
+  when: guest_os_product_type == 'client'
+
+- name: "BitLocker Drive Encryption is enabled automatically"
+  ansible.builtin.set_fact:
+    win_bde_auto_enable: >
+      {%- if guest_os_product_type == 'client' and guest_os_ansible_distribution_ver is version('10.0.26100.0', '>=') and vm_secureboot_enabled -%}true
+      {%- else -%}false
+      {%- endif -%}
+
 - name: "Check and install BitLocker feature in Windows Server"
   when: guest_os_product_type == 'server'
   block:
@@ -35,6 +49,7 @@
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Enable-BitLocker -MountPoint 'C:' -UsedSpaceOnly -TpmProtector -SkipHardwareTest"
+  when: not win_bde_auto_enable
 
 - name: "Retry to get 'C:' drive encryption state"
   ansible.windows.win_shell: "manage-bde -status 'C:'"
