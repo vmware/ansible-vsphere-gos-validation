@@ -44,8 +44,8 @@
     log_path: "{{ win_updates_log_file }}"
     skip_optional: true
     state: "installed"
-    reboot: true
-    reboot_timeout: 2700
+    # reboot: true
+    # reboot_timeout: 2700
   delegate_to: "{{ vm_guest_ip }}"
   register: win_updates_install_result
   ignore_errors: "{{ win_updates_ignore_errors | default(false) }}"
@@ -53,6 +53,19 @@
 - name: "Print Windows online updates install result"
   ansible.builtin.debug: var=win_updates_install_result
   when: enable_debug
+
+- name: "Restart guest OS after Windows online updates install"
+  when:
+    - not win_updates_install_result.failed | default(true)
+    - win_updates_install_result.reboot_required | default(false)
+  block:
+    - name: "Pause 10 seconds"
+      ansible.builtin.pause:
+        seconds: 10
+    - name: "Restart guest OS"
+      include_tasks: win_shutdown_restart.yml
+      vars:
+        set_win_power_state: "restart"
 
 - name: "Windows online updates install task succeeds"
   when:
