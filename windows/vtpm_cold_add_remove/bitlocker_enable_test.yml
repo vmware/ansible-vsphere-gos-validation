@@ -4,20 +4,21 @@
 # Check C: drive used space is encrypted, protection is on,
 # and encryption key protector is TPM after enabling BitLocker
 #
-# From this doc https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-bitlocker,
-# Windows 11 v24H2 hardware requirements for Automatic Device Encryption are:
-# TPM 2.0 and UEFI secure boot.
-- name: "Get VM firmware info for Windows client VM"
+# From Windows 11 v24H2, hardware requirements for Automatic Device Encryption are:
+# TPM 2.0 and UEFI secure boot,
+# please refer to this doc: https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-bitlocker
+- name: "Get VM firmware info for Windows client"
   include_tasks: ../../common/vm_get_boot_info.yml
   when: guest_os_product_type == 'client'
 
-- name: "BitLocker Drive Encryption is enabled automatically"
+- name: "Set fact of whether BitLocker Drive Encryption is enabled automatically"
   ansible.builtin.set_fact:
     win_bde_auto_enable: >
       {%- if guest_os_product_type == 'client' and guest_os_ansible_distribution_ver is version('10.0.26100.0', '>=') and vm_secureboot_enabled -%}true
       {%- else -%}false
       {%- endif -%}
 
+# BitLocker is not installed by default in Windows Server
 - name: "Check and install BitLocker feature in Windows Server"
   when: guest_os_product_type == 'server'
   block:
@@ -45,7 +46,7 @@
           vars:
             set_win_power_state: "restart"
 
-- name: "Enable Bitlocker on 'C:' drive"
+- name: "Enable BitLocker on 'C:' drive"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Enable-BitLocker -MountPoint 'C:' -UsedSpaceOnly -TpmProtector -SkipHardwareTest"
@@ -58,26 +59,50 @@
   delegate_to: "{{ vm_guest_ip }}"
   ignore_unreachable: true
   retries: 60
-  delay: 5
+  delay: 10
   until:
     - get_encrypt_result.stdout is defined
     - "'Used Space Only Encrypted' in get_encrypt_result.stdout"
-    - "'Protection On' in get_encrypt_result.stdout"
+    - "'100.0%' in get_encrypt_result.stdout"
 
 - name: "Check 'C:' drive encryption state"
   ansible.builtin.assert:
     that:
       - get_encrypt_result.failed is defined
       - not get_encrypt_result.failed
-    fail_msg: "Not get 'Used Space Only Encrypted' and/or 'Protection On' result after 300 seconds."
+    fail_msg: "Not get 'Used Space Only Encrypted' and/or '100.0%' percentage encrypted result after 600 seconds."
 
 - name: "Get 'C:' drive encryption key protector"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "manage-bde -protectors -get 'C:'"
 
-- name: "Check 'C:' drive is encrypted and key protector is TPM"
+- name: "Set fact of the result of getting key protector"
+  ansible.builtin.set_fact:
+    get_key_protector_result: "{{ win_powershell_cmd_output }}"
+
+# For Automatic Device Encryption enabled device, C: drive is encrypted automatically,
+# while key protector is None
+- name: "Add TPM protector"
+  when:
+    - win_bde_auto_enable
+    - "'TPM' not in get_key_protector_result.stdout"
+  block:
+    - name: "Add TPM protector for C: drive encryption"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "manage-bde -protectors -add 'C:' -tpm"
+    - name: "Restart guest OS"
+      include_tasks: ../utils/win_shutdown_restart.yml
+      vars:
+        set_win_power_state: "restart"
+    - name: "Get 'C:' drive encryption key protector again"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "manage-bde -protectors -get 'C:'"
+
+- name: "Check 'C:' drive key protector is TPM"
   ansible.builtin.assert:
     that:
       - "'TPM' in win_powershell_cmd_output.stdout"
-    fail_msg: "Not found 'TPM' in the output: {{ win_powershell_cmd_output.stdout }}"
+    fail_msg: "Not get 'TPM' key protector in the result: {{ win_powershell_cmd_output.stdout }}"
