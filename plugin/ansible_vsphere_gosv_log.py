@@ -780,6 +780,21 @@ class CallbackModule(CallbackBase):
         test_idx = 0
         for test_id in self.test_runs:
             test_result = self.test_runs[test_id]
+            if test_result.name == 'deploy_vm':
+                # Update deploy_vm test case name
+                if self.testing_vars.get('vm_deploy_method', '').lower() == 'ova':
+                    if self.testing_testcase_file and 'windows' in self.testing_testcase_file:
+                        test_result.name = 'deploy_vm_ovf'
+                    else:
+                        test_result.name = 'deploy_vm_ova'
+
+                elif (self.testing_vars.get('boot_disk_controller') and
+                      self.testing_vars.get('firmware') and
+                      self.testing_vars.get('network_adapter_type')):
+                    test_result.name = "deploy_vm_{}_{}_{}".format(self.testing_vars['firmware'].lower(),
+                                                                   self.testing_vars['boot_disk_controller'].lower(),
+                                                                   self.testing_vars['network_adapter_type'].lower())
+
             test_idx += 1
             test_exec_time = time.strftime('%H:%M:%S', time.gmtime(test_result.duration))
             if test_result.status == 'Passed':
