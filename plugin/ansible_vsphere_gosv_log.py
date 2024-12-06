@@ -780,7 +780,8 @@ class CallbackModule(CallbackBase):
         test_idx = 0
         for test_id in self.test_runs:
             test_result = self.test_runs[test_id]
-            if test_result.name == 'deploy_vm':
+            if (str(self.testing_vars.get('new_vm', False)).lower() == 'true' and
+                test_result.name == 'deploy_vm'):
                 # Update deploy_vm test case name
                 if self.testing_vars.get('vm_deploy_method', '').lower() == 'ova':
                     if self.testing_testcase_file and 'windows' in self.testing_testcase_file:
