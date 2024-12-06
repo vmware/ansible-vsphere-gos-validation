@@ -1,29 +1,19 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Enable guest IP hack on ESXi host
-- name: "Enable GuestIPHack on ESXi host '{{ esxi_hostname }}'"
-  ansible.builtin.command: "esxcli system settings advanced set -o /Net/GuestIPHack -i 1"
-  delegate_to: "{{ esxi_hostname }}"
-  register: esxcli_output
-- name: Display the esxcli command result
-  ansible.builtin.debug: var=esxcli_output
-  when: enable_debug is defined and enable_debug
+- name: "Get ESXi server advanced system settings"
+  include_tasks: esxi_get_advanced_system_settings.yml
 
-- name: "Get GuestIPHack option value on ESXi host"
-  ansible.builtin.shell: "esxcli system settings advanced list -o /Net/GuestIPHack | grep 'Int Value' | awk 'NR==1 {print $3}'"
-  delegate_to: "{{ esxi_hostname }}"
-  changed_when: false
-  register: esxcli_output2
-- name: Display the esxcli command result
-  ansible.builtin.debug: var=esxcli_output2
-  when: enable_debug is defined and enable_debug
+- name: "Display current state of guest IP hack on ESXi host"
+  ansible.builtin.debug:
+    msg: >-
+      Current value of 'Net.GuestIPHack' is
+      {{ esxi_advanced_system_settings['Net.GuestIPHack'] | default('') }}
 
-- name: "Check GuestIPHack enabled on ESXi host"
-  ansible.builtin.assert:
-    that:
-      - esxcli_output2.stdout_lines is defined
-      - esxcli_output2.stdout_lines | length > 0
-      - esxcli_output2.stdout_lines[0] == '1'
-    fail_msg: "Enable GuestIPHack on ESXi host failed, got value '{{ esxcli_output2.stdout_lines[0] }}', expected '1'."
-    success_msg: "Enable GuestIPHack on ESXi host succeed"
+- name: "Enable guest IP hack on ESXi host"
+  include_tasks: esxi_set_advanced_system_settings.yml
+  vars:
+    esxi_host_config_options: {'Net.GuestIPHack': 1}
+  when: >-
+    esxi_advanced_system_settings['Net.GuestIPHack'] is undefined or
+    esxi_advanced_system_settings['Net.GuestIPHack'] | string != "1"
