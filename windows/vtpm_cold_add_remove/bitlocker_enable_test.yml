@@ -76,6 +76,7 @@
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "manage-bde -protectors -get 'C:'"
+    win_execute_cmd_ignore_error: true
 
 - name: "Set fact of the result of getting key protector"
   ansible.builtin.set_fact:
@@ -86,7 +87,7 @@
 - name: "Add TPM protector"
   when:
     - win_bde_auto_enable
-    - "'TPM' not in get_key_protector_result.stdout"
+    - "'TPM' not in get_key_protector_result.stdout | default('')"
   block:
     - name: "Add TPM protector for C: drive encryption"
       include_tasks: ../utils/win_execute_cmd.yml
