@@ -17,20 +17,16 @@
     fetch_file_ignore_errors: true
 
 - name: "Get guest OS release info from /etc/os-release"
+  when: fetch_file_local_path
   block:
     - name: "Set fact of the local path for {{ guest_os_release_path }} fetched from guest OS"
       ansible.builtin.set_fact:
         guest_os_release_local_path: "{{ fetch_file_local_path }}"
 
-    - name: "Get content of guest /etc/os-release"
-      ansible.builtin.shell: "cat {{ guest_os_release_local_path }} | sed 's/=/: /'"
-      changed_when: false
-      register: get_os_release_content
-
     - name: "Set fact of guest OS release info"
       ansible.builtin.set_fact:
-        guest_os_release: "{{ get_os_release_content.stdout | from_yaml }}"
-      when:
-        - get_os_release_content.stdout is defined
-        - get_os_release_content.stdout
-  when: fetch_file_local_path
+        guest_os_release: "{{ dict(_keys|zip(_vals)) }}"
+      vars:
+        _lines: "{{ lookup('file', guest_os_release_local_path).splitlines() | map('trim') | select() | list }}"
+        _keys: "{{ _lines | map('split', '=') | map('first') | map('trim') | list }}"
+        _vals: "{{ _lines | map('split', '=') | map('last') | map('trim') | map('regex_replace', '^\"(.*)\"$', '\\1') | list }}"

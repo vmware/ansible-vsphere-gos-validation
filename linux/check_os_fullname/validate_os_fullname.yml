@@ -1,102 +1,49 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Check expected guest id and full name is set for {{ vm_guest_os_distribution }}"
-  ansible.builtin.assert:
-    that:
-      - expected_guest_id
-      - expected_guest_fullname
-    fail_msg: >-
-      Failed to set expected guest id or guest full name for {{ vm_guest_os_distribution }}
-      with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }} server.
-
-- name: "Get VM's guest info"
-  include_tasks: ../../common/vm_get_guest_info.yml
-
-- name: "Display ESXi version and VM's hardware version"
+- name: "Display details about VM guest info"
   ansible.builtin.debug:
     msg:
       - "ESXi version: {{ esxi_version }}"
+      - "Latest guest info hardware version: {{ guest_info_latest_hwv }}"
+      - "VMware Tools version: {{ vmtools_version }}"
       - "VM's hardware version: {{ vm_hardware_version }}"
+      - "Expected guest id: {{ expected_guest_id }}"
+      - "Actual guest id: {{ guestinfo_guest_id }}"
+      - "Expected guest full name: {{ expected_guest_fullname }}"
+      - "Actual guest id: {{ guestinfo_guest_full_name }}"
+      - "Expected guest family: {{ expected_guest_family }}"
+      - "Actual guest family: {{ guestinfo_guest_family }}"
 
-# If the guest os full name is unmapped and displays OS detailed data on ESXi 6.7 GA and Update 1,
-# or on ESXi 7.0.0, that's expected. Test passed.
-# The unmapped guest full name which at least includes Linux kernel version, OS pretty name
-# For VM with newer VMware Tools, the unmapped guest full name also includes OS name, version id and build id
-# Here we only check linux kernel version, OS pretty name or distro name
-- name: "Test passed with unmapped guest full name on ESXi {{ esxi_version }}"
+- name: "Check whether unmapped guest id can be ignored"
+  include_tasks: check_unmapped_guest_id.yml
   when:
-    - not guestinfo_guest_id
-    - ((esxi_version is version('6.7.0', '==') and esxi_update_version | int < 2) or
-       esxi_version is version('7.0.0', '=='))
-    - guest_os_ansible_kernel and guest_os_ansible_kernel in guestinfo_guest_full_name
-    - ((guest_os_release.PRETTY_NAME is defined and guest_os_release.PRETTY_NAME and
-      guest_os_release.PRETTY_NAME in guestinfo_guest_full_name) or
-      (guest_os_release.NAME is defined and guest_os_release.NAME and
-      guest_os_release.NAME in guestinfo_guest_full_name))
-  block:
-    - name: "Guest OS full name is unmapped"
-      ansible.builtin.debug:
-        msg: >-
-          Guest id is '{{ guestinfo_guest_id }}' on ESXi {{ esxi_version }}, and
-          guest OS full name is '{{ guestinfo_guest_full_name }}',  which shows
-          guest OS detailed information and is as expected on ESXi {{ esxi_version }}.
-          Test Passed.
-      tags:
-        - known_issue
-    - name: "Test passed on ESXi {{ esxi_version }}"
-      ansible.builtin.meta: end_host
+    - expected_guest_id != guestinfo_guest_id
+    - (not guestinfo_guest_id) or (guestinfo_guest_id == vm_guest_id)
 
 - name: "Check guest id in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
   ansible.builtin.assert:
     that:
       - guestinfo_guest_id == expected_guest_id
     fail_msg: >-
-      VM's guest id in guest info is '{{ guestinfo_guest_id }}',
-      not expected '{{ expected_guest_id }}'.
+      VM's guest id in guest info is '{{ guestinfo_guest_id }}', not expected '{{ expected_guest_id }}'.
     success_msg: >-
-      VM's guest id in guest info is '{{ guestinfo_guest_id }}',
-      which is as expected '{{ expected_guest_id }}'.
+      VM's guest id in guest info is '{{ guestinfo_guest_id }}', which is as expected '{{ expected_guest_id }}'.
 
 - name: "Check guest full name in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
   ansible.builtin.assert:
     that:
       - guestinfo_guest_full_name == expected_guest_fullname
     fail_msg: >-
-      VM's guest full name is '{{ guestinfo_guest_full_name }}',
-      not expected '{{ expected_guest_fullname }}'.
+      VM's guest full name is '{{ guestinfo_guest_full_name }}', not expected '{{ expected_guest_fullname }}'.
     success_msg: >-
-      VM's guest full name is '{{ guestinfo_guest_full_name }}',
-      which is as expected '{{ expected_guest_fullname }}'.
-  when: not expected_guest_fullname | regex_search('or later')
-
-- name: "Check guest full name in VM's guest info"
-  when: expected_guest_fullname | regex_search('or later')
-  block:
-    - name: "Set alternative for the expected guest full name"
-      ansible.builtin.set_fact:
-        expected_guest_fullname_alternative: "{{ expected_guest_fullname | regex_replace('or later( versions)? ', '') }}"
-
-    - name: "Check guest full name in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
-      ansible.builtin.assert:
-        that:
-          - guestinfo_guest_full_name in [expected_guest_fullname, expected_guest_fullname_alternative]
-        fail_msg: >-
-          VM's guest full name is '{{ guestinfo_guest_full_name }}',
-          not expected '{{ expected_guest_fullname }}'
-          or '{{ expected_guest_fullname_alternative }}'.
-        success_msg: >-
-          VM's guest full name is '{{ guestinfo_guest_full_name }}',
-          which is as expected '{{ expected_guest_fullname }}'
-          or '{{ expected_guest_fullname_alternative }}'.
+      VM's guest full name is '{{ guestinfo_guest_full_name }}', which is as expected '{{ expected_guest_fullname }}'.
 
 - name: "Check guest family in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
   ansible.builtin.assert:
     that:
       - guestinfo_guest_family == expected_guest_family
     fail_msg: >-
-      VM's guest family in guest info is '{{ guestinfo_guest_family }}',
-       not expected '{{ expected_guest_family }}'.
+      VM's guest family in guest info is '{{ guestinfo_guest_family }}', not expected '{{ expected_guest_family }}'.
     success_msg: >-
-      VM's guest family in guest info is '{{ guestinfo_guest_family }}',
-      which is as expected '{{ expected_guest_family }}'.
+      VM's guest family in guest info is '{{ guestinfo_guest_family }}', which is as expected '{{ expected_guest_family }}'.

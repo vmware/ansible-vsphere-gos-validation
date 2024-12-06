@@ -31,13 +31,43 @@
             - name: "Enable debug logging for VMware Tools"
               include_tasks: ../utils/enable_vmtools_logging.yml
 
-        - name: "Get ESXi version and build"
-          include_tasks: ../../common/esxi_get_version_build.yml
-          when: esxi_version is undefined or esxi_update_version is undefined
+        - name: "Set VMware Tools config file for Flatcar {{ guest_os_ansible_distribution_ver }}"
+          ansible.builtin.set_fact:
+            vmtools_config_file: "/etc/vmware-tools/tools.conf"
+          when:
+            - guest_os_ansible_distribution == 'Flatcar'
+            - guest_os_ansible_distribution_ver is version('3760.2.0', '>=')
+
+        - name: "Get hardware version for checking guest info on ESXi {{ esxi_version }}"
+          when: esxi_version is version('8.0.3', '!=')
+          block:
+            - name: "Get ESXi hardware versions"
+              include_tasks: ../../common/esxi_get_hardware_versions.yml
+    
+            - name: "Set fact of latest hardware version for checking guest info on ESXi {{ esxi_version }}"
+              ansible.builtin.set_fact:
+                guest_info_latest_hwv:  "{{ esxi_latest_hardware_version }}"
+
+        - name: "Set hardware version for checking guest info on ESXi {{ esxi_version }}"
+          ansible.builtin.set_fact:
+            guest_info_latest_hwv: 22
+          when: esxi_version is version('8.0.3', '==')
+
+        - name: "Get supported guest ids on ESXi {{ esxi_version }}"
+          include_tasks: ../../common/esxi_get_guest_ids.yml
+          vars:
+            esxi_hardware_version: "{{ guest_info_latest_hwv }}"
 
         - name: "Display guest OS distribution"
           ansible.builtin.debug:
             msg: "{{ vm_guest_os_distribution }}"
+
+        - name: "Initialize facts about VM expected guest info"
+          ansible.builtin.set_fact:
+            expected_guest_id: ""
+            expected_guest_fullname: ""
+            expected_guest_family: ""
+            guest_is_otherlinux: false
 
         - name: "Get guest short-name config from {{ vmtools_config_file }}"
           ansible.builtin.shell: |
@@ -49,16 +79,23 @@
         - name: "Set fact of guest OS short-name config"
           ansible.builtin.set_fact:
             guest_short_name: "{{ get_shortname_result.stdout | default('') }}"
+        
+        - name: "Match guest id for {{ vm_guest_os_distribution }}"
+          include_tasks: match_guest_id.yml
 
-        - name: "Set expected guest id, full name and family when guest short-name is set"
-          include_tasks: set_guestinfo_with_shortname.yml
-          when: guest_short_name
+        - name: "Set VM expected guest full name from guest id {{ expected_guest_id }}"
+          include_tasks: map_guest_id_to_fullname.yml
 
-        - name: "Set expected guest id, full name and family when guest short-name is not set"
-          include_tasks: set_guestinfo_without_shortname.yml
-          when: not guest_short_name
+        - name: "Set facts of VM expected guest family and VM configured guest family"
+          ansible.builtin.set_fact:
+            expected_guest_family: |-
+              {%- if expected_guest_id is match('freebsd.*') -%}otherGuestFamily
+              {%- else -%}linuxGuest{%- endif -%}
+            vm_guest_family: |-
+              {%- if vm_guest_id is match('freebsd.*') -%}otherGuestFamily
+              {%- else -%}linuxGuest{%- endif -%}
 
-        - name: "Validate guest OS full name in guestinfo"
+        - name: "Validate guest id, full name and family in guest info"
           include_tasks: validate_os_fullname.yml
       rescue:
         - name: "Test rescue"
