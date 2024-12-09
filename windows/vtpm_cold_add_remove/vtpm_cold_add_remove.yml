@@ -33,6 +33,17 @@
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
           vars:
+            skip_msg:
+              - "Skip test case due to Windows editions that support TPM are 'Pro', 'Enterprise', 'Pro Education', 'Education'."
+              - "This guest OS is: {{ guest_os_edition }}."
+            skip_reason: "Not Supported"
+          when:
+            - guest_os_edition | lower not in ['pro', 'enterprise', 'education', 'pro education']
+            - guest_os_product_type == 'client'
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
             skip_msg: "Skip test case due to VM firmware is: {{ vm_firmware }}, not EFI."
             skip_reason: "Not Applicable"
           when: vm_firmware != 'efi'
