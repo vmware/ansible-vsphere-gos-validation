@@ -13,10 +13,7 @@
 
 - name: "Set fact of whether BitLocker Drive Encryption is enabled automatically"
   ansible.builtin.set_fact:
-    win_bde_auto_enable: |-
-      {%- if guest_os_product_type == 'client' and guest_os_ansible_distribution_ver is version('10.0.26100.0', '>=') and vm_secureboot_enabled -%}true
-      {%- else -%}false
-      {%- endif -%}
+    win_bde_auto_enable: "{{ guest_os_product_type == 'client' and guest_os_ansible_distribution_ver is version('10.0.26100.0', '>=') and vm_secureboot_enabled }}"
 
 # BitLocker is not installed by default in Windows Server
 - name: "Check and install BitLocker feature in Windows Server"
@@ -80,14 +77,14 @@
 
 - name: "Set fact of the result of getting key protector"
   ansible.builtin.set_fact:
-    get_key_protector_result: "{{ win_powershell_cmd_output }}"
+    get_key_protector_result: "{{ win_powershell_cmd_output.stdout | default('') }}"
 
 # For Automatic Device Encryption enabled device, C: drive is encrypted automatically,
 # while key protector is None
 - name: "Add TPM protector"
   when:
     - win_bde_auto_enable
-    - "'TPM' not in get_key_protector_result.stdout | default('')"
+    - "'TPM' not in get_key_protector_result"
   block:
     - name: "Add TPM protector for C: drive encryption"
       include_tasks: ../utils/win_execute_cmd.yml
@@ -105,9 +102,11 @@
 - name: "Check 'C:' drive key protector is TPM"
   ansible.builtin.assert:
     that:
+      - win_powershell_cmd_output.stdout | default('')
       - "'TPM' in win_powershell_cmd_output.stdout"
-    fail_msg: "Not get 'TPM' key protector in the result: {{ win_powershell_cmd_output.stdout }}"
+    fail_msg: "Not get 'TPM' key protector in the result: {{ win_powershell_cmd_output.stdout | default('') }}"
 
+# Remove TPM key protector before following TPM cold remove test
 - name: "Remove TPM key protector"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
