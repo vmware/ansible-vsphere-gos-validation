@@ -51,10 +51,10 @@
   ansible.builtin.debug: var=win_updates_install_result
   when: enable_debug
 
-- name: "Restart guest OS when required"
-  when:
-    - not win_updates_install_result.failed | default(true)
-    - win_updates_install_result.reboot_required | default(false)
+- name: "Restart guest OS when install failed or required"
+  when: >
+    (win_updates_install_result.failed | default(true)) or
+    (win_updates_install_result.reboot_required | default(true))
   block:
     - name: "Pause 10 seconds after Windows updates install"
       ansible.builtin.pause:
