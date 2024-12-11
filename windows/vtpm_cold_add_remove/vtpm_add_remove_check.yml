@@ -31,27 +31,11 @@
 - name: "Get TPM device info in guest OS"
   include_tasks: ../utils/win_get_tpm_status.yml
 
-# Check vTPM device exists in guest OS
-- name: "Check TPM device status in guest OS"
+- name: "Check TPM device status in guest OS after cold add"
+  include_tasks: check_vtpm_status.yml
   when: vtpm_test_operation == 'add'
-  block:
-    - name: "Make sure TPM device is present and ready"
-      ansible.builtin.assert:
-        that:
-          - win_tpm_info['TpmPresent'] | bool
-          - win_tpm_info['TpmReady'] | bool
-          - win_tpm_info['ManufacturerIdTxt'] | trim == 'VMW'
-        fail_msg: "TPM device status got in Windows guest OS: {{ win_tpm_info }}, which contains unexpected values."
-    - name: "Make sure TPM device is enabled and activated"
-      ansible.builtin.assert:
-        that:
-          - win_tpm_info['TpmEnabled'] | bool
-          - win_tpm_info['TpmActivated'] | bool
-        fail_msg: "TPM device status got in Windows guest OS: {{ win_tpm_info }}, which contains unexpected values."
-      when: guest_os_ansible_distribution is not search('2016|2019')
 
-# Check vTPM device does not exist in guest OS
-- name: "Check TPM device is not present in guest OS"
+- name: "Check TPM device status in guest OS after cold remove"
   ansible.builtin.assert:
     that:
       - not win_tpm_info['TpmPresent'] | bool
