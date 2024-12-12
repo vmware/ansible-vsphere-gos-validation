@@ -7,6 +7,7 @@
   ansible.builtin.set_fact:
     guest_id_major_version: "{{ guest_os_ansible_kernel | regex_search('^\\d+') }}"
     guest_is_otherlinux: true
+    guest_id_pattern: "other\\d+xLinux"
 
 - name: "Fail the test due to unknown Linux kernel major version"
   ansible.builtin.fail:
@@ -15,10 +16,4 @@
 
 - name: "Get supported other Linux guest ids for 64-bit guest OS"
   ansible.builtin.set_fact:
-    supported_guest_ids: "{{ esxi_guest_ids | select('match', 'other\\d+xLinux64Guest') | reject('match', 'other2[46]xLinux64Guest') }}"
-  when: guest_id_bit == '64'
-
-- name: "Get supported other Linux guest ids for 32-bit guest OS"
-  ansible.builtin.set_fact:
-    supported_guest_ids: "{{ esxi_guest_ids | select('match', 'other\\d+xLinux$') | reject('match', 'other2[46]xLinux') }}"
-  when: guest_id_bit != '64'
+    supported_guest_ids: "{{ esxi_guest_ids_for_bit | select('match', guest_id_pattern) | reject('match', 'other2[46]xLinux') }}"

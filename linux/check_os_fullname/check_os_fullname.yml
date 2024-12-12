@@ -38,29 +38,20 @@
             - guest_os_ansible_distribution == 'Flatcar'
             - guest_os_ansible_distribution_ver is version('3760.2.0', '>=')
 
-        - name: "Get hardware version for checking guest info on ESXi {{ esxi_version }}"
-          when: esxi_version is version('8.0.3', '!=')
-          block:
-            - name: "Get ESXi hardware versions"
-              include_tasks: ../../common/esxi_get_hardware_versions.yml
-    
-            - name: "Set fact of latest hardware version for checking guest info on ESXi {{ esxi_version }}"
-              ansible.builtin.set_fact:
-                guest_info_latest_hwv:  "{{ esxi_latest_hardware_version }}"
+        - name: "Get ESXi hardware versions"
+          include_tasks: ../../common/esxi_get_hardware_versions.yml
 
-        - name: "Set hardware version for checking guest info on ESXi {{ esxi_version }}"
+        - name: "Set facts of hardware versions for checking VM guest info"
           ansible.builtin.set_fact:
-            guest_info_latest_hwv: 22
-          when: esxi_version is version('8.0.3', '==')
+            vm_base_hardware_version: "{{ vm_hardware_version_num }}"
+            vm_current_hw_version: "{{ vm_hardware_version_num }}"
+            guest_info_latest_hwv: "{{ 22 if esxi_version is version('8.0.3', '==') else esxi_latest_hardware_version }}"
+            compatible_hardware_versions: "{{ esxi_hardware_versions | select('>=', vm_hardware_version_num | int) }}"
 
         - name: "Get supported guest ids on ESXi {{ esxi_version }}"
           include_tasks: ../../common/esxi_get_guest_ids.yml
           vars:
             esxi_hardware_version: "{{ guest_info_latest_hwv }}"
-
-        - name: "Display guest OS distribution"
-          ansible.builtin.debug:
-            msg: "{{ vm_guest_os_distribution }}"
 
         - name: "Initialize facts about VM expected guest info"
           ansible.builtin.set_fact:
@@ -79,7 +70,7 @@
         - name: "Set fact of guest OS short-name config"
           ansible.builtin.set_fact:
             guest_short_name: "{{ get_shortname_result.stdout | default('') }}"
-        
+
         - name: "Match guest id for {{ vm_guest_os_distribution }}"
           include_tasks: match_guest_id.yml
 
@@ -95,11 +86,37 @@
               {%- if vm_guest_id is match('freebsd.*') -%}otherGuestFamily
               {%- else -%}linuxGuest{%- endif -%}
 
-        - name: "Validate guest id, full name and family in guest info"
+        - name: "Validate guest id, full name and family in guest info for compatible hardware versions"
           include_tasks: validate_os_fullname.yml
+          with_items: "{{ compatible_hardware_versions }}"
+          loop_control:
+            loop_var: compatible_hw_version
+
       rescue:
         - name: "Test rescue"
           include_tasks: ../../common/test_rescue.yml
       always:
         - name: "Collect VMware Tools logs"
           include_tasks: ../utils/collect_vmtools_logs.yml
+
+        - name: "Revert to base snapshot to downgrade VM hardware version and update VM info"
+          when:
+            - vm_base_hardware_version | default('')
+            - vm_current_hw_version | default('')
+            - vm_current_hw_version | int > vm_base_hardware_version | int
+          block:
+            - name: "Revert to base snapshot"
+              include_tasks: ../../common/vm_revert_snapshot.yml
+              vars:
+                snapshot_name: "{{ base_snapshot_name }}"
+
+            # FreeBSD VM's base snapshot is in powered off state
+            - name: "Power on FreeBSD VM and get VM guest IP"
+              include_tasks: ../../common/update_inventory.yml
+              when: guest_os_ansible_distribution == "FreeBSD"
+
+            - name: "Update VM info"
+              include_tasks: ../../common/vm_get_vm_info.yml
+
+            - name: "Update VM guest info"
+              include_tasks: ../../common/vm_get_guest_info.yml
