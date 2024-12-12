@@ -2,18 +2,12 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Get TPM device info in Windows guest OS
+# Return:
+#   win_tpm_info: the dict of TPM device info
 #
-- name: "Initialize the TPM device status"
+- name: "Initialize the TPM device status dict"
   ansible.builtin.set_fact:
-    win_tpm_info_dict: {}
-    win_tpm_info: {
-      'TpmPresent': 'NA',
-      'TpmReady': 'NA',
-      'TpmEnabled': 'NA',
-      'TpmActivated': 'NA',
-      'ManufacturerIdTxt': 'NA',
-      'ManufacturerVersion': 'NA'
-    }
+    win_tpm_info: {}
 
 - name: "Get TPM device info"
   include_tasks: win_execute_cmd.yml
@@ -27,17 +21,8 @@
   block:
     - name: "Set fact of TPM device info"
       ansible.builtin.set_fact:
-        win_tpm_info_dict: "{{ win_tpm_info_dict | combine({item.split(':')[0].strip(): item.split(':')[1].strip() | replace('\u0000', '')}) }}"
+        win_tpm_info: "{{ win_tpm_info | combine({item.split(':')[0].strip(): item.split(':')[1].strip() | replace('\u0000', '')}) }}"
       with_items: "{{ win_powershell_cmd_output.stdout_lines | select }}"
 
 - name: "Display the TPM device info got in guest OS"
-  ansible.builtin.debug: var=win_tpm_info_dict
-
-- name: "Set fact of required info about TPM device"
-  ansible.builtin.set_fact:
-    win_tpm_info: "{{ win_tpm_info | combine({item: win_tpm_info_dict[item]}) }}"
-  when: item in win_tpm_info_dict
-  with_items: "{{ win_tpm_info.keys() }}"
-
-- name: "Display the required info about TPM device"
   ansible.builtin.debug: var=win_tpm_info
