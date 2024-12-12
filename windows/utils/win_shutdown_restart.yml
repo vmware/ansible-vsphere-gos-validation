@@ -7,6 +7,8 @@
 #     are "shutdown" or "restart".
 #   win_reboot_timeout: maximum seconds to wait for machine to re-appear on the network.
 #     Default value is 600 seconds.
+#   win_query_user_timeout: maximum seconds to wait for user logon.
+#     Default value is 15 seconds.
 #
 - name: "Shutdown guest OS inside OS"
   when: set_win_power_state == "shutdown"
@@ -54,8 +56,8 @@
       ignore_errors: true
       delegate_to: "{{ vm_guest_ip }}"
       ignore_unreachable: true
-      retries: 5
-      delay: 3
+      retries: "{{ ((win_query_user_timeout | default(15) | int) / 5) | int }}"
+      delay: 5
       until:
         - query_user_result.stdout_lines is defined
         - query_user_result.stdout_lines | length != 0
@@ -64,4 +66,4 @@
         that:
           - query_user_result.stdout_lines is defined
           - query_user_result.stdout_lines | length != 0
-        fail_msg: "Not get logon user in console session after 15 seconds: {{ query_user_result }}"
+        fail_msg: "Not get logon user in console session after {{ win_query_user_timeout | default(15) }} seconds: {{ query_user_result }}"
