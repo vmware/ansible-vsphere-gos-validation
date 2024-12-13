@@ -49,65 +49,50 @@
     win_powershell_cmd: "Enable-BitLocker -MountPoint 'C:' -UsedSpaceOnly -TpmProtector -SkipHardwareTest"
   when: not win_bde_auto_enable
 
-- name: "Retry to get 'C:' drive encryption state"
-  ansible.windows.win_shell: "manage-bde -status 'C:'"
-  register: get_encrypt_result
-  ignore_errors: true
-  delegate_to: "{{ vm_guest_ip }}"
-  ignore_unreachable: true
-  retries: 60
-  delay: 10
-  until:
-    - get_encrypt_result.stdout is defined
-    - "'Used Space Only Encrypted' in get_encrypt_result.stdout"
-    - "'100.0%' in get_encrypt_result.stdout"
-
-- name: "Check 'C:' drive encryption state"
-  ansible.builtin.assert:
-    that:
-      - get_encrypt_result.failed is defined
-      - not get_encrypt_result.failed
-    fail_msg: "Not get 'Used Space Only Encrypted' and/or '100.0%' percentage encrypted result after 600 seconds."
-
-- name: "Get 'C:' drive encryption key protector"
-  include_tasks: ../utils/win_execute_cmd.yml
+# Command "manage-bde" returns noting in Windows Server 2016 through
+# remote connection, so here use powershell cmdlet
+- name: "Make sure 'C:' drive encryption percentage 100%"
+  include_tasks: ../utils/win_wait_bitlocker_encrypt.yml
   vars:
-    win_powershell_cmd: "manage-bde -protectors -get 'C:'"
-    win_execute_cmd_ignore_error: true
+    win_bde_percent: 100
 
-- name: "Set fact of the result of getting key protector"
+- name: "Get 'C:' drive encryption info"
+  include_tasks: ../utils/win_get_bitlocker_vol_info.yml
+
+- name: "Save 'C:' drive encryption info got above"
   ansible.builtin.set_fact:
-    get_key_protector_result: "{{ win_powershell_cmd_output.stdout | default('') }}"
+    win_bde_vol_info_before: "{{ win_bde_vol_info }}"
 
 # For Automatic Device Encryption enabled device, C: drive is encrypted automatically,
 # while key protector is None
 - name: "Add TPM protector"
   when:
     - win_bde_auto_enable
-    - "'TPM' not in get_key_protector_result"
+    - win_bde_vol_info.KeyProtector is undefined or win_bde_vol_info.KeyProtector is not search('Tpm')
   block:
     - name: "Add TPM protector for C: drive encryption"
       include_tasks: ../utils/win_execute_cmd.yml
       vars:
-        win_powershell_cmd: "manage-bde -protectors -add 'C:' -tpm"
+        win_powershell_cmd: "Add-BitLockerKeyProtector -MountPoint 'C:' -TpmProtector"
     - name: "Restart guest OS"
       include_tasks: ../utils/win_shutdown_restart.yml
       vars:
         set_win_power_state: "restart"
-    - name: "Get 'C:' drive encryption key protector again"
-      include_tasks: ../utils/win_execute_cmd.yml
-      vars:
-        win_powershell_cmd: "manage-bde -protectors -get 'C:'"
+    - name: "Get 'C:' drive encryption info again"
+      include_tasks: ../utils/win_get_bitlocker_vol_info.yml
 
 - name: "Check 'C:' drive key protector is TPM"
   ansible.builtin.assert:
     that:
-      - win_powershell_cmd_output.stdout | default('')
-      - "'TPM' in win_powershell_cmd_output.stdout"
-    fail_msg: "Not get 'TPM' key protector in the result: {{ win_powershell_cmd_output.stdout | default('') }}"
+      - win_bde_vol_info
+      - win_bde_vol_info.KeyProtector is defined
+      - win_bde_vol_info.KeyProtector is search('Tpm')
+    fail_msg: "Not get 'Tpm' from the 'KeyProtector' property: {{ win_bde_vol_info.KeyProtector | default('') }}"
 
 # Remove TPM key protector before following TPM cold remove test
 - name: "Remove TPM key protector"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "manage-bde -protectors -delete 'C:' -type tpm"
+    win_powershell_cmd: >-
+      $tpm_protector = (Get-BitlockerVolume -MountPoint 'C:').KeyProtector | Where-Object {$_.KeyProtectorType -eq 'Tpm'};
+      Remove-BitLockerKeyProtector -MountPoint 'C:' -KeyProtectorId $tpm_protector.KeyProtectorId
