@@ -62,13 +62,16 @@
 - name: "Save 'C:' drive encryption info got above"
   ansible.builtin.set_fact:
     win_bde_vol_info_before: "{{ win_bde_vol_info }}"
+  when: >
+    (win_bde_vol_info.KeyProtector is undefined) or
+    (win_bde_vol_info.KeyProtector is not search('Tpm'))
 
 # For Automatic Device Encryption enabled device, C: drive is encrypted automatically,
 # while key protector is None
 - name: "Add TPM protector"
   when:
     - win_bde_auto_enable
-    - win_bde_vol_info.KeyProtector is undefined or win_bde_vol_info.KeyProtector is not search('Tpm')
+    - win_bde_vol_info_before.KeyProtector is undefined or win_bde_vol_info_before.KeyProtector is not search('Tpm')
   block:
     - name: "Add TPM protector for C: drive encryption"
       include_tasks: ../utils/win_execute_cmd.yml
