@@ -43,11 +43,18 @@
           vars:
             set_win_power_state: "restart"
 
-- name: "Enable BitLocker on 'C:' drive"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "Enable-BitLocker -MountPoint 'C:' -UsedSpaceOnly -TpmProtector -SkipHardwareTest"
+- name: "Handle BitLocker Device Encryption not enabled automatically situation"
   when: not win_bde_auto_enable
+  block:
+    - name: "Enable BitLocker on 'C:' drive"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "Enable-BitLocker -MountPoint 'C:' -UsedSpaceOnly -TpmProtector -SkipHardwareTest"
+    - name: "Check enable BitLocker command result"
+      ansible.builtin.assert:
+        that:
+          - not (win_powershell_cmd_output.stderr is defined and win_powershell_cmd_output.stderr)
+        fail_msg: "Execute 'Enable-BitLocker' command in guest OS returns error: {{ win_powershell_cmd_output.stderr }}"
 
 # Command "manage-bde" returns noting in Windows Server 2016 through
 # remote connection, so here use powershell cmdlet
