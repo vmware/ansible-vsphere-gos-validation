@@ -22,7 +22,7 @@
   ansible.builtin.set_fact:
     win_bde_volume: "{{ win_bde_volume | default('C:') }}"
     win_wait_bde_timeout: "{{ win_wait_bde_timeout | default(600) }}"
-    win_bde_percent_search: "{{ 'EncryptionPercentage : ' ~ win_bde_percent | int }}"
+    win_bde_percent_search: "{{ 'EncryptionPercentage\\s*:\\s*' ~ win_bde_percent | int }}"
 
 - name: "Print the percentage string to wait for"
   ansible.builtin.debug: var=win_bde_percent_search
@@ -37,8 +37,7 @@
   delay: 10
   until:
     - get_encrypt_result.stdout is defined
-    - get_encrypt_result.stdout
-    - get_encrypt_result.stdout is search(win_bde_percent_search)
+    - get_encrypt_result.stdout | regex_search(win_bde_percent_search)
 
 - name: "Print the BitLocker encrypted volume {{ win_bde_volume }} info"
   ansible.builtin.debug: var=get_encrypt_result
