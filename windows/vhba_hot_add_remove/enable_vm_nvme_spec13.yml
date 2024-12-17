@@ -1,20 +1,32 @@
 # Copyright 2022-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Set fact of VM advanced setting for enabling NVMe Spec 1.3"
-  ansible.builtin.set_fact:
-    vm_advanced_settings:
-      - key: "nvme.specVersion"
-        value: "103"
+# From Windows 11 and Windows Server 2022 guest OS on VM hardware version >= 19,
+# no need to enable NVMe spec 1.3 in vmx explicitly.
+#
+- name: "Print whether to add VM advanced setting"
+  ansible.builtin.debug:
+    msg: >-
+      VM guest is {{ guest_os_ansible_distribution }}, no need to add VM advanced setting for enabling NVMe Spec 1.3 explicitly.
+  when: guest_os_build_num | int >= 20348
 
-- name: "Set VM extra config for enabling NVMe Spec 1.3"
-  include_tasks: ../utils/win_set_vm_extra_config.yml
+- name: "Add VM advanced setting for {{ guest_os_ansible_distribution }}"
+  when: guest_os_build_num | int < 20348
+  block:
+    - name: "Set fact of VM advanced setting for enabling NVMe Spec 1.3"
+      ansible.builtin.set_fact:
+        vm_advanced_settings:
+          - key: "nvme.specVersion"
+            value: "103"
 
-- name: "Check 'nvme.specVersion' is '103' in VM's extra config after VM power-on"
-  ansible.builtin.assert:
-    that:
-      - vm_extra_config['nvme.specVersion'] is defined
-      - vm_extra_config['nvme.specVersion'] == '103'
-    fail_msg: >-
-      The 'nvme.specVersion' is not '103' in VM's extra config after VM power-on. In VM's extra config,
-      nvme.specVersion = {{ vm_extra_config['nvme.specVersion'] | default('') }}.
+    - name: "Set VM advanced setting for enabling NVMe Spec 1.3"
+      include_tasks: ../utils/win_set_vm_extra_config.yml
+
+    - name: "Check 'nvme.specVersion' is '103' in VM's extra config after VM power-on"
+      ansible.builtin.assert:
+        that:
+          - vm_extra_config['nvme.specVersion'] is defined
+          - vm_extra_config['nvme.specVersion'] == '103'
+        fail_msg: >-
+          The 'nvme.specVersion' is not '103' in VM's extra config after VM power-on. In VM's extra config,
+          nvme.specVersion = {{ vm_extra_config['nvme.specVersion'] | default('') }}.
