@@ -13,11 +13,27 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
-        - include_tasks: vhba_test.yml
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip this test case from Windows 11 and Windows Server 2022 guest OS on VM with hardware version >= 19,
+              will run test case 'nvme_vhba_device_ops_spec13' directly.
+            skip_reason: "Not Applicable"
+          when:
+            - vm_hardware_version_num | int >= 19
+            - guest_os_build_num | int >= 20348
+
+        - name: "Start VHBA test"
+          include_tasks: vhba_test.yml
           vars:
             test_disk_controller_type: "nvme"
             test_purpose: "hot-add"
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml

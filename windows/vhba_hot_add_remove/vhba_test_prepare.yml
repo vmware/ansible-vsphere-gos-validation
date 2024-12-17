@@ -9,6 +9,13 @@
     ctl_num_guest_before_hotadd: "{{ ctl_num_guest }}"
     disk_num_guest_before_hotadd: "{{ disk_num_guest }}"
 
+# From Windows 11 and Windows Server 2022 guest OS on VM hardware version >= 19,
+# no need to enable NVMe spec 1.3 in vmx explicitly.
+- name: "Set fact of whether to add VM extra config"
+  ansible.builtin.set_fact:
+    vm_add_nvme_103: true
+  when: guest_os_build_num | int < 20348
+
 - name: "Enable NVMe spec 1.3"
   include_tasks: enable_vm_nvme_spec13.yml
   when:
