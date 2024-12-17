@@ -50,6 +50,20 @@
       include_tasks: ../utils/win_execute_cmd.yml
       vars:
         win_powershell_cmd: "Enable-BitLocker -MountPoint 'C:' -UsedSpaceOnly -TpmProtector -SkipHardwareTest"
+
+    - name: "Set fact of encounter known issue"
+      ansible.builtin.set_fact:
+        win_2019_known_issue: true
+      when:
+        - win_powershell_cmd_output.stderr is defined
+        - win_powershell_cmd_output.stderr
+        - guest_os_ansible_distribution is search('Windows Server 2019')
+        - win_boot_disk_ctl_type in ['lsilogicsas', 'paravirtual']
+
+    - name: "Workaround for known issue"
+      include_task: handle_vm_known_issue.yml
+      when: win_2019_known_issue | default(false)
+
     - name: "Check enable BitLocker command result"
       ansible.builtin.assert:
         that:
