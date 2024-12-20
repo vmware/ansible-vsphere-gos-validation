@@ -39,10 +39,17 @@
     - get_encrypt_result.stdout is defined
     - get_encrypt_result.stdout | regex_search(win_bde_percent_search)
 
-- name: "Print the BitLocker encrypted volume {{ win_bde_volume }} info"
+- name: "Print the getting BitLocker encrypted volume info result"
   ansible.builtin.debug: var=get_encrypt_result
 
-- name: "Check BitLocker encrypted volume {{ win_bde_volume }} info"
+- name: "Get BitLocker encrypted volume info failed"
+  ansible.builtin.fail:
+    msg: "Failed to get BitLocker encrypted volume {{ win_bde_volume }} info due to: {{ get_encrypt_result.msg | default('') }}"
+  when:
+    - get_encrypt_result.unreachable is defined
+    - get_encrypt_result.unreachable
+
+- name: "Check getting BitLocker encrypted volume info result"
   ansible.builtin.assert:
     that:
       - get_encrypt_result.failed is defined

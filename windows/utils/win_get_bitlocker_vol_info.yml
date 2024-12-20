@@ -18,15 +18,11 @@
     win_powershell_cmd: "Get-BitLockerVolume -MountPoint {{ win_bde_volume }} | Format-List"
 
 - name: "Set fact of the dict of the encryption info"
+  ansible.builtin.set_fact:
+    win_bde_vol_info: "{{ win_powershell_cmd_output.stdout | replace(win_bde_volume, win_bde_volume.strip(':')) | from_yaml }}"
   when:
-    - win_powershell_cmd_output.stdout_lines is defined
-    - win_powershell_cmd_output.stdout_lines | select | length > 0
-  block:
-    - name: "Set the encryption info"
-      ansible.builtin.set_fact:
-        win_bde_vol_info: "{{ win_bde_vol_info | combine({item.split(':')[0].strip(): (item.split(':')[1] | default('')).strip() | replace('\u0000', '')}) }}"
-      when: item and ((item | replace('\u0000', '')).strip())
-      with_items: "{{ win_powershell_cmd_output.stdout_lines | select }}"
+    - win_powershell_cmd_output.stdout is defined
+    - win_powershell_cmd_output.stdout
 
 - name: "Print the encryption info of {{ win_bde_volume }} volume"
   ansible.builtin.debug: var=win_bde_vol_info
