@@ -1,0 +1,23 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of the valid SCSI controller types list"
+  ansible.builtin.set_fact:
+    valid_scsi_controller_list: ['buslogic', 'paravirtual', 'lsilogicsas', 'lsilogic']
+
+- name: "Set disk controller type to scsi, sata or nvme"
+  ansible.builtin.set_fact:
+    disk_controller: "{{ 'scsi' if test_disk_controller_type in valid_scsi_controller_list else test_disk_controller_type }}"
+
+- name: "Get the number of { disk_controller }} controller"
+  include_tasks: ../../common/vm_get_disk_controller_num.yml
+
+- name: "Set facts of {{ disk_controller }} controller number and controllers info before hotadd"
+  ansible.builtin.set_fact:
+    vhba_number_before_hotadd: "{{ vhba_number }}"
+    disk_controllers_before_hotadd: "{{ disk_controller_facts['disk_controller_data'] }}"
+
+# New disk controller can be added when existing controller number < 4
+- name: "Set fact of add new disk controller when it's number < 4"
+  ansible.builtin.set_fact:
+    add_new_controller: "{{ vhba_number_before_hotadd | int < 4 }}"

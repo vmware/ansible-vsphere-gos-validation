@@ -10,36 +10,34 @@
 # - sata: use the version of community.vmware collection which contains this controller type support.
 # - buslogic: not supported in 64bit Windows guest OS, no testing.
 #
-- name: "Initialize whether add new disk controller and new disk controller bus"
-  ansible.builtin.set_fact:
-    add_new_controller: false
-    new_vhba_bus_found: false
-
-- name: "Get VM disk controller info"
-  include_tasks: get_vm_disk_ctl_num_bus.yml
+- name: "Get VM current disk controller info"
+  include_tasks: get_vm_disk_ctl_info.yml
 
 - name: "Skip test case"
   include_tasks: ../../common/skip_test_case.yml
   vars:
-    skip_msg: "Skip test case due to controller '{{ disk_controller }}' number is already 4: {{ vhba_number_before_hotadd }}."
-    skip_reason: "Not Applicable"
+    skip_msg: "Test case is blocked due to controller '{{ disk_controller }}' number is already 4: {{ vhba_number_before_hotadd }}."
+    skip_reason: "Blocked"
   when: not add_new_controller
 
-- name: "Test case block"
-  when:
-    - add_new_controller
-    - new_vhba_bus_found
+- name: "Get new disk controller bus number"
+  include_tasks: ../../common/vm_get_new_vhba_bus_number.yml
+  vars:
+    disk_controller_facts_data: "{{ disk_controllers_before_hotadd }}"
+    new_vhba_type: "{{ disk_controller }}"
+
+- name: "Do testing on the new disk controller"
+  when: new_vhba_bus_found
   block:
     - name: "Preparation for the testing"
       include_tasks: vhba_test_prepare.yml
- 
+
     - name: "Execute disk hot add test"
       include_tasks: hotadd_remove_vhba_test.yml
       when: >
         (test_purpose == "hot-add") or
-        (test_purpose == "hot-add-spec13" and test_disk_controller_type == "nvme")
+        (test_purpose == "hot-add-spec13")
 
     - name: "Execute disk hot extend test"
       include_tasks: hot_extend_disk_test.yml
-      when:
-        - test_purpose == "hot-extend"
+      when: test_purpose == "hot-extend"
