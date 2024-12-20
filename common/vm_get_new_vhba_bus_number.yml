@@ -29,20 +29,22 @@
     new_vhba_bus_number: ''
     new_vhba_bus_found: false
 
-- ansible.builtin.debug:
-    msg: "The number of '{{ new_vhba_type }}' vhba already reach 4, can not get bus number of new adapter"
-  when: disk_controller_facts_data[new_vhba_type]|length == 4
+- name: "{{ new_vhba_type }}' vhba is already 4"
+  ansible.builtin.debug:
+    msg: "The number of '{{ new_vhba_type }}' vhba is already 4, can not get bus number for the new adapter."
+  when: disk_controller_facts_data[new_vhba_type] | length == 4
 
 - name: "Get new '{{ new_vhba_type }}' controller bus number from 0 to 3"
   ansible.builtin.set_fact:
     new_vhba_bus_number: "{{ item }}"
-    new_vhba_bus_found: "{{ true if item | string not in disk_controller_facts_data[new_vhba_type] else false }}"
+    new_vhba_bus_found: "{{ (item | string) not in disk_controller_facts_data[new_vhba_type] }}"
   loop: "{{ range(0, 4) | list }}"
   when:
     - not new_vhba_bus_found
     - disk_controller_facts_data[new_vhba_type] | length < 4
 
-- ansible.builtin.debug:
+- name: "Print the new vhba result"
+  ansible.builtin.debug:
     msg:
       - "Get new '{{ new_vhba_type }}' controller bus number: {{ new_vhba_bus_found }}"
-      - "Get new '{{ new_vhba_type }}' controller bus number: {{ new_vhba_bus_number }}"
+      - "New '{{ new_vhba_type }}' controller bus number: {{ new_vhba_bus_number }}"
