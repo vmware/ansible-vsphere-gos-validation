@@ -9,18 +9,16 @@
     ctl_num_guest_before_hotadd: "{{ ctl_num_guest }}"
     disk_num_guest_before_hotadd: "{{ disk_num_guest }}"
 
+# For hot-add nvme spec 1.3 test
 # From Windows 11 and Windows Server 2022 guest OS on VM hardware version >= 19,
 # no need to enable NVMe spec 1.3 in vmx explicitly.
-- name: "Set fact of whether to add VM extra config"
-  ansible.builtin.set_fact:
-    vm_add_nvme_103: true
-  when: guest_os_build_num | int < 20348
-
 - name: "Enable NVMe spec 1.3"
   include_tasks: enable_vm_nvme_spec13.yml
   when:
     - test_purpose == "hot-add-spec13" or test_purpose == "hot-extend"
+    - guest_os_build_num | int < 20348
 
+# For hot-add nvme disk test
 - name: "Prepare for the NVMe disk hotadd testing"
   when:
     - test_disk_controller_type == "nvme"
@@ -32,11 +30,8 @@
       ansible.builtin.set_fact:
         nvme_ctl_inst_id_list_before: "{{ nvme_ctl_instance_id_list }}"
 
-# For hot-add sata test, set the boot disk label firstly since boot order may be changed after hot-add disk.
-- name: "Initialize the boot disk label"
-  ansible.builtin.set_fact:
-    boot_disk_label: ""
-
+# For hot-add sata disk test, set the boot disk label first since
+# boot order may be changed after hot-add disk.
 - name: "Prepare for the SATA disk hotadd testing on VM with BIOS firmware"
   when:
     - test_purpose == "hot-add"
@@ -44,6 +39,10 @@
     - vm_firmware == 'bios'
     - win_boot_disk_ctl_type not in ['ide', 'sata']
   block:
+    - name: "Initialize the boot disk label"
+      ansible.builtin.set_fact:
+        boot_disk_label: ""
+
     - name: "Get VM VirtualDisk info"
       include_tasks: ../../common/vm_get_device_with_type.yml
       vars:
