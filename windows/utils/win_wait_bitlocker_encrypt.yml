@@ -1,0 +1,57 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Retry to get the BitLocker encrypted volume info until it's encryption
+# percentage value to be the same as the specified one.
+# Parameters:
+#   win_bde_volume (optional): the encrypted disk drive letter, default is 'C:'.
+#   win_bde_percent: the expected encryption percentage of the specified drive,
+#     e.g., 100, 0.
+#   win_wait_bde_timeout (optional): the timeout in seconds to wait for the expected
+#     encryption percentage, default value is 600.
+#
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - win_bde_percent is defined
+      - win_bde_percent | int >= 0
+      - win_bde_percent | int <= 100
+    fail_msg: "Parameter 'win_bde_percent' must be set to a valid percentage value in 0 - 100."
+
+- name: "Initialize the values of parameters"
+  ansible.builtin.set_fact:
+    win_bde_volume: "{{ win_bde_volume | default('C:') }}"
+    win_wait_bde_timeout: "{{ win_wait_bde_timeout | default(600) }}"
+    win_bde_percent_search: "{{ 'EncryptionPercentage\\s*:\\s*' ~ win_bde_percent | int }}"
+
+- name: "Print the percentage string to wait for"
+  ansible.builtin.debug: var=win_bde_percent_search
+
+- name: "Get BitLocker encrypted volume {{ win_bde_volume }} info"
+  ansible.windows.win_shell: "Get-BitLockerVolume -MountPoint {{ win_bde_volume }} | Format-List"
+  register: get_encrypt_result
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_unreachable: true
+  retries: "{{ (win_wait_bde_timeout | int / 10) | int }}"
+  delay: 10
+  until:
+    - get_encrypt_result.stdout is defined
+    - get_encrypt_result.stdout | regex_search(win_bde_percent_search)
+
+- name: "Print the getting BitLocker encrypted volume info result"
+  ansible.builtin.debug: var=get_encrypt_result
+
+- name: "Get BitLocker encrypted volume info failed"
+  ansible.builtin.fail:
+    msg: "Failed to get BitLocker encrypted volume {{ win_bde_volume }} info due to: {{ get_encrypt_result.msg | default('') }}"
+  when:
+    - get_encrypt_result.unreachable is defined
+    - get_encrypt_result.unreachable
+
+- name: "Check getting BitLocker encrypted volume info result"
+  ansible.builtin.assert:
+    that:
+      - get_encrypt_result.failed is defined
+      - not get_encrypt_result.failed
+    fail_msg: "Not get expected encryption percentage: {{ win_bde_percent }} after {{ win_wait_bde_timeout }} seconds."

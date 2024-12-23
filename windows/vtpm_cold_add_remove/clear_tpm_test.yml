@@ -1,0 +1,20 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check OS still work well after executing Clear-Tpm cmdlet
+#
+- name: "Execute Clear-Tpm cmdlet in guest OS"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Clear-Tpm"
+
+- name: "Restart guest OS after reset TPM"
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+
+- name: "Get TPM info after reset"
+  include_tasks: ../utils/win_get_tpm_status.yml
+
+- name: "Check TPM device status in guest OS after reset"
+  include_tasks: check_vtpm_status.yml

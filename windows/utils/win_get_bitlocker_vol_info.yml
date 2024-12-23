@@ -1,0 +1,28 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get specified BitLocker encrypted volume info.
+# Parameters:
+#   win_bde_volume (optional): the encrypted disk drive letter, default is 'C:'.
+# Return:
+#   win_bde_vol_info: the dict of encrypted disk drive encryption info.
+#
+- name: "Initialize the default values of parameters"
+  ansible.builtin.set_fact:
+    win_bde_vol_info: {}
+    win_bde_volume: "{{ win_bde_volume | default('C:') }}"
+
+- name: "Get the encryption info of {{ win_bde_volume }} volume"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-BitLockerVolume -MountPoint {{ win_bde_volume }} | Format-List"
+
+- name: "Set fact of the dict of the encryption info"
+  ansible.builtin.set_fact:
+    win_bde_vol_info: "{{ win_powershell_cmd_output.stdout | replace(win_bde_volume, win_bde_volume.strip(':')) | regex_replace('\\{(.*)\\}', '[\\1]') | from_yaml }}"
+  when:
+    - win_powershell_cmd_output.stdout is defined
+    - win_powershell_cmd_output.stdout
+
+- name: "Print the encryption info of {{ win_bde_volume }} volume"
+  ansible.builtin.debug: var=win_bde_vol_info
