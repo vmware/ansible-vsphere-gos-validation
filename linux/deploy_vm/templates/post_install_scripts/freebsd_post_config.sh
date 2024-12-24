@@ -133,6 +133,10 @@ sed -i '' 's/kern.geom.label.gptid.enable="0"/kern.geom.label.gptid.enable="1"/'
 echo 'kern.geom.label.gpt.enable="1"' >>/boot/loader.conf
 echo 'kern.geom.label.ufs.enable="1"' >>/boot/loader.conf
 echo 'kern.geom.label.ufsid.enable="1"' >>/boot/loader.conf
+if [ "$machtype" != "amd64" ] && [ "$machtype" != "x86_64" ]; then
+    # Workaround for FreeBSD issue https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=283276
+    echo 'kern.kstack_pages=8' >>/boot/loader.conf
+fi
 
 # Reducing boot menu delay
 echo "Reducing boot menu delay ..." > /dev/ttyu0
