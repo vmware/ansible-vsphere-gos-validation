@@ -1,30 +1,37 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Hot add disk to existing controller"
+- name: "Hot add a new disk to the existing controller"
   include_tasks: ../../common/vm_hot_add_remove_disk.yml
   vars:
     disk_operation: 'present'
     disk_controller_type: "{{ test_disk_controller_type }}"
     ctrl_number: "{{ new_vhba_bus_number }}"
     unit_number: 1
-- name: "Wait 15 seconds after disk hotadd"
+
+- name: "Wait 15 seconds after disk hot add"
   ansible.builtin.pause:
     seconds: 15
 
-- name: "Get the number of disk in guest OS after hotadd"
+- name: "Get the number of disk in guest OS after hot add"
   include_tasks: ../utils/win_get_disk_num.yml
-- name: "Set fact of disk number after hotadd"
+
+- name: "Set fact of disk number after hot add"
   ansible.builtin.set_fact:
     disk_num_guest_after_hotadd2: "{{ disk_num_guest }}"
 
-# Hotadd NVMe disk to existing controller, the disk is not recognized
-# before guest OS restart or disable/enable NVMe controller
+# Hot add NVMe disk to existing controller, the disk is not recognized
+# before guest OS restart or disable/enable NVMe controller.
+# Note:
+#   Disable/enable operation prompts to request OS restart due to NVMe
+# controller disable request is vetoed by storage after OS restart.
+# So the workaround here is changed to restart guest OS directly.
+# - include_tasks: disable_enable_nvme_device.yml
 - name: "Handle known issue"
   when:
     - test_disk_controller_type == 'nvme'
     - test_purpose == "hot-add"
-    - disk_num_guest_after_hotadd2 | int != disk_num_guest_before_hotadd | int + 2
+    - disk_num_guest_after_hotadd2 | int != disk_num_guest_before_hotadd1 | int + 1
   block:
     - name: "Known issue - workaround of hot adding NVMe disk to existing controller"
       ansible.builtin.debug:
@@ -34,9 +41,6 @@
       tags:
         - known_issue
 
-    # Disable/enable operation prompts to request OS restart due to NVMe controller disable request
-    # is vetoed by storage after OS restart. So change to restart guest OS directly as the workaround.
-    # - include_tasks: disable_enable_nvme_device.yml
     - name: "Restart guest OS"
       include_tasks: ../utils/win_shutdown_restart.yml
       vars:
@@ -47,20 +51,13 @@
       ansible.builtin.set_fact:
         disk_num_guest_after_hotadd2: "{{ disk_num_guest }}"
 
-- name: "Verify disk number increases in guest OS"
+- name: "Verify disk number increases 1 in guest OS"
   ansible.builtin.assert:
     that:
-      - disk_num_guest_after_hotadd2 | int == disk_num_guest_before_hotadd | int + 2
-    success_msg: "Disk number increases 2 in guest OS after hotadding disks to new controller and existing controller."
-    fail_msg: "Disk number not increase 2 after hotadding disks to new controller and existing controller, before hotadd: {{ disk_num_guest_before_hotadd }}, after hotadd: {{ disk_num_guest_after_hotadd2 }}"
-
-- name: "Get the raw disk number in guest OS"
-  include_tasks: ../utils/win_get_raw_disk_num.yml
-
-- name: "Get the raw disk unique id"
-  include_tasks: ../utils/win_get_disk_unique_id.yml
-  vars:
-    win_get_disk_uid_num: "{{ win_raw_disk_num }}"
+      - disk_num_guest_after_hotadd2 | int == disk_num_guest_before_hotadd1 | int + 1
+    fail_msg:
+      - "Testing failed at hot adding new disk to the existing controller." 
+      - "Disk number before hot add: {{ disk_num_guest_before_hotadd1 }}, after hot add: {{ disk_num_guest_after_hotadd2 }}"
 
 - name: "Add disk to existing controller"
   ansible.builtin.set_fact:
