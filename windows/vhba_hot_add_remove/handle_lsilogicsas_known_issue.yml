@@ -1,0 +1,47 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the content of test file failed after guest OS restart
+- name: "Check whether disk is offline after guest OS restart"
+  when:
+    - get_file_content_result2.rc is defined
+    - get_file_content_result2.rc != 0
+  block:
+    - name: "Get offline disk info in guest OS"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "Get-Disk | Where-Object IsOffline -eq $True | select DiskNumber,UniqueId | ft -hidetableheaders"
+    - name: "Set fact of disk is online"
+      ansible.builtin.set_fact:
+        new_disk_is_online: true
+      when:
+        - win_powershell_cmd_output.stdout_lines is defined
+        - win_powershell_cmd_output.stdout_lines | length == 0
+
+- name: "Handle get new file content failure"
+  block:
+    - name: "Known issue - workaround of hot adding disk to new LSILogicSAS controller in Windows Server"
+      ansible.builtin.debug:
+        msg:
+          - "After Windows Server guest restart the new added disk to the new LSILogicSAS controller will be offline. Ignore this known issue."
+          - "Online this disk as a workaround for hot adding disk to the new LSILogicSAS controller test."
+      tags:
+        - known_issue
+    - include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "Get-Disk | Where-Object IsOffline -eq $True | Set-Disk -IsOffline $False"
+    - include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "type {{ write_test_file_path_win }}"
+        win_execute_cmd_ignore_error: true
+    - name: "Save the result of getting new file content after online disk"
+      ansible.builtin.set_fact:
+        get_file_content_result2: "{{ win_powershell_cmd_output }}"
+  when:
+    - get_file_content_result2.rc is defined
+    - get_file_content_result2.rc != 0
+    - new_disk_is_online is defined
+    - not new_disk_is_online
+    - test_disk_controller_type == 'lsilogicsas'
+    - test_purpose == "hot-add"
+    - "'Windows Server' in guest_os_ansible_distribution"
