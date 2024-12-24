@@ -6,29 +6,32 @@
 # Return:
 #   drive_letter_new: an unassigned driver letter
 #
-- name: Initialize the assigned drive letter list
-  ansible.builtin.set_fact:
-    assigned_drive_letter: ['C', 'D', 'E']
-- name: Set fact of the available driver letter list
+- name: "Set fact of the available driver letter list"
   ansible.builtin.set_fact:
     valid_drive_letter_list: ['Z', 'Y', 'X', 'W', 'V', 'U', 'T', 'S']
 
-# Get assigned drive letter list in Windows guest
-- include_tasks: win_execute_cmd.yml
+- name: "Get assigned drive letter list in Windows guest OS"
+  include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "(get-volume | where-object {$_.DriveType -eq 'Fixed'}).DriveLetter"
 
-- name: Set fact of the assigned driver letter
+- name: "Check the result of getting assigned drive letter list"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.stdout_lines is defined
+      - win_powershell_cmd_output.stdout_lines | length != 0
+    fail_msg: "Not get the assigned drive letters in guest OS: {{ win_powershell_cmd_output.stdout_lines | default('') }}"
+
+- name: "Set fact of the assigned driver letter list"
   ansible.builtin.set_fact:
     assigned_drive_letter: "{{ win_powershell_cmd_output.stdout_lines | list }}"
-  when:
-    - win_powershell_cmd_output is defined
-    - win_powershell_cmd_output.stdout_lines is defined
-- ansible.builtin.debug:
-    msg: "Get assigned drive letters: {{ assigned_drive_letter }}"
 
-- name: Set fact of the unassigned driver letter
+- name: "Set fact of the unassigned driver letter"
   ansible.builtin.set_fact:
     drive_letter_new: "{{ valid_drive_letter_list | difference(assigned_drive_letter) | random }}"
-- ansible.builtin.debug:
-    msg: "Drive letter can be used: {{ drive_letter_new }}"
+
+- name: "Print the driver letter info"
+  ansible.builtin.debug:
+    msg:
+      - "Assigned driver letter: {{ assigned_drive_letter }}" 
+      - "Drive letter can be used: {{ drive_letter_new }}"
