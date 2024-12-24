@@ -1,43 +1,50 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# This file is used to hotadd and hot remove disk controller and disk of VM.
-# Disk controller types notes:
-# - paravirtual: require pvscsi driver installed or VMware Tools installed.
-# - lsilogicsas: the default disk controller type of VM.
+# Notes on Windows VM disk controller types:
+# - paravirtual: inbox pvscsi driver or VMware Tools installed in guest OS.
 # - lsilogic: no inbox driver in Windows guest OS now, so no testing.
-# - nvme: use the version of community.vmware collection which contains this controller type support.
-# - sata: use the version of community.vmware collection which contains this controller type support.
-# - buslogic: not supported in 64bit Windows guest OS, no testing.
+# - buslogic: not supported in 64bit Windows guest OS, so no testing.
 #
+- name: "Initialize the fact of whether can add new disk controller"
+  ansible.builtin.set_fact:
+    add_new_controller: false
+
 - name: "Get VM current disk controller info"
   include_tasks: get_vm_disk_ctl_info.yml
+
+- name: "Set fact of whether can add new disk controller"
+  ansible.builtin.set_fact:
+    add_new_controller: "{{ disk_controller_count | int < 4 }}"
 
 - name: "Skip test case"
   include_tasks: ../../common/skip_test_case.yml
   vars:
-    skip_msg: "Test case is blocked due to controller '{{ disk_controller }}' number is already 4: {{ vhba_number_before_hotadd }}."
+    skip_msg: "Test case is blocked due to controller '{{ disk_controller }}' number is already 4: {{ disk_controller_count }}."
     skip_reason: "Blocked"
   when: not add_new_controller
 
-- name: "Get new disk controller bus number"
-  include_tasks: ../../common/vm_get_new_vhba_bus_number.yml
-  vars:
-    disk_controller_facts_data: "{{ disk_controllers_before_hotadd }}"
-    new_vhba_type: "{{ disk_controller }}"
+- name: "Preparation for the testing"
+  include_tasks: vhba_test_prepare.yml
 
-- name: "Do testing on the new disk controller"
-  when: new_vhba_bus_found
+- name: "Execute disk hot add test"
+  when: >
+    (test_purpose == "hot-add") or
+    (test_purpose == "hot-add-spec13")
   block:
-    - name: "Preparation for the testing"
-      include_tasks: vhba_test_prepare.yml
+    - name: "Test on adding new disk on NVMe boot disk controller"
+      include_tasks: hotadd_vm_disk_existing_ctrl.yml
+      when: test_disk_controller_type == 'nvme'
 
-    - name: "Execute disk hot add test"
-      include_tasks: hotadd_remove_vhba_test.yml
-      when: >
-        (test_purpose == "hot-add") or
-        (test_purpose == "hot-add-spec13")
+    - name: "Test on adding new disk on new disk controller at the same time"
+      include_tasks: hotadd_vm_disk_new_ctrl.yml
 
-    - name: "Execute disk hot extend test"
-      include_tasks: hot_extend_disk_test.yml
-      when: test_purpose == "hot-extend"
+    - name: "Test on adding new disk on the existing controller"
+      include_tasks: hotadd_vm_disk_existing_ctrl.yml
+
+    - name: "Test on remove new added disks and disk controller"
+      include_tasks: hotremove_vm_disk_ctrl.yml
+
+- name: "Execute disk hot extend test"
+  include_tasks: hot_extend_disk_test.yml
+  when: test_purpose == "hot-extend"
