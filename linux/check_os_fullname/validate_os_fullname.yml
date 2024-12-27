@@ -5,16 +5,16 @@
 #
 - name: "Start to validate VM guest info"
   ansible.builtin.debug:
-    msg: "Start to validate VM guest info for hardware version {{ compatible_hw_version }}"
+    msg: "Start to validate VM guest info for hardware version {{ vm_compatible_hw_version }}"
 
 - name: "Set facts whether to upgrade VM hardware version and skip guest info checking"
   ansible.builtin.set_fact:
     skip_guest_info_checking: false
     upgrade_vm_hardware_version: >-
       {{
-        compatible_hw_version is defined and
-        compatible_hw_version is match('\d+') and
-        compatible_hw_version | int > vm_current_hw_version | int
+        vm_compatible_hw_version is defined and
+        vm_compatible_hw_version is match('\d+') and
+        vm_compatible_hw_version | int > vm_current_hw_version | int
       }}
 
 - name: "Upgrade VM hardware version"
@@ -23,10 +23,10 @@
     - name: "Shutdown VM"
       include_tasks: ../utils/shutdown.yml
 
-    - name: "Upgrade VM hardware version from {{ vm_current_hw_version }} to {{ compatible_hw_version }}"
+    - name: "Upgrade VM hardware version from {{ vm_current_hw_version }} to {{ vm_compatible_hw_version }}"
       include_tasks: ../../common/vm_upgrade_hardware_version.yml
       vars:
-        hw_version: "{{ compatible_hw_version }}"
+        hw_version: "{{ vm_compatible_hw_version }}"
 
     - name: "Set fact for VM current hardware version"
       ansible.builtin.set_fact:
@@ -47,7 +47,7 @@
   ansible.builtin.debug:
     msg:
       - "ESXi version: {{ esxi_version }}"
-      - "Latest guest info hardware version: {{ guest_info_latest_hwv }}"
+      - "Latest guest info hardware version: {{ guestinfo_latest_hw_version }}"
       - "VMware Tools version: {{ vmtools_version }}"
       - "VM hardware version: {{ vm_current_hw_version }}"
       - "VM guest OS distribution: {{ vm_guest_os_distribution }}"
@@ -111,4 +111,4 @@
 
 - name: "End to validate VM guest info"
   ansible.builtin.debug:
-    msg: "End to validate VM guest info for hardware version {{ compatible_hw_version }}"
+    msg: "End to validate VM guest info for hardware version {{ vm_compatible_hw_version }}"

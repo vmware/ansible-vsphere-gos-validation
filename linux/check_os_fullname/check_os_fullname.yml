@@ -41,17 +41,22 @@
         - name: "Get ESXi hardware versions"
           include_tasks: ../../common/esxi_get_hardware_versions.yml
 
+        # guestinfo_latest_hw_version is the hardware version containing latest guest ids on the ESXi server
+        # vm_base_hw_version is the hardware version of VM at base snapshot
+        # vm_current_hw_version is the hardware version of VM at present and will be updated after upgrading
+        # hardware version
+        # vm_compatible_hw_versions is a list of hardware versions which VM is compatible with
         - name: "Set facts of hardware versions for checking VM guest info"
           ansible.builtin.set_fact:
-            vm_base_hardware_version: "{{ vm_hardware_version_num }}"
+            guestinfo_latest_hw_version: "{{ 22 if esxi_version is version('8.0.3', '==') else esxi_latest_hardware_version }}"
+            vm_base_hw_version: "{{ vm_hardware_version_num }}"
             vm_current_hw_version: "{{ vm_hardware_version_num }}"
-            guest_info_latest_hwv: "{{ 22 if esxi_version is version('8.0.3', '==') else esxi_latest_hardware_version }}"
-            compatible_hardware_versions: "{{ esxi_hardware_versions | select('>=', vm_hardware_version_num | int) }}"
+            vm_compatible_hw_versions: "{{ esxi_hardware_versions | select('>=', vm_hardware_version_num | int) }}"
 
         - name: "Get supported guest ids on ESXi {{ esxi_version }}"
           include_tasks: ../../common/esxi_get_guest_ids.yml
           vars:
-            esxi_hardware_version: "{{ guest_info_latest_hwv }}"
+            esxi_hardware_version: "{{ guestinfo_latest_hw_version }}"
 
         - name: "Initialize facts about VM expected guest info"
           ansible.builtin.set_fact:
@@ -88,9 +93,9 @@
 
         - name: "Validate guest id, full name and family in guest info for compatible hardware versions"
           include_tasks: validate_os_fullname.yml
-          with_items: "{{ compatible_hardware_versions }}"
+          with_items: "{{ vm_compatible_hw_versions }}"
           loop_control:
-            loop_var: compatible_hw_version
+            loop_var: vm_compatible_hw_version
 
       rescue:
         - name: "Test rescue"
@@ -101,9 +106,9 @@
 
         - name: "Revert to base snapshot to downgrade VM hardware version and update VM info"
           when:
-            - vm_base_hardware_version | default('')
+            - vm_base_hw_version | default('')
             - vm_current_hw_version | default('')
-            - vm_current_hw_version | int > vm_base_hardware_version | int
+            - vm_current_hw_version | int > vm_base_hw_version | int
           block:
             - name: "Revert to base snapshot"
               include_tasks: ../../common/vm_revert_snapshot.yml
