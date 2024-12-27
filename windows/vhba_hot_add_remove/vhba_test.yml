@@ -6,23 +6,20 @@
 # - lsilogic: no inbox driver in Windows guest OS now, so no testing.
 # - buslogic: not supported in 64bit Windows guest OS, so no testing.
 #
-- name: "Initialize the fact of whether can add new disk controller"
-  ansible.builtin.set_fact:
-    add_new_controller: false
-
 - name: "Get VM current disk controller info"
   include_tasks: get_vm_disk_ctl_info.yml
 
-- name: "Set fact of whether can add new disk controller"
-  ansible.builtin.set_fact:
-    add_new_controller: "{{ disk_controller_count | int < 4 }}"
+- name: "Print whether can add new disk controller"
+  ansible.builtin.debug:
+    msg: "Can add a new '{{ disk_controller }}' controller since existing controller number {{ disk_controller_count }} < 4."
+  when: disk_controller_count | int < 4
 
 - name: "Skip test case"
   include_tasks: ../../common/skip_test_case.yml
   vars:
     skip_msg: "Test case is blocked due to controller '{{ disk_controller }}' number is already 4: {{ disk_controller_count }}."
     skip_reason: "Blocked"
-  when: not add_new_controller
+  when: disk_controller_count | int == 4
 
 - name: "Preparation for the testing"
   include_tasks: vhba_test_prepare.yml
@@ -34,6 +31,8 @@
   block:
     - name: "Test on adding new disk on NVMe boot disk controller"
       include_tasks: hotadd_vm_disk_existing_ctrl.yml
+      vars:
+        test_on_boot_ctrl: true
       when: test_disk_controller_type == 'nvme'
 
     - name: "Test on adding new disk on new disk controller at the same time"
