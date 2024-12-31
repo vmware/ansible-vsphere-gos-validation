@@ -8,6 +8,9 @@
     guest_id_pattern: ""
     guest_id_bit: ""
     guest_id_major_version: ""
+    guest_is_otherlinux: false
+    esxi_guest_ids_for_bit: []
+    supported_guest_ids: []
 
 - name: "Set guest id pattern and bit from short-name in tools.conf"
   when: guest_short_name
@@ -24,38 +27,70 @@
 - name: "Set guest id pattern and bit from guest OS release"
   when: not guest_short_name
   block:
-    - name: "Initialize facts to map guest id for {{ vm_guest_os_distribution }}"
+    - name: "Set fact of guest id bit"
       ansible.builtin.set_fact:
-        guest_os_release_name: "{{ guest_os_release.NAME | replace(' ', '') | regex_replace(' *(server|os) *$', '', ignorecase=True) }}"
-        guest_os_release_id: |-
-          {%- if guest_os_release.ID | lower == 'sled' -%}sles
-          {%- elif guest_os_release.ID | lower is match('opensuse.*') -%}opensuse
-          {%- else -%}{{ guest_os_release.ID }}
-          {%- endif -%}
-        guest_id_major_version: "{{ guest_os_release.VERSION | regex_search('\\d+') }}"
-
-    - name: "Match MIRACLE LINUX guest id to asianux on ESXi {{ esxi_veresion }} with VMware Tools version {{ vmtools_version }}"
-      ansible.builtin.set_fact:
-        guest_os_release_id: "asianux|{{ guest_os_release_id }}"
-      when: 
-        - guest_os_ansible_distribution == 'MIRACLE'
-        - vmtools_version is version('12.3.5', '>')
-        - esxi_version is version('8.0.3', '<=')
-     
-    - name: "Set facts of guest id pattern and bit from guest OS release"
-      ansible.builtin.set_fact:
-        guest_id_pattern: "(?i)({{ guest_os_release_id }}|({{ guest_os_release_name }}))\\w*\\d*"
         guest_id_bit: "{{ '64' if guest_os_bit == '64-bit' else '' }}"
 
-- name: "Set fact of supported 64-bit guest ids matching '{{ guest_id_pattern  }}'"
+    # AlmaLinux and Rocky Linux will be recognized as other Linux by VMware Tool earlier than 12.0.0
+    # MIRACLE LINUX will be recognized as other Linux by VMware Tool earlier thatn 12.4.0
+    # ProLinux, FusionOS, Pardus and Kylin Linux will be recognized as other Linux
+    # by VMware Tool earlier than 12.5.0
+    - name: "Set fact that current guest OS should be recognized as other Linux"
+      ansible.builtin.set_fact:
+        guest_is_otherlinux: true
+      when: >-
+        (guest_os_ansible_distribution in ['Almalinux', 'Rocky'] and
+         vmtools_version is version('12.0.0', '<')) or
+        (guest_os_ansible_distribution == 'MIRACLE' and
+         vmtools_version is version('12.4.0', '<')) or
+        (guest_os_ansible_distribution in ['ProLinux', 'FusionOS',
+                                           'Pardus GNU/Linux',
+                                           'Kylin Linux Advanced Server'] and
+         vmtools_version is version('12.5.0', '<'))
+
+    - name: "Set guest id pattern for {{ guest_os_ansible_distribution }}"
+      when: not guest_is_otherlinux
+      block:
+        - name: "Initialize facts to map guest id for {{ vm_guest_os_distribution }}"
+          ansible.builtin.set_fact:
+            guest_os_release_name: "{{ guest_os_release.NAME | replace(' ', '') |
+                                       regex_replace(' *(server|os) *$', '', ignorecase=True) }}"
+            guest_os_release_id: |-
+              {%- if guest_os_release.ID | lower == 'sled' -%}sles
+              {%- elif guest_os_release.ID | lower is match('opensuse.*') -%}opensuse
+              {%- else -%}{{ guest_os_release.ID }}
+              {%- endif -%}
+            guest_id_major_version: "{{ guest_os_release.VERSION | regex_search('\\d+') }}"
+
+        - name: "Match MIRACLE LINUX guest id to 'asianux' with VMware Tools version {{ vmtools_version }}"
+          ansible.builtin.set_fact:
+            guest_os_release_id: "asianux"
+            guest_os_release_name: "Asianux"
+          when:
+            - guest_os_ansible_distribution == 'MIRACLE'
+            - vmtools_version is version('12.4.0', '>=')
+            - vmtools_version is version('12.5.0', '<')
+
+        - name: "Set facts of guest id pattern and bit from guest OS release"
+          ansible.builtin.set_fact:
+            guest_id_pattern: "(?i)({{ guest_os_release_id }}|({{ guest_os_release_name }}))\\w*\\d*"
+
+- name: "Set fact of ESXi supported 64-bit guest ids"
   ansible.builtin.set_fact:
-    supported_guest_ids: "{{ esxi_guest_ids | select('match', guest_id_pattern ~ '_?64Guest') }}"
+    esxi_guest_ids_for_bit: "{{ esxi_guest_ids | select('match', '.*64Guest') }}"
   when: guest_id_bit == '64'
 
-- name: "Set fact of supported 32-bit guest ids matching '{{ guest_id_pattern }}'"
+- name: "Set fact of ESXi supported 32-bit guest ids"
   ansible.builtin.set_fact:
-    supported_guest_ids: "{{ esxi_guest_ids | reject('match', '.*64Guest') | select('match', guest_id_pattern ~ 'Guest') }}"
+    esxi_guest_ids_for_bit: "{{ esxi_guest_ids | reject('match', '.*64Guest') }}"
   when: guest_id_bit != '64'
+
+- name: "Set fact of supported {{ guest_id_bit }}-bit guest ids matching '{{ guest_id_pattern  }}'"
+  ansible.builtin.set_fact:
+    supported_guest_ids: "{{ esxi_guest_ids_for_bit | select('match', guest_id_pattern) }}"
+  when:
+    - guest_id_pattern
+    - not guest_is_otherlinux
 
 # Not found supported guest ids for guest OS distribution, then look for supported other Linux guest ids
 - name: "Get supported other Linux guest ids"
@@ -64,11 +99,14 @@
     - supported_guest_ids | length == 0
     - guest_os_ansible_distribution != "FreeBSD"
 
+- name: "Display supported guest ids for {{ vm_guest_os_distribution }}"
+  ansible.builtin.debug: var=supported_guest_ids
+
 - name: "Set fact of expected guest id for {{ vm_guest_os_distribution }}"
   ansible.builtin.set_fact:
     expected_guest_id: "{{ supported_guest_ids[0] }}"
   when: supported_guest_ids | length == 1
-  
+
 - name: "Look for closest guest id for {{ vm_guest_os_distribution }}"
   when: supported_guest_ids | length > 1
   block:

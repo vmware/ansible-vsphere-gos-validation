@@ -1,49 +1,114 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+# Validate VM guest info for a compatible hardware version
+#
+- name: "Start to validate VM guest info"
+  ansible.builtin.debug:
+    msg: "Start to validate VM guest info for hardware version {{ vm_compatible_hw_version }}"
+
+- name: "Set facts whether to upgrade VM hardware version and skip guest info checking"
+  ansible.builtin.set_fact:
+    skip_guest_info_checking: false
+    upgrade_vm_hardware_version: >-
+      {{
+        vm_compatible_hw_version is defined and
+        vm_compatible_hw_version is match('\d+') and
+        vm_compatible_hw_version | int > vm_current_hw_version | int
+      }}
+
+- name: "Upgrade VM hardware version"
+  when: upgrade_vm_hardware_version | bool
+  block:
+    - name: "Shutdown VM"
+      include_tasks: ../utils/shutdown.yml
+
+    - name: "Upgrade VM hardware version from {{ vm_current_hw_version }} to {{ vm_compatible_hw_version }}"
+      include_tasks: ../../common/vm_upgrade_hardware_version.yml
+      vars:
+        hw_version: "{{ vm_compatible_hw_version }}"
+
+    - name: "Set fact for VM current hardware version"
+      ansible.builtin.set_fact:
+        vm_current_hw_version: "{{ vm_hardware_version_num }}"
+
+    - name: "Power on VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-on'
+
+    - name: "Get VM guest IP"
+      include_tasks: ../../common/update_inventory.yml
+
+- name: "Get VM guest info"
+  include_tasks: ../../common/vm_get_guest_info.yml
+
 - name: "Display details about VM guest info"
   ansible.builtin.debug:
     msg:
       - "ESXi version: {{ esxi_version }}"
-      - "Latest guest info hardware version: {{ guest_info_latest_hwv }}"
+      - "Latest guest info hardware version: {{ guestinfo_latest_hw_version }}"
       - "VMware Tools version: {{ vmtools_version }}"
-      - "VM's hardware version: {{ vm_hardware_version }}"
+      - "VM hardware version: {{ vm_current_hw_version }}"
+      - "VM guest OS distribution: {{ vm_guest_os_distribution }}"
+      - "VM config guest id: {{ vm_guest_id }}"
       - "Expected guest id: {{ expected_guest_id }}"
       - "Actual guest id: {{ guestinfo_guest_id }}"
+      - "VM config guest OS version: {{ vm_guest_os_version }}"
       - "Expected guest full name: {{ expected_guest_fullname }}"
-      - "Actual guest id: {{ guestinfo_guest_full_name }}"
+      - "Actual guest full name: {{ guestinfo_guest_full_name }}"
       - "Expected guest family: {{ expected_guest_family }}"
       - "Actual guest family: {{ guestinfo_guest_family }}"
 
 - name: "Check whether unmapped guest id can be ignored"
   include_tasks: check_unmapped_guest_id.yml
-  when:
-    - expected_guest_id != guestinfo_guest_id
-    - (not guestinfo_guest_id) or (guestinfo_guest_id == vm_guest_id)
+  when: expected_guest_id != guestinfo_guest_id
 
-- name: "Check guest id in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
-  ansible.builtin.assert:
-    that:
-      - guestinfo_guest_id == expected_guest_id
-    fail_msg: >-
-      VM's guest id in guest info is '{{ guestinfo_guest_id }}', not expected '{{ expected_guest_id }}'.
-    success_msg: >-
-      VM's guest id in guest info is '{{ guestinfo_guest_id }}', which is as expected '{{ expected_guest_id }}'.
+- name: "Check VM guest info"
+  when: not skip_guest_info_checking
+  block:
+    - name: "Check guest id in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
+      ansible.builtin.assert:
+        that:
+          - guestinfo_guest_id == expected_guest_id
+        fail_msg: >-
+          VM's guest id in guest info is '{{ guestinfo_guest_id }}', not expected '{{ expected_guest_id }}'.
+        success_msg: >-
+          VM's guest id in guest info is '{{ guestinfo_guest_id }}', which is as expected '{{ expected_guest_id }}'.
 
-- name: "Check guest full name in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
-  ansible.builtin.assert:
-    that:
-      - guestinfo_guest_full_name == expected_guest_fullname
-    fail_msg: >-
-      VM's guest full name is '{{ guestinfo_guest_full_name }}', not expected '{{ expected_guest_fullname }}'.
-    success_msg: >-
-      VM's guest full name is '{{ guestinfo_guest_full_name }}', which is as expected '{{ expected_guest_fullname }}'.
+    - name: "Check guest full name in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
+      ansible.builtin.assert:
+        that:
+          - guestinfo_guest_full_name == expected_guest_fullname
+        fail_msg: >-
+          VM's guest full name is '{{ guestinfo_guest_full_name }}', not expected '{{ expected_guest_fullname }}'.
+        success_msg: >-
+          VM's guest full name is '{{ guestinfo_guest_full_name }}', which is as expected '{{ expected_guest_fullname }}'.
+      when:
+        - not (expected_guest_fullname is search('or later'))
+        - not (guestinfo_guest_full_name is search('or later'))
 
-- name: "Check guest family in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
-  ansible.builtin.assert:
-    that:
-      - guestinfo_guest_family == expected_guest_family
-    fail_msg: >-
-      VM's guest family in guest info is '{{ guestinfo_guest_family }}', not expected '{{ expected_guest_family }}'.
-    success_msg: >-
-      VM's guest family in guest info is '{{ guestinfo_guest_family }}', which is as expected '{{ expected_guest_family }}'.
+    - name: "Check guest full name in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
+      ansible.builtin.assert:
+        that:
+          - guestinfo_guest_full_name | regex_replace(' or later( versions)?', '') == expected_guest_fullname | regex_replace(' or later( versions)?', '')
+        fail_msg: >-
+          VM's guest full name is '{{ guestinfo_guest_full_name }}', not expected '{{ expected_guest_fullname }}'.
+        success_msg: >-
+          VM's guest full name is '{{ guestinfo_guest_full_name }}', which is as expected '{{ expected_guest_fullname }}'.
+      when: >-
+        expected_guest_fullname is search('or later') or
+        guestinfo_guest_full_name is search('or later')
+
+    - name: "Check guest family in VM's guest info with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
+      ansible.builtin.assert:
+        that:
+          - guestinfo_guest_family == expected_guest_family
+        fail_msg: >-
+          VM's guest family in guest info is '{{ guestinfo_guest_family }}', not expected '{{ expected_guest_family }}'.
+        success_msg: >-
+          VM's guest family in guest info is '{{ guestinfo_guest_family }}', which is as expected '{{ expected_guest_family }}'.
+
+- name: "End to validate VM guest info"
+  ansible.builtin.debug:
+    msg: "End to validate VM guest info for hardware version {{ vm_compatible_hw_version }}"
