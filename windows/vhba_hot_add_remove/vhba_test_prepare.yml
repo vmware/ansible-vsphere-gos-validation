@@ -1,58 +1,26 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+# For hot add sata disk test, set the boot disk label first since
+# boot order may be changed after hot-add disk.
+# For hot add nvme disk test, get nvme boot disk controller info first
+# since there is hot adding disk to nvme boot disk controller test.
+#
+- name: "Get VM boot disk and controller info"
+  include_tasks: get_vm_boot_disk_info.yml
+  when:
+    - boot_disk_info_retrieved is undefined
+    - (test_disk_controller_type == 'sata' and vm_firmware == 'bios' and win_boot_disk_ctl_type not in ['ide', 'sata']) or
+      (test_disk_controller_type == 'nvme' and win_boot_disk_ctl_type == 'nvme')
+
 - name: "Get new disk controller bus number"
   include_tasks: ../../common/vm_get_new_vhba_bus_number.yml
   vars:
     disk_controller_facts_data: "{{ disk_controllers_before_hotadd }}"
     new_vhba_type: "{{ disk_controller }}"
 
-- name: "Get the number of controllers and disks in guest OS before hotadd"
-  include_tasks: get_guest_disk_ctl_num.yml
-
-- name: "Set fact of disk controller and disk number before hotadd"
-  ansible.builtin.set_fact:
-    ctl_num_guest_before_hotadd: "{{ ctl_num_guest }}"
-    disk_num_guest_before_hotadd: "{{ disk_num_guest }}"
-
 - name: "Enable NVMe spec 1.3"
   include_tasks: enable_vm_nvme_spec13.yml
-  when: >
-    (test_purpose == "hot-add-spec13") or
-    (test_purpose == "hot-extend")
-
-# For hot-add sata disk test, set the boot disk label first since
-# boot order may be changed after hot-add disk.
-- name: "Prepare for the SATA disk hotadd testing on VM with BIOS firmware"
   when:
-    - test_purpose == "hot-add"
-    - test_disk_controller_type == 'sata'
-    - vm_firmware == 'bios'
-    - win_boot_disk_ctl_type not in ['ide', 'sata']
-  block:
-    - name: "Initialize the boot disk label"
-      ansible.builtin.set_fact:
-        boot_disk_label: ""
-
-    - name: "Get VM VirtualDisk info"
-      include_tasks: ../../common/vm_get_device_with_type.yml
-      vars:
-        device_vim_type: vim.vm.device.VirtualDisk
-
-    - name: "Set the disk label list"
-      ansible.builtin.set_fact:
-        disk_label_list: "{{ disk_label_list | default([]) + [item.deviceInfo.label] }}"
-      with_items: "{{ device_info_with_type }}"
-
-    - name: "Set the boot hard disk label when there's only one disk"
-      ansible.builtin.set_fact:
-        boot_disk_label: "{{ disk_label_list[0] }}"
-      when: disk_label_list | length == 1
-
-    - name: "Set the boot hard disk label when there are multiple disks"
-      ansible.builtin.set_fact:
-        boot_disk_label: "{{ 'Hard disk 1' if 'Hard disk 1' in disk_label_list else disk_label_list[0] }}"
-      when: disk_label_list | length > 1
-
-    - name: "Display the boot hard disk label"
-      ansible.builtin.debug: var=boot_disk_label
+    - test_disk_controller_type == 'nvme'
+    - test_purpose in ["hot-add-spec13", "hot-extend"]
