@@ -12,6 +12,13 @@
 - name: "Get VM disk controller info"
   include_tasks: ../../common/vm_get_disk_controller_facts.yml
 
+- name: "Set fact of VM disk controllers before hot adding tests"
+  ansible.builtin.set_fact:
+    disk_controllers_before_hotadd: "{{ disk_controller_facts['disk_controller_data'] }}"
+
+- name: "Print VM controller facts before hot add"
+  ansible.builtin.debug: var=disk_controllers_before_hotadd
+
 - name: "Set fact of the number of '{{ disk_controller }}' controller"
   ansible.builtin.set_fact:
-    disk_controller_count: "{{ disk_controller_facts.disk_controller_data[disk_controller] | default({}) | length }}"
+    disk_controller_count: "{{ disk_controllers_before_hotadd[disk_controller] | default({}) | length }}"

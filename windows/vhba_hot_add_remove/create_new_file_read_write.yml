@@ -3,36 +3,36 @@
 ---
 - name: "Set fact of test file path and test content"
   ansible.builtin.set_fact:
-    write_test_file_path_win: "{{ drive_letter_new }}:\\test_disk_write.txt"
+    write_test_file_path: "{{ drive_letter_new }}:\\test_disk_write.txt"
     test_line: "This is the test line to write to the file. "
 
 - name: "Create new test file in guest OS"
   include_tasks: ../utils/win_create_file.yml
   vars:
-    new_empty_file_path: "{{ write_test_file_path_win }}"
+    new_empty_file_path: "{{ write_test_file_path }}"
 
 - name: "Get test file status in guest OS"
   include_tasks: ../utils/win_check_file_exist.yml
   vars:
-    win_check_file_exist_file: "{{ write_test_file_path_win }}"
+    win_check_file_exist_file: "{{ write_test_file_path }}"
 
 - name: "Check test file exists in guest OS"
   ansible.builtin.assert:
     that:
       - win_check_file_exist_result
     success_msg: "New created file is found in guest OS"
-    fail_msg: "New created file is not found in guest OS: {{ write_test_file_path_win }}"
+    fail_msg: "New created file is not found in guest OS: {{ write_test_file_path }}"
 
 - name: "Write content to the test file"
   include_tasks: ../utils/win_write_to_file.yml
   vars:
-    write_file_path: "{{ write_test_file_path_win }}"
+    write_file_path: "{{ write_test_file_path }}"
     write_file_content: "{% for i in range(0, 20) %} '{{ test_line }}\n{{ test_line }}' {% endfor %}"
 
 - name: "Get the content of test file"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "type {{ write_test_file_path_win }}"
+    win_powershell_cmd: "type {{ write_test_file_path }}"
 
 - name: "Save the result of getting new file content"
   ansible.builtin.set_fact:
@@ -46,22 +46,13 @@
       - "test_line in get_file_content_result1.stdout"
     fail_msg: "The file content is '{{ get_file_content_result1.stdout }}', which should contain: '{{ test_line }}'"
 
-- name: "Set boot disk"
+- name: "Handle known issue"
+  include_tasks: handle_sata_known_issue.yml
   when:
-    - boot_disk_label is defined and boot_disk_label
-    - add_new_controller is defined and add_new_controller
-  block:
-    - name: "Boot order change of hot-add disk to new SATA controller for OS with BIOS firmware"
-      ansible.builtin.debug:
-        msg:
-            - "The disk boot order may be changed after hot-add new disk which causes failure of powering on VM."
-            - "Specify the boot disk as workaround. "
-
-    - include_tasks: ../../common/vm_set_boot_options.yml
-      vars:
-        boot_hdd_name: "{{ boot_disk_label }}"
-        boot_order_list:
-          - disk
+    - on_new_controller
+    - test_disk_controller_type == 'sata'
+    - vm_firmware == 'bios'
+    - win_boot_disk_ctl_type not in ['ide', 'sata']
 
 - name: "Restart guest OS"
   include_tasks: ../utils/win_shutdown_restart.yml
@@ -71,15 +62,38 @@
 - name: "Get the content of test file after guest OS restart"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "type {{ write_test_file_path_win }}"
+    win_powershell_cmd: "type {{ write_test_file_path }}"
     win_execute_cmd_ignore_error: true
 
 - name: "Save the result of getting test file content after guest OS restart"
   ansible.builtin.set_fact:
     get_file_content_result2: "{{ win_powershell_cmd_output }}"
 
-- name: "Handle known issue"
-  include_tasks: handle_lsilogicsas_known_issue.yml
+# Get the content of test file failed after guest OS restart
+- name: "Check whether disk is offline after guest OS restart"
+  when:
+    - get_file_content_result2.rc is defined
+    - get_file_content_result2.rc != 0
+  block:
+    - name: "Initialize the fact of whether disk is online"
+      ansible.builtin.set_fact:
+        new_disk_is_online: false
+
+    - name: "Get offline disk info in guest OS"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "Get-Disk | Where-Object IsOffline -eq $True | select DiskNumber,UniqueId | ft -hidetableheaders"
+
+    - name: "Set fact of whether disk is online"
+      ansible.builtin.set_fact:
+        new_disk_is_online: true
+      when:
+        - win_powershell_cmd_output.stdout_lines is defined
+        - win_powershell_cmd_output.stdout_lines | length == 0
+
+    - name: "Handle known issue"
+      include_tasks: handle_lsilogicsas_known_issue.yml
+      when: not new_disk_is_online
 
 - name: "Check file content after guest OS restart"
   ansible.builtin.assert:
