@@ -1,42 +1,52 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get new disk controller bus number and new disk unit number
+# Get bus number of disk controller with type specified and new disk unit number
 # Parameters:
-#   existing_vhba_type: the disk controller type
-#   disk_controller_facts_data: 'disk_controller_facts.disk_controller_data'
-#     got from 'vm_get_disk_controller_facts.yml' task.
+#   existing_vhba_type: the disk controller type.
+#   existing_vhba_bus_number (optional): the bus number of disk controller.
+#   disk_controller_facts_data: existing disk controllers got from result
+#     'disk_controller_facts.disk_controller_data' returned by
+#     'vm_get_disk_controller_facts.yml' task.
 # Return:
-#   existing_vhba_bus_number: bus number of existing disk controller with specified type
-#   new_disk_unit_number: new disk unit number
-#   existing_vbha_found: if disk controller with specified type exists
-#   new_disk_unit_number_got: whether get new disk unit number or not
+#   existing_vhba_bus_number: bus number of existing disk controller with type
+#     specified by parameter 'existing_vhba_type'.
+#   new_disk_unit_number: new disk unit number.
+#   existing_vbha_found: whether disk controller with specified type is found
+#     in disk controllers facts specified by paramter 'disk_controller_facts_data'.
 #
-- name: "Check required parameter"
+- name: "Check required parameters"
   ansible.builtin.assert:
     that:
       - existing_vhba_type is defined and existing_vhba_type
       - disk_controller_facts_data is defined and disk_controller_facts_data
     fail_msg: "'existing_vhba_type' and 'disk_controller_facts_data' are required parameters."
 
-- name: "Set fact of vhba type and name mapping dict"
-  ansible.builtin.set_fact:
-    vhba_type_name_map:
-      paravirtual: 'VMware paravirtual SCSI'
-      lsilogic: 'LSI Logic'
-      lsilogicsas: 'LSI Logic SAS'
-      nvme: 'NVME controller'
-      sata: 'AHCI'
+- name: "Check parameter value"
+  ansible.builtin.assert:
+    that:
+      - existing_vhba_bus_number | int in range(0, 5)
+    fail_msg: "Parameter 'existing_vhba_bus_number' is {{ existing_vhba_bus_number }}, while valid value is in {{ range(0, 5) | list }}."
+  when: existing_vhba_bus_number is defined
 
-- name: "Print the vhba name"
-  ansible.builtin.debug:
-    msg: "Specified vhba type '{{ existing_vhba_type }}' corresponding name: {{ vhba_type_name_map[existing_vhba_type] }}"
-
-- name: "Initialize the fact of whether it's SCSI controller"
+- name: "Initialize the facts of new disk node info"
   ansible.builtin.set_fact:
+    new_disk_unit_number: ''
+    existing_vbha_found: false
     is_scsi_vhba: "{{ existing_vhba_type in ['paravirtual', 'lsilogic', 'lsilogicsas'] }}"
 
-- name: "Set fact of the max unit number of disk with different types"
+- name: "Set fact of the vhba name"
+  ansible.builtin.set_fact:
+    vhba_type_name: >-
+      {%- if existing_vhba_type == 'paravirtual' -%}VMware paravirtual SCSI
+      {%- elif existing_vhba_type == 'lsilogic' -%}LSI Logic
+      {%- elif existing_vhba_type == 'lsilogicsas' -%}LSI Logic SAS
+      {%- elif existing_vhba_type == 'nvme' -%}NVME controller
+      {%- elif existing_vhba_type == 'sata' -%}AHCI
+      {%- else -%}Unknown
+      {%- endif -%}
+
+- name: "Set fact of the max unit number of disk"
   ansible.builtin.set_fact:
     valid_max_unit_number: >-
       {%- if is_scsi_vhba -%}15
@@ -45,66 +55,63 @@
       {%- else -%}0
       {%- endif -%}
 
-- name: "Check max unit number of disk"
+- name: "Print the vhba info"
+  ansible.builtin.debug:
+    msg:
+      - "Specified vhba type: {{ existing_vhba_type }}"
+      - "Specified vhba bus number: {{ existing_vhba_bus_number | default('') }}"
+      - "vhba name: {{ vhba_type_name }}"
+      - "Is SCSI vhba: {{ is_scsi_vhba }}"
+      - "Maximum unit number: {{ valid_max_unit_number }}"
+
+- name: "Check the max unit number of disk"
   ansible.builtin.assert:
     that:
-      - valid_max_unit_number != 0
-    fail_msg: "Got invalid max unit number of {{ existing_vhba_type }} disk: {{ valid_max_unit_number }}"
+      - valid_max_unit_number | int != 0
+    fail_msg: "Got invalid maximum unit number of {{ existing_vhba_type }} disk: {{ valid_max_unit_number }}."
 
-- name: "Initialize the fact of new disk node info on existing controller"
+- name: "Get disk controller with type '{{ existing_vhba_type }}'"
   ansible.builtin.set_fact:
-    existing_vhba_bus_number: ''
-    new_disk_unit_number: ''
-    existing_vbha_found: false
-    new_disk_unit_number_got: false
-    existing_device_key: []
-
-- name: "Loop to get exisitng '{{ existing_vhba_type }}' controller bus number"
-  ansible.builtin.set_fact:
-    existing_vhba_bus_number: "{{ item.key }}"
+    existing_vhba_bus_number: "{{ item.value['controller_busnumber'] }}"
     existing_device_key: "{{ item.value['controller_disks_devicekey'] }}"
-    existing_vbha_found: "{{ item.value['controller_summary'] in [vhba_type_name_map[existing_vhba_type], (' '.join([vhba_type_name_map[existing_vhba_type], item.key]))] }}"
+    existing_vbha_found: true
   with_dict: "{{ disk_controller_facts_data['scsi'] if is_scsi_vhba else disk_controller_facts_data[existing_vhba_type] }}"
-  when: not existing_vbha_found
-
-- name: "Check disks attached to the controller are not full"
-  ansible.builtin.assert:
-    that:
-      - (is_scsi_vhba and existing_device_key | length < valid_max_unit_number) or
-        (not is_scsi_vhba and existing_device_key | length < valid_max_unit_number + 1)
-    fail_msg: "Disk controller {{ existing_vhba_bus_number }} already has full disks attached {{ existing_device_key }}."
   when:
-    - existing_vbha_found
-    - existing_device_key | length != 0
+    - not existing_vbha_found
+    - item.value['controller_summary'] == vhba_type_name
+    - existing_vhba_bus_number | default(item.key) | int == item.value['controller_busnumber']
+    - item.value['controller_disks_devicekey'] | length < valid_max_unit_number | int + 1
 
-- name: "Check found exisitng '{{ existing_vhba_type }}' controller"
+- name: "Check found '{{ existing_vhba_type }}' controller"
   ansible.builtin.assert:
     that:
       - existing_vbha_found
-    fail_msg: "Not found existing {{ existing_vhba_type }} controller in: {{ disk_controller_facts_data }}"
+    fail_msg: "Not found '{{ existing_vhba_type }}' controller with available disk slot in VM controllers: {{ disk_controller_facts_data }}."
+
+- name: "Set fact of the new disk unit number"
+  ansible.builtin.set_fact:
+    new_disk_unit_number: 0
+  when: existing_device_key | length == 0
 
 - name: "Calculate the new disk unit number"
-  when: existing_vbha_found
+  when: existing_device_key | length > 0
   block:
-    - name: "Print the existing disks device key list"
+    - name: "Print the disk device key list"
       ansible.builtin.debug: var=existing_device_key
- 
-    - name: "Sanitize the device key list of existing disk"
+    - name: "Sanitize the disk device key list"
       ansible.builtin.set_fact:
         existing_device_key: "{% for item in existing_device_key %}{{ item | int % 1000 }} {% endfor %}"
- 
+    - name: "Print the sanitized disk device key list"
+      ansible.builtin.debug: var=existing_device_key
     - name: "Set fact of the new disk unit number"
       ansible.builtin.set_fact:
         new_disk_unit_number: "{{ item }}"
-        new_disk_unit_number_got: "{{ (item + (valid_max_unit_number + 1) * existing_vhba_bus_number | int) | string not in existing_device_key.split() }}"
       loop: "{{ range(0, (valid_max_unit_number + 1)) | list }}"
-      when: not new_disk_unit_number_got
+      when: (item + (valid_max_unit_number + 1) * existing_vhba_bus_number | int) | string not in existing_device_key.split()
 
-- name: "Print the new disk info"
+- name: "Print the new disk node info"
   ansible.builtin.debug:
     msg:
       - "Specified vhba type '{{ existing_vhba_type }}' found: {{ existing_vbha_found }}"
       - "Found vhba bus number: {{ existing_vhba_bus_number }}"
-      - "Got new disk unit number: {{ new_disk_unit_number_got }}"
       - "New disk unit number: {{ new_disk_unit_number }}"
-      - "Attached disks are full on vhba: {{ disk_full_existing_vhba }}"

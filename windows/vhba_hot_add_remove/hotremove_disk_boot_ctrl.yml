@@ -1,0 +1,36 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Hot remove disk added on the boot controller"
+  include_tasks: ../../common/vm_hot_add_remove_disk.yml
+  vars:
+    disk_operation: 'absent'
+    ctrl_number: "{{ boot_disk_ctl_bus_num }}"
+    unit_number: "{{ rm_disk_unit_num }}"
+    disk_controller_type: "{{ test_disk_controller_type }}"
+
+- name: "Wait 10 seconds after disk hot remove"
+  ansible.builtin.pause:
+    seconds: 10
+
+- name: "Handle known issue"
+  include_tasks: handle_nvme_known_issue.yml
+  when:
+    - test_disk_controller_type == 'nvme'
+    - test_purpose == "hot-add"
+
+- name: "Get disk number in guest OS after hot removing"
+  include_tasks: ../utils/win_get_disk_num.yml
+
+- name: "Set fact of disk number after hot removing"
+  ansible.builtin.set_fact:
+    disk_num_guest_after_remove: "{{ disk_num_guest }}"
+
+- name: "Check disk controller and disk number after hot remove"
+  ansible.builtin.assert:
+    that:
+      - disk_num_guest_after_remove | int == disk_num_guest_before_hotadd | int
+    fail_msg: >-
+      After disk hot remove from boot disk controller,
+      disk number '{{ disk_num_guest_after_remove }}', which is not the same as the one before hot add,
+      disk number '{{ disk_num_guest_before_hotadd }}'.
