@@ -29,23 +29,27 @@
     (test_purpose == "hot-add") or
     (test_purpose == "hot-add-spec13")
   block:
-    - name: "Test on adding new disk on NVMe boot disk controller"
-      include_tasks: hotadd_disk_existing_ctrl.yml
-      vars:
-        test_on_boot_ctrl: true
+    - name: "Test on adding a new disk on NVMe boot disk controller"
       when:
         - test_disk_controller_type == 'nvme'
         - win_boot_disk_ctl_type == 'nvme'
+      block:
+        - name: "Add a new NVMe disk to boot disk controller"
+          include_tasks: hotadd_disk_existing_ctrl.yml
+          vars:
+            test_on_boot_ctrl: true
+        - name: "Remove the new added disk to boot disk controller"
+          include_tasks: hotremove_disk_boot_ctrl.yml
 
-    - name: "Test on adding new disk on new disk controller at the same time"
+    - name: "Test on adding a new disk on the new disk controller at the same time"
       include_tasks: hotadd_disk_new_ctrl.yml
 
-    - name: "Test on adding new disk on the existing controller"
+    - name: "Test on adding a new disk on the existing controller added above"
       include_tasks: hotadd_disk_existing_ctrl.yml
       vars:
         test_on_boot_ctrl: false
 
-    - name: "Test on remove new added disks and disk controller"
+    - name: "Test on removing the new added disks and disk controller"
       include_tasks: hotremove_disk_and_ctrl.yml
 
 - name: "Execute disk hot extend test"
