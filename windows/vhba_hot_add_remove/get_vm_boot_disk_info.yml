@@ -30,12 +30,25 @@
     boot_disk_label: "{{ vm_boot_disk_info[0]['deviceInfo']['label'] }}"
     boot_disk_ctl_key: "{{ vm_boot_disk_info[0]['controllerKey'] }}"
 
-- name: "Set fact of boot disk controller bus number"
+- name: "Set fact of boot disk controller info"
   ansible.builtin.set_fact:
-    boot_disk_ctl_bus_num: "{{ item['controller_busnumber'] }}"
-    boot_ctl_disk_list: "{{ }}"
-  with_items: "{{ disk_controllers_before_hotadd[disk_controller].values() }}"
-  when: item['controller_devicekey'] | int == boot_disk_ctl_key | int
+    vm_boot_disk_ctl_info: "{{ disk_controllers_before_hotadd[disk_controller].values() | selectattr('controller_devicekey', 'equalto', boot_disk_ctl_key | int) }}"
+
+- name: "Check getting the info of boot disk controller"
+  ansible.builtin.assert:
+    that:
+      - vm_boot_disk_ctl_info | length == 1
+    fail_msg: "Not get the info of disk controller with key '{{ boot_disk_ctl_key }}' in VM disk controller info: {{ disk_controllers_before_hotadd[disk_controller] }}"
+
+- name: "Set fact of boot disk controller bus number and device list"
+  ansible.builtin.set_fact:
+    boot_disk_ctl_bus_num: "{{ vm_boot_disk_ctl_info[0]['controller_busnumber'] }}"
+    boot_ctl_disk_list: "{{ vm_boot_disk_ctl_info[0]['controller_disks_devicekey'] }}"
+
+- name: "Set fact of the new disk unit number"
+  ansible.builtin.set_fact:
+    boot_disk_new_unit_num: "{{ (boot_ctl_disk_list | max | int) % 1000 + 1 }}"
+  when: boot_ctl_disk_list | length < 15
 
 - name: "Display the boot disk info"
   ansible.builtin.debug:
@@ -43,6 +56,7 @@
       - "Boot disk label: {{ boot_disk_label }}"
       - "Boot disk controller key: {{ boot_disk_ctl_key }}"
       - "Boot disk controller bus number: {{ boot_disk_ctl_bus_num }}"
+      - "New disk unit number to boot disk controller: {{ boot_disk_new_unit_num }}"
 
 - name: "Set fact of boot disk info retrieved"
   ansible.builtin.set_fact:
