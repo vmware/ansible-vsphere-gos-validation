@@ -1,29 +1,33 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get NVMe controller devices instance ID in guest OS after hotadd
-- include_tasks: ../utils/win_get_nvme_ctl_inst_id_list.yml
-- name: Set fact of the NVMe controller instance id list after hotadd
+- name: "Get NVMe controller devices instance ID in guest OS after hotadd"
+  include_tasks: ../utils/win_get_nvme_ctl_inst_id_list.yml
+
+- name: "Set fact of the NVMe controller instance id list after hotadd"
   ansible.builtin.set_fact:
     nvme_ctl_inst_id_list_after: "{{ nvme_ctl_instance_id_list }}"
 
-- name: Set fact of the new added NVMe controller instance id
+- name: "Set fact of the new added NVMe controller instance id"
   ansible.builtin.set_fact:
     nvme_ctl_inst_id: "{{ nvme_ctl_inst_id_list_after | difference(nvme_ctl_inst_id_list_before) }}"
 
-- block:
-    # Disable NVMe controller in guest OS
-    - include_tasks: ../utils/win_execute_cmd.yml
+- name: "Disable and enable NVMe controller"
+  when: nvme_ctl_inst_id | length != 0
+  block:
+    - name: "Disable NVMe controller in guest OS"
+      include_tasks: ../utils/win_execute_cmd.yml
       vars:
         win_powershell_cmd: "pnputil /disable-device '{{ nvme_ctl_inst_id[0] }}'"
 
-    # Re-enable NVMe controller in guest OS
-    - include_tasks: ../utils/win_execute_cmd.yml
+    - name: "Re-enable NVMe controller in guest OS"
+      include_tasks: ../utils/win_execute_cmd.yml
       vars:
         win_powershell_cmd: "pnputil /enable-device '{{ nvme_ctl_inst_id[0] }}'"
-  when: nvme_ctl_inst_id | length != 0
 
-- name: Not get the new NVMe controller instance id
+- name: "Not get the new NVMe controller instance id"
   ansible.builtin.fail:
-    msg: "Before controller hotadd, NVMe controller instance id list is '{{ nvme_ctl_inst_id_list_before }}', after hotadd NVMe controller instance id list is '{{ nvme_ctl_inst_id_list_after }}', not get the new controller instance id."
+    msg:
+      - "NVMe controller instance id list before hot add: {{ nvme_ctl_inst_id_list_before }}"
+      - "NVMe controller instance id list after hot add: {{ nvme_ctl_inst_id_list_after }}, not get the new controller instance id."
   when: nvme_ctl_inst_id | length == 0

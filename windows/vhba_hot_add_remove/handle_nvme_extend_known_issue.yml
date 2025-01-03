@@ -1,0 +1,30 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---    
+- name: "Handle known issue"
+  when: >
+    (esxi_version is version('8.0.1', '<')) or
+    (esxi_version is version('8.0.1', '=') and esxi_build != 'N/A' and esxi_build | int < 21495797)
+  block:
+    - name: "Known issue - hot extended NVMe disk size is not recognized"
+      ansible.builtin.debug:
+        msg:
+          - "Hot extended NVMe disk size is not recognized in Windows guest OS when NVMe Spec v1.3 is emulated."
+          - "Ignore this known issue on ESXi version < 8.0 Update 1 build 21495797."
+          - "Restart guest OS is the workaround for this hot extending NVMe disk issue."
+      tags:
+        - known_issue
+
+    - name: "Restart guest OS"
+      include_tasks: ../utils/win_shutdown_restart.yml
+      vars:
+        set_win_power_state: "restart"
+
+    - name: "Get disk size again after guest OS restart"
+      include_tasks: ../utils/win_get_disk_size.yml
+      vars:
+        win_disk_uid: "{{ win_disk_unique_id }}"
+
+    - name: "Set fact of disk size after guest OS restart"
+      ansible.builtin.set_fact:
+        win_disk_size_after: "{{ win_get_disk_size_gb }}"
