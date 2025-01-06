@@ -24,9 +24,13 @@
   ansible.builtin.pause:
     seconds: 15
 
+# This issue may happen when adding new NVMe disk to existing boot or non-boot controller
+# while VM boot disk controller must be NVMe
 - name: "Handle known issue"
   include_tasks: handle_nvme_boot_known_issue.yml
-  when: test_on_boot_ctrl
+  when:
+    - win_boot_disk_ctl_type == 'nvme'
+    - test_disk_controller_type == 'nvme'
 
 - name: "Get disk number in guest OS after hot adding to existing controller"
   include_tasks: ../utils/win_get_disk_num.yml
