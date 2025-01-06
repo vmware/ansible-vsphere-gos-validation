@@ -1,0 +1,29 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Hot add a new NVMe disk to the existing boot or non-boot NVMe controller,
+# guest OS will hang without response. The workaround is removing the new
+# added disk.
+#
+- name: "Handle known issue"
+  block:
+    - name: "Known issue - guest OS hang after hot adding a disk to the existing NVMe controller"
+      ansible.builtin.debug:
+        msg:
+          - "Guest OS may appear to be stuck after rebooting when hot adding a new disk to the existing NVMe controller."
+          - "This is a known issue on Windows Server 2025, please refer to KB article: https://knowledge.broadcom.com/external/article?articleId=380610"
+          - "Removing the added NVMe disk is the workaround for this issue."
+      tags:
+        - known_issue
+
+    - name: "Check guest OS connection"
+      include_tasks: win_check_winrm.yml
+      vars:
+        win_ignore_winrm_error: true
+
+    - name: "Guest OS is not connectable"
+      ansible.builtin.debug:
+        msg: "Guest OS is not connectable after hot adding a disk to the NVMe boot disk controller."
+      when:
+        - check_winrm_result.failed is defined
+        - check_winrm_result.failed

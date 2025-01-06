@@ -1,15 +1,20 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Check VM IP address is retrieved"
+# Check Windows guest OS connection status
+# Parameter:
+#   win_ignore_winrm_error: whether to ignore the connection failure or not,
+#     default value is false.
+#
+- name: "Check VM guest IP address"
   ansible.builtin.assert:
     that:
       - vm_guest_ip is defined
       - vm_guest_ip
     fail_msg: "Cannot check guest winrm connection due to 'vm_guest_ip' is '{{ vm_guest_ip | default('not defined') }}'"
 
-- name: "Check if guest OS winrm is connectable"
-  wait_for:
+- name: "Check guest OS winrm port is open"
+  ansible.windows.win_wait_for:
     host: "{{ vm_guest_ip }}"
     port: "{{ guest_os_winrm_port | default(5986) }}"
     delay: 1
@@ -17,17 +22,20 @@
     timeout: "{{ win_check_winrm_timeout | default(600) }}"
   register: check_winrm_result
   ignore_errors: true
-- name: "Display the check winrm result"
-  ansible.builtin.debug: var=check_winrm_result
-  when: enable_debug
 
-- name: "Guest OS winrm is not connectable"
+- name: "Display the result of checking winrm port"
+  ansible.builtin.debug: var=check_winrm_result
+
+- name: "Check guest OS winrm port state failed"
   when:
     - check_winrm_result.failed is defined
     - check_winrm_result.failed
   block:
     - name: "Check if there are 'WinBSOD' logs in vmware.log"
       include_tasks: win_check_winbsod.yml
-    - name: "Guest OS winrm connection failure"
+
+    - name: "Guest OS winrm port is not connectable"
       ansible.builtin.fail:
-        msg: "Guest OS winrm is not connectable in {{ win_check_winrm_timeout | default(600) }} seconds."
+        msg:
+          - "Failed to get winrm port '{{ guest_os_winrm_port | default(5986) }}' open state in guest OS after {{ win_check_winrm_timeout | default(600) }} seconds."
+      when: win_ignore_winrm_error | default(false)
