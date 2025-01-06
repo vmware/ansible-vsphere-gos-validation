@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: "Hot add a new disk controller and disk with 1GB by default"
-  include_tasks: hotadd_vm_disk_new_ctrl.yml
+  include_tasks: hotadd_disk_new_ctrl.yml
 
 - name: "Get disk volume size in guest OS before hot extend"
   include_tasks: ../utils/win_get_disk_volume_size.yml
@@ -48,8 +48,19 @@
       - "After disk hot extend, disk size in guest OS: {{ win_disk_size_after }}GB"
 
 - name: "Handle known issue"
-  include_tasks: handle_nvme_extend_known_issue.yml
   when: win_disk_size_after | int == win_disk_volume_size_before | int
+  block:
+    - name: "Workaround for the known issue"
+      include_tasks: handle_nvme_extend_known_issue.yml
+
+    - name: "Get disk size again after guest OS restart"
+      include_tasks: ../utils/win_get_disk_size.yml
+      vars:
+        win_disk_uid: "{{ win_disk_unique_id }}"
+
+    - name: "Set fact of disk size after guest OS restart"
+      ansible.builtin.set_fact:
+        win_disk_size_after: "{{ win_get_disk_size_gb }}"
 
 - name: "Check disk size after hot extend"
   ansible.builtin.assert:
