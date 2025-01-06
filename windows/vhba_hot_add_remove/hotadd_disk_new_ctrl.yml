@@ -6,8 +6,8 @@
 
 - name: "Set fact of disk controller and disk number before hot adding new disk controller and disk"
   ansible.builtin.set_fact:
-    ctl_num_guest_before_hotadd: "{{ ctl_num_guest }}"
-    disk_num_guest_before_hotadd: "{{ disk_num_guest }}"
+    ctl_num_guest_before_add: "{{ ctl_num_guest }}"
+    disk_num_guest_before_add: "{{ disk_num_guest }}"
 
 - name: "Hot add new disk controller and disk at the same time"
   include_tasks: ../../common/vm_hot_add_ctrl_disk.yml
@@ -25,26 +25,27 @@
 
 - name: "Set fact of disk controller and disk number after hot adding new disk controller and disk"
   ansible.builtin.set_fact:
-    ctl_num_guest_after_hotadd: "{{ ctl_num_guest }}"
-    disk_num_guest_after_hotadd: "{{ disk_num_guest }}"
+    ctl_num_guest_after_add: "{{ ctl_num_guest }}"
+    disk_num_guest_after_add: "{{ disk_num_guest }}"
 
 - name: "Print the disk controller and disk number in guest OS"
   ansible.builtin.debug:
     msg:
-      - "Before hot adding, the number of '{{ disk_controller }}' controller: {{ ctl_num_guest_before_hotadd }}"
-      - "After hot adding, the number of '{{ disk_controller }}' controller: {{ ctl_num_guest_after_hotadd }}"
-      - "Before hot adding, the number of disk: {{ disk_num_guest_before_hotadd }}"
-      - "After hot adding, the number of disk: {{ disk_num_guest_after_hotadd }}"
+      - "Before hot adding, the number of '{{ disk_controller }}' controller: {{ ctl_num_guest_before_add }}"
+      - "After hot adding, the number of '{{ disk_controller }}' controller: {{ ctl_num_guest_after_add }}"
+      - "Before hot adding, the number of disk: {{ disk_num_guest_before_add }}"
+      - "After hot adding, the number of disk: {{ disk_num_guest_after_add }}"
 
 - name: "Verify disk controller and disk number increases 1 in guest OS"
   ansible.builtin.assert:
     that:
-      - ctl_num_guest_after_hotadd | int == ctl_num_guest_before_hotadd | int + 1
-      - disk_num_guest_after_hotadd | int == disk_num_guest_before_hotadd | int + 1
-    fail_msg:
-      - "Testing failed at hot adding new {{ test_disk_controller_type }} controller and disk at the same time."
-      - "Disk controller number before hot add: {{ ctl_num_guest_before_hotadd }}, after hot add: {{ ctl_num_guest_after_hotadd }}"
-      - "Disk number before hot add: {{ disk_num_guest_before_hotadd }}, after hot add: {{ disk_num_guest_after_hotadd }}"
+      - ctl_num_guest_after_add | int == ctl_num_guest_before_add | int + 1
+      - disk_num_guest_after_add | int == disk_num_guest_before_add | int + 1
+    fail_msg: >-
+      After hot adding a new disk controller and disk, in guest OS
+      disk controller number is '{{ ctl_num_guest_after_add }}', disk number is '{{ disk_num_guest_after_add }}',
+      which are not the expected values,
+      disk controller '{{ ctl_num_guest_before_add | int + 1 }}', disk number '{{ disk_num_guest_before_add | int + 1 }}'.
 
 - name: "Initialize new disk and create disk partition in guest OS"
   include_tasks: create_partition_raw_disk.yml
