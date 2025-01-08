@@ -28,7 +28,20 @@
     wait_for_customization: true
     wait_for_customization_timeout: "{{ linux_gosc_timeout | default(omit) }}"
   register: customize_linux_result
+  ignore_errors: true
 
 - name: "Display the Linux customization result"
   ansible.builtin.debug: var=customize_linux_result
   when: enable_debug
+
+- name: "Check the Linux guest OS is customized"
+  ansible.builtin.assert:
+    that:
+      - customize_linux_result.failed is defined
+      - not customize_linux_result.failed
+      - customize_linux_result.changed is defined
+      - customize_linux_result.changed
+    fail_msg: >-
+      Failed to perform guest customization on {{ vm_guest_os_distribution }} with error: {{ customize_linux_result.msg | default('') }}
+      {{ ', warnings: ' ~ customize_linux_result.warnings if customize_linux_result.warnings | default('') else '' }}
+    success_msg: "Successfully performed guest customization on {{ vm_guest_os_distribution }}"
