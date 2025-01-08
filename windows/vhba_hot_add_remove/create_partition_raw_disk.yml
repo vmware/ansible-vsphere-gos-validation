@@ -11,13 +11,13 @@
 
 - name: "Set fact of the diskpart file name"
   ansible.builtin.set_fact:
-    diskpart_file_name: "diskpart_{{ win_raw_disk_num }}.txt"
+    new_diskpart_file_name: "diskpart_{{ win_raw_disk_num }}.txt"
 
 - name: "Set fact of the diskpart file path"
   ansible.builtin.set_fact:
     diskpart_file_path: "../utils/scripts/diskpart.txt"
-    diskpart_file_path_current: "{{ current_test_log_folder }}/{{ diskpart_file_name }}"
-    diskpart_file_path_win: "C:\\test_diskpart\\{{ diskpart_file_name }}"
+    diskpart_file_path_current: "{{ current_test_log_folder }}/{{ new_diskpart_file_name }}"
+    diskpart_file_path_win: "C:\\test_diskpart\\{{ new_diskpart_file_name }}"
 
 - name: "Get diskpart script file status"
   ansible.builtin.stat:
@@ -39,7 +39,7 @@
 - name: "Copy diskpart file to current test case log folder"
   ansible.builtin.copy:
     src: "{{ diskpart_file_path }}"
-    dest: "{{ current_test_log_folder }}/"
+    dest: "{{ diskpart_file_path_current }}"
 
 - name: "Get unused driver letter in guest OS"
   include_tasks: ../utils/win_get_unused_drive_letter.yml
@@ -72,7 +72,7 @@
   include_tasks: ../utils/win_copy_file_from_local.yml
   vars:
     src_path_local: "{{ diskpart_file_path_current }}"
-    dest_path_remote: "C:\\test_diskpart\\"
+    dest_path_remote: "{{ diskpart_file_path_win }}"
 
 - name: "Get diskpart script file status in guest OS"
   include_tasks: ../utils/win_check_file_exist.yml
