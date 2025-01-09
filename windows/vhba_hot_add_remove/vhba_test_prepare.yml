@@ -3,15 +3,12 @@
 ---
 # For hot add sata disk test, set the boot disk label first since
 # boot order may be changed after hot-add disk.
-# For hot add nvme disk test, get nvme boot disk controller info first
-# since there is hot adding disk to nvme boot disk controller test.
+# For hot add disk test, get VM boot disk controller info first
+# since there is test step of hot adding disk to boot disk controller.
 #
 - name: "Get VM boot disk and controller info"
   include_tasks: get_vm_boot_disk_info.yml
-  when:
-    - boot_disk_info_retrieved is undefined
-    - (test_disk_controller_type == 'sata' and vm_firmware == 'bios' and win_boot_disk_ctl_type not in ['ide', 'sata']) or
-      (test_disk_controller_type == 'nvme' and win_boot_disk_ctl_type == 'nvme')
+  when: boot_disk_info_retrieved is undefined
 
 - name: "Get new disk controller bus number"
   include_tasks: ../../common/vm_get_new_vhba_bus_number.yml
