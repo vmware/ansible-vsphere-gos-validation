@@ -9,12 +9,18 @@
     ctl_num_guest_before_add: "{{ ctl_num_guest }}"
     disk_num_guest_before_add: "{{ disk_num_guest }}"
 
+- name: "Set facts of new disk node info"
+  ansible.builtin.set_fact:
+    new_disk_node_ctl_type: 'non-boot'
+    new_disk_node_ctl_bus: "{{ new_vhba_bus_number }}"
+    new_disk_node_unit: 0
+
 - name: "Hot add new disk controller and disk at the same time"
   include_tasks: ../../common/vm_hot_add_ctrl_disk.yml
   vars:
     disk_controller_type: "{{ test_disk_controller_type }}"
-    ctrl_number: "{{ new_vhba_bus_number }}"
-    unit_number: 0
+    ctrl_number: "{{ new_disk_node_ctl_bus }}"
+    unit_number: "{{ new_disk_node_unit }}"
 
 - name: "Wait 10 seconds after new disk controller and disk hot add"
   ansible.builtin.pause:
