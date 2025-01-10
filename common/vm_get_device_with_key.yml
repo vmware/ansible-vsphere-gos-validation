@@ -7,17 +7,20 @@
 # Return:
 #   device_info_with_key: the info of device with specified device key
 #
+- name: "Initialize the device info"
+  ansible.builtin.set_fact:
+    device_info_with_key: ""
 
-- include_tasks: vm_get_config.yml
+- name: "Get VM hardware device info"
+  include_tasks: vm_get_config.yml
   vars:
     property_list: ['config.hardware.device']
 
 - name: "Look for device with key '{{ device_key }}'"
   ansible.builtin.set_fact:
-    device_info_with_key: ""
     device_list_with_key: "{{ vm_config.config.hardware.device | selectattr('key', 'equalto', device_key | int) }}"
 
-- name: "Get device info with device key '{{ device_key }}'"
+- name: "Set fact the info of device with key '{{ device_key }}'"
   ansible.builtin.set_fact:
     device_info_with_key: "{{ device_list_with_key[0] }}"
   when: device_list_with_key and device_list_with_key | length > 0

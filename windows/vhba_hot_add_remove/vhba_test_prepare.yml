@@ -2,18 +2,20 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # For hot add sata disk test, set the boot disk label first since
-# boot order may be changed after hot-add disk.
+# boot order may be changed after disk hot add when VM with BIOS firmware.
 # For hot add disk test, get VM boot disk controller info first
 # since there is test step of hot adding disk to boot disk controller.
 #
 - name: "Get VM boot disk and controller info"
   include_tasks: get_vm_boot_disk_info.yml
-  when: boot_disk_info_retrieved is undefined
+  when:
+    - boot_disk_info_retrieved is undefined
+    - (test_disk_controller_type == win_boot_disk_ctl_type) or (test_disk_controller_type == 'sata' and vm_firmware == 'bios' and win_boot_disk_ctl_type not in ['ide', 'sata'])
 
 - name: "Get new disk controller bus number"
   include_tasks: ../../common/vm_get_new_vhba_bus_number.yml
   vars:
-    disk_controller_facts_data: "{{ disk_controllers_before_hotadd }}"
+    disk_controller_facts_data: "{{ disk_ctls_before_hotadd }}"
     new_vhba_type: "{{ disk_controller }}"
 
 - name: "Enable NVMe spec 1.3"
