@@ -36,10 +36,23 @@
     wait_for_customization: true
     wait_for_customization_timeout: 2400
   register: win_gosc_result
+  ignore_errors: true
 
 - name: "Display the Windows GOSC result"
   ansible.builtin.debug: var=win_gosc_result
   when: enable_debug
+
+- name: "Check the Windows guest OS is customized"
+  ansible.builtin.assert:
+    that:
+      - win_gosc_result.failed is defined
+      - not win_gosc_result.failed
+      - win_gosc_result.changed is defined
+      - win_gosc_result.changed
+    fail_msg: >-
+      Guest customization failed on {{ vm_guest_os_distribution }} with error: {{ win_gosc_result.msg | default('') }}
+      {{ ', warnings: ' ~ win_gosc_result.warnings if win_gosc_result.warnings | default('') else '' }}
+    success_msg: "Guest customization succeeded on {{ vm_guest_os_distribution }}"
 
 - name: "Set fact of the password for user 'Administrator'"
   ansible.builtin.set_fact:
