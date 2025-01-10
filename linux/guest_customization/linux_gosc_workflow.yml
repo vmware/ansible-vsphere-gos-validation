@@ -177,29 +177,35 @@
     - name: "Test case failure"
       include_tasks: ../../common/test_rescue.yml
   always:
-    - name: "Collect GOSC log"
-      when:
-        - gosc_deploypkg_log_local is defined
-        - gosc_deploypkg_log_local
+    - name: "Get VM's power state"
+      include_tasks: ../../common/vm_get_power_state.yml
+
+    - name: "Collect guest customization logs"
+      when: vm_power_state_get == "poweredOn"
       block:
-        - name: "Get stat of {{ gosc_deploypkg_log_local }}"
-          ansible.builtin.stat:
-            path: "{{ gosc_deploypkg_log_local }}"
-          register: gosc_deploypkg_log_stat
-
-        - name: "Fetch GOSC log file {{ gosc_deploypkg_log_file }}"
-          include_tasks: ../../common/vm_guest_file_operation.yml
-          vars:
-            operation: "fetch_file"
-            src_path: "{{ gosc_deploypkg_log_file }}"
-            dest_path: "{{ gosc_deploypkg_log_local }}"
+        - name: "Collect GOSC log"
           when:
-            - not (gosc_deploypkg_log_stat.stat.exists | default(False))
-            - vmtools_is_running is defined
-            - vmtools_is_running | bool
+            - gosc_deploypkg_log_local is defined
+            - gosc_deploypkg_log_local
+          block:
+            - name: "Get stat of {{ gosc_deploypkg_log_local }}"
+              ansible.builtin.stat:
+                path: "{{ gosc_deploypkg_log_local }}"
+              register: gosc_deploypkg_log_stat
 
-    - name: "Colect cloud-init logs"
-      include_tasks: ../utils/collect_cloudinit_logs.yml
-      when: >
-        enable_cloudinit_gosc or
-        (guest_os_ansible_distribution == "VMware Photon OS")
+            - name: "Fetch GOSC log file {{ gosc_deploypkg_log_file }}"
+              include_tasks: ../../common/vm_guest_file_operation.yml
+              vars:
+                operation: "fetch_file"
+                src_path: "{{ gosc_deploypkg_log_file }}"
+                dest_path: "{{ gosc_deploypkg_log_local }}"
+              when:
+                - not (gosc_deploypkg_log_stat.stat.exists | default(false))
+                - vmtools_is_running is defined
+                - vmtools_is_running | bool
+
+        - name: "Colect cloud-init logs"
+          include_tasks: ../utils/collect_cloudinit_logs.yml
+          when: >
+            enable_cloudinit_gosc or
+            (guest_os_ansible_distribution == "VMware Photon OS")
