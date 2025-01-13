@@ -58,6 +58,16 @@
   include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"
+    win_reboot_ignore_error: true
+
+# This issue may happen when adding new disk to existing boot or
+# non-boot NVMe controller
+- name: "Handle known issue"
+  include_tasks: handle_nvme_boot_known_issue.yml
+  when:
+    - restart_guest_os.failed | default(false)
+    - test_disk_controller_type == 'nvme'
+    - guest_os_ansible_distribution is search('2025')
 
 - name: "Get the content of test file after guest OS restart"
   include_tasks: ../utils/win_execute_cmd.yml
