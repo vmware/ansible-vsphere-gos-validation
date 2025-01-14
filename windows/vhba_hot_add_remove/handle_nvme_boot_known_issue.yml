@@ -21,13 +21,23 @@
       vars:
         win_ignore_winrm_error: true
 
-    - name: "Guest OS is not connectable"
-      ansible.builtin.debug:
-        msg: "Guest OS is not connectable after hot adding a disk to the NVMe boot disk controller."
-      when:
-        - check_winrm_result.failed is defined
-        - check_winrm_result.failed
+    - name: "Power off guest OS"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-off'
 
-    - name: "Add workaround here later"
-      ansible.builtin.fail:
-        msg: "Guest OS reboot failed, and can not connect, add workaround here."
+    - name: "Remove new added disk"
+      include_tasks: ../../common/vm_hot_add_remove_disk.yml
+      vars:
+        disk_operation: 'absent'
+        ctrl_number: "{{ new_disk_node_ctl_bus }}"
+        unit_number: "{{ new_disk_node_unit_num }}"
+        disk_controller_type: "{{ test_disk_controller_type }}"
+
+    - name: "Power on guest OS"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-on'
+
+    - name: "Check guest OS connection after removing new added disk"
+      include_tasks: ../utils/win_check_winrm.yml

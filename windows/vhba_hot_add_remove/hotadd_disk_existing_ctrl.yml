@@ -39,43 +39,23 @@
 - name: "Get disk number in guest OS after hot adding to existing controller"
   include_tasks: ../utils/win_get_disk_num.yml
 
-- name: "Set fact of disk number after hot adding to existing controller"
-  ansible.builtin.set_fact:
-    disk_num_guest_after_add: "{{ disk_num_guest }}"
-
-- name: "Print the disk number in guest OS"
-  ansible.builtin.debug:
-    msg:
-      - "Before hot add, the number of disk in guest: {{ disk_num_guest_before_add }}"
-      - "After hot add, the number of disk in guest: {{ disk_num_guest_after_add }}"
-
-- name: "Handle known issue"
+# This issue may happen when adding new disk to existing boot or
+# non-boot NVMe controller
+- name: "Handle known issue on {{ guest_os_ansible_distribution }}"
+  include_tasks: handle_nvme_boot_known_issue.yml
   when:
-    - disk_num_guest_after_add | int != disk_num_guest_before_add | int + 1
-    - test_disk_controller_type == 'nvme'
-    - test_purpose == "hot-add"
-  block:
-    - name: "Workaround for the known issue"
-      include_tasks: handle_nvme_ops_known_issue.yml
+    - disk_num_guest | int == 0
+    - nvme_boot_known_issue
 
-    - name: "Get disk number in guest OS after restart"
-      include_tasks: ../utils/win_get_disk_num.yml
-
-    - name: "Reset the fact of disk number after guest OS restart"
-      ansible.builtin.set_fact:
-        disk_num_guest_after_add: "{{ disk_num_guest }}"
-
-- name: "Verify disk number increases 1 in guest OS"
-  ansible.builtin.assert:
-    that:
-      - disk_num_guest_after_add | int == disk_num_guest_before_add | int + 1
-    fail_msg: >-
-      After hot adding a new disk to the existing '{{ new_disk_node_ctl_type }}'
-      {{ test_disk_controller_type }} controller, disk number in guest OS is:
-      {{ disk_num_guest_after_add }}, which is not the same as the expected value
-      {{ disk_num_guest_before_add | int + 1 }}.
-
-- name: "Initialize new disk and create disk partition in guest OS"
-  include_tasks: create_partition_raw_disk.yml
+- name: "Check added disk in guest OS"
+  include_tasks: check_disk_after_adding.yml
   vars:
     on_new_controller: false
+  when: disk_num_guest | int > 0
+
+- name: "Failed to get the number of disks in {{ guest_os_ansible_distribution }}"
+  ansible.builtin.fail:
+    msg: "Get the number of disks in guest OS failed after adding new disk to the existing {{ new_disk_node_ctl_type }} {{ test_disk_controller_type }} controller."
+  when:
+    - disk_num_guest | int == 0
+    - not nvme_boot_known_issue

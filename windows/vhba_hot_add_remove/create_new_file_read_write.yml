@@ -62,60 +62,19 @@
 
 # This issue may happen when adding new disk to existing boot or
 # non-boot NVMe controller
-- name: "Handle known issue"
+- name: "Handle known issue on {{ guest_os_ansible_distribution }}"
   include_tasks: handle_nvme_boot_known_issue.yml
   when:
     - restart_guest_os.failed | default(false)
-    - test_disk_controller_type == 'nvme'
-    - guest_os_ansible_distribution is search('2025')
+    - nvme_boot_known_issue
 
-- name: "Get the content of test file after guest OS restart"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "type {{ write_test_file_path }}"
-    win_execute_cmd_ignore_error: true
+- name: "Check new file content again after guest OS restart"
+  include_tasks: check_file_after_restart.yml
+  when: not restart_guest_os.failed | default(false)
 
-- name: "Save the result of getting test file content after guest OS restart"
-  ansible.builtin.set_fact:
-    get_file_content_result2: "{{ win_powershell_cmd_output }}"
-
-# Get the content of test file failed after guest OS restart
-- name: "Check whether disk is offline after guest OS restart"
+- name: "Restart guest OS failed on {{ guest_os_ansible_distribution }}"
+  ansible.builtin.fail:
+    msg: "Restart guest OS failed after adding a new disk, creating new file on the new volume."
   when:
-    - get_file_content_result2.rc is defined
-    - get_file_content_result2.rc != 0
-  block:
-    - name: "Initialize the fact of whether disk is online"
-      ansible.builtin.set_fact:
-        new_disk_is_online: false
-
-    - name: "Get offline disk info in guest OS"
-      include_tasks: ../utils/win_execute_cmd.yml
-      vars:
-        win_powershell_cmd: "Get-Disk | Where-Object IsOffline -eq $True | select DiskNumber,UniqueId | ft -hidetableheaders"
-
-    - name: "Set fact of whether disk is online"
-      ansible.builtin.set_fact:
-        new_disk_is_online: true
-      when:
-        - win_powershell_cmd_output.stdout_lines is defined
-        - win_powershell_cmd_output.stdout_lines | length == 0
-
-    - name: "Handle known issue"
-      include_tasks: handle_lsilogicsas_known_issue.yml
-      when:
-        - not new_disk_is_online
-        - test_disk_controller_type == 'lsilogicsas'
-        - test_purpose == "hot-add"
-        - "'Windows Server' in guest_os_ansible_distribution"
-
-- name: "Check file content after guest OS restart"
-  ansible.builtin.assert:
-    that:
-      - get_file_content_result2.rc is defined
-      - get_file_content_result2.rc == 0
-      - get_file_content_result2.stdout is defined
-      - get_file_content_result2.stdout == get_file_content_result1.stdout
-    fail_msg:
-      - "Get test file content failed after guest OS restart: {{ get_file_content_result2.rc }}"
-      - "The file content after guest restart is '{{ get_file_content_result2.stdout }}', which is not the same as before guest restart: '{{ get_file_content_result1.stdout }}'"
+    - restart_guest_os.failed | default(false)
+    - not nvme_boot_known_issue
