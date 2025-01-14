@@ -1,0 +1,65 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of disk number after hot adding"
+  ansible.builtin.set_fact:
+    disk_num_guest_after_add: "{{ disk_num_guest }}"
+
+- name: "Set fact of disk controller number after hot adding"
+  ansible.builtin.set_fact:
+    ctl_num_guest_after_add: "{{ ctl_num_guest }}"
+  when: on_new_controller
+
+- name: "Print the disk number in guest OS"
+  ansible.builtin.debug:
+    msg:
+      - "Before hot adding, the number of disks in guest OS: {{ disk_num_guest_before_add }}"
+      - "After hot adding, the number of disks in guest OS: {{ disk_num_guest_after_add }}"
+
+- name: "Print the disk controller number in guest OS"
+  ansible.builtin.debug:
+    msg:
+      - "Before hot adding, the number of '{{ test_disk_controller_type }}' controller in guest OS: {{ ctl_num_guest_before_add }}"
+      - "After hot adding, the number of '{{ test_disk_controller_type }}' controller in guest OS: {{ ctl_num_guest_after_add }}"
+  when: on_new_controller
+
+- name: "Handle known issue"
+  when:
+    - not on_new_controller
+    - disk_num_guest_after_add | int != disk_num_guest_before_add | int + 1
+    - test_disk_controller_type == 'nvme'
+    - test_purpose == "hot-add"
+  block:
+    - name: "Workaround for the known issue"
+      include_tasks: handle_nvme_ops_known_issue.yml
+
+    - name: "Get disk number in guest OS after restart"
+      include_tasks: ../utils/win_get_disk_num.yml
+
+    - name: "Reset the fact of disk number after guest OS restart"
+      ansible.builtin.set_fact:
+        disk_num_guest_after_add: "{{ disk_num_guest }}"
+
+- name: "Verify disk number increases 1 in guest OS"
+  ansible.builtin.assert:
+    that:
+      - disk_num_guest_before_add | int != 0
+      - disk_num_guest_after_add | int != 0
+      - disk_num_guest_after_add | int == disk_num_guest_before_add | int + 1
+    fail_msg: >-
+      After hot adding a new disk to the {{ test_disk_controller_type }} controller,
+      disk number in guest OS is {{ disk_num_guest_after_add }}, which is not the
+      same as the expected value {{ disk_num_guest_before_add | int + 1 }}.
+
+- name: "Verify disk controller number increases 1 in guest OS"
+  ansible.builtin.assert:
+    that:
+      - ctl_num_guest_after_add | int == ctl_num_guest_before_add | int + 1
+    fail_msg: >-
+      After hot adding a new disk to a new {{ test_disk_controller_type }} controller,
+      disk controller number in guest OS is {{ ctl_num_guest_after_add }}, which is not
+      the same as the expected value {{ ctl_num_guest_before_add | int + 1 }}.
+  when: on_new_controller
+
+- name: "Initialize new disk and create disk partition in guest OS"
+  include_tasks: create_partition_raw_disk.yml
