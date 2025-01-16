@@ -12,7 +12,7 @@
     win_powershell_cmd: "netsh advfirewall set allprofiles state off"
 
 # By default, Windows will restart automatically when BSOD,
-# diable this automatic reboot when failure
+# disable this automatic reboot when failure
 - name: "Disable auto reboot in Windows guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
@@ -21,6 +21,14 @@
 - name: "Disable Microsoft Store service in Windows Client"
   include_tasks: ../utils/win_disable_store_auto_update.yml
   when: guest_os_product_type == "client"
+
+- name: "Disable Shutdown event tracker in Windows Server"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      REG ADD "HKLM\Software\Policies\Microsoft\Windows NT\Reliability" /v "ShutdownReasonUI" /t REG_DWORD /d 0 /f;
+      REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Reliability" /v "ShutdownReasonOn" /t REG_DWORD /d 0 /f
+  when: guest_os_product_type == "server"
 
 - name: "Disable UAC"
   include_tasks: ../utils/win_disable_uac.yml
