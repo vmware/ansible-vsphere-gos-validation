@@ -44,7 +44,9 @@
   include_tasks: handle_nvme_boot_known_issue.yml
   when:
     - disk_num_guest | int == 0
-    - nvme_boot_known_issue
+    - test_disk_controller_type == 'nvme'
+    - win_boot_disk_ctl_type == 'nvme'
+    - guest_os_ansible_distribution is search('2025')
 
 - name: "Check added disk in guest OS"
   include_tasks: check_disk_after_adding.yml
@@ -57,4 +59,4 @@
     msg: "Get the number of disks in guest OS failed after adding new disk to the existing {{ new_disk_node_ctl_type }} {{ test_disk_controller_type }} controller."
   when:
     - disk_num_guest | int == 0
-    - not nvme_boot_known_issue
+    - not (test_disk_controller_type == 'nvme' and win_boot_disk_ctl_type == 'nvme' and guest_os_ansible_distribution is search('2025'))

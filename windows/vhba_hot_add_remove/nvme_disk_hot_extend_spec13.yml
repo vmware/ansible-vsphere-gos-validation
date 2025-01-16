@@ -20,10 +20,13 @@
           include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: >-
-              Windows Server 2016 and its updates do not contain the fix of hot adding/removing NVMe disk issue,
+              Skip testing on this guest OS '{{ guest_os_ansible_distribution }}', since
+              Windows Server 2019 and earlier releases do not contain the fix of hot adding/removing NVMe disk issue,
               so skip this test case and only run test case 'nvme_vhba_device_ops' with workaround.
             skip_reason: "Not Applicable"
-          when: guest_os_ansible_distribution is search('2016')
+          when:
+            - guest_os_product_type == 'server'
+            - guest_os_ansible_kernel is version('10.0.20348.0', '<')
 
         - name: "Test run"
           include_tasks: vhba_test.yml
