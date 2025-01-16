@@ -14,6 +14,18 @@
     ctl_num_guest_before_remove: "{{ ctl_num_guest }}"
     disk_num_guest_before_remove: "{{ disk_num_guest }}"
 
+- name: "Get VM disk controllers info before hot removing"
+  include_tasks: ../../common/vm_get_disk_controller_facts.yml
+
+- name: "Set fact of the number of disks before hot removing"
+  ansible.builtin.set_fact:
+    disk_num_under_remove: >-
+      {{ disk_controller_facts['disk_controller_data'][disk_controller][new_vhba_bus_number | string]['controller_disks_devicekey'] | default([]) }}
+
+- name: "Print the number of the disks under removing"
+  ansible.builtin.debug:
+    msg: "The number of disks attached to the controller '{{ test_disk_controller_type }}: {{ new_vhba_bus_number }}' is: {{ disk_num_under_remove | length }}"
+
 - name: "Hot remove disks added on the new controller"
   include_tasks: ../../common/vm_hot_add_remove_disk.yml
   vars:
@@ -21,9 +33,10 @@
     ctrl_number: "{{ new_vhba_bus_number }}"
     unit_number: "{{ rm_disk_unit_num }}"
     disk_controller_type: "{{ test_disk_controller_type }}"
-  loop: [0, 1]
+  loop: "{{ range(0, (disk_num_under_remove | length)) }}"
   loop_control:
     loop_var: rm_disk_unit_num
+  when: disk_num_under_remove | length > 0
 
 - name: "Wait 10 seconds after disk hot remove"
   ansible.builtin.pause:
@@ -45,7 +58,7 @@
 - name: "Handle known issue"
   include_tasks: handle_nvme_ops_known_issue.yml
   when:
-    - disk_num_guest_after_remove | int != disk_num_guest_before_remove | int - 2
+    - disk_num_guest_after_remove | int != (disk_num_guest_before_remove | int - disk_num_under_remove | length)
     - test_disk_controller_type == 'nvme'
     - test_purpose == "hot-add"
 
@@ -76,10 +89,11 @@
 - name: "Check disk controller and disk number after hot remove"
   ansible.builtin.assert:
     that:
-      - disk_num_guest_after_remove | int == disk_num_guest_before_remove | int - 2
+      - disk_num_guest_after_remove | int == (disk_num_guest_before_remove | int - disk_num_under_remove | length)
       - ctl_num_guest_after_remove | int == ctl_num_guest_before_remove | int - 1
     fail_msg: >-
-      After hot removing new added disk controller and disks, in guest OS
+      After hot removing new added disk controller and disks,
       disk controller number is '{{ ctl_num_guest_after_remove }}', disk number is '{{ disk_num_guest_after_remove }}',
       which are not the expected values,
-      disk controller '{{ ctl_num_guest_before_remove | int - 1 }}', disk number '{{ disk_num_guest_before_remove | int - 2 }}'.
+      disk controller '{{ ctl_num_guest_before_remove | int - 1 }}', disk number
+      '{{ disk_num_guest_before_remove | int - disk_num_under_remove | length }}'.
