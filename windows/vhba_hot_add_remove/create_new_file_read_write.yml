@@ -64,9 +64,8 @@
   include_tasks: handle_nvme_boot_known_issue.yml
   when:
     - restart_guest_os.failed | default(false)
-    - test_disk_controller_type == 'nvme'
-    - win_boot_disk_ctl_type == 'nvme'
-    - guest_os_ansible_distribution is search('2025')
+    - not on_new_controller
+    - nvme_boot_known_issue
 
 - name: "Check new file content again after guest OS restart"
   include_tasks: check_file_after_restart.yml
@@ -77,4 +76,4 @@
     msg: "Restart guest OS failed after adding a new disk, creating new file on the new volume."
   when:
     - restart_guest_os.failed | default(false)
-    - not (test_disk_controller_type == 'nvme' and win_boot_disk_ctl_type == 'nvme' and guest_os_ansible_distribution is search('2025'))
+    - on_new_controller or not nvme_boot_known_issue

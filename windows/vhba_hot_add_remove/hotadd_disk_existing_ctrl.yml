@@ -5,6 +5,13 @@
 # set to 'true' means adding a new disk on the boot disk controller, 'false'
 # means adding a new disk to the existing non-boot disk controller.
 #
+- name: "Set fact of the conditions of NVMe known issue on Windows Server 2025"
+  ansible.builtin.set_fact:
+    nvme_boot_known_issue: |-
+      {%- if (test_disk_controller_type == 'nvme' and win_boot_disk_ctl_type == 'nvme' and guest_os_ansible_distribution is search('2025')) -%}true
+      {%- else -%}false
+      {%- endif -%}
+
 - name: "Get disk number in guest OS before hot adding to existing controller"
   include_tasks: ../utils/win_get_disk_num.yml
 
@@ -44,9 +51,7 @@
   include_tasks: handle_nvme_boot_known_issue.yml
   when:
     - disk_num_guest | int == 0
-    - test_disk_controller_type == 'nvme'
-    - win_boot_disk_ctl_type == 'nvme'
-    - guest_os_ansible_distribution is search('2025')
+    - nvme_boot_known_issue
 
 - name: "Check added disk in guest OS"
   include_tasks: check_disk_after_adding.yml
@@ -59,4 +64,4 @@
     msg: "Get the number of disks in guest OS failed after adding new disk to the existing {{ new_disk_node_ctl_type }} {{ test_disk_controller_type }} controller."
   when:
     - disk_num_guest | int == 0
-    - not (test_disk_controller_type == 'nvme' and win_boot_disk_ctl_type == 'nvme' and guest_os_ansible_distribution is search('2025'))
+    - not nvme_boot_known_issue
