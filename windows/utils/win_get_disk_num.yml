@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Get the total number of disks in Windows guest
+# Parameter:
+#   win_get_disk_num_ignore_error: whether to ignore the task
+#     failure when getting the number of disks in guest OS.
+#     Default value is false.
+#
 - name: "Initialize the total number of disks"
   ansible.builtin.set_fact:
     disk_num_guest: 0
@@ -10,7 +15,7 @@
   include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "(Get-Disk | measure).Count"
-    win_execute_cmd_ignore_error: true
+    win_execute_cmd_ignore_error: "{{ win_get_disk_num_ignore_error | default(false) }}"
 
 - name: "Set fact of total number of disks in guest OS"
   ansible.builtin.set_fact:
