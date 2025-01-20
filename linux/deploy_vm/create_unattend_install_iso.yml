@@ -36,6 +36,12 @@
     new_os_installation_iso: ""
     new_os_installation_iso_path: ""
 
+- name: "Set facts of messages to match autoinstall is started"
+  ansible.builtin.set_fact:
+    autoinstall_start_msg: "Autoinstall is started."
+    autoinstall_ipv4_msg: "IPv4-address="
+  when: unattend_installer in ["Ubuntu-Ubiquity", "Ubuntu-Subiquity", "Debian", "Pardus", "FreeBSD"]
+
 # unattend_install_conf is not for Ubuntu Server, Ubuntu Desktop 23.04 and later
 - name: "Create unattend install ISO for {{ unattend_installer }}"
   when: unattend_installer != "Ubuntu-Subiquity"
@@ -86,10 +92,6 @@
 - name: "Create unattend install ISO for Ubuntu Server, Ubuntu desktop 23.04 or later"
   when: unattend_installer == "Ubuntu-Subiquity"
   block:
-    - name: "Set fact for autoinstall start message to be printed to VM serial port"
-      ansible.builtin.set_fact:
-        autoinstall_start_msg: "Ubuntu autoinstall is started with IPv4 address:"
-
     - name: "Create the Ubuntu seed ISO to modify login information"
       include_tasks: ../utils/create_seed_iso.yml
       vars:
