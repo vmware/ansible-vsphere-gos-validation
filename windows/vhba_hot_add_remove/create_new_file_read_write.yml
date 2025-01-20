@@ -60,20 +60,25 @@
     set_win_power_state: "restart"
     win_reboot_ignore_error: true
 
-- name: "Handle known issue on {{ guest_os_ansible_distribution }}"
-  include_tasks: handle_nvme_boot_known_issue.yml
-  when:
-    - restart_guest_os.failed | default(false)
-    - not on_new_controller
-    - nvme_boot_known_issue
+- name: "Restart guest OS failed"
+  when: restart_guest_os.failed | default(false)
+  block:
+    - name: "Set fact of the error message"
+      ansible.builtin.set_fact:
+        disk_issue_msg: >-
+          Failed to reboot guest OS after writing content to the new disk added to the
+          existing '{{ new_disk_node_ctl_type }}' {{ test_disk_controller_type }} controller
+          on node '{{ new_disk_node_ctl_bus }}:{{ new_disk_node_unit_num }}'.
+
+    - name: "Handle known issue on {{ new_disk_node_ctl_type }} {{ new_disk_node_ctl_type }} controller"
+      include_tasks: handle_nvme_boot_known_issue.yml
+      when: nvme_boot_known_issue
+
+    - name: "Restart guest OS failed on {{ guest_os_ansible_distribution }}"
+      ansible.builtin.fail:
+        msg: "{{ disk_issue_msg }}"
+      when: not nvme_boot_known_issue
 
 - name: "Check new file content again after guest OS restart"
   include_tasks: check_file_after_restart.yml
   when: not restart_guest_os.failed | default(false)
-
-- name: "Restart guest OS failed on {{ guest_os_ansible_distribution }}"
-  ansible.builtin.fail:
-    msg: "Restart guest OS failed after creating and writing content to the new file on the new disk {{ new_disk_node_ctl_bus }}: {{ new_disk_node_unit_num }}."
-  when:
-    - restart_guest_os.failed | default(false)
-    - on_new_controller or not nvme_boot_known_issue
