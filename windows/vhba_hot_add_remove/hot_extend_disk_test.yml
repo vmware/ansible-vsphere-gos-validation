@@ -48,7 +48,9 @@
       - "After disk hot extend, disk size in guest OS: {{ win_disk_size_after }}GB"
 
 - name: "Handle known issue"
-  when: win_disk_size_after | int == win_disk_volume_size_before | int
+  when:
+    - win_disk_size_after | int == win_disk_volume_size_before | int
+    - esxi_version is version('8.0.1', '<=') and esxi_build != 'N/A' and esxi_build | int < 21495797
   block:
     - name: "Workaround for the known issue"
       include_tasks: handle_nvme_extend_known_issue.yml
