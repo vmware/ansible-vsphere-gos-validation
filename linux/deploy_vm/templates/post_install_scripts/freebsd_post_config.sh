@@ -12,7 +12,7 @@ echo 'kern.geom.label.gpt.enable="1"' >>/boot/loader.conf
 echo 'kern.geom.label.ufs.enable="1"' >>/boot/loader.conf
 echo 'kern.geom.label.ufsid.enable="1"' >>/boot/loader.conf
 
-if [ "$machtype" == "i386" ]; then
+if [ "$machtype" != "amd64" ] && [ "$machtype" != "x86_64" ]; then
     # Workaround for FreeBSD issue https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=283276
     echo 'kern.kstack_pages=8' >>/boot/loader.conf
 fi
@@ -40,10 +40,10 @@ echo "DONE" >/dev/ttyu0
 
 # Get DHCP IP address
 echo "Getting IP with dhclient ..." > /dev/ttyu0
-dhclient ${ifdev} >/dev/ttyu0
+dhclient -n ${ifdev} >/dev/ttyu0
 sleep 10
-echo "Checking network ..." > /dev/ttyu0
-ifconfig > /dev/ttyu0
+echo "Display network interface" > /dev/ttyu0
+ifconfig ${ifdev}> /dev/ttyu0
 
 # Set Proxy.
 {% if http_proxy_vm is defined and http_proxy_vm %}
@@ -115,13 +115,15 @@ fi
 
 # Add new user. 
 {% if new_user is defined and new_user != 'root' %}
-echo "Adding new user {{ new_user }} ..." >/dev/ttyu0
+printf "Adding new user {{ new_user }} ..." >/dev/ttyu0
 echo "{{ vm_password }}" | pw useradd {{ new_user }} -s /bin/sh -d /home/{{ new_user }} -m -g wheel -h 0
 echo '{{ new_user }} ALL=(ALL:ALL) ALL' >> /usr/local/etc/sudoers
+echo "DONE" >/dev/ttyu0
 {% endif %}
 
-echo "Set password of root user" >/dev/ttyu0
+printf "Setting password of root user ..." >/dev/ttyu0
 echo "{{ vm_password }}" | pw -V /etc usermod root -h 0
+echo "DONE" >/dev/ttyu0
 
 # Enable root login via ssh
 printf "Enabling root login via ssh ... " > /dev/ttyu0
