@@ -26,21 +26,23 @@
   ansible.builtin.debug:
     msg: "The number of disks attached to the controller '{{ test_disk_controller_type }}: {{ new_vhba_bus_number }}' is: {{ disk_num_under_remove | length }}"
 
-- name: "Hot remove disks added on the new controller"
-  include_tasks: ../../common/vm_hot_add_remove_disk.yml
-  vars:
-    disk_operation: 'absent'
-    ctrl_number: "{{ new_vhba_bus_number }}"
-    unit_number: "{{ rm_disk_unit_num }}"
-    disk_controller_type: "{{ test_disk_controller_type }}"
-  loop: "{{ range(0, (disk_num_under_remove | length)) }}"
-  loop_control:
-    loop_var: rm_disk_unit_num
+- name: "Remove the disks attached to the new controller"
   when: disk_num_under_remove | length > 0
+  block:
+    - name: "Hot remove added disks before"
+      include_tasks: ../../common/vm_hot_add_remove_disk.yml
+      vars:
+        disk_operation: 'absent'
+        ctrl_number: "{{ new_vhba_bus_number }}"
+        unit_number: "{{ rm_disk_unit_num }}"
+        disk_controller_type: "{{ test_disk_controller_type }}"
+      loop: "{{ range(0, (disk_num_under_remove | length)) }}"
+      loop_control:
+        loop_var: rm_disk_unit_num
 
-- name: "Wait 10 seconds after disk hot remove"
-  ansible.builtin.pause:
-    seconds: 10
+    - name: "Wait 10 seconds after disk hot remove"
+      ansible.builtin.pause:
+        seconds: 10
 
 - name: "Get disk number in guest OS after hot removing"
   include_tasks: ../utils/win_get_disk_num.yml
