@@ -54,6 +54,15 @@
     - vm_firmware == 'bios'
     - win_boot_disk_ctl_type not in ['ide', 'sata']
 
+- name: "Meet the conditions of known issue on VM with NVMe boot disk controller"
+  ansible.builtin.set_fact:
+    nvme_boot_known_issue: true
+  when:
+    - test_disk_controller_type == 'nvme'
+    - win_boot_disk_ctl_type == 'nvme'
+    - guest_os_ansible_distribution is search('2025')
+    - vm_firmware == 'bios'
+
 - name: "Restart guest OS"
   include_tasks: ../utils/win_shutdown_restart.yml
   vars:
@@ -70,7 +79,7 @@
           existing '{{ new_disk_node_ctl_type }}' {{ test_disk_controller_type }} controller
           on node '{{ new_disk_node_ctl_bus }}:{{ new_disk_node_unit_num }}'.
 
-    - name: "Handle known issue on {{ new_disk_node_ctl_type }} {{ new_disk_node_ctl_type }} controller"
+    - name: "Handle known issue on {{ new_disk_node_ctl_type }} {{ test_disk_controller_type }} controller"
       include_tasks: handle_nvme_boot_known_issue.yml
       when: nvme_boot_known_issue
 

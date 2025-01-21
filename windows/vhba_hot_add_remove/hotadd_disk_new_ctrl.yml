@@ -4,6 +4,7 @@
 - name: "Not meet conditions of known issue on NVMe boot disk controller by default"
   ansible.builtin.set_fact:
     nvme_boot_known_issue: false
+    nvme_issue_disk_removed: false
 
 - name: "Get disk controller number in guest OS before hot adding new disk controller and disk"
   include_tasks: ../utils/win_get_ctl_num.yml
@@ -29,15 +30,6 @@
     msg:
       - "New disk will be added to the controller with bus number: {{ new_disk_node_ctl_bus }}"
       - "New disk's unit number will be: {{ new_disk_node_unit_num }}"
-
-- name: "Meet the conditions of known issue on VM with NVMe boot disk controller"
-  ansible.builtin.set_fact:
-    nvme_boot_known_issue: true
-  when:
-    - test_disk_controller_type == 'nvme'
-    - win_boot_disk_ctl_type == 'nvme'
-    - guest_os_ansible_distribution is search('2025')
-    - vm_firmware == 'bios'
 
 - name: "Hot add new disk controller and disk at the same time"
   include_tasks: ../../common/vm_hot_add_ctrl_disk.yml
