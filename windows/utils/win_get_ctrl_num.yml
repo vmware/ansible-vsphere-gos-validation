@@ -1,0 +1,43 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the number of disk controllers with specified type in Windows guest OS.
+# Parameters:
+#   win_ctrl_type: disk controller type can be set to 'sata', 'nvme',
+#     'paravirtual', 'lsilogicsas'.
+# Return:
+#   ctrl_num_guest: the number of controllers with specified type.
+#
+- name: "Initialize the number of {{ win_ctrl_type }} controllers in guest OS"
+  ansible.builtin.set_fact:
+    ctrl_num_guest: 0
+
+- name: "Set fact of the command for getting the number of controllers"
+  ansible.builtin.set_fact:
+    win_get_ctrl_cmd: >-
+      {%- if win_ctrl_type == 'sata' -%}(Get-WmiObject Win32_IDEController | where-object {$_.Name -like '*SATA AHCI*'} | measure).Count
+      {%- elif win_ctrl_type == 'nvme' -%}(Get-WmiObject Win32_SCSIController | where-object {$_.Name -like '*NVM Express*'} | measure).Count
+      {%- elif win_ctrl_type == 'paravirtual' -%}(Get-WmiObject Win32_SCSIController | where-object {$_.Name -like '*PVSCSI*'} | measure).Count
+      {%- elif win_ctrl_type == 'lsilogicsas' -%}(Get-WmiObject Win32_SCSIController | where-object {$_.Name -like 'LSI*SAS*'} | measure).Count
+      {%- endif -%}
+
+- name: "Check the command for getting the number of controllers"
+  ansible.builtin.assert:
+    that:
+      - win_get_ctrl_cmd
+    fail_msg: "The command for getting the number of '{{ win_ctrl_type }}' controllers is not set: {{ win_get_ctrl_cmd }}"
+
+- name: "Get the number of {{ win_ctrl_type }} controllers in guest OS"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ win_get_ctrl_cmd }}"
+
+- name: "Set fact of the number of {{ win_ctrl_type }} controllers in guest OS"
+  ansible.builtin.set_fact:
+    ctrl_num_guest: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length == 1
+
+- name: "Print the number of {{ win_ctrl_type }} controllers in guest OS"
+  ansible.builtin.debug: var=ctrl_num_guest

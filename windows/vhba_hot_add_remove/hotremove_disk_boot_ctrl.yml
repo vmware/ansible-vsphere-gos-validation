@@ -1,43 +1,40 @@
 # Copyright 2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Get disk number in guest OS before hot removing"
-  include_tasks: ../utils/win_get_disk_num.yml
+- name: "Get disk and controller number before hot removing disk from boot disk controller"
+  include_tasks: get_guest_disk_ctrl_num.yml
+  vars:
+    disk_ops_stage: 'before'
 
-- name: "Set fact of disk number before hot removing"
-  ansible.builtin.set_fact:
-    disk_num_guest_before_remove: "{{ disk_num_guest }}"
-
-- name: "Hot remove disk added on the boot controller"
+- name: "Hot remove disk from boot disk controller"
   include_tasks: ../../common/vm_hot_add_remove_disk.yml
   vars:
     disk_operation: 'absent'
-    ctrl_number: "{{ boot_disk_ctl_bus_num }}"
-    unit_number: "{{ boot_ctl_new_unit_num }}"
-    disk_controller_type: "{{ test_disk_controller_type }}"
+    ctrl_number: "{{ boot_disk_ctrl_bus_num }}"
+    unit_number: "{{ boot_ctrl_new_unit_num }}"
+    disk_controller_type: "{{ test_disk_ctrl_type }}"
 
-- name: "Wait 10 seconds after disk hot remove"
+- name: "Wait 10 seconds after hot removing disk"
   ansible.builtin.pause:
     seconds: 10
 
-- name: "Handle known issue"
+- name: "Get disk and controller number after hot removing disk from boot disk controller"
+  include_tasks: get_guest_disk_ctrl_num.yml
+  vars:
+    disk_ops_stage: 'after'
+
+- name: "Handle known issue on NVMe disk hot remove"
   include_tasks: handle_nvme_ops_known_issue.yml
   when:
+    - disk_num_guest_after | int != disk_num_guest_before | int - 1
     - test_purpose == "hot-add"
-    - test_disk_controller_type == 'nvme'
+    - test_disk_ctrl_type == 'nvme'
 
-- name: "Get disk number in guest OS after hot removing"
-  include_tasks: ../utils/win_get_disk_num.yml
-
-- name: "Set fact of disk number after hot removing"
-  ansible.builtin.set_fact:
-    disk_num_guest_after_remove: "{{ disk_num_guest }}"
-
-- name: "Check disk controller and disk number after hot remove"
+- name: "Check disk number after hot removing"
   ansible.builtin.assert:
     that:
-      - disk_num_guest_after_remove | int == disk_num_guest_before_remove | int - 1
+      - disk_num_guest_after | int == disk_num_guest_before | int - 1
     fail_msg: >-
       After hot removing the new added disk from boot disk controller, disk number in guest OS is
-      '{{ disk_num_guest_after_remove }}', which is not the expected value,
-      '{{ disk_num_guest_before_remove | int - 1 }}'.
+      '{{ disk_num_guest_after }}', which is not the expected value,
+      '{{ disk_num_guest_before | int - 1 }}'.
