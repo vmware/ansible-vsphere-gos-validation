@@ -7,25 +7,25 @@
 - name: "Initialize the facts of VM with PVSCSI and VMXNET3 devices"
   ansible.builtin.set_fact:
     vm_has_pvscsi_boot_disk: false
-    vm_has_pvscsi_ctl: false
+    vm_has_pvscsi_ctrl: false
     vm_has_vmxnet3_net: false
 
 # PVSCSI boot disk controller
 - name: "Set boot disk controller type to PVSCSI"
   ansible.builtin.set_fact:
     vm_has_pvscsi_boot_disk: true
-  when: win_boot_disk_ctl_type == 'paravirtual'
+  when: win_boot_disk_ctrl_type == 'paravirtual'
 
 # Not PVSCSI boot disk controller
 - name: "Check if VM has non-boot PVSCSI controller"
   when: not vm_has_pvscsi_boot_disk
   block:
     - name: "Get PVSCSI controller number in guest OS"
-      include_tasks: ../utils/win_get_pvscsi_ctl_num.yml
+      include_tasks: ../utils/win_get_pvscsi_ctrl_num.yml
     - name: "Set fact of VM has non-boot PVSCSI controller"
       ansible.builtin.set_fact:
-        vm_has_pvscsi_ctl: true
-      when: ctl_num_guest | int > 0
+        vm_has_pvscsi_ctrl: true
+      when: ctrl_num_guest | int > 0
 
 - name: "Get network adatper number in guest OS"
   include_tasks: ../utils/win_get_netadapter_num.yml
@@ -39,7 +39,7 @@
 - name: "VM without PVSCSI controller"
   when:
     - not vm_has_pvscsi_boot_disk
-    - not vm_has_pvscsi_ctl
+    - not vm_has_pvscsi_ctrl
   block:
     - name: "Add a PVSCSI controller to VM"
       include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
