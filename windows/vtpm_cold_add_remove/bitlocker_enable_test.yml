@@ -46,29 +46,35 @@
 - name: "Handle BitLocker Device Encryption not enabled automatically situation"
   when: not win_bde_auto_enable
   block:
-    - name: "Enable BitLocker on 'C:' drive"
-      include_tasks: ../utils/win_execute_cmd.yml
-      vars:
-        win_powershell_cmd: "Enable-BitLocker -MountPoint 'C:' -UsedSpaceOnly -TpmProtector -SkipHardwareTest"
-
-    - name: "Set fact of encounter known issue on {{ guest_os_ansible_distribution }}"
+    - name: "Set fact of the command for enabling BitLocker in guest OS"
       ansible.builtin.set_fact:
-        win_bde_known_issue: true
-      when:
-        - win_powershell_cmd_output.stderr is defined
-        - win_powershell_cmd_output.stderr
-        - guest_os_ansible_distribution is search('2019|2022')
-        - win_boot_disk_ctl_type in ['lsilogicsas', 'paravirtual']
+        win_enable_bitlocker_cmd: "Enable-BitLocker -MountPoint 'C:' -UsedSpaceOnly -TpmProtector -SkipHardwareTest"
+
+    - name: "Retry to enable BitLocker on 'C:' drive"
+      ansible.windows.win_shell: "{{ win_enable_bitlocker_cmd }}"
+      register: win_enable_bl_cmd_result
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      until:
+        - win_enable_bl_cmd_result is defined
+        - not (win_enable_bl_cmd_result.stderr is defined and win_enable_bl_cmd_result.stderr is search('an I/O device error'))
+      retries: 3
+      delay: 120
 
     - name: "Workaround for known issue"
       include_tasks: handle_vm_known_issue.yml
-      when: win_bde_known_issue | default(false)
+      when:
+        - guest_os_ansible_distribution is search('2019|2022')
+        - win_boot_disk_ctl_type in ['lsilogicsas', 'paravirtual']
+        - win_enable_bl_cmd_result.stderr is defined
+        - win_enable_bl_cmd_result.stderr
 
     - name: "Check enable BitLocker command result"
       ansible.builtin.assert:
         that:
-          - not (win_powershell_cmd_output.stderr is defined and win_powershell_cmd_output.stderr)
-        fail_msg: "Execute 'Enable-BitLocker' command in guest OS returns error: {{ win_powershell_cmd_output.stderr }}"
+          - win_enable_bl_cmd_result is defined
+          - not (win_enable_bl_cmd_result.stderr is defined and win_enable_bl_cmd_result.stderr)
+        fail_msg: "Execute 'Enable-BitLocker' command in guest OS returns error: {{ win_enable_bl_cmd_result.stderr }}"
 
 # Command "manage-bde" returns noting in Windows Server 2016 through
 # remote connection, so here use powershell cmdlet
