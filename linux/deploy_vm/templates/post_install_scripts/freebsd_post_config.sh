@@ -164,6 +164,10 @@ if [ "$machtype" == "amd64" ] || [ "$machtype" == "x86_64" ]; then
     echo "DONE" >/dev/ttyu0
 fi
 
+if [ "$BSDINSTALL_LOG" != "" ] && [ -f $BSDINSTALL_LOG ]; then
+    echo "Dump BSD installer log" >/dev/ttyu0
+    cat $BSDINSTALL_LOG >/dev/ttyu0
+fi
 echo "End of installerconfig" > /dev/ttyu0
 echo "{{ autoinstall_complete_msg }}" > /dev/ttyu0
 
