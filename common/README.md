@@ -185,6 +185,7 @@
 * vds_network_cleanup.yml: Cleanup vSphere Distributed Switch networking
 * test_rescue: Tasks executed when test case failure
 * skip_test_case.yml: Tasks for skipping testcase and ending play
+* test_ssh_connection.yml: Tasks for testing SSH connection
 
 ## Common tasks for Linux and Windows test cases
 * compose_vm_cdroms.yml: Generate VM CDROM device info list for creating new VM
