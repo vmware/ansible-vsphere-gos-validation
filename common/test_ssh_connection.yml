@@ -1,0 +1,27 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Test SSH connection
+# Parameters:
+#   ssh_server_ip: IP address or hostname of the remote server
+# Return:
+#   ssh_connect_success: true if SSH connection succeeds to remote server.
+#
+- name: "Initialize the result of testing SSH connection"
+  ansible.builtin.set_fact:
+    ssh_connect_success: false
+
+- name: "Test SSH connection to {{ ssh_server_ip }}"
+  ansible.builtin.setup:
+    gather_subset: ['!all','!min','system']
+  delegate_to: "{{ ssh_server_ip }}"
+  ignore_unreachable: true
+  register: test_ssh_result
+
+- name: "Set result of testing SSH connection"
+  ansible.builtin.set_fact:
+    ssh_connect_success: >-
+      {{
+        test_ssh_result.unreachable is undefined and
+        not (test_ssh_result.failed | default(false))
+      }}
