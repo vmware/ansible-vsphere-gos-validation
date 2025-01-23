@@ -32,8 +32,10 @@ printf "Setting Time Zone to UTC ..." >/dev/ttyu0
 /sbin/adjkerntz -a
 echo "DONE" >/dev/ttyu0
 
-echo "Getting network interface name ... " > /dev/ttyu0
+printf "Getting network interface name ... " > /dev/ttyu0
 ifdev=$(ifconfig | grep '^[a-z]' | cut -d: -f1 | head -n 1) >/dev/ttyu0
+echo "DONE" >/dev/ttyu0
+
 printf "Setting network interface ${ifdev} with DHCP IP assignment ... " > /dev/ttyu0
 sysrc ifconfig_${ifdev}=DHCP
 echo "DONE" >/dev/ttyu0
