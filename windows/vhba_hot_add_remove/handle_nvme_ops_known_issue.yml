@@ -1,4 +1,4 @@
-# Copyright 2024 VMware, Inc.
+# Copyright 2025 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Hot add or hot remove NVMe disk to existing controller,
@@ -10,25 +10,23 @@
 # So the workaround here is changed to restart guest OS directly.
 # - include_tasks: disable_enable_nvme_device.yml
 #
-- name: "Handle known issue"
-  block:
-    - name: "Known issue - hot add or remove NVMe disk to existing controller is not recognized"
-      ansible.builtin.debug:
-        msg:
-          - "Hot add or remove NVMe disk is not supported on Windows VM when NVMe Spec v1.0 is emulated."
-          - "Ignore this known issue."
-          - "Restart guest OS is the workaround for hot adding or removing disk to take effect."
-      tags:
-        - known_issue
+- name: "Known issue - hot add or remove NVMe disk to existing controller is not recognized"
+  ansible.builtin.debug:
+    msg:
+      - "Hot add or remove NVMe disk is not supported on Windows VM when NVMe Spec v1.0 is emulated."
+      - "Ignore this known issue."
+      - "Restart guest OS is the workaround for hot adding or removing disk to take effect."
+  tags:
+    - known_issue
 
-    - name: "Restart guest OS"
-      include_tasks: ../utils/win_shutdown_restart.yml
-      vars:
-        set_win_power_state: "restart"
+- name: "Restart guest OS"
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
 
-    - name: "Get disk number again in guest OS after reboot"
-      include_tasks: ../utils/win_get_disk_num.yml
+- name: "Get disk number again in guest OS after reboot"
+  include_tasks: ../utils/win_get_disk_num.yml
 
-    - name: "Set fact of disk number again after reboot"
-      ansible.builtin.set_fact:
-        disk_num_guest_after: "{{ disk_num_guest }}"
+- name: "Set fact of disk number again after reboot"
+  ansible.builtin.set_fact:
+    disk_num_guest_after: "{{ disk_num_guest }}"
