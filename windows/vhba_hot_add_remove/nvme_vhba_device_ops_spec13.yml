@@ -3,7 +3,7 @@
 ---
 # Description:
 #   This test case is used for check hotadd, hot remove disk
-# on NVMe controller with NVMe Spec 1.3 enabled.
+# on a new and existing NVMe controller with NVMe Spec 1.3 enabled.
 #
 - name: nvme_vhba_device_ops_spec13
   hosts: localhost
@@ -13,20 +13,34 @@
       block:
         - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
+          vars:
+            create_current_test_folder: true
 
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: >- 
-              The NVMe 1.3 Spec is supported from ESXi 7.0.2 hardware version 19. 
+            skip_msg: >-
+              The NVMe 1.3 Spec is supported from ESXi 7.0.2 hardware version 19.
               Skip this test case due to VM's hardware version is '{{ vm_hardware_version_num }}'.
             skip_reason: "Not Supported"
-          when: vm_hardware_version_num is undefined or vm_hardware_version_num | int < 19
+          when: vm_hardware_version_num and vm_hardware_version_num | int < 19
 
-        - name: "Start VHBA test"
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip testing on this guest OS '{{ guest_os_ansible_distribution }}', since
+              Windows Server 2019 and earlier server releases do not contain the fix of hot adding/removing NVMe disk issue,
+              so skip this test case and only run test case 'nvme_vhba_device_ops' with workaround.
+            skip_reason: "Not Applicable"
+          when:
+            - guest_os_product_type == 'server'
+            - guest_os_ansible_kernel is version('10.0.20348.0', '<')
+
+        - name: "Test run"
           include_tasks: vhba_test.yml
           vars:
-            test_disk_controller_type: "nvme"
+            test_disk_ctrl_type: "nvme"
             test_purpose: "hot-add-spec13"
       rescue:
         - name: "Test case failure"

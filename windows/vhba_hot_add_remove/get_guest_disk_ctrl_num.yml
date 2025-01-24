@@ -1,0 +1,31 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Parameter 'disk_ops_stage' must be passed when include this tasks file
+# with value 'before' or 'after'.
+#
+- name: "Get disk controller number in guest OS {{ disk_ops_stage }} ops"
+  include_tasks: ../utils/win_get_ctrl_num.yml
+  vars:
+    win_ctrl_type: "{{ test_disk_ctrl_type }}"
+
+- name: "Get disk number in guest OS {{ disk_ops_stage }} ops"
+  include_tasks: ../utils/win_get_disk_num.yml
+
+- name: "Set fact of disk controller and disk number {{ disk_ops_stage }} ops"
+  ansible.builtin.set_fact:
+    ctrl_num_guest_before: "{{ ctrl_num_guest }}"
+    disk_num_guest_before: "{{ disk_num_guest }}"
+  when: disk_ops_stage == 'before'
+
+- name: "Set fact of disk controller and disk number {{ disk_ops_stage }} ops"
+  ansible.builtin.set_fact:
+    ctrl_num_guest_after: "{{ ctrl_num_guest }}"
+    disk_num_guest_after: "{{ disk_num_guest }}"
+  when: disk_ops_stage == 'after'
+
+- name: "Print the disk controller and disk number {{ disk_ops_stage }} ops"
+  ansible.builtin.debug:
+    msg:
+      - "Disk controllers in guest OS: {{ (disk_ops_stage == 'before') | ternary(ctrl_num_guest_before, ctrl_num_guest_after) }}"
+      - "Disks in guest OS: {{ (disk_ops_stage == 'before') | ternary(disk_num_guest_before, disk_num_guest_after) }}"

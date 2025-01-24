@@ -1,0 +1,59 @@
+# Copyright 2022-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# If there is SATA controller, then add a new CDROM attached
+# to it, if there is no SATA controller, add a new SATA controller
+# firstly, then add a new CDROM attached to it.
+#
+- name: "Initialize the facts of new CDROM node info"
+  ansible.builtin.set_fact:
+    new_cdrom_ctrl_num: ''
+    new_cdrom_unit_num: ''
+
+- name: "Get VM disk controller info"
+  include_tasks: ../../common/vm_get_disk_controller_facts.yml
+
+- name: "Set fact of VM SATA controller info"
+  ansible.builtin.set_fact:
+    vm_sata_ctrl_info: "{{ disk_controller_facts.disk_controller_data['sata'] | default({}) }}"
+
+- name: "Set fact of new CDROM node info to new SATA controller"
+  ansible.builtin.set_fact:
+    new_cdrom_ctrl_num: 0
+    new_cdrom_unit_num: 0
+  when: vm_sata_ctrl_info | length == 0
+
+- name: "Set fact of new CDROM node info to existing SATA controller"
+  ansible.builtin.set_fact:
+    new_cdrom_ctrl_num: "{{ (vm_sata_ctrl_info.values() | list)[0]['controller_busnumber'] }}"
+    new_cdrom_unit_num: "{{ (vm_sata_ctrl_info.values() | list)[0]['controller_disks_devicekey'] | max | int % 1000 + 1 }}"
+  when: vm_sata_ctrl_info | length != 0
+
+- name: "Print the new CDROM node info"
+  ansible.builtin.debug:
+    msg:
+      - "New CDROM controller bus number: {{ new_cdrom_ctrl_num }}"
+      - "New CDROM device unit number: {{ new_cdrom_unit_num }}"
+
+- name: "Check the new CDROM node info"
+  ansible.builtin.assert:
+    that:
+      - new_cdrom_ctrl_num != ''
+      - new_cdrom_unit_num != ''
+    fail_msg: "Not get SATA controller bus number: '{{ new_cdrom_ctrl_num }}', or new CDROM unit number: '{{ new_cdrom_unit_num }}'"
+
+- name: "Add new CDROM to VM"
+  include_tasks: ../../common/vm_configure_cdrom.yml
+  vars:
+    cdrom_type: 'client'
+    cdrom_controller_num: "{{ new_cdrom_ctrl_num }}"
+    cdrom_unit_num: "{{ new_cdrom_unit_num }}"
+    cdrom_state: 'present'
+
+- name: "Check add new CDROM task result"
+  ansible.builtin.assert:
+    that:
+      - vm_config_cdrom_result is defined
+      - vm_config_cdrom_result.changed is defined
+      - vm_config_cdrom_result.changed
+    fail_msg: "Adding new CDROM to SATA controller task result is not changed: {{ vm_config_cdrom_result.changed | default('') }}"

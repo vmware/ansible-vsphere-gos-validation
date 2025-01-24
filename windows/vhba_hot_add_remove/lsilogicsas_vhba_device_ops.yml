@@ -2,18 +2,25 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is used for check hotadd, hot remove disk on existing LSILogicSAS
-# controller, and hotadd, hot remove new LSILogicSAS controller and disk.
+#   This test case is for disk hot add and hot remove on a new and existing
+# LSILogicSAS controller.
 #
 - name: lsilogicsas_vhba_device_ops
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
-        - include_tasks: vhba_test.yml
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
           vars:
-            test_disk_controller_type: "lsilogicsas"
+            create_current_test_folder: true
+
+        - name: "Test run"
+          include_tasks: vhba_test.yml
+          vars:
+            test_disk_ctrl_type: "lsilogicsas"
             test_purpose: "hot-add"
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
