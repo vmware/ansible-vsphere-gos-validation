@@ -1,54 +1,52 @@
-# Copyright 2024 VMware, Inc.
+# Copyright 2025 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Hot add a new NVMe disk to the existing boot or non-boot NVMe controller,
 # guest OS will hang without response. The workaround is removing the new
 # added disk.
 #
-- name: "Handle known issue"
-  block:
-    - name: "Known issue - guest OS hang after hot adding a disk to the existing NVMe controller"
-      ansible.builtin.debug:
-        msg:
-          - "{{ disk_issue_msg | default('') }}"
-          - "Guest OS may appear to be stuck with or without rebooting after hot adding a new disk to the existing NVMe controller."
-          - "This is a known issue on Windows Server 2025, please refer to KB article: https://knowledge.broadcom.com/external/article?articleId=380610"
-          - "Removing the added NVMe disk is the workaround for this issue."
-      tags:
-        - known_issue
+- name: "Known issue - guest OS hang after hot adding a disk to the existing NVMe controller"
+  ansible.builtin.debug:
+    msg:
+      - "{{ disk_issue_msg | default('') }}"
+      - "Guest OS may appear to be stuck with or without rebooting after hot adding a new disk to the existing NVMe controller."
+      - "This is a known issue on Windows Server 2025, please refer to KB article: https://knowledge.broadcom.com/external/article?articleId=380610"
+      - "Removing the added NVMe disk is the workaround for this issue."
+  tags:
+    - known_issue
 
-    - name: "Check guest OS connection"
-      include_tasks: ../utils/win_check_winrm.yml
-      vars:
-        win_ignore_winrm_error: true
+- name: "Check guest OS connection"
+  include_tasks: ../utils/win_check_winrm.yml
+  vars:
+    win_ignore_winrm_error: true
 
-    - name: "Take a screenshot when hit NVMe known issue"
-      include_tasks: ../../common/vm_take_screenshot.yml
-      vars:
-        vm_screenshot_local_dir: "{{ current_test_log_folder }}"
-        vm_screenshot_local_name: "screenshot_at_disk_{{ new_disk_node_ctrl_bus }}_{{ new_disk_node_unit_num }}.png"
+- name: "Take a screenshot when hit NVMe known issue"
+  include_tasks: ../../common/vm_take_screenshot.yml
+  vars:
+    vm_screenshot_local_dir: "{{ current_test_log_folder }}"
+    vm_screenshot_local_name: "screenshot_at_nvme_{{ new_disk_node_ctrl_bus }}_{{ new_disk_node_unit_num }}.png"
 
-    - name: "Power off guest OS"
-      include_tasks: ../../common/vm_set_power_state.yml
-      vars:
-        vm_power_state_set: 'powered-off'
+- name: "Power off guest OS"
+  include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-off'
 
-    - name: "Remove new added disk"
-      include_tasks: ../../common/vm_hot_add_remove_disk.yml
-      vars:
-        disk_operation: 'absent'
-        ctrl_number: "{{ new_disk_node_ctrl_bus }}"
-        unit_number: "{{ new_disk_node_unit_num }}"
-        disk_controller_type: "{{ test_disk_ctrl_type }}"
+- name: "Remove new added disk"
+  include_tasks: ../../common/vm_hot_add_remove_disk.yml
+  vars:
+    disk_operation: 'absent'
+    ctrl_number: "{{ new_disk_node_ctrl_bus }}"
+    unit_number: "{{ new_disk_node_unit_num }}"
+    disk_controller_type: "{{ test_disk_ctrl_type }}"
 
-    - name: "Power on guest OS"
-      include_tasks: ../../common/vm_set_power_state.yml
-      vars:
-        vm_power_state_set: 'powered-on'
+- name: "Power on guest OS"
+  include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-on'
 
-    - name: "Get VM IP address and update host inventrory"
-      include_tasks: ../utils/win_update_inventory.yml
+- name: "Get VM IP address and update host inventrory"
+  include_tasks: ../utils/win_update_inventory.yml
 
-    - name: "Set fact of the new added disk removed"
-      ansible.builtin.set_fact:
-        nvme_issue_disk_removed: true
+- name: "Set fact of the new added disk removed"
+  ansible.builtin.set_fact:
+    nvme_issue_disk_removed: true
