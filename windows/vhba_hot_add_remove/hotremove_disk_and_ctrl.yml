@@ -1,6 +1,12 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+# Hot remove the disks added to the new disk controller firstly,
+# then remove that controller when disks are removed successfully,
+# or there will be error with below message when removing NVMe controller:
+# "The guest operating system did not respond to a hot-remove request
+# for device nvme0 in a timely manner."
+#
 - name: "Get disk and controller number before hot removing disk"
   include_tasks: get_guest_disk_ctrl_num.yml
   vars:
@@ -32,9 +38,28 @@
       loop_control:
         loop_var: rm_disk_unit_num
 
-    - name: "Wait 10 seconds after disk hot remove"
+    - name: "Wait 10 seconds after disk hot removing"
       ansible.builtin.pause:
         seconds: 10
+
+    - name: "Get disk number in guest OS after hot removing"
+      include_tasks: ../utils/win_get_disk_num.yml
+
+    - name: "Handle known issue on NVMe disk hot remove"
+      include_tasks: handle_nvme_ops_known_issue.yml
+      when:
+        - disk_num_guest | int != disk_num_guest_before | int - disk_num_under_remove | length
+        - test_purpose == "hot-add"
+        - test_disk_ctrl_type == 'nvme'
+
+    - name: "Check disk number after hot removing"
+      ansible.builtin.assert:
+        that:
+          - disk_num_guest | int == disk_num_guest_before | int - disk_num_under_remove | length
+        fail_msg: >-
+          After hot removing the new added disks attached to the new disk controller,
+          disk number is '{{ disk_num_guest }}', which is not the expected value
+          '{{ disk_num_guest_before | int - disk_num_under_remove | length }}'
 
 - name: "Hot remove new added disk controller"
   include_tasks: ../../common/vm_hot_add_remove_disk_ctrl.yml
@@ -47,19 +72,16 @@
   ansible.builtin.pause:
     seconds: 10
 
-- name: "Get disk and controller number after hot removing"
-  include_tasks: get_guest_disk_ctrl_num.yml
+- name: "Get disk controller number after hot removing"
+  include_tasks: ../utils/win_get_ctrl_num.yml
   vars:
-    disk_ops_stage: 'after'
+    win_ctrl_type: "{{ test_disk_ctrl_type }}"
 
-- name: "Check disk and controller number after hot removing"
+- name: "Check disk controller number after hot removing"
   ansible.builtin.assert:
     that:
-      - disk_num_guest_after | int == (disk_num_guest_before | int - disk_num_under_remove | length)
-      - ctrl_num_guest_after | int == ctrl_num_guest_before | int - 1
+      - ctrl_num_guest | int == ctrl_num_guest_before | int - 1
     fail_msg: >-
-      After hot removing new added disk controller and disks,
-      disk controller number is '{{ ctrl_num_guest_after }}', disk number is '{{ disk_num_guest_after }}',
-      which are not the expected values,
-      disk controller '{{ ctrl_num_guest_before | int - 1 }}', disk number
-      '{{ disk_num_guest_before | int - disk_num_under_remove | length }}'.
+      Hot removing the new added disk controller after removing it's attached disks,
+      disk controller number is '{{ ctrl_num_guest }}', which is not the expected value
+      '{{ ctrl_num_guest_before | int - 1 }}'.
