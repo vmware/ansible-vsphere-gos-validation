@@ -1,4 +1,6 @@
 #!/bin/sh
+echo "{{ autoinstall_start_msg }}" >/dev/ttyu0
+
 machtype=$(uname -m)
 echo "Machine type is $machtype" > /dev/ttyu0
 
@@ -41,11 +43,13 @@ sysrc ifconfig_${ifdev}=DHCP
 echo "DONE" >/dev/ttyu0
 
 # Get DHCP IP address
-echo "Getting IP with dhclient ..." > /dev/ttyu0
+printf "Getting IP address with dhclient ..." > /dev/ttyu0
 dhclient -n ${ifdev} >/dev/ttyu0
 sleep 10
-echo "Display network interface" > /dev/ttyu0
-ifconfig ${ifdev}> /dev/ttyu0
+echo "DONE" >/dev/ttyu0
+
+ipv4=$(ifconfig ${ifdev} | awk '/inet [0-9]+/ {print $2}')
+echo "{{ autoinstall_ipv4_msg }}$ipv4" > /dev/ttyu0
 
 # Set Proxy.
 {% if http_proxy_vm is defined and http_proxy_vm %}
