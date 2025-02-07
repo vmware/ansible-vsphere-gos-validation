@@ -9,28 +9,36 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: false
+            create_current_test_folder: true
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Guest OS is '{{ guest_os_ansible_architecture }}', NVDIMM is not supported on 32bit Windows."
             skip_reason: "Not Supported"
           when: guest_os_ansible_architecture == "32-bit"
 
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "NVDIMM support starts from ESXi 6.7 and VM hardware version 14. VM hardware version is '{{ vm_hardware_version_num }}', which is not >= 14."
             skip_reason: "Not Supported"
           when: vm_hardware_version_num | int < 14
 
-        - include_tasks: ../../common/esxi_get_guest_config_options.yml
+        - name: "Get whether VM support persistent memory feature"
+          include_tasks: ../../common/esxi_get_guest_config_options.yml
           vars:
             guest_id: "{{ vm_guest_id }}"
             esxi_hardware_version: "{{ vm_hardware_version_num }}"
-        - include_tasks: ../../common/skip_test_case.yml
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "This guest ID '{{ vm_guest_id }}' with hardware version '{{ vm_hardware_version_num }}' does not support persistent memory, support_persistent_memory config option value is '{{ guest_config_options.support_persistent_memory | default('') }}'."
             skip_reason: "Not Supported"
@@ -38,9 +46,11 @@
             (guest_config_options.support_persistent_memory is undefined) or
             (not guest_config_options.support_persistent_memory | bool)
 
-        # Get ESXi host persistent memory info
-        - include_tasks: ../../common/esxi_get_pmem_info.yml
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Get ESXi host persistent memory info"
+          include_tasks: ../../common/esxi_get_pmem_info.yml
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Test case '{{ ansible_play_name }}' is blocked because no persistent memory on ESXi host '{{ esxi_pmem_total_mb }}', or available size '{{ esxi_pmem_available_mb }}' is less than 16 MB."
             skip_reason: "Blocked"
@@ -48,9 +58,11 @@
             (esxi_pmem_total_mb | int == 0) or
             (esxi_pmem_available_mb | int < 16)
 
-        # Do cold add testing
-        - include_tasks: cold_add_nvdimm_test.yml
-        # Do cold remove testing
-        - include_tasks: cold_remove_nvdimm_test.yml
+        - name: "Do cold add testing"
+          include_tasks: cold_add_nvdimm_test.yml
+
+        - name: "Do cold remove testing"
+          include_tasks: cold_remove_nvdimm_test.yml
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
