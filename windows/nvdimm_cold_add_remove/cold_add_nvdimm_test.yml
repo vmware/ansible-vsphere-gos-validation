@@ -12,27 +12,31 @@
     new_nvdimm_device_label: ""
     new_nvdimm_device_vmdk: ""
 
-# Get VM NVDIMM device before cold add
-- include_tasks: ../../common/vm_get_device_with_type.yml
+- name: "Get VM NVDIMM device before cold add"
+  include_tasks: ../../common/vm_get_device_with_type.yml
   vars:
     device_vim_type: vim.vm.device.VirtualNVDIMM
+
 - name: "Set fact of NVDIMM device list before cold add"
   ansible.builtin.set_fact:
     vm_nvdimm_list_before_add: "{{ device_info_with_type }}"
 
-# Get NVDIMM device in guest OS before cold add
-- include_tasks: ../utils/win_get_pmem_disk_list.yml
+- name: "Get NVDIMM device in guest OS before cold add"
+  include_tasks: ../utils/win_get_pmem_disk_list.yml
+
 - name: "Set fact of the PMem disk info got in guest OS"
   ansible.builtin.set_fact:
     guest_nvdimm_list_before_add: "{{ win_pmem_disk_list }}"
 
 # VM should be in power off state when adding NVDIMM device
-- include_tasks: ../utils/shutdown_vm.yml
+- name: "Shut down guest OS"
+  include_tasks: ../utils/shutdown_vm.yml
 
-# Add a new NVDIMM device to VM
-- include_tasks: ../../common/vm_add_remove_nvdimm.yml
+- name: "Add a new NVDIMM device to VM"
+  include_tasks: ../../common/vm_add_remove_nvdimm.yml
   vars:
     vm_nvdimm_size_mb: "{{ new_nvdimm_device_size }}"
+
 - name: "Check adding NVDIMM device task result"
   ansible.builtin.assert:
     that:
@@ -40,10 +44,11 @@
       - vm_config_nvdimm_result.changed
     fail_msg: "Add NVDIMM device to VM task result is not changed."
 
-# Get NVDIMM device list after cold add
-- include_tasks: ../../common/vm_get_device_with_type.yml
+- name: "Get VM NVDIMM device list after cold add"
+  include_tasks: ../../common/vm_get_device_with_type.yml
   vars:
     device_vim_type: vim.vm.device.VirtualNVDIMM
+
 - name: "Set fact of NVDIMM device list after cold add"
   ansible.builtin.set_fact:
     vm_nvdimm_list_after_add: "{{ device_info_with_type }}"
@@ -65,6 +70,7 @@
   when:
     - new_nvdimm_device.deviceInfo is defined
     - new_nvdimm_device.deviceInfo.label is defined
+
 - name: "Set fact of the new added NVDIMM device vmdk file path"
   ansible.builtin.set_fact:
     new_nvdimm_device_vmdk: "{{ new_nvdimm_device.backing.fileName }}"
@@ -77,24 +83,30 @@
     that:
       - "'PMemDS' in new_nvdimm_device_vmdk"
     fail_msg: "'PMemDS' keyword is not in the backing vmdk file path of new NVDIMM device: {{ new_nvdimm_device_vmdk }}"
-- include_tasks: ../../common/esxi_check_delete_datastore_file.yml
+
+- name: ""
+  include_tasks: ../../common/esxi_check_delete_datastore_file.yml
   vars:
     file_in_datastore_ops: "file"
     file_in_datastore: "{{ new_nvdimm_device_vmdk.split(']')[0].strip('[]') }}"
     file_in_datastore_path: "{{ new_nvdimm_device_vmdk.split(']')[1].strip(' ') }}"
     file_in_datastore_ops_timeout: 120
 
-# Power on VM
-- include_tasks: ../../common/vm_set_power_state.yml
+- name: "Power on VM"
+  include_tasks: ../../common/vm_set_power_state.yml
   vars:
     vm_power_state_set: "powered-on"
-- include_tasks: ../utils/win_update_inventory.yml
 
-# Check NVDIMM device recognized in guest OS
-- include_tasks: ../utils/win_get_pmem_disk_list.yml
+- name: "Update VM guest IP in host inventory"
+  include_tasks: ../utils/win_update_inventory.yml
+
+- name: "Get NVDIMM device in guest OS"
+  include_tasks: ../utils/win_get_pmem_disk_list.yml
+
 - name: "Set fact of the PMem disk info got in guest OS"
   ansible.builtin.set_fact:
     guest_nvdimm_list_after_add: "{{ win_pmem_disk_list }}"
+
 - name: "Set fact of new added PMem disk info"
   ansible.builtin.set_fact:
     new_nvdimm_device_guest: "{{ (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add))[0] }}"
@@ -109,13 +121,8 @@
       - new_nvdimm_device_guest.HealthStatus == "Healthy"
     fail_msg: "Persistent memory disk status got in guest OS '{{ new_nvdimm_device_guest }}', which status is not 'Healthy', or the size got is not '{{ new_nvdimm_device_size }}' MB."
 
-- include_tasks: ../utils/win_get_raw_disk_num.yml
-- include_tasks: ../utils/win_get_disk_unique_id.yml
-  vars:
-    win_get_disk_uid_num: "{{ win_raw_disk_num }}"
-
-# Initialize and create partition on the pmem disk
-- include_tasks: ../vhba_hot_add_remove/create_partition_raw_disk.yml
+- name: "Initialize and create partition on the pmem disk"
+  include_tasks: ../vhba_hot_add_remove/create_partition_raw_disk.yml
   vars:
     test_disk_ctrl_type: "nvdimm"
     test_purpose: "cold-add"
