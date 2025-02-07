@@ -1,4 +1,4 @@
-# Copyright 2021-2024 VMware, Inc.
+# Copyright 2025 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Hot remove the disks added to the new disk controller firstly,
@@ -45,20 +45,24 @@
     - name: "Get disk number in guest OS after hot removing"
       include_tasks: ../utils/win_get_disk_num.yml
 
+    - name: "Set fact of disk number in guest OS after hot removing"
+      ansible.builtin.set_fact:
+        disk_num_guest_after: "{{ disk_num_guest }}"
+
     - name: "Handle known issue on NVMe disk hot remove"
       include_tasks: handle_nvme_ops_known_issue.yml
       when:
-        - disk_num_guest | int != disk_num_guest_before | int - disk_num_under_remove | length
+        - disk_num_guest_after | int != disk_num_guest_before | int - disk_num_under_remove | length
         - test_purpose == "hot-add"
         - test_disk_ctrl_type == 'nvme'
 
     - name: "Check disk number after hot removing"
       ansible.builtin.assert:
         that:
-          - disk_num_guest | int == disk_num_guest_before | int - disk_num_under_remove | length
+          - disk_num_guest_after | int == disk_num_guest_before | int - disk_num_under_remove | length
         fail_msg: >-
           After hot removing the new added disks attached to the new disk controller,
-          disk number is '{{ disk_num_guest }}', which is not the expected value
+          disk number is '{{ disk_num_guest_after }}', which is not the expected value
           '{{ disk_num_guest_before | int - disk_num_under_remove | length }}'
 
 - name: "Hot remove new added disk controller"
