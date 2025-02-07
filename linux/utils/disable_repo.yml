@@ -3,35 +3,27 @@
 ---
 # Disable a package reposiotory
 # Parameter
-#   guest_repo_list(Optional): A list of repo names to disable. By default, all repos will be disabled
+#   repo_name: (Optional)The repo name to disable. By default, all repos will be disabled
 
-- name: "Get enabled repositories list on {{ vm_guest_os_distribution }}"
-  when:
-    - guest_os_family == 'RedHat'
-    - guest_repo_list is undefined
-  block:
-    - name: "List all yum repositories"
-      ansible.builtin.shell: "yum repolist 2>/dev/null | grep -v 'repo id.*repo name' | awk '{print $1}'"
-      delegate_to: "{{ vm_guest_ip }}"
-      ignore_errors: true
-      register: yum_repo_list_result
-
-    - name: "Set fact of the repo list"
-      ansible.builtin.set_fact:
-        guest_repo_list: "{{ yum_repo_list_result.stdout_lines | select }}"
-      when:
-        - not yum_repo_list_result.failed
-        - yum_repo_list_result.stdout_lines
-
+# Disable all repositories and ignore errors if no repo exists
 - name: "Disable all repositories"
-  when: guest_repo_list is undefined or guest_repo_list | length == 0
+  when: repo_name is undefined or not repo_name
   block:
     # RHEL-like OS
     - name: "Disable all yum repositories"
       ansible.builtin.shell: "sed -i 's/enabled *= *1/enabled=0/' /etc/yum.repos.d/*.repo"
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: true
-      when: guest_os_family == 'VMware Photon OS'
+      when:
+        - guest_os_family in ['RedHat', 'VMware Photon OS']
+        - guest_os_ansible_distribution != 'ProLinux'
+
+    # ProLinux
+    - name: "Remove all yum repositories"
+      ansible.builtin.shell: "rm /etc/yum.repos.d/*.repo"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      when: guest_os_ansible_distribution == 'ProLinux'
 
     # SUSE
     - name: "Disable all zypper repositories"
@@ -40,35 +32,31 @@
       ignore_errors: true
       when: guest_os_family == "Suse"
 
-- name: "Disable guest OS repositories"
-  when: guest_repo_list | length > 0
+- name: "Disable repository {{ repo_name }}"
+  when: repo_name is defined and repo_name
   block:
     # RHEL-like OS
-    - name: "Disable repositories for {{ vm_guest_os_distribution }}"
+    - name: "Disable repository {{ repo_name }} for {{ vm_guest_os_distribution }}"
       when: guest_os_family == 'RedHat'
       block:
-        - name: "Disable yum repository"
-          ansible.builtin.command: "yum-config-manager --disable {{ item }}"
+        - name: "Disable yum repository {{ repo_name }}"
+          ansible.builtin.command: "yum-config-manager --disable {{ repo_name }}"
           delegate_to: "{{ vm_guest_ip }}"
-          with_items: "{{ guest_repo_list }}"
           when: guest_os_ansible_pkg_mgr == "yum"
 
-        - name: "Disable yum repository"
-          ansible.builtin.command: "dnf config-manager --set-disabled {{ item }}"
+        - name: "Disable yum repository {{ repo_name }}"
+          ansible.builtin.command: "dnf config-manager --set-disabled {{ repo_name }}"
           delegate_to: "{{ vm_guest_ip }}"
-          with_items: "{{ guest_repo_list }}"
           when: guest_os_ansible_pkg_mgr in ["dnf", "dnf5"]
 
     # VMware Photon OS
-    - name: "Disable yum repository {{ item }}"
-      ansible.builtin.shell: "grep -l '\\[{{ item }}\\]' /etc/yum.repos.d/*.repo | xargs sed -i 's/enabled *= *1/enabled=0/'"
+    - name: "Disable yum repository {{ repo_name }}"
+      ansible.builtin.shell: "grep -l '\\[{{ repo_name }}\\]' /etc/yum.repos.d/*.repo | xargs sed -i 's/enabled *= *1/enabled=0/'"
       delegate_to: "{{ vm_guest_ip }}"
-      with_items: "{{ guest_repo_list }}"
       when: guest_os_ansible_distribution == 'VMware Photon OS'
 
     # SUSE
-    - name: "Disable zypper repository {{ item }}"
-      ansible.builtin.command: "zypper mr -d {{ item }}"
+    - name: "Disable zypper repository {{ repo_name }}"
+      ansible.builtin.command: "zypper mr -d {{ repo_name }}"
       delegate_to: "{{ vm_guest_ip }}"
-      with_items: "{{ guest_repo_list }}"
       when: guest_os_family == "Suse"
