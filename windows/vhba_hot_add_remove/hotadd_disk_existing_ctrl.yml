@@ -5,9 +5,8 @@
 # set to 'true' means adding a new disk to the boot disk controller, 'false'
 # means adding a new disk to the existing non-boot disk controller.
 #
-- name: "Initialize not meet conditions of known issue on VM with NVMe boot disk controller"
+- name: "Initialize NVMe disk is not removed"
   ansible.builtin.set_fact:
-    nvme_boot_known_issue: false
     nvme_issue_disk_removed: false
 
 - name: "Get disk and controller number before hot adding disk to existing controller"
@@ -41,12 +40,10 @@
 
 - name: "Meet the conditions of known issue on VM with NVMe boot disk controller"
   ansible.builtin.set_fact:
-    nvme_boot_known_issue: true
-  when:
-    - test_disk_ctrl_type == 'nvme'
-    - win_boot_disk_ctrl_type == 'nvme'
-    - guest_os_ansible_distribution is search('2025')
-    - test_on_boot_ctrl
+    nvme_boot_known_issue: >-
+      {%- if guest_os_ansible_distribution is search('2025') and test_disk_ctrl_type == 'nvme' and win_boot_disk_ctrl_type == 'nvme' and test_on_boot_ctrl -%}true
+      {%- else -%}false
+      {%- endif -%}
 
 - name: "Get disk number in guest OS after hot adding disk to existing controller"
   include_tasks: ../utils/win_get_disk_num.yml

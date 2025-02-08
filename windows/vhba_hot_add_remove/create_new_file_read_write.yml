@@ -46,22 +46,21 @@
       - "test_line in get_file_content_result1.stdout"
     fail_msg: "The file content is '{{ get_file_content_result1.stdout }}', which should contain: '{{ test_line }}'"
 
+# Before restart guest OS
 - name: "Handle known issue"
   include_tasks: handle_sata_known_issue.yml
   when:
-    - on_new_controller
     - test_disk_ctrl_type == 'sata'
     - vm_firmware == 'bios'
+    - on_new_controller | default(false)
     - win_boot_disk_ctrl_type not in ['ide', 'sata']
 
 - name: "Meet the conditions of known issue on VM with NVMe boot disk controller"
   ansible.builtin.set_fact:
-    nvme_boot_known_issue: true
-  when:
-    - test_disk_ctrl_type == 'nvme'
-    - win_boot_disk_ctrl_type == 'nvme'
-    - guest_os_ansible_distribution is search('2025')
-    - vm_firmware == 'bios'
+    nvme_boot_known_issue: >-
+      {%- if guest_os_ansible_distribution is search('2025') and test_disk_ctrl_type == 'nvme' and win_boot_disk_ctrl_type == 'nvme' and vm_firmware == 'bios' -%}true
+      {%- else -%}false
+      {%- endif -%}
 
 - name: "Restart guest OS"
   include_tasks: ../utils/win_shutdown_restart.yml
