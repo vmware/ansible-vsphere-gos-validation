@@ -1,6 +1,10 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+- name: "Set default file name of the new disk part script"
+  ansible.builtin.set_fact:
+    new_diskpart_file_name: "{{ new_diskpart_file_name | default('diskpart.txt') }}"
+
 - name: "Get the raw disk number in guest OS"
   include_tasks: ../utils/win_get_raw_disk_num.yml
 
@@ -8,13 +12,6 @@
   include_tasks: ../utils/win_get_disk_unique_id.yml
   vars:
     win_get_disk_uid_num: "{{ win_raw_disk_num }}"
-
-- name: "Set fact of the diskpart file name"
-  ansible.builtin.set_fact:
-    new_diskpart_file_name: >-
-      {%- if test_disk_ctrl_type == 'nvdimm' -%}diskpart.txt
-      {%- else -%}diskpart_{{ new_disk_node_ctrl_bus }}_{{ new_disk_node_unit_num }}.txt
-      {%- endif -%}
 
 - name: "Set fact of the diskpart file path"
   ansible.builtin.set_fact:
@@ -93,8 +90,3 @@
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "diskpart /s {{ diskpart_file_path_win }}"
-
-- name: "Create new file and write content to it on new disk"
-  include_tasks: create_new_file_read_write.yml
-  when:
-    - not (test_disk_ctrl_type == "nvme" and test_purpose == "hot-extend")
