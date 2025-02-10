@@ -10,27 +10,31 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: true
 
-        # Get OS info inside guest OS
-        - include_tasks: ../utils/win_get_fullname.yml
-        - ansible.builtin.debug:
+        - name: "Get OS info inside guest OS" 
+          include_tasks: ../utils/win_get_fullname.yml
+
+        - name: "Print OS info"
+          ansible.builtin.debug:
             msg:
               - "Get guest fullname in guest OS: {{ os_fullname_guest }}"
               - "Get OS architecture in guest OS: {{ guest_os_ansible_architecture }}"
               - "VM guest ID is: {{ vm_guest_id }}"
 
-        # Get ESXi version info if not defined
-        - include_tasks: ../../common/esxi_get_version_build.yml
+        - name: "Get ESXi version info if not defined"
+          include_tasks: ../../common/esxi_get_version_build.yml
           when: >
             (esxi_version is undefined) or
             (esxi_version == 'N/A')
 
-        # Get guest fullname from VM guest info
-        - include_tasks: ../../common/vm_get_guest_info.yml
+        - name: "Get guest fullname from VM guest info"
+          include_tasks: ../../common/vm_get_guest_info.yml
 
         - name: "Known issue - ignore incorrect guestID of Windows 11"
           ansible.builtin.debug:
@@ -48,6 +52,7 @@
             - "'Windows 11' in os_fullname_guest"
             - vmtools_version is defined and vmtools_version
             - vmtools_version is version('12.0.0', '>=')
+
         - name: "Check guest ID got from guest info is not empty"
           ansible.builtin.assert:
             that:
@@ -60,39 +65,16 @@
             (esxi_version is version('7.0.3', '=') and (esxi_build is undefined or esxi_build != "19193900")) or
             (vmtools_version is undefined or vmtools_version is version('12.0.0', '<'))
 
-        - name: Initialize the expected guest fullname
-          ansible.builtin.set_fact:
-            expected_guest_fullname: ""
-        # Set expected guest fullname for Windows client
-        - block:
-            - include_tasks: win10_fullname.yml
-              when: "'Windows 10' in os_fullname_guest"
-            - include_tasks: win11_fullname.yml
-              when: "'Windows 11' in os_fullname_guest"
-          when: guest_os_product_type == "client"
-
-        # Set expected guest fullname for Windows Server
-        - block:
-            - block:
-                - include_tasks: winsrv2016orlater_fullname.yml
-                - include_tasks: winsrv2019_fullname.yml
-              when: not "'Windows Server 2022' in os_fullname_guest"
-            - include_tasks: winsrv2022_fullname.yml
-              when:
-                - "'Windows Server 2022' in os_fullname_guest"
-                - guest_os_build_num | int == 20348
-            - include_tasks: winsrvnext_fullname.yml
-              when:
-                - guest_os_build_num | int >= 22424
-          when: guest_os_product_type != "client"
-
-        - ansible.builtin.debug:
-            msg: "Expected guest fullname on ESXi '{{ esxi_version }}': {{ expected_guest_fullname }}"
-        - name: "Verify guest fullname in guest info is expected"
+        - name: "Set fact of the guest OS info list"
+          include_tasks: win_guest_os_info.yml
+ 
+        - name: "Check current guest OS in the guest OS info list"
           ansible.builtin.assert:
             that:
-              - expected_guest_fullname != ""
-              - (guestinfo_guest_full_name == expected_guest_fullname) or (expected_guest_fullname is string and expected_guest_fullname in guestinfo_guest_full_name) or (expected_guest_fullname | type_debug == 'list' and guestinfo_guest_full_name in expected_guest_fullname)
-            fail_msg: "Guest fullname in guest info: {{ guestinfo_guest_full_name }}, is not the same as expected one: {{ expected_guest_fullname }}."
+              - win_gos_info | selectattr('win_guest', 'equalto', current_gos)
+            fail_msg:
+              - "The defined Windows guest OS info list does not contain this OS version: {{ current_gos }},"
+              - "please check if this guest OS is supported and add it's info to the list accordingly."
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
