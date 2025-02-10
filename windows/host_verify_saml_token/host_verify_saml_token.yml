@@ -26,6 +26,18 @@
             skip_test_no_vmtools: true
             create_current_test_folder: true
 
+        - name: "Check SSH connection to vCenter Server"
+          include_tasks: ../../common/test_ssh_connection.yml
+          vars:
+            ssh_server_ip: "{{ vcenter_hostname }}"
+
+        - name: "Block test case due to vCenter Server is not connectable via SSH"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Test case {{ ansible_play_name }} is blocked because SSH connection to vCenter Server failed."
+            skip_reason: "Blocked"
+          when: not ssh_connect_success
+
         - name: "Skip test case for old ESXi server or VMware Tools"
           include_tasks: ../../common/skip_test_case.yml
           vars:
