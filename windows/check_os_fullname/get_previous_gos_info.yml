@@ -1,0 +1,50 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the previous guest OS info in the pre-defined 'win_gos_info'
+# before the current guest OS version
+- name: "Check current guest OS in the guest OS info list"
+  ansible.builtin.assert:
+    that:
+      - win_gos_info | selectattr('win_guest', 'equalto', current_gos)
+    fail_msg:
+      - "The defined Windows guest OS info list does not contain this OS version: {{ current_gos }},"
+      - "please check if this guest OS is supported and add it's info to the list accordingly."
+
+- name: "Initialize the previous guest OS info"
+  ansible.builtin.set_fact:
+    previous_gos: ""
+
+- name: "Set fact of the Windows Server guest OS info"
+  ansible.builtin.set_fact:
+    gos_list: "{{ win_gos_info | selectattr('win_guest', 'search', 'Server') }}"
+
+- name: "Set fact of the Windows Client guest OS info"
+  ansible.builtin.set_fact:
+    gos_list: "{{ win_gos_info | difference(gos_list) }}"
+  when: guest_os_product_type == "client"
+
+- name: "Sort the guest OS info list"
+  ansible.builtin.set_fact:
+    gos_list: "{{ gos_list | sort(attribute='win_guest', reverse=true) }}"
+
+- debug: var=gos_list
+
+- name: "Set fact of the index of current guest OS in the list"
+  ansible.builtin.set_fact:
+    current_gos_index: "{{ (gos_list | map(attribute='win_guest') | list).index(current_gos) }}"
+
+- debug: var=current_gos_index
+
+- name: "No previous guest OS in the list"
+  ansible.builtin.debug:
+    msg: "Current guest OS '{{ current_gos }}' has no previous earlier version in the defeined guest OS info list."
+  when: current_gos_index | int == gos_list | length - 1
+
+- name: "Set fact of the previous guest OS"
+  ansible.builtin.set_fact:
+    previous_gos: "{{ gos_list[current_gos_index | int + 1] }}"
+  when: current_gos_index | int < gos_list | length - 1
+
+- name: "Print the previous guest OS info"
+  ansible.builtin.debug: var=previous_gos
