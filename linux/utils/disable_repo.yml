@@ -6,13 +6,24 @@
 #   repo_name: (Optional)The repo name to disable. By default, all repos will be disabled
 
 # Disable all repositories and ignore errors if no repo exists
-- block:
+- name: "Disable all repositories"
+  when: repo_name is undefined or not repo_name
+  block:
     # RHEL-like OS
     - name: "Disable all yum repositories"
       ansible.builtin.shell: "sed -i 's/enabled *= *1/enabled=0/' /etc/yum.repos.d/*.repo"
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: true
-      when: guest_os_family in ['RedHat', 'VMware Photon OS']
+      when:
+        - guest_os_family in ['RedHat', 'VMware Photon OS']
+        - guest_os_ansible_distribution != 'ProLinux'
+
+    # ProLinux
+    - name: "Remove all yum repositories"
+      ansible.builtin.shell: "rm /etc/yum.repos.d/*.repo"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      when: guest_os_ansible_distribution == 'ProLinux'
 
     # SUSE
     - name: "Disable all zypper repositories"
@@ -20,12 +31,14 @@
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: true
       when: guest_os_family == "Suse"
-  when: repo_name is undefined or not repo_name
 
-# Disable repo with name {{ repo_name }}
-- block:
+- name: "Disable repository {{ repo_name }}"
+  when: repo_name is defined and repo_name
+  block:
     # RHEL-like OS
-    - block:
+    - name: "Disable repository {{ repo_name }} for {{ vm_guest_os_distribution }}"
+      when: guest_os_family == 'RedHat'
+      block:
         - name: "Disable yum repository {{ repo_name }}"
           ansible.builtin.command: "yum-config-manager --disable {{ repo_name }}"
           delegate_to: "{{ vm_guest_ip }}"
@@ -35,7 +48,6 @@
           ansible.builtin.command: "dnf config-manager --set-disabled {{ repo_name }}"
           delegate_to: "{{ vm_guest_ip }}"
           when: guest_os_ansible_pkg_mgr in ["dnf", "dnf5"]
-      when: guest_os_family == 'RedHat'
 
     # VMware Photon OS
     - name: "Disable yum repository {{ repo_name }}"
@@ -48,4 +60,3 @@
       ansible.builtin.command: "zypper mr -d {{ repo_name }}"
       delegate_to: "{{ vm_guest_ip }}"
       when: guest_os_family == "Suse"
-  when: repo_name is defined and repo_name
