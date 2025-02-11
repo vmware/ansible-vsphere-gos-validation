@@ -3,16 +3,16 @@
 ---
 # Get boot disk controller type in Windows guest OS
 # Return:
-#   win_boot_disk_ctl_type: valid and known value is in this list:
+#   win_boot_disk_ctrl_type: valid and known value is in this list:
 #   ['lsilogicsas', 'nvme', 'sata', 'paravirtual', 'ide']
 #
 - name: "Initialize the boot disk controller type"
   ansible.builtin.set_fact:
-    win_boot_disk_ctl_type: ""
+    win_boot_disk_ctrl_type: ""
 
 - name: "Set fact of valid boot disk controller types list"
   ansible.builtin.set_fact:
-    win_valid_boot_disk_ctl: ['lsilogicsas', 'nvme', 'sata', 'paravirtual', 'ide']
+    win_valid_boot_disk_ctrl: ['lsilogicsas', 'nvme', 'sata', 'paravirtual', 'ide']
 
 - name: "Get boot disk BusType firstly"
   include_tasks: win_execute_cmd.yml
@@ -21,30 +21,30 @@
 
 - name: "Set fact of boot disk controller type by disk BusType"
   ansible.builtin.set_fact:
-    win_boot_disk_ctl_type: "{{ (win_powershell_cmd_output.stdout_lines | select)[0].strip() | lower }}"
+    win_boot_disk_ctrl_type: "{{ (win_powershell_cmd_output.stdout_lines | select)[0].strip() | lower }}"
   when:
     - win_powershell_cmd_output.stdout_lines is defined
     - win_powershell_cmd_output.stdout_lines | length > 0
 
 - name: "Set boot disk controller type to ide"
   ansible.builtin.set_fact:
-    win_boot_disk_ctl_type: 'ide'
-  when: win_boot_disk_ctl_type == 'ata'
+    win_boot_disk_ctrl_type: 'ide'
+  when: win_boot_disk_ctrl_type == 'ata'
 
 # LSILogicSAS and PVSCSI disks are all returned 'SAS' BusType above
 - name: "Get SAS disk controller name"
-  when: win_boot_disk_ctl_type == 'sas'
+  when: win_boot_disk_ctrl_type == 'sas'
   block:
     - name: "Get SCSI controller type"
       include_tasks: win_execute_cmd.yml
       vars:
         win_powershell_cmd: >-
           $disk_uid = ((Get-Disk | where-object {$_.IsBoot -eq $true}).Path -split '#')[-2];
-          $disk_ctl_id = ((Get-WmiObject Win32_SCSIControllerDevice | where-object {$_.Dependent -like "*$disk_uid*"}).Antecedent -split 'DeviceID=')[-1].trim('"');
-          (Get-WmiObject Win32_SCSIController | where-object {$_.DeviceId -eq ($disk_ctl_id -replace '\\\\','\')}).Name
+          $disk_ctrl_id = ((Get-WmiObject Win32_SCSIControllerDevice | where-object {$_.Dependent -like "*$disk_uid*"}).Antecedent -split 'DeviceID=')[-1].trim('"');
+          (Get-WmiObject Win32_SCSIController | where-object {$_.DeviceId -eq ($disk_ctrl_id -replace '\\\\','\')}).Name
     - name: "Set fact of boot disk controller type"
       ansible.builtin.set_fact:
-        win_boot_disk_ctl_type: |-
+        win_boot_disk_ctrl_type: |-
           {%- if win_powershell_cmd_output.stdout_lines[0] is search('PVSCSI') -%}paravirtual
           {%- elif win_powershell_cmd_output.stdout_lines[0] | regex_search('LSI.*SAS.*') -%}lsilogicsas
           {%- endif -%}
@@ -55,9 +55,9 @@
 - name: "Check boot disk controller type"
   ansible.builtin.assert:
     that:
-      - win_boot_disk_ctl_type in win_valid_boot_disk_ctl
-    fail_msg: "Boot disk controller: '{{ win_boot_disk_ctl_type }}', which is not in the known list '{{ win_valid_boot_disk_ctl }}'."
+      - win_boot_disk_ctrl_type in win_valid_boot_disk_ctrl
+    fail_msg: "Boot disk controller: '{{ win_boot_disk_ctrl_type }}', which is not in the known list '{{ win_valid_boot_disk_ctrl }}'."
 
 - name: "Display boot disk controller type"
   ansible.builtin.debug:
-    msg: "Boot disk controller type got in Windows guest OS: {{ win_boot_disk_ctl_type }}"
+    msg: "Boot disk controller type got in Windows guest OS: {{ win_boot_disk_ctrl_type }}"

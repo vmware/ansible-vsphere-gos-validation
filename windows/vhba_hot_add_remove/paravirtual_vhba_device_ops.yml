@@ -2,20 +2,24 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is used for check hotadd, hot remove disk on existing PVSCSI
-# controller, and hotadd, hot remove new PVSCSI controller and disk. Test case
-# will be 'Blocked' if there is no PVSCSI driver, which means either VMware Tools
-# is not installed or not running, or guest OS does not have inbox PVSCSI driver.
+#   This test case is for disk hot add and hot remove on a new and existing PVSCSI
+# controller. Test case result is 'Blocked' when there is no PVSCSI driver in guest OS,
+# which means either VMware Tools is not running, or guest OS does not have inbox PVSCSI driver.
 #
 - name: paravirtual_vhba_device_ops
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_current_test_folder: true
 
         # Skip test case if no pvscsi driver in guest OS, no matter it's from inbox or VMware Tools
-        - include_tasks: ../../common/skip_test_case.yml
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Test case '{{ current_testcase_name }}' is blocked because guest OS has no inbox PVSCSI driver or VMware Tools is not installed"
             skip_reason: "Blocked"
@@ -23,9 +27,11 @@
             - not vmtools_is_running
             - not guest_os_with_inbox_drivers
 
-        - include_tasks: vhba_test.yml
+        - name: "Test run"
+          include_tasks: vhba_test.yml
           vars:
-            test_disk_controller_type: "paravirtual"
+            test_disk_ctrl_type: "paravirtual"
             test_purpose: "hot-add"
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml

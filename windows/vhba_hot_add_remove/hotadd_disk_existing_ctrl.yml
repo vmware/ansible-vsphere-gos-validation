@@ -1,0 +1,77 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Parameter 'test_on_boot_ctrl' must be passed when including this tasks file,
+# set to 'true' means adding a new disk to the boot disk controller, 'false'
+# means adding a new disk to the existing non-boot disk controller.
+#
+- name: "Initialize NVMe disk is not removed"
+  ansible.builtin.set_fact:
+    nvme_issue_disk_removed: false
+
+- name: "Get disk and controller number before hot adding disk to existing controller"
+  include_tasks: get_guest_disk_ctrl_num.yml
+  vars:
+    disk_ops_stage: 'before'
+
+- name: "Set facts of new disk node info"
+  ansible.builtin.set_fact:
+    new_disk_node_ctrl_type: "{{ test_on_boot_ctrl | ternary('boot', 'non-boot') }}"
+    new_disk_node_ctrl_bus: "{{ test_on_boot_ctrl | ternary(boot_disk_ctrl_bus_num, new_vhba_bus_number) }}"
+    new_disk_node_unit_num: "{{ test_on_boot_ctrl | ternary(boot_ctrl_new_unit_num, 1) }}"
+
+- name: "Print the new disk node info"
+  ansible.builtin.debug:
+    msg:
+      - "New disk's controller bus number: {{ new_disk_node_ctrl_bus }}"
+      - "New disk's unit number: {{ new_disk_node_unit_num }}"
+
+- name: "Hot add a new disk to the existing {{ new_disk_node_ctrl_type }} {{ test_disk_ctrl_type }} controller"
+  include_tasks: ../../common/vm_hot_add_remove_disk.yml
+  vars:
+    disk_operation: 'present'
+    disk_controller_type: "{{ test_disk_ctrl_type }}"
+    ctrl_number: "{{ new_disk_node_ctrl_bus }}"
+    unit_number: "{{ new_disk_node_unit_num }}"
+
+- name: "Wait 15 seconds after disk hot add"
+  ansible.builtin.pause:
+    seconds: 15
+
+- name: "Meet the conditions of known issue on VM with NVMe boot disk controller"
+  ansible.builtin.set_fact:
+    nvme_boot_known_issue: "{{ guest_os_ansible_distribution is search('2025') and test_disk_ctrl_type == 'nvme' and win_boot_disk_ctrl_type == 'nvme' and test_on_boot_ctrl }}"
+
+- name: "Get disk number in guest OS after hot adding disk to existing controller"
+  include_tasks: ../utils/win_get_disk_num.yml
+  vars:
+    win_get_disk_num_ignore_error: true
+
+- name: "Set fact of disk number after hot adding disk to existing controller"
+  ansible.builtin.set_fact:
+    disk_num_guest_after: "{{ disk_num_guest }}"
+
+- name: "Get disk number in guest OS failed"
+  when: disk_num_guest_after | int == 0
+  block:
+    - name: "Set fact of the error message"
+      ansible.builtin.set_fact:
+        disk_issue_msg: >-
+          Failed to get the number of disks in guest OS after adding a new disk to the
+          existing '{{ new_disk_node_ctrl_type }}' '{{ test_disk_ctrl_type }}' controller
+          on node '{{ new_disk_node_ctrl_bus }}:{{ new_disk_node_unit_num }}'.
+
+    - name: "Handle known issue on {{ new_disk_node_ctrl_type }} {{ new_disk_node_ctrl_type }} controller"
+      include_tasks: handle_nvme_boot_known_issue.yml
+      when: nvme_boot_known_issue
+
+    - name: "Failed to get the number of disks in {{ guest_os_ansible_distribution }}"
+      ansible.builtin.fail:
+        msg: "{{ disk_issue_msg }}"
+      when: not nvme_boot_known_issue
+
+- name: "Check disk in guest OS after hot adding disk to existing controller"
+  include_tasks: check_disk_after_adding.yml
+  vars:
+    on_new_controller: false
+  when: disk_num_guest_after | int > 0

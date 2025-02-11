@@ -1,22 +1,33 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Copy diskpart script to Windows guest and run it to create partition on raw disk
-#
+- name: "Set default file name of the new disk part script"
+  ansible.builtin.set_fact:
+    new_diskpart_file_name: "{{ new_diskpart_file_name | default('diskpart.txt') }}"
+
+- name: "Get the raw disk number in guest OS"
+  include_tasks: ../utils/win_get_raw_disk_num.yml
+
+- name: "Get the raw disk unique id"
+  include_tasks: ../utils/win_get_disk_unique_id.yml
+  vars:
+    win_get_disk_uid_num: "{{ win_raw_disk_num }}"
+
 - name: "Set fact of the diskpart file path"
   ansible.builtin.set_fact:
     diskpart_file_path: "../utils/scripts/diskpart.txt"
-    diskpart_file_path_current: "{{ current_test_log_folder }}/diskpart.txt"
-    diskpart_file_path_win: "C:\\test_diskpart\\diskpart.txt"
+    diskpart_file_path_current: "{{ current_test_log_folder }}/{{ new_diskpart_file_name }}"
+    diskpart_file_path_win: "C:\\{{ new_diskpart_file_name }}"
 
-- name: "Check diskpart script file exists in current path"
+- name: "Get diskpart script file status"
   ansible.builtin.stat:
     path: "{{ diskpart_file_path }}"
     get_attributes: false
     get_checksum: false
     get_mime: false
   register: diskpart_file_stat
-- name: "Check if diskpart file exists"
+
+- name: "Check if diskpart script file exists locally"
   ansible.builtin.assert:
     that:
       - diskpart_file_stat.stat is defined 
@@ -28,62 +39,54 @@
 - name: "Copy diskpart file to current test case log folder"
   ansible.builtin.copy:
     src: "{{ diskpart_file_path }}"
-    dest: "{{ current_test_log_folder }}/"
+    dest: "{{ diskpart_file_path_current }}"
 
-- include_tasks: ../utils/win_get_unused_drive_letter.yml
-- include_tasks: ../utils/win_get_set_disk_online.yml
+- name: "Get unused driver letter in guest OS"
+  include_tasks: ../utils/win_get_unused_drive_letter.yml
+
+- name: "Set raw disk status to online in guest OS"
+  include_tasks: ../utils/win_get_set_disk_online.yml
   vars:
     win_online_disk_num: "{{ win_raw_disk_num }}"
 
-# Edit diskpart script file
 - name: "Modify raw disk number in diskpart script file"
   ansible.builtin.lineinfile:
     path: "{{ diskpart_file_path_current }}"
     regexp: 'select disk *'
     line: "select disk {{ win_raw_disk_num }}"
-  when:
-    - win_raw_disk_num is defined
-    - win_raw_disk_num != ''
 
 - name: "Modify new drive letter in diskpart script file"
   ansible.builtin.lineinfile:
     path: "{{ diskpart_file_path_current }}"
     regexp: 'assign letter*'
     line: "assign letter={{ drive_letter_new }}"
-  when:
-    - drive_letter_new is defined
-    - drive_letter_new
+
 - name: "Remove online disk if disk is already online"
   ansible.builtin.lineinfile:
     path: "{{ diskpart_file_path_current }}"
     regexp: 'online disk'
     state: absent
-  when:
-    - win_is_disk_online is defined
-    - win_is_disk_online
+  when: win_is_disk_online
 
-# Transfer diskpart script file from local to remote Windows guest OS
-- include_tasks: ../utils/win_copy_file_from_local.yml
+- name: "Transfer diskpart script file from local to guest OS"
+  include_tasks: ../utils/win_copy_file_from_local.yml
   vars:
     src_path_local: "{{ diskpart_file_path_current }}"
-    dest_path_remote: "C:\\test_diskpart\\"
-- include_tasks: ../utils/win_check_file_exist.yml
+    dest_path_remote: "{{ diskpart_file_path_win }}"
+
+- name: "Get diskpart script file status in guest OS"
+  include_tasks: ../utils/win_check_file_exist.yml
   vars:
     win_check_file_exist_file: "{{ diskpart_file_path_win }}"
-- name: "Check diskpart script file copied to guest OS"
+
+- name: "Check diskpart script file exists in guest OS"
   ansible.builtin.assert:
     that:
       - win_check_file_exist_result
     success_msg: "diskpart file found in guest OS"
     fail_msg: "diskpart file not found in guest OS: {{ diskpart_file_path_win }}"
 
-# Execute diskpart on new disk
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Execute diskpart script on new disk"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: "diskpart /s {{ diskpart_file_path_win }}"
-
-# Create new file on new disk, write content to it and read from it
-# NVMe disk hot extend test case will not execute below tasks
-- include_tasks: create_new_file_read_write.yml
-  when:
-    - not (test_disk_controller_type == "nvme" and test_purpose == "hot-extend")

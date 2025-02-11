@@ -1,0 +1,44 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Initialize NVMe disk is not removed"
+  ansible.builtin.set_fact:
+    nvme_issue_disk_removed: false
+
+- name: "Get disk and controller number before hot adding disk with new controller"
+  include_tasks: get_guest_disk_ctrl_num.yml
+  vars:
+    disk_ops_stage: 'before'
+
+- name: "Set facts of new disk node info"
+  ansible.builtin.set_fact:
+    new_disk_node_ctrl_type: 'non-boot'
+    new_disk_node_ctrl_bus: "{{ new_vhba_bus_number }}"
+    new_disk_node_unit_num: 0
+
+- name: "Print the new disk node info"
+  ansible.builtin.debug:
+    msg:
+      - "New disk's controller bus number: {{ new_disk_node_ctrl_bus }}"
+      - "New disk's unit number: {{ new_disk_node_unit_num }}"
+
+- name: "Hot add new disk controller and disk at the same time"
+  include_tasks: ../../common/vm_hot_add_ctrl_disk.yml
+  vars:
+    disk_controller_type: "{{ test_disk_ctrl_type }}"
+    ctrl_number: "{{ new_disk_node_ctrl_bus }}"
+    unit_number: "{{ new_disk_node_unit_num }}"
+
+- name: "Wait 10 seconds after new disk controller and disk hot add"
+  ansible.builtin.pause:
+    seconds: 10
+
+- name: "Get disk and controller number after hot adding disk with new controller"
+  include_tasks: get_guest_disk_ctrl_num.yml
+  vars:
+    disk_ops_stage: 'after'
+
+- name: "Check disk and controller in guest OS after hot adding disk with new controller"
+  include_tasks: check_disk_after_adding.yml
+  vars:
+    on_new_controller: true

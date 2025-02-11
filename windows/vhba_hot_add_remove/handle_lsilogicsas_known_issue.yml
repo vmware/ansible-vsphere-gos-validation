@@ -1,0 +1,25 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Known issue - hot added disk to new LSILogicSAS controller in Windows Server is offline"
+  ansible.builtin.debug:
+    msg:
+      - "After Windows Server guest OS restarts, the new added disk to the new LSILogicSAS controller will be offline."
+      - "Set the offline disk to online again is the workaround for this known issue."
+  tags:
+    - known_issue
+
+- name: "Set offline disk to online in guest OS"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-Disk | Where-Object IsOffline -eq $True | Set-Disk -IsOffline $False"
+
+- name: "Get file content again after online disk"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "type {{ write_test_file_path }}"
+    win_execute_cmd_ignore_error: true
+
+- name: "Save the result of getting file content after online disk"
+  ansible.builtin.set_fact:
+    get_file_content_result2: "{{ win_powershell_cmd_output }}"
