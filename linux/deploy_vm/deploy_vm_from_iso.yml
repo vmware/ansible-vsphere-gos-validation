@@ -90,7 +90,7 @@
   ansible.builtin.set_fact:
     vm_video_memory_mb: 8
   when:
-    - unattend_installer in ['RHEL', 'SLE', 'Ubuntu-Ubiquity', 'Ubuntu-Subiquity', 'Debian']
+    - unattend_installer in ['RHEL', 'SLE', 'Agama', 'Ubuntu-Ubiquity', 'Ubuntu-Subiquity', 'Debian']
     - unattend_install_conf | lower is not search('minimal|server_without_gui|ubuntu/server')
 
 - name: "Set video memory size"
@@ -151,12 +151,12 @@
 - name: "Get VM's primary network adapter MAC address"
   include_tasks: ../../common/vm_wait_primary_nic_mac.yml
 
-# VMware Photon OS kickstart file can't add shutdown action,
+# VMware Photon OS and SLE/openSUSE 16 unattended config file can't add poweroff action,
 # so here needs to shutdown it separately
-- name: "Shutdown VMware Photon OS VM after auto install completes"
-  when: unattend_installer == 'Photon'
+- name: "Shutdown VM after auto install completes"
+  when: unattend_installer in ['Photon', 'Agama']
   block:
-    - name: "Wait for guest full name on VMware Photon OS VM"
+    - name: "Wait for VM guest full name"
       include_tasks: ../../common/vm_wait_guest_fullname.yml
       vars:
         vm_get_fullname_timeout: 600
@@ -166,7 +166,7 @@
       vars:
         update_inventory_timeout: 300
 
-    - name: "Shutdown guest OS to remove serial port"
+    - name: "Shutdown guest OS for removing serial port"
       include_tasks: ../utils/shutdown.yml
 
 - name: "Wait for VM being powered off"
