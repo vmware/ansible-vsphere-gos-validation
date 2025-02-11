@@ -1,0 +1,61 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get supported for create guest IDs
+- name: "Get supported guest IDs on ESXi {{ esxi_version }} with hardware version {{ vm_hardware_version_num }}"
+  include_tasks: ../../common/esxi_get_guest_ids.yml
+  vars:
+    esxi_hardware_version: "{{ vm_hardware_version_num }}"
+
+# Set expected guest ID corresponding to current OS
+- name: "Set fact of expected guest ID of current {{ guest_os_ansible_architecture }} OS"
+  ansible.builtin.set_fact:
+    current_os_guest_id: "{{ (guest_os_ansible_architecture == '64-bit' | ternary(current_gos_info['win_guest_id'] | select('match', '.*64Guest'), current_gos_info['win_guest_id'] | reject('match', '.*64Guest')))[0] }}"
+
+# Expected guest ID in supported guest IDs list
+- name: "Check guest ID and fullname in VM guest info"
+  ansible.builtin.assert:
+    that:
+      - guestinfo_guest_id == vm_guest_id
+      - guestinfo_guest_id == current_os_guest_id
+      - guestinfo_guest_full_name in current_gos_info['win_guest_fullname']
+    fail_msg:
+      - "Guest ID in VM guest info '{{ guestinfo_guest_id }}' should be equal to the configured guest ID '{{ vm_guest_id }}',"
+      - "Guest ID in VM guest info '{{ guestinfo_guest_id }}' should be equal to the expected one '{{ current_os_guest_id }}',"
+      - "Guest fullname in VM guest info '{{ guestinfo_guest_full_name }}' should be in the expected list '{{ current_gos_info['win_guest_fullname'] }}'."
+  when: current_os_guest_id in esxi_guest_ids
+
+# Expected guest ID not in supported guest IDs list
+- name: "Guest ID is not supported for create on ESXi {{ esxi_version }}"
+  when: current_os_guest_id not in esxi_guest_ids
+  block:
+    - name: "Get the previous OS info in the pre-defined guest OS info list"
+      include_tasks: get_previous_gos_info.yml
+
+    # Set expected guest ID corresponding to previous OS version
+    - name: "Set fact of expected guest ID of previous {{ guest_os_ansible_architecture }} OS"
+      ansible.builtin.set_fact:
+        previous_os_guest_id: "{{ (guest_os_ansible_architecture == '64-bit' | ternary(previous_gos_info['win_guest_id'] | select('match', '.*64Guest'), previous_gos_info['win_guest_id'] | reject('match', '.*64Guest')))[0] }}"
+
+    - name: "Check VM configured guest ID is the previous guest ID"
+      ansible.builtin.assert:
+        that:
+          - vm_guest_id == previous_os_guest_id
+        fail_msg:
+          - "VM guest ID '{{ vm_guest_id }}' is not configured to the one of the previous OS version: {{ previous_os_guest_id }},"
+          - "since guest ID '{{ current_os_guest_id }}' of current OS is not found in the supported for create guest IDs on ESXi."
+
+# Guest ID is defined while not supported for create
+- name: "Set fact of the conditions guest OS is recognized"
+  ansible.builtin.set_fact:
+    current_os_recognized: true
+    configured_pre_guest_id: true
+  when:
+    - current_gos_info.win_guest_add_esxi is defined and current_gos_info.win_guest_add_esxi
+    - esxi_version is version(current_gos_info.win_guest_add_esxi, '>=')
+    - esxi_version is version(current_gos_info.win_guest_creation_esxi, '<')
+    - vmtools_version is version(current_gos_info.win_guest_vmtools, '>=')
+
+# Current ESXi version does not contain the current OS defination
+# 1. Current VMware Tools version can recognize the current OS
+# 2. Current VMware Tools version can not recognize the current OS
