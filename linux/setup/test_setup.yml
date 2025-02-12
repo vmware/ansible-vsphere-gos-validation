@@ -27,6 +27,17 @@
       ansible.builtin.set_fact:
         vm_info_retrieved: true
 
+# Sometimes after reverting snapshot on FreeBSD VM, its network is not reachable.
+# Here restarts it to work around the network issue
+- name: "Reset FreeBSD VM to update network after reverting to base snapshot"
+  include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "restarted"
+  when:
+    - base_snapshot_exists
+    - guest_os_ansible_distribution is defined
+    - guest_os_ansible_distribution == 'FreeBSD'
+
 - name: "Get VM guest IP"
   include_tasks: ../../common/update_inventory.yml
 
