@@ -26,7 +26,7 @@
     disk_size_gb: "{{ new_disk_size_gb }}"
     ctrl_number: "{{ new_ctrl_number }}"
     unit_number: "{{ new_unit_number }}"
-  when: add_new_controller
+  when: new_disk_ctrl_state == "new"
 
 - name: "Hot add a new disk on an existing {{ new_disk_ctrl_type }} controller"
   include_tasks: ../../common/vm_hot_add_remove_disk.yml
@@ -36,9 +36,15 @@
     disk_size_gb: "{{ new_disk_size_gb }}"
     ctrl_number: "{{ new_ctrl_number }}"
     unit_number: "{{ new_unit_number }}"
-  when: not add_new_controller
+  when: new_disk_ctrl_state == "existing"
 
-- name: "Wait for hot-added disk being present in guest OS"
+- name: "Collect dmesg after hot adding a disk to {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller"
+  include_tasks: ../utils/collect_dmesg.yml
+  vars:
+    dmesg_options: "-c"
+    dmesg_output_file_name: "dmesg_after_{{ new_disk_ctrl_state }}_ctrl_disk_hot_add.log"
+
+- name: "Wait for hot-added disk to {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller being present in guest OS"
   include_tasks: wait_device_list_changed.yml
   vars:
     device_list_before_change: "{{ guest_disk_list_before_hotadd }}"
@@ -60,7 +66,8 @@
   ansible.builtin.assert:
     that:
       - guest_disk_list_after_hotadd | difference(guest_disk_list_before_hotadd) | length == 1
-    fail_msg: "Guest OS failed to recognize the new hot-added {{ new_disk_ctrl_type }} disk"
+    fail_msg: "Guest OS failed to recognize the new disk hot added to {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller"
+    success_msg: "Guest OS successfully recognized the new disk hot added to {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller"
 
 - name: "Set fact of the new guest disk info"
   ansible.builtin.set_fact:
@@ -129,6 +136,12 @@
     unit_number: "{{ new_unit_number }}"
     disk_controller_type: "{{ new_disk_ctrl_type }}"
 
+- name: "Collect dmesg after hot removing the disk from the {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller"
+  include_tasks: ../utils/collect_dmesg.yml
+  vars:
+    dmesg_options: "-c"
+    dmesg_output_file_name: "dmesg_after_{{ new_disk_ctrl_state }}_ctrl_disk_hot_remove.log"
+
 - name: "Wait for disk being absent in guest OS"
   include_tasks: wait_device_list_changed.yml
   vars:
@@ -152,4 +165,5 @@
   ansible.builtin.assert:
     that:
       - guest_disk_list_before_hotremove | difference(guest_disk_list_after_hotremove) | length == 1
-    fail_msg: "After disk hot-remove, the Guest OS still can see it"
+    fail_msg: "After the disk hot removed from {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller, it is still present in guest OS."
+    success_msg: "After the disk hot removed from {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller, it is absent in guest OS."

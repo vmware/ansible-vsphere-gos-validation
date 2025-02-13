@@ -15,12 +15,22 @@
     firewall_service_name: "ufw.service"
   when: guest_os_ansible_distribution == "Ubuntu"
 
-- name: "Stop and disable firewall service"
-  include_tasks: service_operation.yml
-  vars:
-    service_name: "{{ firewall_service_name }}"
-    service_enabled: false
-    service_state: "stopped"
+- name: "Check firewall service status and disable it"
   when:
     - firewall_service_name is defined
     - firewall_service_name
+  block:
+    - name: "Get firewall service status"
+      include_tasks: get_service_info.yml
+      vars:
+        service_name: "{{ firewall_service_name }}"
+
+    - name: "Stop and disable firewall service"
+      include_tasks: service_operation.yml
+      vars:
+        service_name: "{{ firewall_service_name }}"
+        service_enabled: false
+        service_state: "stopped"
+      when:
+        - service_info.state is defined
+        - service_info.state in ['active', 'running']

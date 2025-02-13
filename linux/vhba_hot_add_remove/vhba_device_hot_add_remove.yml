@@ -102,15 +102,17 @@
       vars:
         dmesg_options: "-c"
         dmesg_output_file_name: "dmesg_before_vhba_test.log"
+        dmesg_no_log: true
 
     - name: "Clear /var/log/messages"
       ansible.builtin.shell: "cat /dev/null >/var/log/messages"
       changed_when: false
       delegate_to: "{{ vm_guest_ip }}"
 
-    - name: "Firstly hot add a new disk controller and disk at the same time"
+    # Firstly hot add a new disk controller and disk at the same time
+    - name: "Set fact of the new disk controller state to 'new'"
       ansible.builtin.set_fact:
-        add_new_controller: true
+        new_disk_ctrl_state: "new"
 
     - name: "Hot add a new controller and disk at the same time, test it and then hot remove the disk"
       include_tasks: hot_add_remove_disk.yml
@@ -128,9 +130,10 @@
         disk_controller_facts['disk_controller_data'][new_vhba_type] is undefined or
         disk_controller_facts['disk_controller_data'][new_vhba_type][new_ctrl_number | quote] is undefined
 
-    - name: "Then hot add a new disk on previously added controller {{new_disk_ctrl_type }}{{ new_ctrl_number }}"
+    # Then hot add a new disk on previously added controller
+    - name: "Set fact of the new disk controller state to 'existing'"
       ansible.builtin.set_fact:
-        add_new_controller: false
+        new_disk_ctrl_state: "existing"
 
     - name: "Hot add a new disk on the previous added controller, test it and then hot remove it"
       include_tasks: hot_add_remove_disk.yml

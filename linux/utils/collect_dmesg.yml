@@ -7,6 +7,7 @@
 #   dmesg_options: the dmesg command options
 #   dmesg_output_file_name (optional): the file name for saving dmesg output in test case log folder
 #   dmesg_ignore_errors (optional): ignore errors when executing dmesg. Default is false.
+#   dmesg_no_log (optional): true to hide output on console. Default is false.
 # Return:
 #   dmesg_output_file_path: the file path to save dmesg output at localhost
 #
@@ -21,13 +22,13 @@
   ignore_errors: "{{ dmesg_ignore_errors | default(false) }}"
   delegate_to: "{{ vm_guest_ip }}"
   register: dmesg_cmd_result
+  no_log: "{{ dmesg_no_log | default(false) }}"
 
 - name: "Save dmesg output to local file in test case log folder"
   when:
     - dmesg_cmd_result.rc is defined
     - dmesg_cmd_result.rc == 0
     - dmesg_cmd_result.stdout is defined
-    - dmesg_cmd_result.stdout
   block:
     # Set a default dmesg output file with execution timestamp
     - name: "Set default file name for saving the dmesg command output"
@@ -48,3 +49,7 @@
       when:
         - save_dmesg_result.failed is defined
         - not save_dmesg_result.failed
+
+    - name: "Display the demst output file path"
+      ansible.builtin.debug:
+        msg: "The output of dmesg is saved into {{ dmesg_output_file_path }}"
