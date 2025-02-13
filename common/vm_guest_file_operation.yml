@@ -1,28 +1,43 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Valid Guest file operation is: create_dir, delete_dir, fetch_file, copy_file
-# Common parameters for file operation:
-#   tools_ready_in_guest_file_ops: default value is true. Set it to false if
-# VMware tools is not running when do guest file operation, will wait for
-# VMware tools status is running.
+# File or directory operations in guest OS through VMware Tools.
+# Parameters:
+#   operation: File operation in guest OS, valid values are:
+#     'create_dir', 'delete_dir', 'fetch_file', 'copy_file'.
+#   tools_ready_in_guest_file_ops (optional): If set to false, will
+#     wait for VMware Tools status is running before doing file operation.
+#     Default value is true.
+#   guest_file_ops_ignore_error (optional): Whether to ignore errors during
+#     file operation. Default value is false.
+#   dir_path: The directory path to be created or deleted when 'operation' is
+#     set to 'create_dir', 'delete_dir'.
+#   recurse: Whether to create or delete the directory path recursively or not
+#     when 'operation' is set to 'create_dir', 'delete_dir'.
+#   src_path: The source file path in guest OS when 'operation' is set to
+#     'fetch_file', the source file path on localhost when 'operation' is set to
+#     'copy_file'.
+#   dest_path: The dest file path on localhost when 'operation' is set to
+#     'fetch_file', the dest file path in guest OS when 'operation' is set to
+#     'copy_file'.
+#   overwrite: Overwrite the dest file or not if it exists when 'operation'
+#     is set to 'copy_file'.
 #
-- name: "By default VMware tools status is running"
+- name: "By default won't wait for VMware Tools to be running and not ignore error"
   ansible.builtin.set_fact:
-    tools_ready_in_guest_file_ops: true
-  when: tools_ready_in_guest_file_ops is undefined
+    tools_ready_in_guest_file_ops: "{{ tools_ready_in_guest_file_ops | default(true) }}"
+    guest_file_ops_ignore_error: "{{ guest_file_ops_ignore_error | default(false) }}"
 
-# Wait for VMware Tools in running status
-- include_tasks: vm_wait_vmtools_status.yml
+- name: "Wait for VMware Tools in running status"
+  include_tasks: vm_wait_vmtools_status.yml
   vars:
     vm_wait_vmtools_running: true
   when: not tools_ready_in_guest_file_ops
 
-# Parameters for create_dir:
-# dir_path: The directory path to be created
-# recurse: Whether to create the directory path recursively or not
-- block:
-    - name: "Create directory {{ dir_path }} in VM guest"
+- name: "Create directory in guest OS"
+  when: operation == "create_dir"
+  block:
+    - name: "Create directory {{ dir_path }}"
       community.vmware.vmware_guest_file_operation:
         hostname: "{{ vsphere_host_name }}"
         username: "{{ vsphere_host_user }}"
@@ -40,21 +55,20 @@
       ignore_errors: true
     - name: "Print the result of create directory"
       ansible.builtin.debug: var=create_dir_op
-      when: enable_debug is defined and enable_debug
-    - name: "Only ignore directory exists error"
+      when: enable_debug
+    - name: "Ignore directory exists error or configured to ignore error"
       ansible.builtin.fail:
         msg: "Failed to create diretory: '{{ dir_path }}', due to {{ create_dir_op.msg }}"
       when:
+        - not guest_file_ops_ignore_error
         - create_dir_op is defined
         - not create_dir_op.changed
         - ('msg' in create_dir_op) and (create_dir_op.msg.count('already exists') == 0)
-  when: operation == "create_dir"
 
-# Parameters for delete_dir:
-# dir_path: The directory path to be deleted
-# recurse: Delete the directory path recursively or not
-- block:
-    - name: "Delete directory {{ dir_path }} in VM guest"
+- name: "Delete directory in guest OS"
+  when: operation == "delete_dir"
+  block:
+    - name: "Delete directory {{ dir_path }}"
       community.vmware.vmware_guest_file_operation:
         hostname: "{{ vsphere_host_name }}"
         username: "{{ vsphere_host_user }}"
@@ -69,26 +83,26 @@
           operation: "delete"
           recurse: "{{ recurse }}"
       register: delete_dir_op
-    - name: "Print result of delete directory"
+      ignore_errors: "{{ guest_file_ops_ignore_error }}"
+    - name: "Print result of delete directory in guest OS"
       ansible.builtin.debug: var=delete_dir_op
-      when: enable_debug is defined and enable_debug
-  when: operation == "delete_dir"
+      when: enable_debug
 
-# Parameters for fetch_file:
-# src_path: The source file path in guest
-# dest_path: The dest file path on localhost
-- block:
+- name: "Fetch file from guest OS"
+  when: operation == "fetch_file"
+  block:
     - name: "Check If the destination base directory exist"
       ansible.builtin.stat:
         path: "{{ dest_path | dirname }}"
       ignore_errors: true
       register: fetch_dir_stat
-    - include_tasks: create_directory.yml
+    - name: "Create destination base directory"
+      include_tasks: create_directory.yml
       vars:
         dir_path: "{{ dest_path | dirname }}"
         dir_mode: "0777"
       when: not fetch_dir_stat.stat.exists
-    - name: "Fetch file {{ src_path }} from VM guest"
+    - name: "Fetch file {{ src_path }}"
       community.vmware.vmware_guest_file_operation:
         hostname: "{{ vsphere_host_name }}"
         username: "{{ vsphere_host_user }}"
@@ -102,17 +116,15 @@
           src: "{{ src_path }}"
           dest: "{{ dest_path }}"
       register: fetch_file_op
-    - name: "Print result of fetch file from Guest OS"
+      ignore_errors: "{{ guest_file_ops_ignore_error }}"
+    - name: "Print result of fetch file from guest OS"
       ansible.builtin.debug: var=fetch_file_op
-      when: enable_debug is defined and enable_debug
-  when: operation == "fetch_file"
+      when: enable_debug
 
-# Parameters for copy_file:
-# src_path: The source file path localhost
-# dest_path: The dest file path in guest
-# overwrite: If the dest file exists, overwrite it or not
-- block:
-    - name: "Copy file {{ src_path }} to VM guest"
+- name: "Copy file to guest OS"
+  when: operation == "copy_file"
+  block:
+    - name: "Copy file {{ src_path }}"
       community.vmware.vmware_guest_file_operation:
         hostname: "{{ vsphere_host_name }}"
         username: "{{ vsphere_host_user }}"
@@ -127,7 +139,7 @@
           dest: "{{ dest_path }}"
           overwrite: "{{ overwrite | default(true) }}"
       register: copy_file_op
-    - name: "Print result of copy file to Guest OS"
+      ignore_errors: "{{ guest_file_ops_ignore_error }}"
+    - name: "Print result of copy file to guest OS"
       ansible.builtin.debug: var=copy_file_op
-      when: enable_debug is defined and enable_debug
-  when: operation == "copy_file"
+      when: enable_debug
