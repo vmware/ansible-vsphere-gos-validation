@@ -1,0 +1,23 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# On ESXi 7.0U3c, guest fullname is 'Windows 11 Enterprise, 64-bit (Build xxxxx)',
+# guest ID is empty.
+#
+- name: "Set fact of the exception of Windows 11 guest fullname"
+  ansible.builtin.set_fact:
+    win11_70u3c_exception: true
+  when:
+    - guest_os_ansible_distribution is search('Windows 11')
+    - esxi_version is version('7.0.3', '=')
+    - esxi_build == "19193900"
+    - vmtools_version is version('12.0.0', '>=')
+
+- name: "Known issue - incorrect/empty guestID in guest info of Windows 11"
+  ansible.builtin.debug:
+    msg:
+      - "The guestID of Windows 11 guest in guestinfo is empty on ESXi 7.0U3c. Ignore this known issue."
+      - "Please refer to https://knowledge.broadcom.com/external/article?legacyId=86517."
+  tags:
+    - known_issue
+  when: win11_70u3c_exception is defined and win11_70u3c_exception
