@@ -24,7 +24,7 @@
         - name: "Set fact of the pre-defined guest OS info"
           include_tasks: win_guest_os_info.yml
 
-        - name: "Print current guest OS info"
+        - name: "Print the guest OS info before checking"
           ansible.builtin.debug:
             msg:
               - "OS architecture got in guest OS: {{ guest_os_ansible_architecture }}"
@@ -36,9 +36,11 @@
         - name: "Set fact of current OS name"
           ansible.builtin.set_fact:
             current_gos: "{{ guest_os_ansible_distribution.strip('Microsoft ') }}"
+
         - name: "Get the current OS info in the pre-defined guest OS info list"
           ansible.builtin.set_fact:
             current_gos_info: "{{ win_gos_info | selectattr('win_guest', 'equalto', current_gos) }}"
+
         - name: "Check current OS in the pre-defined guest OS info list"
           ansible.builtin.assert:
             that:
@@ -47,11 +49,12 @@
               - "The pre-defined guest OS info list does not contain this OS version: {{ current_gos }},"
               - "please check whether this guest OS is supported and add it's info to the list accordingly."
 
-       - name: "Check guest fullname in VM guest info"
-         include_tasks: check_guest_fullname_guest_info.yml
+       - name: "Check whether meet the conditions of known issue"
+         include_tasks: win11_guest_info_exception.yml
 
-       - name: "Check guest ID in VM guest info"
-         include_tasks: check_guest_id_guest_info.yml
+       - name: "Check guest fullname in VM guest info"
+         include_tasks: check_guest_info.yml
+         when: win11_70u3c_exception is undefined
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
