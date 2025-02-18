@@ -1,0 +1,23 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set disk controller type to scsi, sata or nvme"
+  ansible.builtin.set_fact:
+    disk_controller: "{{ (test_disk_ctrl_type in ['paravirtual', 'lsilogicsas']) | ternary('scsi', test_disk_ctrl_type) }}"
+
+- name: "Get VM disk controllers info"
+  include_tasks: ../../common/vm_get_disk_controller_facts.yml
+
+- name: "Set fact of VM disk controllers before testing"
+  ansible.builtin.set_fact:
+    disk_ctrls_before_hotadd: "{{ disk_controller_facts['disk_controller_data'] }}"
+
+- name: "Set fact of the number of '{{ disk_controller }}' controller"
+  ansible.builtin.set_fact:
+    disk_controller_count: "{{ disk_ctrls_before_hotadd[disk_controller] | default({}) | length }}"
+
+- name: "Print under testing disk controller info"
+  ansible.builtin.debug:
+    msg:
+      - "Disk controller type: {{ disk_controller }}"
+      - "Disk controller count: {{ disk_controller_count }}"

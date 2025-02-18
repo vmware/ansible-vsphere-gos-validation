@@ -1,0 +1,51 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Print the disk number in guest OS"
+  ansible.builtin.debug:
+    msg:
+      - "Before hot adding, the number of disks in guest OS: {{ disk_num_guest_before }}"
+      - "After hot adding, the number of disks in guest OS: {{ disk_num_guest_after }}"
+
+- name: "Print the disk controller number in guest OS"
+  ansible.builtin.debug:
+    msg:
+      - "Before hot adding, the number of '{{ test_disk_ctrl_type }}' controller in guest OS: {{ ctrl_num_guest_before }}"
+      - "After hot adding, the number of '{{ test_disk_ctrl_type }}' controller in guest OS: {{ ctrl_num_guest_after }}"
+  when: on_new_controller
+
+- name: "Handle known issue on NVMe disk hot add"
+  include_tasks: handle_nvme_ops_known_issue.yml
+  when:
+    - not on_new_controller
+    - disk_num_guest_after | int != disk_num_guest_before | int + 1
+    - test_disk_ctrl_type == 'nvme'
+    - test_purpose == "hot-add"
+
+- name: "Verify disk number increases 1 in guest OS"
+  ansible.builtin.assert:
+    that:
+      - disk_num_guest_after | int == disk_num_guest_before | int + 1
+    fail_msg: >-
+      After hot adding a new disk to the '{{ test_disk_ctrl_type }}' controller,
+      disk number in guest OS is {{ disk_num_guest_after }}, which is not the
+      same as the expected value {{ disk_num_guest_before | int + 1 }}.
+
+- name: "Verify disk controller number increases 1 in guest OS"
+  ansible.builtin.assert:
+    that:
+      - ctrl_num_guest_after | int == ctrl_num_guest_before | int + 1
+    fail_msg: >-
+      After hot adding a new disk to a new '{{ test_disk_ctrl_type }}' controller,
+      disk controller number in guest OS is {{ ctrl_num_guest_after }}, which is not
+      the same as the expected value {{ ctrl_num_guest_before | int + 1 }}.
+  when: on_new_controller
+
+- name: "Initialize new disk and create disk partition in guest OS"
+  include_tasks: create_partition_raw_disk.yml
+  vars:
+    new_diskpart_file_name: "diskpart_{{ new_disk_node_ctrl_bus }}_{{ new_disk_node_unit_num }}.txt"
+
+- name: "Create new file and write content on new disk"
+  include_tasks: create_new_file_read_write.yml
+  when: not (test_disk_ctrl_type == "nvme" and test_purpose == "hot-extend")

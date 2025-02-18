@@ -59,11 +59,8 @@
 * vm_hot_add_remove_disk_ctrl.yml: Hotadd or remove VM disk controller
 * vm_hot_add_remove_disk.yml: Hotadd or remove VM disk
 * vm_get_new_vhba_bus_number.yml: Get bus number of a new disk controller
-* vm_get_new_disk_node_info.yml: Get disk node info of a new disk
 * vm_get_disk_facts.yml: Get VM disk info
 * vm_get_disk_controller_facts.yml: Get VM disk controller info
-* vm_get_disk_controller_num.yml: Get VM disk controller number with specified type
-* vm_add_sata_cdrom.yml: Add a new CDROM attached to SATA controller
 
 ### Tasks for VM secureboot settings
 * vm_set_boot_options.yml: Set VM boot configurations
