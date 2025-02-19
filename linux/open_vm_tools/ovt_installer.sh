@@ -39,19 +39,22 @@ if [ "$system" == "FreeBSD" ]; then
     # Workaround for compiliing error on FreeBSD 14
     freebsd_version=$(freebsd-version | cut -d '.' -f 1)
     echo "FreeBSD release version is $freebsd_version"
+    freebsd_patches_dir="/usr/ports/emulators/open-vm-tools/files"
+    ovt_patches=""
     if [ $freebsd_version -ge 14 ]; then
-        vmmemctl_patch="/usr/ports/emulators/open-vm-tools/files/patch-modules_freebsd_vmmemctl_os.c"
-        vmblock_patch="/usr/ports/emulators/open-vm-tools/files/patch-modules_freebsd_vmblock_vfsops.c"
+        ovt_patches="$freebsd_patches_dir/patch-modules_freebsd_vmmemctl_os.c \
+                     $freebsd_patches_dir/patch-modules_freebsd_vmblock_vfsops.c"
+    elif [ $freebsd_version -ge 13 ]; then
+        ovt_patches="$freebsd_patches_dir/patch-services_plugins_dndcp_stringxx_string.hh"
+    fi
 
-        if [ -e "$vmmemctl_patch" ]; then
-            echo "Applying patch $vmmemctl_patch"
-            patch < $vmmemctl_patch
-        fi
-
-        if [ -e "$vmblock_patch" ]; then
-            echo "Applying patch $vmblock_patch"
-            patch < $vmblock_patch
-        fi
+    if [ "$ovt_patches" != "" ]; then
+        for ovt_patch in $ovt_patches; do
+            if [ -e "$ovt_patch" ]; then
+                 echo "Applying patch $ovt_patch"
+                 patch <$ovt_patch
+            fi
+        done
     fi
 fi
 
