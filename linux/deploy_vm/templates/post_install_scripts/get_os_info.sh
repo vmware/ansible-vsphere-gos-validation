@@ -18,7 +18,7 @@ if [ "X$ip_addr" == "X" ]; then
 fi
 
 if [ "X$ip_addr" != "X" ]; then
-    echo "DHCP IPv4 address at post-install: $ip_addr"
+    echo "{{ autoinstall_ipv4_msg }}$ip_addr"
 else
     echo "ERROR: Failed to obtain DHCP IPv4 address"
 fi
