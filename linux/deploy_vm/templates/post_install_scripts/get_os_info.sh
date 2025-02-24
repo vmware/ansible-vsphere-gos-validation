@@ -8,18 +8,34 @@ echo "System environment variables:"
 env | sort
 
 # Get IPv4 address
+echo "Display network interfaces"
+ip -o -f inet addr show
+
+ip_show_retries=0
+while [ $ip_show_retries -lt 10 ]; do
+    ip_link_name=$(ip -o -f inet addr show | grep -v '127.0.0.1' | awk '{print $2}')
+    if [ "X$ip_link_name" != "X" ]; then
+        echo "The network interface name is $ip_link_name"
+        break
+    fi
+    sleep 5
+    ip_show_retries=$((ip_show_retries+1))
+done
+
+if [ "X$ip_link_name" == "X" ]; then
+    echo "ERROR: Failed to get the network interface name. The device might not be ready"
+fi
+
 ip_addr=$(ip -o -f inet addr show | grep -v 127.0.0.1 | awk '{print $4}')
-if [ "X$ip_addr" == "X" ]; then
-    ip_link_name=$(ip -o -f inet addr show | grep -v 127.0.0.1 | awk '{print $2}')
+if [ "X$ip_addr" == "X" ] && [ "X$ip_link_name" != "X" ]; then
     echo "Network interface $ip_link_name has no DHCP IPv4 address. Try to bring it up now ..."
     ip link set $ip_link_name up
     sleep 5
-    ip_addr=$(ip -o -f inet addr show | grep -v 127.0.0.1 | awk '{print $4}')
+    ip_addr=$(ip -o -f inet addr show $ip_link_name | awk '{print $4}')
 fi
 
-if [ "X$ip_addr" != "X" ]; then
-    echo "{{ autoinstall_ipv4_msg }}$ip_addr"
-else
+echo "{{ autoinstall_ipv4_msg }}$ip_addr"
+if [ "X$ip_addr" == "X" ]; then
     echo "ERROR: Failed to obtain DHCP IPv4 address"
 fi
 
