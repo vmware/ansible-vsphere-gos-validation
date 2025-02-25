@@ -33,11 +33,13 @@
         - retry_vmtools_status.vmtools_info.vm_tools_running_status == 'guestToolsNotRunning'
       retries: 60
       delay: 5
-      when: vmtools_is_running
+      when:
+        - vmtools_is_installed
+        - vmtools_is_running
 
     - name: "Meet known issue conditions"
       ansible.builtin.set_fact:
-        vmci_known_issue: "{{ not vmtools_is_running or (retry_vmtools_status is defined and retry_vmtools_status.vmtools_info.vm_tools_running_status | default('') == 'guestToolsNotRunning') }}"
+        vmci_known_issue: "{{ (vmtools_is_installed and not vmtools_is_running) or (retry_vmtools_status is defined and retry_vmtools_status.vmtools_info.vm_tools_running_status | default('') == 'guestToolsNotRunning') }}"
 
     - name: "Known issue - Guest OS hang after reverting to snapshot when VM VBS enabled"
       ansible.builtin.debug:
@@ -49,7 +51,9 @@
         - known_issue
       when: vmci_known_issue
 
-    - name: "Exit testing due to guest OS hang caused by known issue"
+    - name: "Exit testing due to VMCI known issue"
       ansible.builtin.fail:
-        msg: "Testing failed because test environment meets the VMCI known issue conditions on ESXi {{ esxi_version }} build {{ esxi_build }}."
+        msg: >-
+          Exit testing due to VMware Tools is not runing and guest OS hang after reverting to base snapshot caused
+          by the VMCI known issue on ESXi {{ esxi_version }} build {{ esxi_build }}.
       when: vmci_known_issue
