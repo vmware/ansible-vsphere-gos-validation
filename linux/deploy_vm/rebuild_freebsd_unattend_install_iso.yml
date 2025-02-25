@@ -1,0 +1,49 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Rebuild FreeBSD ISO image with unattended install file
+# Parameters:
+#   rebuilt_unattend_iso_path: Local path to the rebuilt ISO image with unattend install config file
+#   src_iso_file_path: Local path to the source ISO image file
+#   src_iso_dir_path: Local path to the directory containing the source ISO image file.
+#
+- name: "Set fact of files to be updated in FreeBSD unattended install ISO"
+  ansible.builtin.set_fact:
+    freebsd_iso_files:
+      - src_file: "{{ new_unattend_install_conf }}"
+        dest_file: "/etc/installerconfig"
+
+- name: "Update boot loader option for 32bit FreeBSD autoinstall"
+  when: "'64Guest' not in guest_id"
+  block:
+    - name: "Set fact of boot loader config file path"
+      ansible.builtin.set_fact:
+        src_boot_loader_conf: "{{ src_iso_dir_path }}/loader.conf"
+        dest_boot_loader_conf: "/boot/loader.conf"
+
+    - name: "Extract boot loader config file in FreeBSD ISO"
+      community.general.iso_extract:
+        image: "{{ src_iso_file_path }}"
+        dest: "{{ src_iso_dir_path }}"
+        files:
+          - "{{ dest_boot_loader_conf[1:] }}"
+
+    - name: "Add kern.kstack_pages option in FreeBSD boot loader"
+      ansible.builtin.lineinfile:
+        path: "{{ src_boot_loader_conf }}"
+        line: 'kern.kstack_pages="8"'
+
+    - name: "Update fact of files to be updated in FreeBSD unattended install ISO"
+      ansible.builtin.set_fact:
+        freebsd_iso_files: >-
+          {{
+            freebsd_iso_files |
+            union([{'src_file': src_boot_loader_conf,
+                    'dest_file': dest_boot_loader_conf}])
+          }}
+
+- name: "Rebuild ISO image file for FreeBSD"
+  community.general.iso_customize:
+    src_iso: "{{ src_iso_file_path }}"
+    dest_iso: "{{ rebuilt_unattend_iso_path }}"
+    add_files: "{{ freebsd_iso_files }}"

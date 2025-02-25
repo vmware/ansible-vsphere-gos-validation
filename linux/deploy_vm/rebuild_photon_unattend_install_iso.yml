@@ -4,13 +4,13 @@
 # Rebuild Photon ISO image with unattended install file
 # Parameters:
 #   rebuilt_unattend_iso_path: Local path to the rebuilt ISO image with unattend install config file
-#   src_iso_file_path: Local path of source ISO image file
-#   src_iso_file_dir: Local dir of source ISO image file
+#   src_iso_file_path: Local path to the source ISO image file
+#   src_iso_dir_path: Local path to the directory containing the source ISO image file.
 #
 - name: "Extract specific files inside ISO"
   community.general.iso_extract:
     image: "{{ src_iso_file_path }}"
-    dest: "{{ src_iso_file_dir }}"
+    dest: "{{ src_iso_dir_path }}"
     files:
       - 'boot/grub2/grub.cfg'
       - 'isolinux/isolinux.cfg'
@@ -18,13 +18,13 @@
 
 - name: "Update timeout for boot menu"
   ansible.builtin.replace:
-    path: "{{ src_iso_file_dir }}/isolinux.cfg"
+    path: "{{ src_iso_dir_path }}/isolinux.cfg"
     regexp: "timeout 0"
     replace: "timeout 1"
 
 - name: "Update boot menu with kickstart for VMware Photon OS"
   ansible.builtin.replace:
-    path: "{{ src_iso_file_dir }}/{{ item }}"
+    path: "{{ src_iso_dir_path }}/{{ item }}"
     regexp: '(.*)(root=[^ ]+)(.*)'
     replace: "\\1\\2 ks=cdrom:/isolinux/{{ unattend_install_file_name }} console=ttyS0,115200n8 \\3"
   with_items:
@@ -36,11 +36,11 @@
     src_iso: "{{ src_iso_file_path }}"
     dest_iso: "{{ rebuilt_unattend_iso_path }}"
     add_files:
-      - src_file: "{{ src_iso_file_dir }}/menu.cfg"
+      - src_file: "{{ src_iso_dir_path }}/menu.cfg"
         dest_file: "isolinux/menu.cfg"
-      - src_file: "{{ src_iso_file_dir }}/grub.cfg"
+      - src_file: "{{ src_iso_dir_path }}/grub.cfg"
         dest_file: "boot/grub2/grub.cfg"
-      - src_file: "{{ src_iso_file_dir }}/isolinux.cfg"
+      - src_file: "{{ src_iso_dir_path }}/isolinux.cfg"
         dest_file: "isolinux/isolinux.cfg"
       - src_file: "{{ new_unattend_install_conf }}"
         dest_file: "isolinux/{{ unattend_install_file_name }}"

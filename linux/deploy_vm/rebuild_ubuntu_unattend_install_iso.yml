@@ -4,13 +4,13 @@
 # Rebuild Ubuntu ISO image with unattended install file
 # Parameters:
 #   rebuilt_unattend_iso_path: Local path to the rebuilt ISO image with unattend install config file
-#   src_iso_file_path: Local path of source ISO image file
-#   src_iso_file_dir: Local dir of source ISO image file
+#   src_iso_file_path: Local path to the source ISO image file
+#   src_iso_dir_path: Local path to the directory containing the source ISO image file.
 #
 - name: "Extract boot config file boot/grub/grub.cfg and md5sum.txt from ISO"
   community.general.iso_extract:
     image: "{{ src_iso_file_path }}"
-    dest: "{{ src_iso_file_dir }}"
+    dest: "{{ src_iso_dir_path }}"
     files:
       - "boot/grub/grub.cfg"
       - "md5sum.txt"
@@ -18,7 +18,7 @@
 - name: "Try to extract BIOS boot config file isolinux/txt.cfg from ISO"
   community.general.iso_extract:
     image: "{{ src_iso_file_path }}"
-    dest: "{{ src_iso_file_dir }}"
+    dest: "{{ src_iso_dir_path }}"
     files:
       - "isolinux/txt.cfg"
   ignore_errors: true
@@ -46,7 +46,7 @@
 
     - name: "Add menu entry for autoinstall in boot/grub/grub.cfg"
       ansible.builtin.blockinfile:
-        path: "{{ src_iso_file_dir }}/grub.cfg"
+        path: "{{ src_iso_dir_path }}/grub.cfg"
         insertafter: "set timeout=.*"
         block: |
           set default="autoinstall"
@@ -58,7 +58,7 @@
 
     - name: "Add menu entry for autoinstall in isolinux/txt.cfg"
       ansible.builtin.replace:
-        path: "{{ src_iso_file_dir }}/txt.cfg"
+        path: "{{ src_iso_dir_path }}/txt.cfg"
         regexp: 'default live'
         replace: |
           default live-install
@@ -71,15 +71,15 @@
     - name: "Set facts of files to be updated or added into Ubuntu ISO"
       ansible.builtin.set_fact:
         update_iso_files:
-          - src_file: "{{ src_iso_file_dir }}/grub.cfg"
+          - src_file: "{{ src_iso_dir_path }}/grub.cfg"
             dest_file: "/boot/grub/grub.cfg"
-          - src_file: "{{ src_iso_file_dir }}/md5sum.txt"
+          - src_file: "{{ src_iso_dir_path }}/md5sum.txt"
             dest_file: "/md5sum.txt"
           - src_file: "{{ new_unattend_install_conf }}"
             dest_file: "/preseed/ubuntu.seed"
-          - src_file: "{{ src_iso_file_dir }}/{{ pre_install_script_file }}"
+          - src_file: "{{ src_iso_dir_path }}/{{ pre_install_script_file }}"
             dest_file: "/preseed/{{ pre_install_script_file }}"
-          - src_file: "{{ src_iso_file_dir }}/{{ post_install_script_file }}"
+          - src_file: "{{ src_iso_dir_path }}/{{ post_install_script_file }}"
             dest_file: "/preseed/{{ post_install_script_file }}"
 
 - name: "Rebuild ISO for Ubuntu desktop or live server using Subiquity installer"
@@ -101,9 +101,9 @@
     - name: "Set facts of files to be updated or added into Ubuntu ISO"
       ansible.builtin.set_fact:
         update_iso_files:
-          - src_file: "{{ src_iso_file_dir }}/grub.cfg"
+          - src_file: "{{ src_iso_dir_path }}/grub.cfg"
             dest_file: "/boot/grub/grub.cfg"
-          - src_file: "{{ src_iso_file_dir }}/md5sum.txt"
+          - src_file: "{{ src_iso_dir_path }}/md5sum.txt"
             dest_file: "/md5sum.txt"
 
 - name: "Update md5sum checksum for boot/grub/grub.cfg"
@@ -111,7 +111,7 @@
     md5=`md5sum grub.cfg | awk '{print $1}'`
     sed -i "/.\/boot\/grub\/grub.cfg/ s/^[^ ]*/$md5/" md5sum.txt
   args:
-    chdir: "{{ src_iso_file_dir }}"
+    chdir: "{{ src_iso_dir_path }}"
 
 - name: "Add isolinux/txt.cfg to update ISO file list and updates its md5sum"
   when: ubuntu_bios_cfg_exist | bool
@@ -120,7 +120,7 @@
       ansible.builtin.set_fact:
         update_iso_files: >-
           {{ update_iso_files +
-            [{'src_file': src_iso_file_dir ~ '/txt.cfg',
+            [{'src_file': src_iso_dir_path ~ '/txt.cfg',
               'dest_file': '/isolinux/txt.cfg'}]
           }}
 
@@ -129,7 +129,7 @@
         md5=`md5sum txt.cfg | awk '{print $1}'`
         sed -i "/.\/isolinux\/txt.cfg/ s/^[^ ]*/$md5/" md5sum.txt
       args:
-        chdir: "{{ src_iso_file_dir }}"
+        chdir: "{{ src_iso_dir_path }}"
 
 - name: "Rebuild ISO for Ubuntu Desktop with Ubiquity installer"
   community.general.iso_customize:

@@ -4,13 +4,13 @@
 # Rebuild Debian ISO image with unattended install file
 # Parameters:
 #   rebuilt_unattend_iso_path: Local path to the rebuilt ISO image with unattend install config file
-#   src_iso_file_path: Local path of source ISO image file
-#   src_iso_file_dir: Local dir of source ISO image file
+#   src_iso_file_path: Local path to the source ISO image file
+#   src_iso_dir_path: Local path to the directory containing the source ISO image file.
 #
 - name: "Extract specific files inside ISO"
   community.general.iso_extract:
     image: "{{ src_iso_file_path }}"
-    dest: "{{ src_iso_file_dir }}"
+    dest: "{{ src_iso_dir_path }}"
     files:
       - 'boot/grub/grub.cfg'
       - 'isolinux/isolinux.cfg'
@@ -19,12 +19,12 @@
 
 - name: "Update timeout for boot menu"
   ansible.builtin.replace:
-    path: "{{ src_iso_file_dir }}/isolinux.cfg"
+    path: "{{ src_iso_dir_path }}/isolinux.cfg"
     regexp: "timeout 0"
     replace: "timeout 1"
 
 - name: "Search string in md5sum.txt"
-  ansible.builtin.shell: "grep '/install.386/' {{ src_iso_file_dir }}/md5sum.txt"
+  ansible.builtin.shell: "grep '/install.386/' {{ src_iso_dir_path }}/md5sum.txt"
   ignore_errors: true
   register: result_search_str
 
@@ -42,14 +42,14 @@
 
 - name: "Update timeout for boot menu"
   ansible.builtin.replace:
-    path: "{{ src_iso_file_dir }}/isolinux.cfg"
+    path: "{{ src_iso_dir_path }}/isolinux.cfg"
     regexp: "default .*"
     replace: "default installgui"
 
 # Add DPMS=-s\ 0 to boot command line to disable screen saver for debian installer
 - name: "Update Debian grub.cfg for autoinstall"
   ansible.builtin.blockinfile:
-    path: "{{ src_iso_file_dir }}/grub.cfg"
+    path: "{{ src_iso_dir_path }}/grub.cfg"
     block: |
       set default="autoinstall"
       set timeout=5
@@ -62,7 +62,7 @@
 # Add DPMS=-s\ 0 to boot command line to disable screen saver for debian installer
 - name: "Update boot menu with preseed.cfg for Debian"
   ansible.builtin.replace:
-    path: "{{ src_iso_file_dir }}/gtk.cfg"
+    path: "{{ src_iso_dir_path }}/gtk.cfg"
     regexp: 'initrd.gz'
     replace: 'initrd.gz auto=true file=/cdrom/{{ unattend_install_file_name }} "DPMS=-s 0"'
 
@@ -74,7 +74,7 @@
     - "sed -i '#./boot/grub/grub.cfg#d' md5sum.txt"
     - "echo \"`md5sum grub.cfg | awk '{print $1}'` ./boot/grub/grub.cfg\" >>md5sum.txt"
   args:
-    chdir: "{{ src_iso_file_dir }}"
+    chdir: "{{ src_iso_dir_path }}"
   register: update_md5sum_result
 
 - name: "Print command output for updating files' md5sum"
@@ -85,17 +85,17 @@
     src_iso: "{{ src_iso_file_path }}"
     dest_iso: "{{ rebuilt_unattend_iso_path }}"
     add_files:
-      - src_file: "{{ src_iso_file_dir }}/grub.cfg"
+      - src_file: "{{ src_iso_dir_path }}/grub.cfg"
         dest_file: "boot/grub/grub.cfg"
-      - src_file: "{{ src_iso_file_dir }}/isolinux.cfg"
+      - src_file: "{{ src_iso_dir_path }}/isolinux.cfg"
         dest_file: "isolinux/isolinux.cfg"
-      - src_file: "{{ src_iso_file_dir }}/gtk.cfg"
+      - src_file: "{{ src_iso_dir_path }}/gtk.cfg"
         dest_file: "isolinux/gtk.cfg"
-      - src_file: "{{ src_iso_file_dir }}/md5sum.txt"
+      - src_file: "{{ src_iso_dir_path }}/md5sum.txt"
         dest_file: "md5sum.txt"
       - src_file: "{{ new_unattend_install_conf }}"
         dest_file: "{{ unattend_install_file_name }}"
-      - src_file: "{{ src_iso_file_dir }}/{{ pre_install_script_file }}"
+      - src_file: "{{ src_iso_dir_path }}/{{ pre_install_script_file }}"
         dest_file: "{{ pre_install_script_file }}"
-      - src_file: "{{ src_iso_file_dir }}/{{ post_install_script_file }}"
+      - src_file: "{{ src_iso_dir_path }}/{{ post_install_script_file }}"
         dest_file: "{{ post_install_script_file }}"

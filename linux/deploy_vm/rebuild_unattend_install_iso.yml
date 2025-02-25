@@ -21,8 +21,8 @@
 
 - name: "Set fact of source ISO image file name and path at local"
   ansible.builtin.set_fact:
+    src_iso_dir_path: "{{ datastore_file_download_result.dest | dirname }}"
     src_iso_file_name: "{{ datastore_file_download_result.dest | basename }}"
-    src_iso_file_dir: "{{ datastore_file_download_result.dest | dirname }}"
     src_iso_file_path: "{{ datastore_file_download_result.dest }}"
 
 - name: "Set fact of unattend install config file name"
@@ -31,13 +31,4 @@
 
 - name: "Rebuild ISO image file for {{ unattend_installer }}"
   include_tasks: "rebuild_{{ unattend_installer.split('-')[0] | lower }}_unattend_install_iso.yml"
-  when: unattend_installer in ["Ubuntu-Ubiquity", "Ubuntu-Subiquity", "Photon", "Debian", "Pardus"]
-
-- name: "Rebuild ISO image file for FreeBSD"
-  community.general.iso_customize:
-    src_iso: "{{ src_iso_file_path }}"
-    dest_iso: "{{ rebuilt_unattend_iso_path }}"
-    add_files:
-      - src_file: "{{ new_unattend_install_conf }}"
-        dest_file: "/etc/installerconfig"
-  when: unattend_installer == "FreeBSD"
+  when: unattend_installer in ["Ubuntu-Ubiquity", "Ubuntu-Subiquity", "Photon", "Debian", "Pardus", "FreeBSD"]

@@ -6,12 +6,15 @@
 # Initialize undefined variables
 - name: "Initialize variables for new VM settings"
   ansible.builtin.set_fact:
-    boot_disk_controller: "{{ boot_disk_controller if (boot_disk_controller is defined and boot_disk_controller) else 'paravirtual' }}"
-    firmware: "{{ firmware if (firmware is defined and firmware) else 'efi' }}"
-    network_adapter_type: "{{ network_adapter_type if (network_adapter_type is defined and network_adapter_type) else 'vmxnet3' }}"
+    boot_disk_controller: "{{ boot_disk_controller | lower if (boot_disk_controller is defined and boot_disk_controller) else 'paravirtual' }}"
+    network_adapter_type: "{{ network_adapter_type | lower if (network_adapter_type is defined and network_adapter_type) else 'vmxnet3' }}"
+    firmware: "{{ firmware | lower if (firmware is defined and firmware) else 'efi' }}"
+    secureboot_enabled: "{{ secureboot_enabled is defined and secureboot_enabled | bool }}"
     vm_video_memory_mb: ""
-    autoinstall_complete_msg: "Autoinstall is completed."
     unattend_installer: ""
+    autoinstall_start_msg: ""
+    autoinstall_ipv4_msg: ""
+    autoinstall_complete_msg: "Autoinstall is completed."
 
 - name: "Set CPU number to {{ cpu_cores_per_socket }}"
   ansible.builtin.set_fact:
@@ -107,15 +110,13 @@
       when: vm_default_video_memory_mb | int < vm_video_memory_mb | int
 
 - name: "Config VM with UEFI firmware"
-  when: firmware | lower == 'efi'
+  when: firmware == 'efi'
   block:
     - name: "Enable secure boot on VM"
       include_tasks: ../../common/vm_set_boot_options.yml
       vars:
         secure_boot_enabled_set: true
-      when:
-        - secureboot_enabled is defined
-        - secureboot_enabled | bool
+      when: secureboot_enabled
 
     - name: "Handle virtual TPM device"
       when:
@@ -142,73 +143,8 @@
   ansible.builtin.pause:
     seconds: 5
 
-- name: "Check 'Image APPROVED' in vmware.log when VM secure boot is enabled"
-  include_tasks: ../../common/vm_wait_log_msg.yml
-  vars:
-    vm_wait_log_name: "vmware.log"
-    vm_wait_log_msg: "SECUREBOOT: Image APPROVED"
-    vm_wait_log_retries: 10
-    vm_wait_log_ignore_errors: false
-    vm_wait_log_hide_output: false
-  when:
-    - firmware | lower == 'efi'
-    - secureboot_enabled is defined and secureboot_enabled
-
-- name: "Wait autoinstall start message appear in serial port file"
-  include_tasks: ../../common/vm_wait_log_msg.yml
-  vars:
-    vm_wait_log_name: "{{ vm_serial_file_name }}"
-    vm_wait_log_msg: "{{ autoinstall_start_msg }}"
-    vm_wait_log_delay: 10
-    vm_wait_log_retries: 10
-  when:
-    - unattend_installer
-    - unattend_installer != 'Ubuntu-Subiquity'
-    - autoinstall_start_msg is defined
-    - autoinstall_start_msg
-
-- name: "Install Ubuntu OS"
-  include_tasks: ubuntu/ubuntu_install_os.yml
-  when: guest_id is match('ubuntu.*')
-
-# For SLES, OS installation with BIOS firmware, send key to boot
-# screen to start new installation instead of booting from local
-- name: "Select boot menu for SLES/SLED"
-  include_tasks: ../../common/vm_guest_send_key.yml
-  vars:
-    keys_send:
-      - DOWNARROW
-      - ENTER
-  when:
-    - unattend_installer in ['SLE', 'openSUSE']
-    - firmware | lower == "bios"
-
-# For RHEL, Fedora or RHEL-like OS, send key to boot screen to skip
-# disk check and start installation directly.
-- name: "Select boot menu for RHEL or Fedora family OS"
-  include_tasks: ../../common/vm_guest_send_key.yml
-  vars:
-    keys_send:
-      - UPARROW
-      - ENTER
-  when:
-    - unattend_installer in ['RHEL', 'CentOS', 'Fedora', 'BCLinux', 'BCLinux-for-Euler', 'FusionOS']
-
-# For UnionTech OS, send key to boot screen
-- name: "Select boot menu for UnionTech OS"
-  include_tasks: ../../common/vm_guest_send_key.yml
-  vars:
-    keys_send:
-      - ENTER
-  when: unattend_installer == 'UOS'
-
-- name: "Wait autoinstall complete message appear in serial port output file"
-  include_tasks: ../../common/vm_wait_log_msg.yml
-  vars:
-    vm_wait_log_name: "{{ vm_serial_file_name }}"
-    vm_wait_log_msg: "{{ autoinstall_complete_msg }}"
-    vm_wait_log_delay: 30
-    vm_wait_log_retries: 120
+- name: "Wait for autoinstall is completed successfully"
+  include_tasks: wait_autoinstall_complete.yml
 
 # For only ESXi managed VM, its MAC address is generated after power on
 # not at VM creation
