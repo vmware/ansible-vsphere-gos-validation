@@ -5,3 +5,51 @@
 # Build 24414501, there is known issue on Windows 11 v24H2 and Windows Server 2025
 # VMs, that guest OS may hang after reverting to 'BaseSnapshot' when VM VBS is enabled.
 #
+- name: "Get VM VBS enable status"
+  include_tasks: ../../common/vm_get_vbs_status.yml
+
+- name: "VM VBS is enabled"
+  when: vm_vbs_enabled
+  block:
+    - name: "Get VMware Tools status"
+      include_tasks: ../../common/vm_get_vmtools_status.yml
+
+    # VMware Tools status will become not running
+    - name: "Refresh VMware Tools running status"
+      community.vmware.vmware_guest_tools_info:
+        hostname: "{{ vsphere_host_name }}"
+        username: "{{ vsphere_host_user }}"
+        password: "{{ vsphere_host_user_password }}"
+        validate_certs: "{{ validate_certs | default(false) }}"
+        datacenter: "{{ vsphere_host_datacenter }}"
+        folder: "{{ vm_folder }}"
+        name: "{{ vm_name }}"
+      register: retry_vmtools_status
+      ignore_errors: true
+      until:
+        - retry_vmtools_status is defined
+        - retry_vmtools_status.vmtools_info is defined
+        - retry_vmtools_status.vmtools_info.vm_tools_running_status is defined
+        - retry_vmtools_status.vmtools_info.vm_tools_running_status == 'guestToolsNotRunning'
+      retries: 60
+      delay: 5
+      when: vmtools_is_running
+
+    - name: "Meet known issue conditions"
+      ansible.builtin.set_fact:
+        vmci_known_issue: "{{ not vmtools_is_running or (retry_vmtools_status is defined and retry_vmtools_status.vmtools_info.vm_tools_running_status | default('') == 'guestToolsNotRunning') }}"
+
+    - name: "Known issue - Guest OS hang after reverting to snapshot when VM VBS enabled"
+      ansible.builtin.debug:
+        msg:
+          - "VMware Tools in guest OS turns to be not running and guest OS hang after reverting to snapshot when VM VBS is enabled."
+          - "This is a known issue on ESXi 8.0U1 to 8.0U3c and VM hardware version > 20."
+          - "Fixes are in the following ESXi release, e.g., new patch release of ESXi 8.0.3."
+      tags:
+        - known_issue
+      when: vmci_known_issue
+
+    - name: "Exit testing due to guest OS hang caused by known issue"
+      ansible.builtin.fail:
+        msg: "Testing failed because test environment meets the VMCI known issue conditions on ESXi {{ esxi_version }} build {{ esxi_build }}."
+      when: vmci_known_issue

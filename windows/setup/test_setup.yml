@@ -18,6 +18,15 @@
   include_tasks: ../../common/check_vm_settings.yml
   when: vm_settings_checked is undefined
 
+- name: "Handle VMCI known issue on ESXi 8.0.x"
+  include_tasks: handle_vmci_known_issue.yml
+  when:
+    - guest_os_ansible_architecture == "64-bit"
+    - vm_hardware_version_num | int > 20
+    - esxi_version is version('8.0.0', '>')
+    - esxi_version is version('8.0.3', '<=')
+    - esxi_build | int <= 24414501
+
 - name: "Get VM guest IP"
   include_tasks: ../../common/vm_get_ip.yml
   vars:
