@@ -18,20 +18,29 @@
       ansible.builtin.set_fact:
         vmtools_is_installed_before: "{{ vmtools_is_installed }}"
         vmtools_is_running_before: "{{ vmtools_is_running }}"
+        get_vmtools_info: {}
 
     # VMware Tools status will become not running
     - name: "Refresh VMware Tools running status"
-      include_tasks: ../../common/vm_wait_vmtools_status.yml
-      vars:
-        vm_wait_vmtools_running: false
-        vm_wait_vmtools_ignore_error: true
       when:
         - vmtools_is_installed_before
         - vmtools_is_running_before
+      block:
+        - name: "Waiting for VMware Tools is not running"
+          include_tasks: ../../common/vm_wait_vmtools_status.yml
+          vars:
+            vm_wait_vmtools_running: false
+            vm_wait_vmtools_ignore_error: true
+        - name: "Save VMware Tools running status"
+          ansible.builtin.set_fact:
+            vmtools_is_running_after: false
+          when:
+            - get_vmtools_info.vmtools_info.vm_tools_running_status is defined
+            - get_vmtools_info.vmtools_info.vm_tools_running_status == 'guestToolsNotRunning'
 
     - name: "Meet known issue conditions"
       ansible.builtin.set_fact:
-        vmci_known_issue: "{{ (vmtools_is_installed_before and not vmtools_is_running_before) or (get_vmtools_info is defined and get_vmtools_info.vmtools_info.vm_tools_running_status | default('') == 'guestToolsNotRunning') }}"
+        vmci_known_issue: "{{ (vmtools_is_installed_before and not vmtools_is_running_before) or (not vmtools_is_running_after | default(true)) }}"
 
     - name: "Known issue - Guest OS hang after reverting to snapshot when VM VBS enabled"
       ansible.builtin.debug:
