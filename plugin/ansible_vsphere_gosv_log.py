@@ -41,7 +41,7 @@ def extract_error_msg(json_obj):
     message = ''
     try:
         for key, value in json_obj.items():
-            if key != 'msg':
+            if key not in ['msg', 'reason']:
                 continue
 
             if isinstance(value, str):
@@ -59,7 +59,6 @@ def extract_error_msg(json_obj):
                         message += '\n' + json_obj['module_stderr'].strip()
                     elif 'module_stdout' in json_obj and str(json_obj['module_stdout']) != '':
                         message += '\n' + json_obj['module_stdout'].strip()
-
             elif isinstance(value, list):
                 message += '\n'.join(value)
             elif isinstance(value, dict):
