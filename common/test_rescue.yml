@@ -76,27 +76,21 @@
         - "vmware.log"
       when: vm_dir_name is defined and vm_dir_name
 
-    - name: "Handle Windows guest OS situation"
-      when: gosv_test_suite == 'windows'
+    - name: "Check Windows guest BSOD in vmware.log"
+      when:
+        - gosv_test_suite == 'windows'
+        - datastore_file_download_success
       block:
-        - name: "Set exit testing when meets VMCI known issue"
+        - name: "Look up Windows guest BSOD in vmware.log"
           ansible.builtin.set_fact:
-            exit_testing_when_fail: true
-          when: vmci_known_issue | default(false)
+            winbsod_in_vmware_log: "{{ lookup('file', datastore_file_download_result.dest) | regex_findall('.*WinBSOD:.*') }}"
 
-        - name: "Check Windows guest BSOD in vmware.log"
-          when: datastore_file_download_success
-          block:
-            - name: "Look up Windows guest BSOD in vmware.log"
-              ansible.builtin.set_fact:
-                winbsod_in_vmware_log: "{{ lookup('file', datastore_file_download_result.dest) | regex_findall('.*WinBSOD:.*') }}"
-
-            - name: "Detected Windows guest BSOD in vmware.log"
-              ansible.builtin.debug:
-                msg: "{{ winbsod_in_vmware_log }}"
-              tags:
-                - fail_message
-              when: winbsod_in_vmware_log | length > 0
+        - name: "Detected Windows guest BSOD in vmware.log"
+          ansible.builtin.debug:
+            msg: "{{ winbsod_in_vmware_log }}"
+          tags:
+            - fail_message
+          when: winbsod_in_vmware_log | length > 0
 
     - name: "Take a snapshot at VM current state"
       include_tasks: vm_take_snapshot.yml

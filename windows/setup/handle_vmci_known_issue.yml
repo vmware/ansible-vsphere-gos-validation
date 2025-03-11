@@ -1,61 +1,27 @@
 # Copyright 2025 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# ESXi version 8.0.1 to 8.0.3 with build lower than ESXi 8.0 Update 3c
-# Build 24414501, there is known issue on Windows VMs,
-# that guest OS hang after reverting to 'BaseSnapshot' when VM VBS is enabled.
+# On ESXi version 8.0.1 to 8.0.3 with build number lower than
+# the ESXi 8.0 Update 3c build 24414501, there is a known issue
+# on Windows VMs with VBS enabled, that guest OS hang after reverting
+# to 'BaseSnapshot' here, so will exit testing when hitting this issue.
 #
-- name: "Get VM VBS enable status"
-  include_tasks: ../../common/vm_get_vbs_status.yml
+- name: "Known issue - Guest OS hang after reverting to snapshot when VM VBS enabled"
+  ansible.builtin.debug:
+    msg:
+      - "VMware Tools in guest OS turns to be not running and guest OS hang after reverting to snapshot when VM VBS is enabled."
+      - "This is a known issue on Intel server installed with ESXi 8.0U1 to 8.0U3c and VM hardware version > 20."
+      - "Fixes are in the following ESXi release, e.g., new patch release of ESXi 8.0.3."
+  tags:
+    - known_issue
 
-- name: "VM VBS is enabled"
-  when: vm_vbs_enabled
-  block:
-    - name: "Get VMware Tools status"
-      include_tasks: ../../common/vm_get_vmtools_status.yml
+- name: "Set exit testing when meets this VMCI known issue"
+  ansible.builtin.set_fact:
+    exit_testing_when_fail: true
 
-    - name: "Save VMware Tools status"
-      ansible.builtin.set_fact:
-        vmtools_is_installed_before: "{{ vmtools_is_installed }}"
-        vmtools_is_running_before: "{{ vmtools_is_running }}"
-        get_vmtools_info: {}
-
-    # VMware Tools status will become not running
-    - name: "Refresh VMware Tools running status"
-      when:
-        - vmtools_is_installed_before
-        - vmtools_is_running_before
-      block:
-        - name: "Waiting for VMware Tools is not running"
-          include_tasks: ../../common/vm_wait_vmtools_status.yml
-          vars:
-            vm_wait_vmtools_running: false
-            vm_wait_vmtools_ignore_error: true
-        - name: "Save VMware Tools running status"
-          ansible.builtin.set_fact:
-            vmtools_is_running_after: false
-          when:
-            - get_vmtools_info.vmtools_info.vm_tools_running_status is defined
-            - get_vmtools_info.vmtools_info.vm_tools_running_status == 'guestToolsNotRunning'
-
-    - name: "Meet known issue conditions"
-      ansible.builtin.set_fact:
-        vmci_known_issue: "{{ (vmtools_is_installed_before and not vmtools_is_running_before) or (not vmtools_is_running_after | default(true)) }}"
-
-    - name: "Known issue - Guest OS hang after reverting to snapshot when VM VBS enabled"
-      ansible.builtin.debug:
-        msg:
-          - "VMware Tools in guest OS turns to be not running and guest OS hang after reverting to snapshot when VM VBS is enabled."
-          - "This is a known issue on ESXi 8.0U1 to 8.0U3c and VM hardware version > 20."
-          - "Fixes are in the following ESXi release, e.g., new patch release of ESXi 8.0.3."
-      tags:
-        - known_issue
-      when: vmci_known_issue
-
-    - name: "Exit testing due to VMCI known issue"
-      ansible.builtin.fail:
-        msg: >-
-          Testing failed due to VMware Tools is not running and guest OS hang after reverting to
-          the base snapshot when VM VBS is enabled, which is caused
-          by the VMCI known issue on ESXi {{ esxi_version }} build {{ esxi_build }}.
-      when: vmci_known_issue
+- name: "Set current test to fail due to this VMCI known issue"
+  ansible.builtin.fail:
+    msg: >-
+      Testing failed due to VMware Tools is not running and guest OS hang after reverting to
+      the base snapshot when VM VBS is enabled, which is caused
+      by the VMCI known issue on Intel server installed with ESXi {{ esxi_version }} build {{ esxi_build }}.
