@@ -27,3 +27,26 @@
       Failed to install open-vm-tools by executing command:
       {{ package_install_cmd }} {{' '.join(ovt_packages) }}
       Caught error: {{ ovt_install_result.stderr | default('') }}
+
+# Workaround for SLES 16, in which vmtoolsd and vgauthd services
+# are disabled after reinstall.
+# Issue was tracked in https://bugzilla.suse.com/show_bug.cgi?id=1237180
+- name: "Enable VMware Tools services"
+  when:
+    - guest_os_ansible_distribution == 'SLES'
+    - guest_os_ansible_distribution_major_ver | int == 16
+  block:
+    - name: "Enable open-vm-tools service"
+      include_tasks: ../utils/service_operation.yml
+      vars:
+        service_name: "{{ ovt_service_name }}"
+        service_enabled: true
+        service_state: "started"
+
+    - name: "Enable VGAuthService service"
+      include_tasks: ../utils/service_operation.yml
+      vars:
+        service_name: "{{ vgauth_service_name }}"
+        service_enabled: true
+        service_state: "started"
+      when: vgauth_service_name
