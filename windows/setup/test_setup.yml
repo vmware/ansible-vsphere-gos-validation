@@ -22,15 +22,22 @@
   include_tasks: ../../common/vm_get_vmtools_status.yml
 
 - name: "Get VM VBS enable status"
-  include_tasks: ../../common/vm_get_vbs_status.yml
-  when: vm_firmware == 'efi'
+  when:
+    - vm_firmware == 'efi'
+    - saved_vm_vbs_status is undefined
+  block:
+    - name: "Get VM VBS enable status"
+      include_tasks: ../../common/vm_get_vbs_status.yml
+    - name: "Save VM VBS enable status"
+      ansible.builtin.set_fact:
+        saved_vm_vbs_status: "{{ vm_vbs_enabled }}"
 
 - name: "Handle VMCI known issue on {{ esxi_cpu_vendor }} ESXi {{ esxi_version }} build {{ esxi_build }}"
   include_tasks: handle_vmci_known_issue.yml
   when:
     - esxi_cpu_vendor == 'intel'
     - base_snapshot_exists | default(false)
-    - vm_vbs_enabled is defined and vm_vbs_enabled
+    - saved_vm_vbs_status is defined and saved_vm_vbs_status
     - vmtools_is_installed
     - vm_hardware_version_num | int > 20
     - esxi_version is version('8.0.0', '>')
