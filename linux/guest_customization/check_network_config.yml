@@ -161,11 +161,14 @@
           when: guest_os_ansible_distribution == "Debian"
 
 - name: "Collect network configuration file for {{ vm_guest_os_distribution }}"
-  when: guest_os_family == "RedHat"
+  when: guest_os_family in ["RedHat", "Suse"]
   block:
     - name: "Set GOSC network configuration file on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
-        src_network_file: /etc/sysconfig/network-scripts/ifcfg-{{ guest_iface_name }}
+        src_network_file: |-
+          {%- if guest_os_family == "RedHat" -%}/etc/sysconfig/network-scripts/ifcfg-{{ guest_iface_name }}
+          {%- else -%}/etc/sysconfig/network/ifcfg-{{ guest_iface_name }}
+          {%- endif -%}
       when: guest_os_network_manager != "NetworkManager"
 
     - name: "Set GOSC network configuration file on {{ vm_guest_os_distribution }}"
@@ -194,11 +197,6 @@
           ansible.builtin.set_fact:
             src_network_file: "{{ guest_network_connection[0].split(':')[-1] }}"
           when: guest_network_connection | length == 1
-
-- name: "Set GOSC network configuration file on {{ vm_guest_os_distribution }}"
-  ansible.builtin.set_fact:
-    src_network_file: "/etc/sysconfig/network/ifcfg-{{ guest_iface_name }}"
-  when: guest_os_family == "Suse"
 
 - name: "Collect network configuration file on {{ vm_guest_os_distribution }}"
   when:
