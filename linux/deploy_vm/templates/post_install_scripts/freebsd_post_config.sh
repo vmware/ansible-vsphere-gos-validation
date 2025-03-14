@@ -73,7 +73,7 @@ env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
 # Different packages between the 32bit image and 64bit image
 packages_to_install="bash sudo wget curl e2fsprogs iozone lsblk"
 if [ "$machtype" == "amd64" ] || [ "$machtype" == "x86_64" ]; then
-    packages_to_install="$packages_to_install xorg kde5 xf86-video-vmware sddm open-vm-tools xf86-input-vmmouse"
+    packages_to_install="$packages_to_install xorg gnome xf86-video-vmware open-vm-tools xf86-input-vmmouse"
 else
     packages_to_install="$packages_to_install open-vm-tools-nox11"
 fi
@@ -122,7 +122,7 @@ fi
 # Add new user. 
 {% if new_user is defined and new_user != 'root' %}
 printf "Adding new user {{ new_user }} ..." >/dev/ttyu0
-echo "{{ vm_password }}" | pw useradd {{ new_user }} -s /bin/sh -d /home/{{ new_user }} -m -g wheel -h 0
+echo "{{ vm_password }}" | pw useradd {{ new_user }} -c {{ new_user }} -s /bin/sh -d /home/{{ new_user }} -m -g wheel -h 0
 echo '{{ new_user }} ALL=(ALL:ALL) ALL' >> /usr/local/etc/sudoers
 echo "DONE" >/dev/ttyu0
 {% endif %}
@@ -154,20 +154,19 @@ printf "Enable ZFS ..." > /dev/ttyu0
 sysrc zfs_enable="YES"
 echo "DONE" >/dev/ttyu0
 
-# Configure KDE desktop
+# Configure GNOME desktop
 if [ "$machtype" == "amd64" ] || [ "$machtype" == "x86_64" ]; then
-    printf "Configuring KDE desktop ... " >/dev/ttyu0
+    printf "Configuring GNOME desktop ... " >/dev/ttyu0
     echo "proc      /proc       procfs  rw  0   0" >> /etc/fstab
+    sysrc hald_enable="YES"
     sysrc dbus_enable="YES"
-    sysrc sddm_enable="YES"
+    sysrc gnome_enable="YES"
+    sysrc moused_enable="YES"
+    sysrc gdm_enable="YES"
     echo "DONE" >/dev/ttyu0
 
-    # Autologin to desktop environment
-    printf "Enabling auto login for user {{ new_user }}... " >/dev/ttyu0
-    echo "[Autologin]" >> /usr/local/etc/sddm.conf
-    echo "User={{ new_user }}" >> /usr/local/etc/sddm.conf
-    echo "Session=plasma.desktop" >> /usr/local/etc/sddm.conf
-    echo "DONE" >/dev/ttyu0
+    # GNOME auto login config doesn't work well on FreeBSD.
+    # So skip it here
 fi
 
 if [ "$BSDINSTALL_LOG" != "" ] && [ -f $BSDINSTALL_LOG ]; then
