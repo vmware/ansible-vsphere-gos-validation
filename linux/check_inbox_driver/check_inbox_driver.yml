@@ -18,18 +18,34 @@
             create_test_log_folder: true
             skip_test_no_vmtools: false
 
-        - name: "Initialized inbox drivers' versions dict"
+        # Use info in /etc/os-release to set the release value, unless it can't provide a complete version, e.g.
+        # - VMWare Photon OS doesn't have version in its PRETTY_NAME
+        # - Debian and Pardus only have major version in its PRETTY_NAME and VERSION
+        # Then use ansible distribution info to set the release value.
+        # SLED/SLES 15 or earlier releases have "SP"in its PRETTY_NAME, so always use PRETTY_NAME for SLED/SLES
+        - name: "Set fact of the OS Release version"
           ansible.builtin.set_fact:
-            inbox_drivers_versions: {}
+            os_release_version: >-
+              {%- if guest_os_release.PRETTY_NAME | default('') and 
+               (guest_os_ansible_distribution in ['SLED', 'SLES'] or
+                guest_os_ansible_distribution_ver in guest_os_release.PRETTY_NAME)-%}
+                  {{ guest_os_release.PRETTY_NAME }}
+              {%- elif guest_os_release.NAME | default('') and guest_os_ansible_distribution_ver in guest_os_release.VERSION | default('') -%}
+                  {{ guest_os_release.NAME ~ ' ' ~ guest_os_release.VERSION }}
+              {%- else -%}
+                  {{ guest_os_ansible_distribution ~ ' ' ~ guest_os_ansible_distribution_ver }}
+              {%- endif -%}
 
-        - name: "Get OS release"
-          include_tasks: get_os_release.yml
-
-        - name: "Get OS kernel version"
+        - name: "Initialize the fact of inbox drivers' versions dict"
           ansible.builtin.set_fact:
-            inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'kernel': guest_os_ansible_kernel}) }}"
+            inbox_drivers_versions: {'Release': "{{ os_release_version }}", 'kernel': "{{ guest_os_ansible_kernel }}"}
 
         - name: "Get open-vm-tools version"
+          when:
+            - vmtools_is_ovt is defined
+            - vmtools_is_ovt
+            - vmtools_install_type is defined
+            - vmtools_install_type == "package"
           block:
             - name: "Get path of vmware-toolbox-cmd"
               include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
@@ -42,7 +58,6 @@
             - name: "Collect open-vm-tools version"
               ansible.builtin.set_fact:
                 inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'open-vm-tools': ovt_version.stdout}) }}"
-          when: vmtools_is_ovt is defined and vmtools_is_ovt
 
         - name: "Get cloud-init version"
           include_tasks: ../utils/get_cloudinit_version.yml
@@ -87,7 +102,7 @@
 
             - name: "Set fact of the output file path"
               ansible.builtin.set_fact:
-                os_release_info_file_path: "{{ current_test_log_folder }}/{{ inbox_drivers_versions['Release'].replace('/','-').replace(' ','-') | lower }}.json"
+                os_release_info_file_path: "{{ current_test_log_folder }}/{{ vm_guest_os_distribution.replace('/','-').replace(' ','-') | lower }}.json"
 
             - name: "The inbox drivers versions will be dump to a json file"
               ansible.builtin.debug: var=os_release_info_file_path
