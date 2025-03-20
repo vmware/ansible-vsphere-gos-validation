@@ -38,17 +38,21 @@
           ansible.builtin.set_fact:
             current_gos: "{{ guest_os_ansible_distribution.strip('Microsoft ') }}"
 
-        - name: "Get the current OS info in the pre-defined guest OS info list"
+        - name: "Get OS info in the pre-defined guest OS info list matched current OS"
           ansible.builtin.set_fact:
             current_gos_info: "{{ win_gos_info | selectattr('win_guest', 'equalto', current_gos) }}"
 
         - name: "Check current OS in the pre-defined guest OS info list"
           ansible.builtin.assert:
             that:
-              - current_gos_info
+              - current_gos_info | length == 1
             fail_msg: >
               "The pre-defined guest OS info list does not contain this OS version: {{ current_gos }},
               please check whether this guest OS is supported and add it to the list accordingly."
+
+        - name: "Set fact of the matched current OS info"
+          ansible.builtin.set_fact:
+            current_gos_info: "{{ current_gos_info[0] }}"
 
         - name: "Handle Windows 11 known issue"
           include_tasks: win11_guest_info_exception.yml
