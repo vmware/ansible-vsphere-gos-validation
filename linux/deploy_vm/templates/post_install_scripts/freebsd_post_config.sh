@@ -73,7 +73,7 @@ env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
 # Different packages between the 32bit image and 64bit image
 packages_to_install="bash sudo wget curl e2fsprogs iozone lsblk"
 if [ "$machtype" == "amd64" ] || [ "$machtype" == "x86_64" ]; then
-    packages_to_install="$packages_to_install xorg gnome xf86-video-vmware open-vm-tools xf86-input-vmmouse"
+    packages_to_install="$packages_to_install xorg gnome slim xf86-video-vmware open-vm-tools xf86-input-vmmouse"
 else
     packages_to_install="$packages_to_install open-vm-tools-nox11"
 fi
@@ -162,11 +162,23 @@ if [ "$machtype" == "amd64" ] || [ "$machtype" == "x86_64" ]; then
     sysrc dbus_enable="YES"
     sysrc gnome_enable="YES"
     sysrc moused_enable="YES"
-    sysrc gdm_enable="YES"
+    sysrc slim_enable="YES"
     echo "DONE" >/dev/ttyu0
 
-    # GNOME auto login config doesn't work well on FreeBSD.
-    # So skip it here
+    # Use SLIM auto login
+    printf "Enabling auto login ... " >/dev/ttyu0
+    sed -i '' -e "s/#auto_login .*/auto_login yes/" /usr/local/etc/slim.conf
+    {% if new_user is defined and new_user != 'root' -%}
+    sed -i '' -e "s/#default_user .*/default_user {{ new_user }}/" /usr/local/etc/slim.conf
+    echo "exec gnome-session" > /home/{{ new_user }}/.xinitrc
+    chmod a+x /home/{{ new_user }}/.xinitrc
+    chown {{ new_user }} /home/{{ new_user }}/.xinitrc 
+    {% else -%}
+    sed -i '' -e "s/#default_user .*/default_user root/" /usr/local/etc/slim.conf
+    echo "exec gnome-session" > /root/.xinitrc
+    chmod a+x /root/.xinitrc
+    {% endif -%}
+    echo "DONE" >/dev/ttyu0
 fi
 
 if [ "$BSDINSTALL_LOG" != "" ] && [ -f $BSDINSTALL_LOG ]; then
