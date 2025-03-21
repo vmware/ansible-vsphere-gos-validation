@@ -1,0 +1,27 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# On ESXi version 8.0.1 to 8.0.3 with build number lower than
+# the ESXi 8.0 Update 3c build 24414501, there is a known issue
+# on Windows VMs with VBS enabled, that guest OS hang after reverting
+# to 'BaseSnapshot' here, so will exit testing when hitting this issue.
+#
+- name: "Known issue - Guest OS hang after reverting to snapshot when VM VBS enabled"
+  ansible.builtin.debug:
+    msg:
+      - "VMware Tools in guest OS turns to be not running and guest OS hang after reverting to snapshot when VM VBS is enabled."
+      - "This is a known issue on Intel server installed with ESXi 8.0U1 to 8.0U3c and VM hardware version > 20."
+      - "Fixes are in the following ESXi release, e.g., new patch release of ESXi 8.0.3."
+  tags:
+    - known_issue
+
+- name: "Set exit testing when meets this VMCI known issue"
+  ansible.builtin.set_fact:
+    exit_testing_when_fail: true
+
+- name: "Set current test to fail due to this VMCI known issue"
+  ansible.builtin.fail:
+    msg: >-
+      Testing failed due to VMware Tools is not running and guest OS hang after reverting to
+      the base snapshot when VM VBS is enabled, which is caused
+      by the VMCI known issue on Intel server installed with ESXi {{ esxi_version }} build {{ esxi_build }}.
