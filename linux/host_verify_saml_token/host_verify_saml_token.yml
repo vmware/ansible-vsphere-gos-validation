@@ -10,32 +10,10 @@
   tasks:
     - name: "Test case block"
       block:
-        - name: "Skip test case due to missing vCenter Server variables"
-          include_tasks: ../../common/skip_test_case.yml
-          vars:
-            skip_msg: "Skip test case {{ ansible_play_name }} is because of missing vCenter Server variables."
-            skip_reason: "Not Applicable"
-          when: >
-            (not vcenter_is_defined) or
-            (vcenter_ssh_username is undefined or not vcenter_ssh_username) or
-            (vcenter_ssh_password is undefined or not vcenter_ssh_password)
-
         - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: true
-
-        - name: "Check SSH connection to vCenter Server"
-          include_tasks: ../../common/test_ssh_connection.yml
-          vars:
-            ssh_server_ip: "{{ vcenter_hostname }}"
-
-        - name: "Block test case due to vCenter Server is not connectable via SSH"
-          include_tasks: ../../common/skip_test_case.yml
-          vars:
-            skip_msg: "Test case {{ ansible_play_name }} is blocked because SSH connection to vCenter Server failed."
-            skip_reason: "Blocked"
-          when: not ssh_connect_success
 
         - name: "Skip test case for {{ guest_os_ansible_distribution }}"
           include_tasks: ../../common/skip_test_case.yml
@@ -58,8 +36,30 @@
             skip_reason: "Not Supported"
           when: esxi_version is version('8.0.2', '<') or vmtools_version is version('12.3.0', '<')
 
+        - name: "Skip test case due to missing vCenter Server variables"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case {{ ansible_play_name }} is because of missing vCenter Server variables."
+            skip_reason: "Not Applicable"
+          when: >
+            (not vcenter_is_defined) or
+            (vcenter_ssh_username is undefined or not vcenter_ssh_username) or
+            (vcenter_ssh_password is undefined or not vcenter_ssh_password)
+
         - name: "Check VMware Tools capability exists for host verified SAML token"
           include_tasks: ../../common/vm_check_vmtools_capability.yml
+
+        - name: "Check SSH connection to vCenter Server"
+          include_tasks: ../../common/test_ssh_connection.yml
+          vars:
+            ssh_server_ip: "{{ vcenter_hostname }}"
+
+        - name: "Block test case due to vCenter Server is not connectable via SSH"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Test case {{ ansible_play_name }} is blocked because SSH connection to vCenter Server failed."
+            skip_reason: "Blocked"
+          when: not ssh_connect_success
 
         - name: "Initialize facts about domain user information"
           ansible.builtin.set_fact:

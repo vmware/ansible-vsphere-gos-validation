@@ -10,6 +10,21 @@
   tasks:
     - name: "Test case block"
       block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            skip_test_no_vmtools: true
+            create_current_test_folder: true
+
+        - name: "Skip test case for old ESXi server or VMware Tools"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case {{ ansible_play_name }} because ESXi version is {{ esxi_version }} < 8.0.2 or
+              VMware Tools version is {{ vmtools_version }} < 12.3.0.
+            skip_reason: "Not Supported"
+          when: esxi_version is version('8.0.2', '<') or vmtools_version is version('12.3.0', '<')
+
         - name: "Skip test case due to missing vCenter Server variables"
           include_tasks: ../../common/skip_test_case.yml
           vars:
@@ -20,11 +35,8 @@
             (vcenter_ssh_username is undefined or not vcenter_ssh_username) or
             (vcenter_ssh_password is undefined or not vcenter_ssh_password)
 
-        - name: "Test setup"
-          include_tasks: ../setup/test_setup.yml
-          vars:
-            skip_test_no_vmtools: true
-            create_current_test_folder: true
+        - name: "Check VMware Tools capability exists for host verified SAML token"
+          include_tasks: ../../common/vm_check_vmtools_capability.yml
 
         - name: "Check SSH connection to vCenter Server"
           include_tasks: ../../common/test_ssh_connection.yml
@@ -37,18 +49,6 @@
             skip_msg: "Test case {{ ansible_play_name }} is blocked because SSH connection to vCenter Server failed."
             skip_reason: "Blocked"
           when: not ssh_connect_success
-
-        - name: "Skip test case for old ESXi server or VMware Tools"
-          include_tasks: ../../common/skip_test_case.yml
-          vars:
-            skip_msg: >-
-              Skip test case {{ ansible_play_name }} because ESXi version is {{ esxi_version }} < 8.0.2 or
-              VMware Tools version is {{ vmtools_version }} < 12.3.0.
-            skip_reason: "Not Supported"
-          when: esxi_version is version('8.0.2', '<') or vmtools_version is version('12.3.0', '<')
-
-        - name: "Check VMware Tools capability exists for host verified SAML token"
-          include_tasks: ../../common/vm_check_vmtools_capability.yml
 
         - name: "Enable guest OS timesync with ESXi server"
           include_tasks: ../utils/win_execute_cmd.yml
