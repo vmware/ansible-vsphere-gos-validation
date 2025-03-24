@@ -14,7 +14,11 @@
 # Set expected guest ID corresponding to current OS
 - name: "Set fact of expected guest ID of current {{ guest_os_ansible_architecture }} OS"
   ansible.builtin.set_fact:
-    current_os_guest_id: "{{ (guest_os_ansible_architecture == '64-bit' | ternary(current_gos_info.win_guest_id | select('match', '.*64Guest'), current_gos_info.win_guest_id | reject('match', '.*64Guest')))[0] }}"
+    current_os_guest_id: >-
+      {%- if guest_os_ansible_architecture == '32-bit' -%}{{ (current_gos_info.win_guest_id | reject('match', '.*64Guest'))[0] }}
+      {%- elif guest_os_ansible_cpu_arch == 'x86' -%}
+      {%- elif guest_os_ansible_cpu_arch == 'arm' -%}
+      {%- endif -%}
 
 - name: "Get the previous OS info in the pre-defined guest OS info list"
   include_tasks: get_previous_gos_info.yml
