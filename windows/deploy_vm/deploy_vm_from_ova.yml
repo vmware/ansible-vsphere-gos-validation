@@ -15,15 +15,17 @@
   when: ova_nfs_server_path is undefined or not ova_nfs_server_path
 
 # OVA file on NFS server
-- name: "Mount NFS storage"
-  include_tasks: ../../common/mount_nfs_storage_local.yml
-  vars:
-    nfs_server_path: "{{ ova_nfs_server_path }}"
+- name: "Get OVA path and file name after mounting NFS storage at local"
   when: ova_nfs_server_path is defined and ova_nfs_server_path
-- name: "Get OVA path and file name"
-  ansible.builtin.set_fact:
-    vm_ova_path: "{{ nfs_mount_dir }}/{{ ova_path }}"
-    vm_ova_name: "{{ ova_path | basename }}"
+  block:
+    - name: "Mount NFS storage at local"
+      include_tasks: ../../common/mount_nfs_storage_local.yml
+      vars:
+        nfs_server_path: "{{ ova_nfs_server_path }}"
+    - name: "Get OVA path and file name"
+      ansible.builtin.set_fact:
+        vm_ova_path: "{{ nfs_mount_dir }}/{{ ova_path }}"
+        vm_ova_name: "{{ ova_path | basename }}"
 # Check OVA file exists
 - name: "Check for {{ vm_ova_path }} existence"
   ansible.builtin.stat:
