@@ -2,29 +2,32 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Fetch log files from Windows guest OS to local
-- name: "Initialize the absolute directory path list of GOSC log"
+- name: "Initialize the absolute path list of GOSC logs"
   ansible.builtin.set_fact:
     win_gosc_log_dir: []
 
-- name: "Set fact of the relative directory path list of GOSC log"
+- name: "Set fact of the relative path list of GOSC logs"
   ansible.builtin.set_fact:
     win_gosc_log_dir_rel:
       - 'Temp\vmware-imc\'
       - 'System32\Sysprep\Panther\'
-      - 'Panther\'
+      - 'Panther\UnattendGC'
+      - 'Panther\setupact.log'
+      - 'Panther\setuperr.log'
+      - 'Panther\unattend.xml'
       - 'Debug\'
 
-- name: "Set fact of the absolute directory path list of GOSC log"
+- name: "Set fact of the absolute path list of GOSC logs"
   ansible.builtin.set_fact:
     win_gosc_log_dir: "{{ [win_windows_dir] | ansible.builtin.product(win_gosc_log_dir_rel) | map('join', win_dir_separator) }}"
 
-- name: "Display the directory path list of GOSC log"
+- name: "Display the absolute path list of GOSC logs"
   ansible.builtin.debug: var=win_gosc_log_dir
 
-- name: "Get GOSC log files from guest OS"
-  include_tasks: ../utils/win_get_folder.yml
+- name: "Get GOSC log files from guest OS by delegating to guest directly"
+  include_tasks: ../utils/win_get_file_folder.yml
   vars:
-    win_get_folder_dst_path: "{{ current_test_log_folder }}"
+    win_get_dst_path: "{{ current_test_log_folder }}"
   with_items: "{{ win_gosc_log_dir }}"
   loop_control:
-    loop_var: win_get_folder_src_path
+    loop_var: win_get_src_path
