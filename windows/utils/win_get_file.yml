@@ -3,17 +3,19 @@
 ---
 # Get specified file from Windows guest OS to local path
 # Parameters:
-#   win_get_file_src_path: the source path of the file
-#   win_get_file_dst_path: the destination path of the file
+#   win_get_file_src_path: the source path of the file in guest OS.
+#   win_get_file_dst_path: the destination path of the file on local machine.
+#   win_get_file_ignore_error: whether ignore errors when fetching file,
+#     default value is false.
 #
-- name: Get file from Windows guest OS to local
-  fetch:
+- name: "Get file from Windows guest OS to local"
+  ansible.builtin.fetch:
     src: "{{ win_get_file_src_path }}"
     dest: "{{ win_get_file_dst_path }}"
-  register: fetch_file
-  ignore_errors: true
+  register: win_fetch_file
+  ignore_errors: "{{ win_get_file_ignore_error | default(false) }}"
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: Display the fetch file result
-  ansible.builtin.debug: var=fetch_file
-  when: enable_debug is defined and enable_debug
+- name: "Display the result of fetching file"
+  ansible.builtin.debug: var=win_fetch_file
+  when: enable_debug
