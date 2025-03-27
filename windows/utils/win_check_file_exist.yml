@@ -1,32 +1,37 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Check specified file info in Windows guest
+# Check if specified file/object exists in Windows guest OS
 # Parameters:
-#   win_check_file_exist_file: the file path
+#   win_check_file_exist_file: the full path of the file/object to get
+#     the facts of.
 # Return:
-#   win_check_file_exist_result: true or false
+#   win_check_file_exist_result: whether the specified file/object exists in
+#     guest OS or not, returns true or false.
 #
-- name: Initialize the file status
+- name: "Initialize the file status"
   ansible.builtin.set_fact:
     win_check_file_exist_result: false
 
-- name: Check if specified file exists in Windows guest OS
+- name: "Check if specified file exists in Windows guest OS"
   ansible.windows.win_stat:
     path: "{{ win_check_file_exist_file }}"
   delegate_to: "{{ vm_guest_ip }}"
   register: win_check_file_info
   ignore_errors: true
-- name: Display the returned file info
-  ansible.builtin.debug: var=win_check_file_info
-  when: enable_debug is defined and enable_debug
 
-- name: Set fact of file existence
+- name: "Display the returned file info"
+  ansible.builtin.debug: var=win_check_file_info
+  when: enable_debug
+
+- name: "Set fact of file existence"
   ansible.builtin.set_fact:
     win_check_file_exist_result: true
   when:
-    - "'stat' in win_check_file_info"
-    - "'exists' in win_check_file_info.stat"
+    - win_check_file_info.stat is defined
+    - win_check_file_info.stat.exists is defined
     - win_check_file_info.stat.exists
-- ansible.builtin.debug:
+
+- name: "Display the check result"
+  ansible.builtin.debug:
     msg: "File '{{ win_check_file_exist_file }}' is in guest OS: {{ win_check_file_exist_result }}"

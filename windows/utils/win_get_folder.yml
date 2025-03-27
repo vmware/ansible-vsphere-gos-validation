@@ -3,46 +3,29 @@
 ---
 # Get files in a folder recusively from Windows guest OS to local machine
 # Parameters:
-#   win_get_folder_src_path: the source folder in Windows guest OS
-#   win_get_folder_dst_path: the destination path in local machine
+#   win_get_folder_src_path: the source folder in Windows guest OS.
+#   win_get_folder_dst_path: the destination path on local machine.
 #
 - name: "Display the source folder path"
   ansible.builtin.debug: var=win_get_folder_src_path
 
-- name: "Check if source folder exists in guest OS"
-  include_tasks: win_check_file_exist.yml
+- name: "Get files and sub folders list in source folder"
+  include_tasks: win_get_sub_files_folders.yml
   vars:
-    win_check_file_exist_file: "{{ win_get_folder_src_path }}"
+    win_get_files_folders_folder: "{{ win_get_folder_src_path }}"
 
-- name: "Set fact of source folder existence state"
-  ansible.builtin.set_fact:
-    win_folder_exist: "{{ win_check_file_exist_result }}"
-
-- name: "Get files in source folder from guest OS"
-  when: win_folder_exist
+- name: "Fetch files in source folder from guest OS"
+  when: win_get_files_folders_list | length != 0
   block:
-    - name: "Get files and sub folders list in source folder"
-      include_tasks: win_get_sub_files_folders.yml
+    - name: "Fetch files recusively"
+      include_tasks: win_get_file_folder.yml
       vars:
-        win_get_files_folders_folder: "{{ win_get_folder_src_path }}"
+        win_get_dst_path: "{{ win_get_folder_dst_path }}"
+      with_items: "{{ win_get_files_folders_list }}"
+      loop_control:
+        loop_var: win_get_src_path
 
-    - name: "Fetch files in source folder from guest OS"
-      when: win_get_files_folders_list | length != 0
-      block:
-        - name: "Fetch files recusively"
-          include_tasks: win_get_file_folder.yml
-          vars:
-            win_get_dst_path: "{{ win_get_folder_dst_path }}"
-          with_items: "{{ win_get_files_folders_list }}"
-          loop_control:
-            loop_var: win_get_src_path
-
-    - name: "No files or sub folders in source folder"
-      ansible.builtin.debug:
-        msg: "Specified folder is empty in guest OS: {{ win_get_folder_src_path }}, skip getting files."
-      when: win_get_files_folders_list | length == 0
-
-- name: "Source folder not exist"
+- name: "No files or sub folders in source folder"
   ansible.builtin.debug:
-    msg: "Specified folder does not exist in guest OS: {{ win_get_folder_src_path }}, skip getting files."
-  when: not win_folder_exist
+    msg: "Specified folder is empty in guest OS: {{ win_get_folder_src_path }}, skip getting files."
+  when: win_get_files_folders_list | length == 0
