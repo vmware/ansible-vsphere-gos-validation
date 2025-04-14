@@ -105,6 +105,8 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
         content: |||
           #!/bin/bash
           echo "Execute post-install script" >/dev/ttyS0
+          echo "Config SSHd to permit root login" >/dev/ttyS0
+          echo "PermitRootLogin yes" >/etc/ssh/sshd_config.d/10_root_login.conf
           echo "{{ autoinstall_complete_msg }}" >/dev/ttyS0
         |||
       }
