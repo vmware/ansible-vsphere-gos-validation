@@ -14,6 +14,15 @@
   tasks:
     - name: "Test case block"
       block:
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case '{{ ansible_play_name }}' because vCPU hotadd is not supported
+              on ARM ESXi host.
+            skip_reason: "Not Supported"
+          when: esxi_cpu_vendor == 'arm'
+
         - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
 
@@ -21,10 +30,14 @@
           when: guest_os_ansible_architecture == "64-bit"
           block:
             # Refer to KB article https://knowledge.broadcom.com/external/article?legacyId=52584
-            - include_tasks: ../../common/vm_get_vbs_status.yml
-            - include_tasks: ../../common/skip_test_case.yml
+            - name: "Get VM VBS enablement status"
+              include_tasks: ../../common/vm_get_vbs_status.yml
+            - name: "Skip test case"
+              include_tasks: ../../common/skip_test_case.yml
               vars:
-                skip_msg: "Skip test case due to CPU hotadd not supported for VM with VBS enabled."
+                skip_msg: >-
+                  Skip test case '{{ ansible_play_name }}' because vCPU hotadd is not supported
+                  for VM with VBS enabled.
                 skip_reason: "Not Supported"
               when: vm_vbs_enabled
 
