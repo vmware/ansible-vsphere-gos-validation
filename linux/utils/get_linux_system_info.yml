@@ -16,6 +16,17 @@
 - name: "Get OS release info"
   include_tasks: get_os_release.yml
 
+# The NAME and PRETTY_NAME in /etc/os-release of SLE 16 Beta3 changed,
+# which caused ansible distribution and family to become "SUSE Linux".
+- name: "Correct guest OS ansible distribution and family for SLES"
+  ansible.builtin.set_fact:
+    guest_os_ansible_distribution: "{{ guest_os_release.ID | upper }}"
+    guest_os_family: "Suse"
+  when:
+    - guest_os_ansible_distribution == "SUSE Linux"
+    - guest_os_release.ID is defined
+    - guest_os_release.ID in ['sles', 'sled']
+
 - name: "Correct guest OS ansible distribution for RHCOS"
   ansible.builtin.set_fact:
     guest_os_ansible_distribution: "RHCOS"

@@ -37,3 +37,16 @@
                 unattend_installer == 'Ubuntu-Subiquity') or
                (ova_guest_os_type is defined and
                 ova_guest_os_type in ['photon', 'ubuntu', 'amazon']))
+
+        - name: "Collect SUSE Amaga installation logs"
+          include_tasks: ../utils/fetch_file.yml
+          vars:
+            fetch_file_src_path: "/var/log/agama-installation.tar.gz"
+            fetch_file_dst_path: "{{ current_test_log_folder }}/"
+            fetch_file_ignore_errors: true
+          when:
+            - unattend_installer | default('') == 'Agama'
+            - guest_os_family is defined
+            - guest_os_family == 'Suse'
+            - guest_os_ansible_distribution_major_ver is defined
+            - guest_os_ansible_distribution_major_ver | int >= 16

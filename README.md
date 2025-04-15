@@ -74,8 +74,9 @@ This project supports below scenarios for end-to-end guest operating system vali
 | Oracle Linux 7.x, 8.x, 9.x                             | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Rocky Linux 8.x, 9.x                                   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | AlmaLinux 8.x, 9.x                                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| SUSE Linux Enterprise 15 SP3 ~ SP7                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| SUSE Linux Enterprise 16                               |                                  |                          | :heavy_check_mark:                 |
+| SUSE Linux Enterprise Desktop 15 SP3 and later         | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| SUSE Linux Enterprise Server 15 SP3 and later          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| SUSE Linux Enterprise Server 16.0                      | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | VMware Photon OS 3.0, 4.0, 5.0                         | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Ubuntu 20.04 and later                                 | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Flatcar 2592.0.0 and later                             |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
@@ -89,6 +90,7 @@ This project supports below scenarios for end-to-end guest operating system vali
 | Pardus 21.2 Server,XFCE Desktop and later              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Pardus 23.x Server,XFCE Desktop                        | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | openSUSE Leap 15.3 and later                           | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| openSUSE Leap 16.0                                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | BCLinux 8.x                                            | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | BCLinux-for-Euler 21.10                                | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Red Hat Enterprise Linux CoreOS (RHCOS) 4.13 and later |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
@@ -97,7 +99,7 @@ This project supports below scenarios for end-to-end guest operating system vali
 | Kylin Linux Advanced Server V10                        | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 
 **Notes**
-This compatible guest operating systems list is used for this project only. For guest operating system support status on ESXi, please refer to [VMware Compatibility Guide](https://www.vmware.com/resources/compatibility/search.php?deviceCategory=software&testConfig=16).
+This compatible guest operating systems list is used for this project only. For guest operating system support status on ESXi, please refer to [Broadcom Compatibility Guide](https://compatibilityguide.broadcom.com/search?program=software&persona=live&column=osVendors&order=asc).
 
 ### Docker images
 * Latest (Release v3.2):

@@ -46,12 +46,12 @@
     - unattend_installer
     - autoinstall_ipv4_msg
   block:
-    # The IPv4 address message is printed after start message for 'Ubuntu-Subiquity' and 'FreeBSD',
+    # The IPv4 address message is printed after start message for 'Ubuntu-Subiquity', 'FreeBSD' and 'Agama',
     # so they need less timeout. The other OS installer prints it in the post-install script, and
     # they need longer timeout.
     - name: "Set facts of retries for waiting IPv4 message"
       ansible.builtin.set_fact:
-        retries_wait_ipv4_msg: "{{ 10 if unattend_installer in ['Ubuntu-Subiquity', 'FreeBSD'] else 150 }}"
+        retries_wait_ipv4_msg: "{{ 10 if unattend_installer in ['Ubuntu-Subiquity', 'FreeBSD', 'Agama'] else 150 }}"
 
     - name: "Wait for IPv4 address message appear in serial port file"
       include_tasks: ../../common/vm_wait_log_msg.yml
@@ -80,9 +80,9 @@
         fail_msg: "Autoinstall failed due to no IPv4 address obtained."
         success_msg: "VM obtained IPv4 address during autoinstall: {{ autoinstall_ipv4_addr | first | default('') }}"
 
-# For SLES, OS installation with BIOS firmware, send key to boot
+# For SLES/SLED/openSUSE, OS installation with BIOS firmware, send key to boot
 # screen to start new installation instead of booting from local
-- name: "Select boot menu for SLES/SLED"
+- name: "Select boot menu for SUSE"
   include_tasks: ../../common/vm_guest_send_key.yml
   vars:
     keys_send:
