@@ -23,17 +23,10 @@
   when: enable_debug is defined and enable_debug
 
 - name: "Update VM memory"
-  when: memory_mb is defined and memory_mb
-  block:
-    - name: "Set the facts of vm memory and initial configuration"
-      ansible.builtin.set_fact:
-        vm_mem_mb: "{{ ovf_deploy.instance.hw_memtotal_mb | int }}"
-        initial_mem_mb: "{{ memory_mb | int }}"
-    - name: "Set initial VM memory"
-      include_tasks: vm_set_memory_size.yml
-      vars:
-        memory_mb: "{{ initial_mem_mb }}"
-      when: vm_mem_mb | int != initial_mem_mb | int
+  include_tasks: vm_set_memory_size.yml
+  when:
+   - memory_mb is defined and memory_mb
+   - ovf_deploy.instance.hw_memtotal_mb | int != memory_mb | int
 
 - name: "Update VM cpu"
   when: >-
@@ -44,8 +37,8 @@
       ansible.builtin.set_fact:
         vm_cpu_num: "{{ ovf_deploy.instance.hw_processor_count | int }}"
         vm_cpu_cores_per_socket: "{{ ovf_deploy.instance.hw_cores_per_socket | int }}"
-        initial_cpu_num: "{{ cpu_number | default(2) | int }}"
-        initial_cores_num: "{{ cpu_cores_per_socket | default(2) | int }}"
+        initial_cpu_num: "{{ cpu_number | default(ovf_deploy.instance.hw_processor_count) | int }}"
+        initial_cores_num: "{{ cpu_cores_per_socket | default(ovf_deploy.instance.hw_cores_per_socket) | int }}"
     - name: "Set initial VM cpu"
       include_tasks: vm_set_cpu_number.yml
       vars:
