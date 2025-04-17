@@ -1,39 +1,48 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Check VM CPU hotadd enable status and VM vCPU number
-- include_tasks: ../../common/vm_get_cpu_info.yml
+# Check VM CPU hot add enable status and VM vCPU number
+- name: "Get VM CPU info"
+  include_tasks: ../../common/vm_get_cpu_info.yml
 
-# Enable VM CPU hotadd or set initial VM CPU number
-- block:
-    - include_tasks: ../utils/win_shutdown_restart.yml
+- name: "Enable VM CPU hot add or set initial VM CPU number"
+  when: >
+    (not vm_cpu_hotadd_enabled and enable_vm_cpu_hotadd) or
+    (vm_cpu_num | int != initial_cpu_num | int) or
+    (vm_cpu_cores_per_socket | int != initial_cores_num | int)
+  block:
+    - name: "Shutdown guest OS"
+      include_tasks: ../utils/win_shutdown_restart.yml
       vars:
         set_win_power_state: "shutdown"
-    - include_tasks: ../../common/vm_enable_cpu_hotadd.yml
-      when: not vm_cpu_hotadd_enabled and enable_vm_cpu_hotadd
+    - name: "Enable VM CPU hot add"
+      include_tasks: ../../common/vm_enable_cpu_hotadd.yml
+      when:
+        - not vm_cpu_hotadd_enabled
+        - enable_vm_cpu_hotadd
 
-    - include_tasks: ../../common/vm_set_cpu_number.yml
+    - name: "Set VM CPU number to the initial value"
+      include_tasks: ../../common/vm_set_cpu_number.yml
       vars:
         num_cores_per_socket: "{{ initial_cores_num }}"
         num_cpus: "{{ initial_cpu_num }}"
       when: >
         (vm_cpu_num | int != initial_cpu_num | int) or
         (vm_cpu_cores_per_socket | int != initial_cores_num | int)
-    - include_tasks: ../../common/vm_set_power_state.yml
+    - name: "Power on VM"
+      include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: "powered-on"
-    - include_tasks: ../utils/win_update_inventory.yml
-  when: >
-    (not vm_cpu_hotadd_enabled and enable_vm_cpu_hotadd) or
-    (vm_cpu_num | int != initial_cpu_num | int) or
-    (vm_cpu_cores_per_socket | int != initial_cores_num | int)
+    - name: "Refresh in memory host IP"
+      include_tasks: ../utils/win_update_inventory.yml
 
 # Validate VM CPU number in guest OS
-- include_tasks: ../utils/win_get_cpu_cores_sockets.yml
-- name: Check VM CPU number got in guest OS
+- name: "Get CPU info in guest OS"
+  include_tasks: ../utils/win_get_cpu_cores_sockets.yml
+- name: "Check VM CPU number got in guest OS"
   ansible.builtin.assert:
     that:
       - win_cpu_number | int == initial_cpu_num | int
       - win_cores_per_socket | int == initial_cores_num | int
-    fail_msg: "VM vCPU number is set to: {{ win_cpu_number }} (not {{ initial_cpu_num }}), cores per socket: {{ win_cores_per_socket }} (not {{ initial_cores_num }}) before hotadd testing."
-    success_msg: "VM vCPU number is set to: {{ win_cpu_number }}, cores per socket: {{ win_cores_per_socket }} before hotadd testing."
+    fail_msg: "VM vCPU number is set to: {{ win_cpu_number }} (not {{ initial_cpu_num }}), cores per socket: {{ win_cores_per_socket }} (not {{ initial_cores_num }}) before hot add testing."
+    success_msg: "VM vCPU number is set to: {{ win_cpu_number }}, cores per socket: {{ win_cores_per_socket }} before hot add testing."

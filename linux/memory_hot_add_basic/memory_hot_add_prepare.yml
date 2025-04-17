@@ -1,35 +1,45 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- include_tasks: ../../common/vm_get_mem_info.yml
+- name: "Get VM memory info"
+  include_tasks: ../../common/vm_get_mem_info.yml
 
-# Enable VM memory hotadd and set VM memory size to 2048 MB
-- block:
-    - include_tasks: ../utils/shutdown.yml
-    - include_tasks: ../../common/vm_enable_memory_hotadd.yml
+- name: "Enable VM memory hot add and set VM memory size to initial value"
+  when: >
+    (not vm_mem_hotadd_enabled) or
+    (vm_mem_size_mb | int != vm_initial_mem_mb | int)
+  block:
+    - name: "Shutdown guest OS"
+      include_tasks: ../utils/shutdown.yml
+    - name: "Enable VM memory hot add"
+      include_tasks: ../../common/vm_enable_memory_hotadd.yml
       when: not vm_mem_hotadd_enabled
 
-    - include_tasks: ../../common/vm_set_memory_size.yml
+    - name: "Set VM memory size to the initial value"
+      include_tasks: ../../common/vm_set_memory_size.yml
       vars:
         memory_mb: "{{ vm_initial_mem_mb }}"
       when: vm_mem_size_mb | int != vm_initial_mem_mb | int
 
-    - include_tasks: ../../common/vm_set_power_state.yml
+    - name: "Power on VM"
+      include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: 'powered-on'
-    - include_tasks: ../../common/update_inventory.yml
-  when: >
-    (not vm_mem_hotadd_enabled) or
-    (vm_mem_size_mb | int != vm_initial_mem_mb | int)
+    - name: "Refresh in memory host IP"
+      include_tasks: ../../common/update_inventory.yml
 
 # Check memory size is set to 2048 MB in guest OS
-- include_tasks: ../utils/wait_for_memory_blocks.yml
+- name: "Wait for memory blocks in guest OS"
+  include_tasks: ../utils/wait_for_memory_blocks.yml
   vars:
     memory_size_mb: "{{ vm_initial_mem_mb }}"
-- include_tasks: ../utils/memory_size_in_guest.yml
-- name: Check memory size got in guest OS
+
+- name: "Get memory size in guest OS"
+  include_tasks: ../utils/memory_size_in_guest.yml
+
+- name: "Check memory size got in guest OS"
   ansible.builtin.assert:
     that:
       - memtotal_mb_in_guest | int == vm_initial_mem_mb | int
-    fail_msg: "Get VM memory size in guest OS: {{ memtotal_mb_in_guest }}MB, not the initial memory size set for hotadd test {{ vm_initial_mem_mb }}MB."
-    success_msg: "Get VM memory size in guest OS before hotadd test: {{ memtotal_mb_in_guest }}MB."
+    fail_msg: "Get VM memory size in guest OS: {{ memtotal_mb_in_guest }}MB, not the initial memory size set for hot add test {{ vm_initial_mem_mb }}MB."
+    success_msg: "Get VM memory size in guest OS before hot add test: {{ memtotal_mb_in_guest }}MB."

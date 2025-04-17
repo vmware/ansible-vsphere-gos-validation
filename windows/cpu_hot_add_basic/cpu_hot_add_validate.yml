@@ -4,17 +4,17 @@
 - name: "Get VM facts"
   include_tasks: ../../common/vm_get_guest_facts.yml
 
-- name: "Set fact of vCPU number before hotadd"
+- name: "Set fact of vCPU number before hot add"
   ansible.builtin.set_fact:
     vcpu_before_hotadd: "{{ vm_guest_facts.instance.hw_processor_count }}"
 
-- name: "Set fact of hotadd CPU number"
+- name: "Set fact of hot add CPU number"
   ansible.builtin.set_fact:
     vcpu_after_hotadd: "{{ vcpu_before_hotadd | int + hotadd_num | int }}"
 
 - name: "Target CPU number is larger than the maximum number"
   ansible.builtin.debug:
-    msg: "Hotadd '{{ hotadd_num }}', VM vCPU number is '{{ vcpu_after_hotadd }}', greater than '{{ max_num_cpus }}', skip hotadd test"
+    msg: "Hotadd '{{ hotadd_num }}', VM vCPU number is '{{ vcpu_after_hotadd }}', greater than '{{ max_num_cpus }}', skip hot add test"
   when: vcpu_after_hotadd | int > max_num_cpus | int
 
 - name: "Target CPU number not exceed the maximum number"
@@ -44,8 +44,8 @@
       include_tasks: ../utils/win_get_cpu_cores_sockets.yml
       when: guest_os_product_type == "server"
 
-    # Validate CPU number after hotadd
-    - name: "Verify hotadded vCPU can be detected in guest OS"
+    # Validate CPU number after hot add
+    - name: "Verify hot added vCPU can be detected in guest OS"
       ansible.builtin.assert:
         that:
           - win_cpu_number | int == vcpu_after_hotadd | int
@@ -54,4 +54,4 @@
 
     - name: "Add test result"
       ansible.builtin.set_fact:
-        cpu_hotadd_results: "{{ cpu_hotadd_results + ['vCPU hotadd succeeds: ' ~ vcpu_before_hotadd ~ '->' ~ vcpu_after_hotadd] }}"
+        cpu_hotadd_results: "{{ cpu_hotadd_results + ['vCPU hot add succeeds: ' ~ vcpu_before_hotadd ~ '->' ~ vcpu_after_hotadd] }}"

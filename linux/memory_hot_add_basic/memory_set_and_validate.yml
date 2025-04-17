@@ -2,44 +2,57 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Get VM memory size before memory hotadd
-- include_tasks: ../../common/vm_get_guest_facts.yml
-- name: "Set fact of the memory size before hotadd"
+- name: "Get VM guest facts"
+  include_tasks: ../../common/vm_get_guest_facts.yml
+
+- name: "Set fact of the memory size before hot add"
   ansible.builtin.set_fact:
     mem_before_hotadd: "{{ vm_guest_facts.instance.hw_memtotal_mb }}"
-- name: "Set fact of the memory size after hotadd"
+
+- name: "Set fact of the memory size after hot add"
   ansible.builtin.set_fact:
     mem_after_hotadd: "{{ (mem_before_hotadd | int) + (hotadd_mb | int) }}"
 
-- ansible.builtin.debug:
-    msg: "After hotadd {{ hotadd_mb }}MB, VM memory size will be greater than {{ max_memory_mb }}MB. Skip this hotadd test."
+- name: "Exit memory hot add test"
+  ansible.builtin.debug:
+    msg: "After hot add {{ hotadd_mb }}MB, VM memory size will be greater than {{ max_memory_mb }}MB. Skip this hot add test."
   when: mem_after_hotadd | int > max_memory_mb | int
 
-- block:
+- name: "Execute memory hot add test"
+  when: mem_after_hotadd | int <= max_memory_mb | int
+  block:
     # It requires a cold add when VM memory size is less than
-    # 3072MB before hotadd, and greater than 3072MB after hotadd.
-    - include_tasks: ../utils/shutdown.yml
+    # 3072MB before hot add, and greater than 3072MB after hot add.
+    - name: "Shutdown guest OS when VM memory size <= 3072MB"
+      include_tasks: ../utils/shutdown.yml
       when:
         - mem_before_hotadd | int <= 3072
         - mem_after_hotadd | int > 3072
-    - include_tasks: ../../common/vm_set_memory_size.yml
+    - name: "Cold add VM memory size from <= 3072MB to > 3072MB"
+      include_tasks: ../../common/vm_set_memory_size.yml
       vars:
         memory_mb: "{{ mem_after_hotadd }}"
 
-    - block:
-        - include_tasks: ../../common/vm_set_power_state.yml
-          vars:
-            vm_power_state_set: 'powered-on'
-
-        - include_tasks: ../../common/update_inventory.yml
+    - name: "Power on VM after memory cold add situation"
       when:
         - mem_before_hotadd | int <= 3072
         - mem_after_hotadd | int > 3072
-    # Check VM connection is not broken after memory hot add
-    - block:
+      block:
+        - name: "Power on VM"
+          include_tasks: ../../common/vm_set_power_state.yml
+          vars:
+            vm_power_state_set: 'powered-on'
+
+        - name: "Refresh in memory host IP info"
+          include_tasks: ../../common/update_inventory.yml
+
+    - name: "Check VM connection is not broken after memory hot add"
+      block:
         - name: "Pause 5 seconds then check VM connection status"
           ansible.builtin.pause:
             seconds: 5
-        - include_tasks: ../../common/vm_wait_connection.yml
+        - name: ""
+          include_tasks: ../../common/vm_wait_connection.yml
           vars:
             vm_wait_connection_timeout: 900
       when: >
@@ -60,4 +73,3 @@
     - name: Set fact of the memory hotadd results
       ansible.builtin.set_fact:
         mem_hotadd_results: "{{ mem_hotadd_results + ['Memory hotadd succeeds: ' ~ mem_before_hotadd ~ '->' ~ mem_after_hotadd] }}"
-  when: mem_after_hotadd | int <= max_memory_mb | int
