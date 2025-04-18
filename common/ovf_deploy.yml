@@ -21,3 +21,34 @@
 - name: Display the result of ovf template deploy
   ansible.builtin.debug: var=ovf_deploy
   when: enable_debug is defined and enable_debug
+
+- name: "Update VM memory and CPU"
+  when: update_vm_mem_cpu is defined and update_vm_mem_cpu
+  block:
+    - name: "Update VM memory"
+      include_tasks: vm_set_memory_size.yml
+      when:
+        - memory_mb is defined and memory_mb
+        - ovf_deploy.instance.hw_memtotal_mb | int != memory_mb | int
+
+    - name: "Update VM CPU"
+      when: >-
+        (cpu_number is defined and cpu_number) or
+        (cpu_cores_per_socket is defined and cpu_cores_per_socket)
+      block:
+        - name: "Set the facts of VM CPU and initial configuration"
+          ansible.builtin.set_fact:
+            ovf_cpu_num: "{{ ovf_deploy.instance.hw_processor_count | int }}"
+            ovf_cpu_cores_per_socket: "{{ ovf_deploy.instance.hw_cores_per_socket | int }}"
+            initial_cpu_num: "{{ cpu_number | default(ovf_deploy.instance.hw_processor_count) | int }}"
+            initial_cores_num: "{{ cpu_cores_per_socket | default(ovf_deploy.instance.hw_cores_per_socket) | int }}"
+        - name: "Override initial_cores_num to 1 if not divisible"
+          ansible.builtin.set_fact:
+            initial_cores_num: 1
+          when: (initial_cpu_num | int) % (initial_cores_num | int) != 0
+        - name: "Set initial VM CPU"
+          include_tasks: vm_set_cpu_number.yml
+          vars:
+            num_cpus: "{{ initial_cpu_num }}"
+            num_cores_per_socket: "{{ initial_cores_num }}"
+          when: (ovf_cpu_num | int != initial_cpu_num | int) or (ovf_cpu_cores_per_socket | int != initial_cores_num | int)
