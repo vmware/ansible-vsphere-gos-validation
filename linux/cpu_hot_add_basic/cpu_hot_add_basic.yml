@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is used for check VM vCPU hotadd works as expected.
-# When calculated vCPU hotadd number list from ESXi server CPU number
+#   This test case is used for check VM vCPU hot add works as expected.
+# When calculated vCPU hot add number list from ESXi server CPU number
 # and configured maximum CPU number (default 16) is empty, this test
 # case result is 'Blocked'.
 # Note: VM vCPU number will be set to 2, cores per socket will be set
-# to 1 before vCPU hotadd test.
+# to 1 before vCPU hot add test.
 #
 - name: cpu_hot_add_basic
   hosts: localhost
@@ -15,14 +15,23 @@
   tasks:
     - name: "Test case block"
       block:
-        # Except for VM guest_id like 'fedora64Guest', 'freebsd.*Guest' not supporting vCPU hot-add,
-        # the other guest OS compatible with ansible-vsphere-gos-validation support vCPU hot-add
-        - name: "Skip test case '{{ ansible_play_name }}' due to VM not support vCPU hot-add"
+        - name: "Skip test case '{{ ansible_play_name }}'"
           include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: >-
-              Skip test case '{{ ansible_play_name }}' because vCPU hot-add is not supported
-              by VM configured with guest ID {{ vm_guest_id }}
+              Skip test case '{{ ansible_play_name }}' because vCPU hot add is not supported
+              on ARM ESXi host.
+            skip_reason: "Not Supported"
+          when: esxi_cpu_vendor == 'arm'
+
+        # Except for VM guest_id like 'fedora64Guest', 'freebsd.*Guest' not supporting vCPU hot-add,
+        # the other guest OS compatible with ansible-vsphere-gos-validation support vCPU hot-add
+        - name: "Skip test case '{{ ansible_play_name }}'"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case '{{ ansible_play_name }}' because vCPU hot add is not supported
+              by VM configured with guest ID {{ vm_guest_id }}.
             skip_reason: "Not Supported"
           when:
             - vm_guest_id is defined
@@ -39,7 +48,7 @@
         - name: "Test case is blocked due to empty vCPU number list"
           include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Test case '{{ ansible_play_name }}' is blocked because vCPU hotadd test value list is empty"
+            skip_msg: "Test case '{{ ansible_play_name }}' is blocked because vCPU hot add test value list is empty"
             skip_reason: "Blocked"
           when: cpu_hotadd_num_list | length == 0
 

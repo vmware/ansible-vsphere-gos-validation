@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is used for test Windows VM vCPU hotadd.
-# For Windows client: hotadded CPU will not be recognized and used
-# after hotadd without OS restart.
-# For Windows server: hotadded CPU will be recognized and used after
-# hotadd without OS restart.
+#   This test case is used for test Windows VM vCPU hot add.
+# For Windows client: hot added CPU will not be recognized and used
+# after hot add without OS restart.
+# For Windows server: hot added CPU will be recognized and used after
+# hot add without OS restart.
 #
 - name: cpu_hot_add_basic
   hosts: localhost
@@ -14,6 +14,15 @@
   tasks:
     - name: "Test case block"
       block:
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case '{{ ansible_play_name }}' because vCPU hot add is not supported
+              on ARM ESXi host.
+            skip_reason: "Not Supported"
+          when: esxi_cpu_vendor == 'arm'
+
         - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
 
@@ -21,10 +30,14 @@
           when: guest_os_ansible_architecture == "64-bit"
           block:
             # Refer to KB article https://knowledge.broadcom.com/external/article?legacyId=52584
-            - include_tasks: ../../common/vm_get_vbs_status.yml
-            - include_tasks: ../../common/skip_test_case.yml
+            - name: "Get VM VBS enablement status"
+              include_tasks: ../../common/vm_get_vbs_status.yml
+            - name: "Skip test case"
+              include_tasks: ../../common/skip_test_case.yml
               vars:
-                skip_msg: "Skip test case due to CPU hotadd not supported for VM with VBS enabled."
+                skip_msg: >-
+                  Skip test case '{{ ansible_play_name }}' because vCPU hot add is not supported
+                  for VM with VBS enabled.
                 skip_reason: "Not Supported"
               when: vm_vbs_enabled
 
@@ -44,25 +57,25 @@
         - name: "Skip test case when the list of added CPU number is empty"
           include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Test case '{{ ansible_play_name }}' is blocked because vCPU hotadd test value list is empty"
+            skip_msg: "Test case '{{ ansible_play_name }}' is blocked because vCPU hot add test value list is empty"
             skip_reason: "Blocked"
           when: cpu_hotadd_num_list | length == 0
 
-        - name: "Initialize the CPU hotadd test result"
+        - name: "Initialize the CPU hot add test result"
           ansible.builtin.set_fact:
             cpu_hotadd_results: []
-        - name: "Preparation for CPU hotadd test"
+        - name: "Preparation for CPU hot add test"
           include_tasks: cpu_hot_add_prepare.yml
           vars:
             enable_vm_cpu_hotadd: true
-        - name: "CPU hotadd test on Windows Server"
+        - name: "CPU hot add test on Windows Server"
           include_tasks: cpu_hot_add_validate.yml
           loop: "{{ cpu_hotadd_num_list }}"
           loop_control:
             loop_var: hotadd_num
           when: guest_os_product_type == "server"
 
-        - name: "CPU hotadd test on Windows Client"
+        - name: "CPU hot add test on Windows Client"
           include_tasks: cpu_hot_add_test_client.yml
           when: guest_os_product_type == "client"
 

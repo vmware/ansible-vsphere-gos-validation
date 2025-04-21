@@ -6,7 +6,7 @@
 # memory hot-add size list from free memory size on ESXi server and the configured
 # maximum memory size (default 16384MB) is empty, or the free memory size on ESXi server
 # is lower than 4096MB, this test case result is 'Blocked'.
-# Note: Linux VM memory size will be set to 2048MB before hotadd test.
+# Note: Linux VM memory size will be set to 2048MB before hot add test.
 #
 - name: memory_hot_add_basic
   hosts: localhost
@@ -14,14 +14,23 @@
   tasks:
     - name: "Test case block"
       block:
-        # Except for VM guest_id like 'freebsd.*Guest' not supporting memory hot-add,
-        # the other guest OS compatible with ansible-vsphere-gos-validation support memory hot-add
-        - name: "Skip test case '{{ ansible_play_name }}' due to VM not support memory hot-add"
+        - name: "Skip test case '{{ ansible_play_name }}'"
           include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: >-
-              Skip test case '{{ ansible_play_name }}' because memory hot-add is not supported by
-              VM configured with guest ID {{ vm_guest_id }}
+              Skip test case '{{ ansible_play_name }}' because memory hot add is not supported
+              on ARM ESXi host.
+            skip_reason: "Not Supported"
+          when: esxi_cpu_vendor == 'arm'
+
+        # Except for VM guest_id like 'freebsd.*Guest' not supporting memory hot-add,
+        # the other guest OS compatible with ansible-vsphere-gos-validation support memory hot-add
+        - name: "Skip test case '{{ ansible_play_name }}'"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case '{{ ansible_play_name }}' because memory hot add is not supported by
+              VM configured with guest ID {{ vm_guest_id }}.
             skip_reason: "Not Supported"
           when:
             - vm_guest_id is defined
@@ -32,7 +41,7 @@
           vars:
             create_test_log_folder: true
 
-        - name: "Set fact of VM initial memory size to 2048MB before hotadd test"
+        - name: "Set fact of VM initial memory size to 2048MB before hot add test"
           ansible.builtin.set_fact:
             vm_initial_mem_mb: 2048
 
