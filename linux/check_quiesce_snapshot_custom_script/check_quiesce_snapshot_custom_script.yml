@@ -32,16 +32,14 @@
             qs_snapshot_name: "quiesce_snapshot_{{ current_test_timestamp }}"
             backup_script_dir: "/etc/vmware-tools/backupScripts.d"
             vss_shell_script: "vss_script_sh.sh"
+            vss_bin_script: >-
+              {{ (esxi_cpu_vendor == 'arm') | ternary('vss_script_bin_arm',
+              'vss_script_bin_' ~ guest_os_bit | replace('-', '')) }}
             vss_log_path: |-
               {%- if guest_os_ansible_distribution in ['Flatcar', 'RHCOS'] -%}/var/vss.log
               {%- else -%}/vss.log
               {%- endif -%}
             vss_content: ""
-
-        - name: "Set fact of the bin executable file path for x86 platform"
-          ansible.builtin.set_fact:
-            vss_bin_script: "vss_script_bin_{{ guest_os_bit | replace('-', '') }}"
-          when: esxi_cpu_vendor != 'arm'
 
         # Create vss_script_sh.sh under /etc/vmware-tools/backupScripts.d/
         - name: "Create backup script dir {{ backup_script_dir }}"
