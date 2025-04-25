@@ -33,7 +33,7 @@
   ansible.builtin.set_fact:
     eth0_name: "{{ network_adapters_before_hotadd[0] }}"
 
-- name: "Install rdma packages for PVRDMA testing"
+- name: "Prepare for PVRDMA testing"
   when: adapter_type == "pvrdma"
   block:
     - name: "Install rdma packages in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
@@ -56,12 +56,13 @@
         network_adapter_name: "{{ eth0_name }}"
 
     - name: "Remove MAC address or UUID from network config file"
+      when: network_config_path
       block:
         - name: "Get network config file state"
           include_tasks: ../utils/get_file_stat_info.yml
           vars:
             guest_file_path: "{{ network_config_path }}"
-    
+
         - name: "Remove MAC address or UUID from network config file for '{{ eth0_name }}'"
           ansible.builtin.lineinfile:
             path: "{{ network_config_path }}"
@@ -69,7 +70,30 @@
             state: absent
           delegate_to: "{{ vm_guest_ip }}"
           when: guest_file_exists
-      when: network_config_path
+
+    - name: "Get VM serial port devices"
+      include_tasks: ../../common/vm_get_device_with_type.yml
+      vars:
+        device_vim_type: "vim.vm.device.VirtualSerialPort"
+
+    - name: "Remove VM serial port devices"
+      when:
+        - device_info_with_type is defined
+        - device_info_with_type | length > 0
+      block:
+        - name: "Shutdown guest OS for removing serial port"
+          include_tasks: ../utils/shutdown.yml
+
+        - name: "Remove VM serial port"
+          include_tasks: ../../common/vm_remove_serial_port.yml
+          vars:
+            vm_serial_file_ds_path: "{{ item.backing.fileName }}"
+          with_items: "{{ device_info_with_type }}"
+
+        - name: "Power on VM"
+          include_tasks: ../../common/vm_set_power_state.yml
+          vars:
+            vm_power_state_set: 'powered-on'
 
 - name: "Disable firewall in guest OS"
   include_tasks: ../utils/disable_firewall.yml
