@@ -3,16 +3,30 @@
 ---
 # Delete unattend install ISO file from ESXi datastore
 #
-- name: "Reconfigure CDROM to client device"
+- name: "Reconfigure CDROM devices to client device"
   include_tasks: ../../common/vm_configure_cdrom.yml
   vars:
     cdrom_type: client
+    cdrom_controller_type: "{{ vm_cdrom.controller_type }}"
     cdrom_controller_num: "{{ vm_cdrom.controller_number | int }}"
     cdrom_unit_num: "{{ vm_cdrom.unit_number | int }}"
     cdrom_state: present
   with_items: "{{ vm_cdroms }}"
   loop_control:
     loop_var: vm_cdrom
+
+- name: "Keep the first CDROM device and remove the others from VM"
+  include_tasks: ../../common/vm_configure_cdrom.yml
+  vars:
+    cdrom_type: client
+    cdrom_controller_type: "{{ vm_cdrom.controller_type }}"
+    cdrom_controller_num: "{{ vm_cdrom.controller_number | int }}"
+    cdrom_unit_num: "{{ vm_cdrom.unit_number | int }}"
+    cdrom_state: absent
+  with_items: "{{ vm_cdroms[1:] }}"
+  loop_control:
+    loop_var: vm_cdrom
+  when: vm_cdroms | length > 1
 
 # It could fail but doesn't affect tests, see https://knowledge.broadcom.com/external/article?legacyId=78653
 - name: "Delete uploaded unattend install ISO from ESXi datastore"

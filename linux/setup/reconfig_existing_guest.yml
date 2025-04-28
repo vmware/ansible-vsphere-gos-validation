@@ -12,33 +12,29 @@
   include_tasks: ../utils/disable_auto_update.yml
   when: guest_os_ansible_distribution in ["Ubuntu"]
 
+- name: "Configure package repositories on {{ vm_guest_os_distribution }}"
+  include_tasks: ../utils/config_repos.yml
+  when: guest_os_ansible_system == "linux"
+
 # 'python3-libdnf5' is required by dnf5 module
-- name: "Install 'python3-libdnf5' on {{ guest_os_ansible_distribution }}"
+- name: "Install 'python3-libdnf5' on {{ vm_guest_os_distribution }}"
   include_tasks: ../utils/install_uninstall_package.yml
   vars:
     package_list: ["python3-libdnf5"]
     package_state: "latest"
+    package_repo_enabled: true
   when: guest_os_ansible_pkg_mgr == 'dnf5'
 
-# Install python3-rpm on RedHat family OS and VMware Photon OS
-- name: "Install 'python3-rpm' on {{ guest_os_ansible_distribution }}"
-  include_tasks: ../utils/install_uninstall_package.yml
-  vars:
-    package_list: ["python3-rpm"]
-    package_state: "latest"
-  when:
-    - guest_os_python_version is version('3.0.0', '>=')
-    - guest_os_ansible_pkg_mgr is search('yum|dnf')
-
-# Install Python3 RPM library on SUSE 16
-- name: "Install Python3 RPM library on {{ guest_os_ansible_distribution }}"
+# Install Python3 RPM library on RedHat and Suse family OS
+- name: "Install 'python3-rpm' on {{ vm_guest_os_distribution }}"
   include_tasks: ../utils/install_uninstall_package.yml
   vars:
     package_list: ["python3*-rpm"]
     package_state: "latest"
+    package_repo_enabled: true
   when:
-    - guest_os_family == "Suse"
-    - guest_os_ansible_distribution_major_ver | int == 16
+    - guest_os_python_version is version('3.0.0', '>=')
+    - guest_os_ansible_pkg_mgr is match('yum|dnf|zypper')
 
 - name: "Reconfigure VMware Photon OS"
   when: guest_os_ansible_distribution == "VMware Photon OS"
@@ -57,16 +53,12 @@
     - name: "Disable DNSSEC and DNSOverTLS settings for VMware Photon OS"
       include_tasks: ../utils/set_dns.yml
 
-    - name: "Update VMware Photon OS repo cache"
-      include_tasks: ../utils/repo_update.yml
-      vars:
-        check_update_cmd: "tdnf makecache"
-
     - name: "Install 'sudo', 'gawk', 'tar' on VMware Photon OS"
       include_tasks: ../utils/install_uninstall_package.yml
       vars:
         package_list: ["sudo", "gawk", "tar"]
         package_state: "latest"
+        package_repo_enabled: true
 
 - name: "Reconfigure {{ guest_os_ansible_distribution }}"
   when:
