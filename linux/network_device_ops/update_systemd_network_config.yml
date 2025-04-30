@@ -1,0 +1,79 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Update systemd network config file for primary or secondary network adapter
+#
+- name: "Set fact of systemd network config template on {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    systemd_network_config_template: "systemd_network_conf.j2"
+
+- name: "Get systemd network config file for '{{ network_adapter_name }}'"
+  include_tasks: ../utils/get_network_config_file.yml
+
+- name: "Check systemd network config file is set"
+  ansible.builtin.assert:
+    that:
+      - network_config_path
+    fail_msg: >-
+      Failed to get the network config file for network adapter '{{ network_adapter_name }}'
+      on {{ vm_guest_os_distribution }}
+
+- name: "Set fact of systemd netwok config directory"
+  ansible.builtin.set_fact:
+    network_config_dir: "{{ network_config_path | dirname }}"
+
+- name: "Get stat info of systemd network config directory"
+  include_tasks: ../utils/get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ network_config_dir }}"
+
+- name: "Check systemd network config directory exists"
+  ansible.builtin.assert:
+    that:
+      - guest_file_exists
+    fail_msg: "Systemd network config directory '{{ network_config_dir }}' doesn't exist"
+    success_msg: "Systemd network config directory '{{ network_config_dir }}' exists"
+
+- name: "Update systemd network config for the primary network adapter '{{ network_adapter_name }}'"
+  when: network_adapter_name == eth0_name
+  block:
+    - name: "Find existing systemd network config files"
+      ansible.builtin.shell: "find {{ network_config_dir }} -name '*.network'"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: find_network_config_result
+
+    - name: "Remove systemd existing network config files"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: "absent"
+      with_items: "{{ find_network_config_result.stdout_lines }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      when:
+        - find_network_config_result.stdout_lines is defined
+        - find_network_config_result.stdout_lines | length > 0
+
+    - name: "Set facts of the primary network adapter config on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        new_systemd_network_config_path: "{{ network_config_dir }}/10-{{ eth0_name }}.network"
+        new_network_adapter: "{{ eth0_name }}"
+        new_nic_ipv4_method: "dhcp"
+
+- name: "Set fact of the secondary network adapter config file on {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    new_systemd_network_config_path: "{{ network_config_dir }}/99-{{ network_adapter_name }}.network"
+  when: network_adapter_name != eth0_name
+
+- name: "Create a new systemd network config file '{{ new_systemd_network_config_path }}'"
+  ansible.builtin.template:
+    src: "{{ systemd_network_config_template }}"
+    dest: "{{ new_systemd_network_config_path }}"
+    mode: "0666"
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Get content of systemd network config file '{{ new_systemd_network_config_path }}'"
+  ansible.builtin.shell: "cat '{{ new_systemd_network_config_path }}'"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: systemd_network_config_content
+
+- name: "Display content of network config file '{{ new_systemd_network_config_path }}'"
+  ansible.builtin.debug: var=systemd_network_config_content
