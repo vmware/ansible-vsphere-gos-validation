@@ -3,6 +3,12 @@
 ---
 # Install required packages and kernel modules
 #
+- name: "Get guest network device manager"
+  include_tasks: ../utils/get_network_manager.yml
+  when: >-
+    guest_os_network_manager is undefined or
+    not guest_os_network_manager
+
 - name: "Install 'distrib-compat' for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
   include_tasks: ../utils/install_uninstall_package.yml
   vars:
@@ -29,9 +35,15 @@
 
 # Get eth0 device name in guest. Sometimes it is not 'eth0',
 # e.g., 'ens192', 'ens33', etc.
-- name: "Set fact of the first network adapter interface name in guest OS"
+- name: "Set fact of the primary network adapter interface name in guest OS"
   ansible.builtin.set_fact:
     eth0_name: "{{ network_adapters_before_hotadd[0] }}"
+
+- name: "Update systemd network config for the primary network adapter"
+  include_tasks: update_systemd_network_config.yml
+  vars:
+    network_adapter_name: "{{ eth0_name }}"
+  when: guest_os_network_manager == "systemd-networkd"
 
 - name: "Prepare for PVRDMA testing"
   when: adapter_type == "pvrdma"
