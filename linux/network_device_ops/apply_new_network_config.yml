@@ -7,107 +7,69 @@
 - name: "Get guest network device manager"
   include_tasks: ../utils/get_network_manager.yml
 
-- name: "Add network connection for {{ guest_os_ansible_distribution }}"
+- name: "Add network connection for new {{ adapter_type }} network adapter on {{ vm_guest_os_distribution }}"
   when: guest_os_network_manager == "NetworkManager"
   block:
-    - name: "Add network connection with static IP address"
-      block:
-        - name: "Add a network connection with static IP address for {{ new_network_adapter }}"
-          ansible.builtin.shell: >-
-            nmcli connection add type ethernet
-            ifname {{ new_network_adapter }}
-            con-name {{ new_network_adapter }}
-            ip4 {{ new_nic_ipv4 }}/{{ new_nic_net_prefix }}
-            gw4 {{ new_nic_gateway }}
-          delegate_to: "{{ vm_guest_ip }}"
-          register: nm_add_static_conn
+    - name: "Set fact of IPv6 config in network connection for new {{ adapter_type }} network adapter"
+      ansible.builtin.set_fact:
+        nmcli_ipv6_method: >-
+          {{
+            (guest_os_ansible_distribution == 'SLED' and
+             guest_os_ansible_distribution_ver == '15.7') |
+            ternary('ipv6.method disabled', '')
+          }}
 
-        - name: "Set result of adding network connection with static IP address"
-          ansible.builtin.set_fact:
-            nm_add_connection: "{{ nm_add_static_conn }}"
+    - name: "Set fact of command for adding network connection with static IP addresss"
+      ansible.builtin.set_fact:
+        nmcli_connection_add_cmd:  >-
+          nmcli connection add type ethernet ifname {{ new_network_adapter }}
+          con-name {{ new_network_adapter }} ipv4.method manual
+          ipv4.addresses {{ new_nic_ipv4 }}/{{ new_nic_net_prefix }}
+          ipv4.gateway {{ new_nic_gateway }} {{ nmcli_ipv6_method }}
       when:
         - new_nic_ipv4 is defined and new_nic_ipv4
         - new_nic_net_prefix is defined and new_nic_net_prefix
         - new_nic_gateway is defined and new_nic_gateway
 
-    - name: "Add network connection with DHCP IP address"
-      block:
-        - name: "Add a network connection with DHCP IP address for {{ new_network_adapter }}"
-          ansible.builtin.shell: >-
-            nmcli connection add type ethernet
-            ifname {{ new_network_adapter }}
-            con-name {{ new_network_adapter }}
-          delegate_to: "{{ vm_guest_ip }}"
-          register: nm_add_dhcp_conn
-
-        - name: "Set result of adding network connection with DHCP IP address"
-          ansible.builtin.set_fact:
-            nm_add_connection: "{{ nm_add_dhcp_conn }}"
+    - name: "Set fact of command for adding network connection with DHCP IP addresss"
+      ansible.builtin.set_fact:
+        nmcli_connection_add_cmd:  >-
+          nmcli connection add type ethernet ifname {{ new_network_adapter }}
+          con-name {{ new_network_adapter }} {{ nmcli_ipv6_method }}
       when: >-
         (new_nic_ipv4 is undefined or not new_nic_ipv4) or
         (new_nic_net_prefix is undefined or not new_nic_net_prefix) or
         (new_nic_gateway is undefined or not new_nic_gateway)
 
-    - name: "Check network connection is added for {{ new_network_adapter }}"
-      ansible.builtin.assert:
-        that:
-          - nm_add_connection is defined
-          - nm_add_connection.rc is defined
-          - nm_add_connection.rc == 0
-        fail_msg: "Failed to add network connection on VM {{ vm_name }}"
-        success_msg: "{{ nm_add_connection.stdout |
-                      default('Successfully added network connection on VM ' ~ vm_name) }}"
+    - name: "Add a network connection for new {{ adapter_type }} network adapter '{{ new_network_adapter }}'"
+      ansible.builtin.shell: "{{ nmcli_connection_add_cmd }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: nmcli_connection_add_result
 
 # Set network config file in guest OS except VMware Photon OS
-- name: "Set network config file for {{ guest_os_ansible_distribution }}"
+- name: "Set network config file for new {{ adapter_type }} network adapter on {{ vm_guest_os_distribution }}"
   when:
     - guest_os_network_manager != "NetworkManager"
     - guest_os_ansible_distribution not in ["VMware Photon OS", "Astra Linux (Orel)"]
   block:
-    - name: "Initialize fact of network config tempate"
+    - name: "Initialize fact of network config template"
       ansible.builtin.set_fact:
         network_config_template: ""
 
-    - name: "Get network config file for '{{ new_network_adapter }}'"
+    - name: "Get network config file for new {{ adapter_type }} network adapter '{{ new_network_adapter }}'"
       include_tasks: ../utils/get_network_config_file.yml
       vars:
         network_adapter_name: "{{ new_network_adapter }}"
 
-    - name: "Set fact of the network config template for {{ guest_os_ansible_distribution }}"
+    - name: "Set fact of the network config template on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
-        network_config_template: rhel_network_conf.j2
-      when: guest_os_family == "RedHat"
+        network_config_template: "{{ guest_os_family | lower }}_network_conf.j2"
+      when: guest_os_family in ["RedHat", "Suse", "Debian", "FreeBSD"]
 
-    - name: "Set fact of the network config template for {{ guest_os_ansible_distribution }}"
-      ansible.builtin.set_fact:
-        network_config_template: debian_network_conf.j2
-      when: >
-        (guest_os_ansible_distribution == "Debian") or
-        (guest_os_ansible_distribution == "Pardus GNU/Linux") or
-        (guest_os_ansible_distribution == "Ubuntu" and
-         guest_os_with_gui is defined and guest_os_with_gui)
-
-    - name: "Set fact of the network config template for Ubuntu server"
-      ansible.builtin.set_fact:
-        network_config_template: ubuntu_netplan_conf.j2
-      when:
-        - guest_os_ansible_distribution == "Ubuntu"
-        - guest_os_with_gui is defined and not guest_os_with_gui
-
-    - name: "Set fact of the network config template for SLE"
-      ansible.builtin.set_fact:
-        network_config_template: sles_network_conf.j2
-      when: guest_os_family == "Suse"
-
-    - name: "Set fact of the network config template for Flatcar"
+    - name: "Set fact of the network config template on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
         network_config_template: flatcar_network_conf.j2
       when: guest_os_ansible_distribution == 'Flatcar'
-
-    - name: "Set fact of the network config template for FreeBSD"
-      ansible.builtin.set_fact:
-        network_config_template: freebsd_network_conf.j2
-      when: guest_os_family == "FreeBSD"
 
     - name: "Create or update network config file for new network interface"
       when:
@@ -120,13 +82,13 @@
             dest: "{{ network_config_path }}"
             mode: "0666"
           delegate_to: "{{ vm_guest_ip }}"
-    
+
         - name: "Get content of network config file '{{ network_config_path }}'"
           ansible.builtin.command: "cat {{ network_config_path }}"
           register: network_config
           changed_when: false
           delegate_to: "{{ vm_guest_ip }}"
-    
+
         - name: "Print content of network config file '{{ network_config_path }}'"
           ansible.builtin.debug: var=network_config.stdout_lines
 
@@ -149,7 +111,8 @@
         seconds: 60
 
     # Update VM's guest IP
-    - include_tasks: ../../common/update_inventory.yml
+    - name: "Update VM's guest IP"
+      include_tasks: ../../common/update_inventory.yml
 
 - name: "Apply new network configuration file for FreeBSD"
   when: guest_os_ansible_distribution == "FreeBSD"
@@ -164,7 +127,7 @@
           poll: 20
           ignore_errors: true
           register: restart_network_result
-  
+
         - name: "Display the result to restart network"
           ansible.builtin.debug: var=restart_network_result
           when: enable_debug is defined and enable_debug
@@ -176,26 +139,26 @@
       include_tasks: ../utils/reboot.yml
       when: adapter_type == "e1000e"
 
-- include_tasks: ../utils/set_network_adapter_status.yml
+- name: "Bring up the new {{ adapter_type  }} network adapter {{ new_network_adapter }}"
+  include_tasks: ../utils/set_network_adapter_status.yml
   vars:
     network_adapter_name: "{{ new_network_adapter }}"
     network_adapter_status: "up"
-  when: 
-    - guest_os_network_manager != "netplan"
+  when: guest_os_network_manager != "netplan"
 
 # Get IP address of new interface
 - name: "Set fact of searching IPv4 address"
   ansible.builtin.set_fact:
-    search_ip: "{% if adapter_type == 'pvrdma' %}{{ new_nic_ipv4 }}{% else %}192.168{% endif %}"
+    search_ip: "{% if new_nic_ipv4 is defined and new_nic_ipv4 %}{{ new_nic_ipv4 }}{% else %}192.168{% endif %}"
 
-- name: "Set command to get link status for the new network adapter"
+- name: "Set command to get IP addresses of the new {{ adatper_type }} network adapter '{{ new_network_adapter }}'"
   ansible.builtin.set_fact:
     get_link_status_cmd: |-
       {%- if guest_os_ansible_distribution == 'FreeBSD' -%}ifconfig {{ new_network_adapter }} | grep inet | grep -v inet6 | awk '{print $2}'
       {%- else -%}ip -br addr show {{ new_network_adapter }} | awk '{print $3}'
       {%- endif -%}
 
-- name: "Wait for network adapter '{{ new_network_adapter }}' IPv4 address"
+- name: "Wait for IPv4 address of the new {{ adatper_type }} network adapter '{{ new_network_adapter }}'"
   ansible.builtin.shell: "{{ get_link_status_cmd }}"
   register: link_status
   changed_when: false
@@ -208,28 +171,35 @@
   delegate_to: "{{ vm_guest_ip }}"
   ignore_errors: true
 
-- name: "Check network adapter '{{ new_network_adapter }}' IPv4 address"
+- name: "Print IP addresses of the new {{ adatper_type }} network adapter '{{ new_network_adapter }}'"
+  ansible.builtin.debug: var=link_status
+
+- name: "Check IPv4 address of the new {{ adapter_type }} network adapter '{{ new_network_adapter }}'"
   ansible.builtin.assert:
     that:
       - link_status is defined
       - link_status.stdout is defined
       - search_ip in link_status.stdout
     fail_msg: >-
-      Network adapter '{{ new_network_adapter }}' on VM {{ vm_name }}
-      failed to obtain IPv4 address after 100 seconds.
-      Its current IPv4 address is '{{ link_status.stdout | default("") }}'.
+      The new {{ adatper_type }} network adapter '{{ new_network_adapter }}'
+      failed to obtain IPv4 address in 100 seconds. The command '{{ get_link_status_cmd }}'
+      returned '{{ link_status | default("") }}'.
 
-- name: "Print the new networ adapter IP address"
-  ansible.builtin.debug: var=link_status
+- name: "Get the new {{ adatper_type }} newtwork adapter status after applying network config"
+  include_tasks: ../utils/get_network_adapters_status.yml
 
-- include_tasks: ../utils/get_network_adapters_status.yml
-- name: "Update the new network adapter status"
+- name: "Update the new network adapter status after applying network config"
   ansible.builtin.set_fact:
-    new_network_adapter_status: "{{ (guest_network_adapters_status | selectattr('device', 'equalto', new_network_adapter))[0] }}"
+    new_network_adapter_status: "{{ guest_network_adapters_status | selectattr('device', 'equalto', new_network_adapter) | first }}"
 
-- name: "Print the new network adapter status after applying new network config"
-  ansible.builtin.debug: var=new_network_adapter_status
-
-- name: "Set the new network adapter ip address after applying new network config"
+- name: "Set fact of the new {{ adapter_type }} network adapter's IPv4 address"
   ansible.builtin.set_fact:
-    new_network_adapter_ip: "{{ link_status.stdout }}"
+    new_network_adapter_ip: >-
+      {{
+        (new_network_adapter_status.ipv4 | type_debug == "list") |
+        ternary(new_network_adapter_status.ipv4[0].address | default('') ,
+                new_network_adapter_status.ipv4.address | default(''))
+      }}
+  when:
+    - new_network_adapter_status.ipv4 is defined
+    - new_network_adapter_status.ipv4 | type_debug in ['list', 'dict']
