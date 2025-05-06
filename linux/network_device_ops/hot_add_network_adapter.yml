@@ -75,7 +75,7 @@
 - name: "Print the new {{ adapter_type }} adapter interface name"
   ansible.builtin.debug: var=new_network_adapter
 
-- name: "Set fact of new {{ adapter_type }} network adapter status after hot adding"
+- name: "Set fact of new {{ adapter_type }} network adapter status before applying network config"
   ansible.builtin.set_fact:
     new_network_adapter_status: "{{ guest_network_adapters_status | selectattr('device', 'equalto', new_network_adapter) | first }}"
 
@@ -83,7 +83,7 @@
   ansible.builtin.set_fact:
     new_network_adapter_mac_addr: "{{ new_network_adapter_status.macaddress }}"
 
-- name: "Set fact of the new {{ adapter_type }} network adapter's IPv4 address after hot adding"
+- name: "Set fact of the new {{ adapter_type }} network adapter's IPv4 address before applying network config"
   ansible.builtin.set_fact:
     new_network_adapter_ip: >-
       {{
@@ -99,7 +99,7 @@
   include_tasks: apply_new_network_config.yml
   when: not new_network_adapter_ip
 
-- name: "Check the new {{ adapter_type }} network adapter has IPv4 adress"
+- name: "Check the new {{ adapter_type }} network adapter has IPv4 address"
   ansible.builtin.assert:
     that:
       - new_network_adapter_ip

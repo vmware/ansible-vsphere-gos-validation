@@ -2,65 +2,69 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Get the network device manager in guest OS
-
-# Set fact of network config file in guest OSes except VMware Photon OS
-- name: "Initialize the fact of guest OS network manager as traditional"
+#
+- name: "Initialize the fact of guest OS network manager"
   ansible.builtin.set_fact:
-    guest_os_network_manager: "traditional"
+    guest_os_network_manager: ""
 
-# Although Debian has NetworkManager, it still uses ifdown/ifup to manage its network devices
+# Debian and Pardus has NetworkManager, but they still uses traditional ifdown/ifup to manage network devices
 - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is traditional ifdown/ifup"
   ansible.builtin.set_fact:
     guest_os_network_manager: "traditional"
   when: guest_os_ansible_distribution in ["Debian", "Pardus GNU/Linux"]
 
-- name: "Set network device manager for {{ guest_os_ansible_distribution }}"
-  when: guest_os_ansible_distribution not in ["Debian", "FreeBSD", "Pardus GNU/Linux"]
+# For other Linux OS, here will firstly check whether "systemd-networkd" or "NetworkManager" is active.
+# The active service will be the network device manager
+- name: "Get network device manager on {{ vm_guest_os_distribution }}"
+  when: guest_os_ansible_distribution not in ["Debian", "Pardus GNU/Linux", "FreeBSD"]
   block:
-    - include_tasks: get_service_info.yml
-      vars:
-        service_name: "NetworkManager.service"
+    - name: "Check active network service"
+      ansible.builtin.shell: "systemctl is-active {{ network_service_name }}"
+      ignore_errors: true
+      delegate_to: "{{ vm_guest_ip }}"
+      with_items: ["systemd-networkd", "NetworkManager"]
+      loop_control:
+        loop_var: network_service_name
+      register: check_active_network_service
 
-    # RHEL/SLED/Ubuntu Desktop network interfaces are managed by NetworkManager
-    - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is NetworkManager"
+    - name: "Set fact of active network service"
       ansible.builtin.set_fact:
-        guest_os_network_manager: "NetworkManager"
+        guest_active_network_service: >-
+          {{
+            check_active_network_service.results |
+            selectattr('stdout', 'defined') |
+            selectattr('stdout', 'equalto', 'active') |
+            map(attribute='network_service_name')
+          }}
+
+    - name: "Set fact of network device mananger on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_os_network_manager: "{{ guest_active_network_service | first }}"
+      when: guest_active_network_service | length > 0
+
+    # SLES uses netplan to manage network interfaces, which is different from Ubuntu netplan
+    - name: "Set fact of network device manager to wicked on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_os_network_manager: "wicked"
       when:
-        - service_info
-        - service_info.state is defined
-        - service_info.state in ['active', 'running']
+        - guest_active_network_service | length == 0
+        - guest_os_family == "Suse"
 
-    - name: "Set network device manager for guest OS which doesn't have NetworkManager"
-      when: >
-        (not service_info or
-        service_info.state is undefined or
-        service_info.state not in ['active', 'running'])
-      block:
-        # SLES uses netplan to manage network interfaces
-        - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is wicked"
-          ansible.builtin.set_fact:
-            guest_os_network_manager: "wicked"
-          when: guest_os_family == "Suse"
+    # Ubuntu server uses netplan to manage network interfaces even though its active service is systemd-networkd
+    - name: "Set fact of network device manager to netplan on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_os_network_manager: "netplan"
+      when:
+        - guest_os_network_manager != "NetworkManager"
+        - guest_os_ansible_distribution == "Ubuntu"
 
-        # Ubuntu server uses netplan to manage network interfaces
-        - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is netplan"
-          ansible.builtin.set_fact:
-            guest_os_network_manager: "netplan"
-          when: guest_os_ansible_distribution == "Ubuntu"
+    # Use traditional ifdown/ifup commands to manage network devices for other Linux OS
+    - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is traditional ifdown/ifup"
+      ansible.builtin.set_fact:
+        guest_os_network_manager: "traditional"
+      when: not guest_os_network_manager
 
-        # Old RHEL uses ifdown/ifup to manage network interfaces
-        - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is traditional ifdown/ifup"
-          ansible.builtin.set_fact:
-            guest_os_network_manager: "traditional"
-          when: guest_os_family == "RedHat"
-
-        # VMware Photon OS/Flatcar uses systemd-networkd to manage network interface
-        - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is systemd-networkd"
-          ansible.builtin.set_fact:
-            guest_os_network_manager: "systemd-networkd"
-          when: guest_os_ansible_distribution in ['VMware Photon OS', 'Flatcar']
-
-- name: "Set network device manager for {{ guest_os_ansible_distribution }}"
+- name: "Set network device manager to netif for {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
     guest_os_network_manager: "netif"
   when: guest_os_ansible_distribution == "FreeBSD"

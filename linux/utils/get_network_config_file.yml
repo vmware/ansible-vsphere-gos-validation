@@ -13,7 +13,9 @@
 
 - name: "Get network device manager in guest OS"
   include_tasks: get_network_manager.yml
-  when: guest_os_network_manager is undefined
+  when: >-
+    guest_os_network_manager is undefined or
+    not guest_os_network_manager
 
 - name: "Get network config file from NetworkManager"
   when: guest_os_network_manager == "NetworkManager"
@@ -49,13 +51,12 @@
       when: >
         (guest_os_ansible_distribution == "Debian") or
         (guest_os_ansible_distribution == "Pardus GNU/Linux") or
-        (guest_os_ansible_distribution == "Ubuntu" and
-         guest_os_with_gui is defined and guest_os_with_gui)
+        (guest_os_ansible_distribution == "Ubuntu" and guest_os_edition == "Desktop")
 
     - name: "Set fact of network config file in Ubuntu server"
       when:
         - guest_os_ansible_distribution == "Ubuntu"
-        - guest_os_with_gui is defined and not guest_os_with_gui
+        - guest_os_edition == "Server"
       block:
         - name: "Get netplan config file in Ubuntu server"
           include_tasks: ../utils/get_netplan_config_file.yml
