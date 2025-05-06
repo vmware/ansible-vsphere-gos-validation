@@ -3,6 +3,17 @@
 ---
 - name: "Test case block"
   block:
+    - name: "Skip test case"
+      include_tasks: ../../common/skip_test_case.yml
+      vars:
+        skip_msg: >-
+          Skip test case '{{ ansible_play_name }}' because '{{ new_disk_ctrl_type }}'
+          controller type is not supported on ARM ESXi host.
+        skip_reason: "Not Supported"
+      when:
+        - esxi_cpu_vendor == 'arm'
+        - new_disk_ctrl_type in ["lsilogic", "lsilogicsas"]
+
     - name: "Test setup"
       include_tasks: ../setup/test_setup.yml
       vars:
