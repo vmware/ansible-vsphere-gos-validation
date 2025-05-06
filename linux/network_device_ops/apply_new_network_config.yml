@@ -29,20 +29,14 @@
           con-name {{ new_network_adapter }} ipv4.method manual
           ipv4.addresses {{ new_nic_ipv4 }}/{{ new_nic_net_prefix }}
           ipv4.gateway {{ new_nic_gateway }} {{ nmcli_ipv6_method }}
-      when:
-        - new_nic_ipv4 is defined and new_nic_ipv4
-        - new_nic_net_prefix is defined and new_nic_net_prefix
-        - new_nic_gateway is defined and new_nic_gateway
+      when: new_nic_ipv4_method == 'static'
 
     - name: "Set fact of command for adding network connection with DHCP IP addresss"
       ansible.builtin.set_fact:
         nmcli_connection_add_cmd:  >-
           nmcli connection add type ethernet ifname {{ new_network_adapter }}
           con-name {{ new_network_adapter }} {{ nmcli_ipv6_method }}
-      when: >-
-        (new_nic_ipv4 is undefined or not new_nic_ipv4) or
-        (new_nic_net_prefix is undefined or not new_nic_net_prefix) or
-        (new_nic_gateway is undefined or not new_nic_gateway)
+      when: new_nic_ipv4_method == 'dhcp'
 
     - name: "Add a network connection for new {{ adapter_type }} network adapter '{{ new_network_adapter }}'"
       ansible.builtin.shell: "{{ nmcli_connection_add_cmd }}"
@@ -53,7 +47,7 @@
 - name: "Set network config file for new {{ adapter_type }} network adapter on {{ vm_guest_os_distribution }}"
   when:
     - guest_os_network_manager != "NetworkManager"
-    - guest_os_ansible_distribution not in ["VMware Photon OS", "Astra Linux (Orel)"]
+    - guest_os_ansible_distribution not in ["VMware Photon OS", "FreeBSD", "Astra Linux (Orel)"]
   block:
     - name: "Initialize fact of network config template"
       ansible.builtin.set_fact:
@@ -67,7 +61,7 @@
     - name: "Set fact of the network config template on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
         network_config_template: "{{ guest_os_family | lower }}_network_conf.j2"
-      when: guest_os_family in ["RedHat", "Suse", "Debian", "FreeBSD"]
+      when: guest_os_family in ["RedHat", "Suse", "Debian"]
 
     - name: "Set fact of the network config template on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
@@ -120,27 +114,37 @@
 - name: "Apply new network configuration file for FreeBSD"
   when: guest_os_ansible_distribution == "FreeBSD"
   block:
-    - name: "Apply new vmxnet3 network configuration for FreeBSD"
-      when: adapter_type == "vmxnet3"
+    - name: "Set new {{ adapter_type }} network adapter with static IPv4 address"
+      when: new_nic_ipv4_method == "static"
       block:
-        - name: "Restart network"
-          ansible.builtin.command: "/etc/netstart"
+        - name: "Set new {{ adapter_type }} network adapter with static IPv4 address"
+          ansible.builtin.shell: 'sysrc ifconfig_{{ new_network_adapter }}="inet {{ new_nic_ipv4 }}/{{ new_nic_net_prefix }}"'
           delegate_to: "{{ vm_guest_ip }}"
-          async: 60
-          poll: 20
+
+        - name: "Restart network and routing on {{ vm_guest_os_distribution }}"
+          ansible.builtin.shell: "service netif restart && service routing restart && dhclient {{ eth0_name }}"
+          delegate_to: "{{ vm_guest_ip }}"
+          async: 20
+          poll: 0
           ignore_errors: true
-          register: restart_network_result
 
-        - name: "Display the result to restart network"
-          ansible.builtin.debug: var=restart_network_result
-          when: enable_debug is defined and enable_debug
+        - name: "Sleep 60s for network restarting on {{ vm_guest_os_distribution }}"
+          ansible.builtin.pause:
+            seconds: 60
 
-        - name: "Update VM's guest IP after apply new network configuration"
+        - name: "Update VM's guest IP in case it's changed"
           include_tasks: ../../common/update_inventory.yml
 
-    - name: "Reboot to apply new e1000e network configuration for FreeBSD"
-      include_tasks: ../utils/reboot.yml
-      when: adapter_type == "e1000e"
+    - name: "Set new {{ adapter_type }} network adapter with DHCP IPv4 address"
+      when: new_nic_ipv4_method == "dhcp"
+      block:
+        - name: "Set new {{ adapter_type }} network adapter with static IPv4 address"
+          ansible.builtin.shell: 'sysrc ifconfig_{{ new_network_adapter }}="DHCP"'
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - name: "Get DHCP IPv4 address for new {{ adapter_type }} network adapter"
+          ansible.builtin.shell: "dhclient {{ new_network_adapter }}"
+          delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Bring up the new {{ adapter_type }} network adapter '{{ new_network_adapter }}'"
   include_tasks: ../utils/set_network_adapter_status.yml
