@@ -22,7 +22,7 @@
       ansible.builtin.shell: "systemctl is-active {{ network_service_name }}"
       ignore_errors: true
       delegate_to: "{{ vm_guest_ip }}"
-      with_items: ["systemd-networkd", "NetworkManager"]
+      with_items: ["NetworkManager", "systemd-networkd"]
       loop_control:
         loop_var: network_service_name
       register: check_active_network_service
@@ -55,7 +55,7 @@
       ansible.builtin.set_fact:
         guest_os_network_manager: "netplan"
       when:
-        - guest_os_network_manager != "NetworkManager"
+        - guest_os_network_manager == "systemd-networkd"
         - guest_os_ansible_distribution == "Ubuntu"
 
     # Use traditional ifdown/ifup commands to manage network devices for other Linux OS
