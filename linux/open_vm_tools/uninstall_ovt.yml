@@ -5,26 +5,26 @@
 # Parameters:
 #   ovt_packages: a list of open-vm-tools packages
 #
+
+- name: "Get installed packages on {{ vm_guest_os_distribution }}"
+  include_tasks: ../utils/get_installed_packages.yml
+
+- name: "Set fact of installed open-vm-tools related packages"
+  ansible.builtin.set_fact:
+    installed_ovt_packages: "{{ ovt_packages | select('in', guest_installed_packages) }}"
+
+- name: "Display open-vm-tools related packages which are installed in guest OS"
+  ansible.builtin.debug: var=installed_ovt_packages
+
 # Uninstall open-vm-tools packages
-- name: "Uninstall packages {{ ovt_packages }}"
-  ansible.builtin.command: "{{ package_uninstall_cmd }} {{ ' '.join(ovt_packages) }}"
+- name: "Uninstall open-vm-tools related packages on {{ vm_guest_os_distribution }}"
+  ansible.builtin.command: "{{ package_uninstall_cmd }} {{ ' '.join(installed_ovt_packages) }}"
   register: ovt_uninstall_result
-  ignore_errors: true
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Display the packages uninstall output"
   ansible.builtin.debug: var=ovt_uninstall_result
-  when: enable_debug | bool
-
-- name: "Assert command is executed successfully"
-  ansible.builtin.assert:
-    that:
-      - ovt_uninstall_result is defined
-      - ovt_uninstall_result.stdout is defined
-      - ovt_uninstall_result.stdout
-      - ovt_uninstall_result.rc is defined
-      - ovt_uninstall_result.rc | int == 0
-    fail_msg: "Failed to uninstall open-vm-tools by executing command: {{ package_uninstall_cmd }} {{ ' '.join(ovt_packages) }}"
+  when: enable_debug
 
 - name: "Reboot VM to make changes take effect"
   include_tasks: ../utils/reboot.yml
@@ -36,7 +36,7 @@
   include_tasks: check_ovt_package.yml
   vars:
     expected_package_state: "absent"
-  with_items: "{{ ovt_packages }}"
+  with_items: "{{ installed_ovt_packages }}"
   loop_control:
     loop_var: package_name
 
