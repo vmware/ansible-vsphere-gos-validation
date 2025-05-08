@@ -1,0 +1,76 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Handle LSILogic known issues
+#
+- name: "Handle LSILogic known issue on Linux"
+  when: guest_os_ansible_system == 'linux'
+  block:
+    - name: "Set fact whether to use SCSI rescan script"
+      ansible.builtin.set_fact:
+        rescan_scsi_with_script: >-
+          {{ 
+            not (guest_os_ansible_distribution in ['Flatcar', 'Fedora', 'RHCOS'] or
+                (guest_os_ansible_distribution == "Ubuntu" and
+                 guest_os_ansible_distribution_major_ver | int >= 22) or
+                (guest_os_ansible_distribution == "Debian" and
+                 guest_os_ansible_distribution_major_ver | int >= 12) or
+                (guest_os_ansible_distribution == "Pardus GNU/Linux" and
+                 guest_os_ansible_distribution_major_ver | int >= 23))
+          }}
+
+    - name: "Rescan SCSI devices in {{ vm_guest_os_distribution }}"
+      when: rescan_scsi_with_script
+      block:
+        - name: "Rescan all SCSI devices"
+          ansible.builtin.command: "/usr/bin/rescan-scsi-bus.sh -a -r"
+          register: rescan_scsi_result
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - name: "Print result of rescanning scsi"
+          ansible.builtin.debug: var=rescan_scsi_result.stdout_lines
+          when:
+            - rescan_scsi_result is defined
+            - rescan_scsi_result.stdout_lines
+
+    - name: "Rescan SCSI devices in {{ vm_guest_os_distribution }}"
+      when: not rescan_scsi_with_script
+      block:
+        - name: "Rescan all hard disks"
+          ansible.builtin.shell: |
+            for i in `find /sys/ -iname rescan`;do echo 1 >$i; done;
+            for i in `find /sys/ -iname scan`;do echo "- - -" >$i; done;
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - name: "Rescan in guest for removed disk"
+          when: wait_device_state | lower == 'absent'
+          block:
+            - name: "Get ansible facts of devices in guest OS"
+              include_tasks: ../../common/get_system_info.yml
+              vars:
+                filter: "ansible_devices"
+
+            - name: "Set fact of removed disk {{ wait_device_name }}"
+              ansible.builtin.set_fact:
+                guest_ansible_device: >
+                  {{
+                    guest_system_info.ansible_devices |
+                    dict2items |
+                    selectattr('key', 'equalto', wait_device_name) |
+                    items2dict
+                  }}
+
+            - name: "Rescan the deleted SCSI disk '{{ wait_device_name }}'"
+              ansible.builtin.shell: "echo 1 > /sys/block/{{ wait_device_name }}/device/delete"
+              ignore_errors: true
+              delegate_to: "{{ vm_guest_ip }}"
+              when:
+                - guest_ansible_device is defined
+                - guest_ansible_device[wait_device_name] is defined
+                - guest_ansible_device[wait_device_name].size is defined
+                - guest_ansible_device[wait_device_name].size == "0.00 Bytes"
+
+- name: "Handle LSILogic knonw issue on FreeBSD by rescanning all devices"
+  ansible.builtin.command: "camcontrol rescan all"
+  delegate_to: "{{ vm_guest_ip }}"
+  when: guest_os_ansible_system == 'freebsd'

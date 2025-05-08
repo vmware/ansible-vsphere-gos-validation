@@ -1,0 +1,63 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Handle NVMe known issues
+#
+- name: "Handle NVMe known issue on Linux"
+  when:
+    - vm_hardware_version_num | int < 19
+    - guest_os_ansible_system == 'linux'
+    - guest_os_ansible_distribution != 'VMware Photon OS'
+  block:
+    - name: "Get boot disk controller type"
+      include_tasks: ../utils/get_boot_disk_ctrl_type.yml
+
+    - name: "Workaround NVMe known issue by reloading driver"
+      when: guest_boot_disk_ctrl_type != 'nvme'
+      block:
+        - name: "Known issue - workaround of detecting NVMe device changes"
+          ansible.builtin.debug:
+            msg:
+              - "Guest OS can't detect hot add, remove disk attached to NVMe controller when VM's hardware version is {{ vm_hardware_version_num }}. Ignore this known issue."
+              - "VM's boot disk controller is not NVMe, so unload and reload nvme driver to see NVMe device changes as a workaround."
+              - "Please refer to https://knowledge.broadcom.com/external/article?legacyId=2147574."
+          tags:
+            - known_issue
+
+        - name: "Unload and reload nvme driver"
+          ansible.builtin.shell: "rmmod nvme && modprobe nvme"
+          delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Workaround NVMe known issue by rebooting guest OS"
+      when: guest_boot_disk_ctrl_type == 'nvme'
+      block:
+        - name: "Known issue - workaround of detecting NVMe device changes"
+          ansible.builtin.debug:
+            msg:
+              - "Guest OS can't detect hot add, remove disk attached to NVMe controller when VM's hardware version is {{ vm_hardware_version_num }}. Ignore this known issue."
+              - "VM's boot disk controller is NVMe, so reboot guest OS to see NVMe device changes as a workaround."
+              - "Please refer to https://knowledge.broadcom.com/external/article?legacyId=2147574."
+          tags:
+            - known_issue
+
+        - name: "Reboot guest OS to detect NVMe device changes"
+          include_tasks: ../utils/reboot.yml
+
+- name: "Handle NVMe known issue on FreeBSD"
+  when:
+    - guest_os_ansible_distribution == 'FreeBSD'
+    - guest_os_ansible_distribution_major_ver | int <= 13
+  block:
+    - name: "Reboot VM to detect NVMe device changes on {{ vm_guest_os_distribution }}"
+      when: new_disk_ctrl_type == 'nvme'
+      block:
+        - name: "Known issue - workaround of detecting NVMe device changes for FreeBSD"
+          ansible.builtin.debug:
+            msg:
+              - "Guest OS can't detect hot add, remove disk attached to NVMe controller. Ignore this known issue."
+              - "Please refer to https://knowledge.broadcom.com/external/article?legacyId=2147574."
+          tags:
+            - known_issue
+
+        - name: "Reboot guest OS to detect NVMe device changes"
+          include_tasks: ../utils/reboot.yml

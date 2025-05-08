@@ -3,11 +3,11 @@
 ---
 # Wait for a device state is present or absent
 # Parameters:
-#   device_list_before_change: The devices list before change
-#   wait_device_state: 'present' for new added device
-#                      'absent' for removed device
+#   wait_device_state: The state of device: 'present' for new added device, and
+#     'absent' for removed device.
+#   wait_device_count: The expected devices count after device is present or absent.
 #   wait_device_name: The devices name which should be absent.
-#                     Required when wait_device_state is absent.
+#     Required when wait_device_state is absent.
 #
 - name: "Check wait_device_state is correct"
   ansible.builtin.assert:
@@ -24,182 +24,48 @@
     fail_msg: "wait_device_name is missing for waiting device absent"
   when: wait_device_state | lower == 'absent'
 
-- name: "Initialize the difference length of device list with device {{ wait_device_state | lower }}"
-  ansible.builtin.set_fact:
-    wait_device_diff: "{% if wait_device_state | lower == 'present' %}1{% else %}-1{% endif %}"
-
-# Rescan SCSI bus when hot adding/removing LSILogic disk
-- name: "Handle LSILogic disk"
-  when: new_disk_ctrl_type == 'lsilogic'
-  block:
-    - name: "Rescan scsi devices in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-      when:
-        - guest_os_ansible_distribution not in ['Flatcar', 'Fedora', 'FreeBSD', 'RHCOS']
-        - not (guest_os_ansible_distribution == "Ubuntu" and
-               guest_os_ansible_distribution_major_ver | int >= 22)
-        - not (guest_os_ansible_distribution == "Debian" and
-               guest_os_ansible_distribution_major_ver | int >= 12)
-        - not (guest_os_ansible_distribution == "Pardus GNU/Linux" and
-               guest_os_ansible_distribution_major_ver | int >= 23)
-      block:
-        - name: "Rescan all scsi devices"
-          ansible.builtin.command: "/usr/bin/rescan-scsi-bus.sh -a -r"
-          register: rescan_scsi_result
-          delegate_to: "{{ vm_guest_ip }}"
-
-        - name: "Print result of rescanning scsi"
-          ansible.builtin.debug: var=rescan_scsi_result.stdout_lines
-          when:
-            - rescan_scsi_result is defined
-            - rescan_scsi_result.stdout_lines
-
-    - name: "Rescan scsi devices in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-      when: >
-        (guest_os_ansible_distribution in ['Flatcar', 'Fedora', 'RHCOS'] or
-         (guest_os_ansible_distribution == "Ubuntu" and
-          guest_os_ansible_distribution_major_ver | int >= 22) or
-         (guest_os_ansible_distribution == "Debian" and
-          guest_os_ansible_distribution_major_ver | int >= 12) or
-         (guest_os_ansible_distribution == "Pardus GNU/Linux" and
-          guest_os_ansible_distribution_major_ver | int >= 23))
-      block:
-        - name: "Rescan all hard disks"
-          ansible.builtin.shell: |
-            for i in `find /sys/ -iname rescan`;do echo 1 >$i; done;
-            for i in `find /sys/ -iname scan`;do echo "- - -" >$i; done;
-          delegate_to: "{{ vm_guest_ip }}"
-
-        - name: "Rescan in guest for removed disk"
-          when: wait_device_state | lower == 'absent'
-          block:
-            - include_tasks: ../../common/get_system_info.yml
-            - name: "Set fact of removed disk {{ wait_device_name }}"
-              ansible.builtin.set_fact:
-                guest_ansible_device: >
-                  {{
-                    guest_system_info.ansible_devices |
-                    dict2items |
-                    selectattr('key', 'equalto', wait_device_name) |
-                    items2dict
-                  }}
-
-            - name: "Rescan the deleted SCSI disk '{{ wait_device_name }}'"
-              ansible.builtin.shell: "echo 1 > /sys/block/{{ wait_device_name }}/device/delete"
-              ignore_errors: true
-              delegate_to: "{{ vm_guest_ip }}"
-              when:
-                - guest_ansible_device is defined
-                - guest_ansible_device[wait_device_name] is defined
-                - guest_ansible_device[wait_device_name].size is defined
-                - guest_ansible_device[wait_device_name].size == "0.00 Bytes"
-
-- name: "Handle NVMe disk"
-  when:
-    - new_disk_ctrl_type == 'nvme'
-    - vm_hardware_version_num | int < 19
-    - guest_os_ansible_distribution not in ['VMware Photon OS', 'FreeBSD']
-  block:
-    - name: "WORKAROUND"
-      ansible.builtin.debug:
-        msg: "Hot adding or removing NVMe disks cannot be detected by guest OS on VMs with hardware version of {{ vm_hardware_version }}."
-
-    # Get boot disk controller
-    - name: "Set fact of VM's boot disk controller type"
-      ansible.builtin.set_fact:
-        vm_boot_disk_ctrl_type: "{{ boot_disk_controller if boot_disk_controller in ['sata', 'nvme'] else 'scsi' }}"
-      when: new_vm
-
-    - name: "For existing VM situation"
-      block:
-        - include_tasks: ../../common/vm_get_device_with_label.yml
-          vars:
-            device_label: "Hard disk 1"
-        - include_tasks: ../../common/vm_get_device_with_key.yml
-          vars:
-            device_key: "{{ device_info_with_label.controllerKey }}"
-        - name: "Set fact of VM's boot disk controller type"
-          ansible.builtin.set_fact:
-            vm_boot_disk_ctrl_type: "{{ device_info_with_key.deviceInfo.label.split()[0] | lower }}"
-      when: not new_vm
-
-    - block:
-        - name: "Known issue - workaround of detecting NVMe device changes"
-          ansible.builtin.debug:
-            msg:
-              - "Guest OS can't detect hot add, remove disk attached to NVMe controller when VM's hardware version is {{ vm_hardware_version_num }}. Ignore this known issue."
-              - "VM's boot disk controller is not NVMe, so unload and reload nvme driver to see NVMe device changes as a workaround."
-              - "Please refer to https://knowledge.broadcom.com/external/article?legacyId=2147574."
-          tags:
-            - known_issue
-
-        - name: "Unload and reload nvme driver"
-          ansible.builtin.shell: "rmmod nvme && modprobe nvme"
-          delegate_to: "{{ vm_guest_ip }}"
-      when: vm_boot_disk_ctrl_type != 'nvme'
-
-    - block:
-        - name: "Known issue - workaround of detecting NVMe device changes"
-          ansible.builtin.debug:
-            msg:
-              - "Guest OS can't detect hot add, remove disk attached to NVMe controller when VM's hardware version is {{ vm_hardware_version_num }}. Ignore this known issue."
-              - "VM's boot disk controller is NVMe, so reboot guest OS to see NVMe device changes as a workaround."
-              - "Please refer to https://knowledge.broadcom.com/external/article?legacyId=2147574."
-          tags:
-            - known_issue
-
-        - include_tasks: ../utils/reboot.yml
-      when: vm_boot_disk_ctrl_type == 'nvme'
-
-- name: "Handle NVMe or LSILogic disk for FreeBSD"
-  when:
-    - guest_os_ansible_distribution == "FreeBSD"
-    - new_disk_ctrl_type in ['nvme' , 'lsilogic']
-  block:
-    - name: "Reboot VM to detect NVMe device changes for FreeBSD 13.x or older releases"
-      when: new_disk_ctrl_type == 'nvme'
-      block:
-        - name: "Known issue - workaround of detecting NVMe device changes for FreeBSD"
-          ansible.builtin.debug:
-            msg:
-              - "Guest OS can't detect hot add, remove disk attached to NVMe controller. Ignore this known issue."
-              - "Please refer to https://knowledge.broadcom.com/external/article?legacyId=2147574."
-          tags:
-            - known_issue
-
-        - include_tasks: ../utils/reboot.yml
-
-    - name: "Recan bus to detect LSILogic device changes"
-      ansible.builtin.command: "camcontrol rescan all"
-      delegate_to: "{{ vm_guest_ip }}"
-      when: new_disk_ctrl_type == 'lsilogic'
-
 - name: "Initialize the command to get device list"
   ansible.builtin.set_fact:
     get_device_list_cmd: |-
-      {%- if guest_os_family == 'FreeBSD' -%}lsblk -d | grep -v SIZE | grep -v cd0
-      {%- else -%}lsblk -o NAME,TYPE,SIZE,FSTYPE -b --nodeps
-      {%- endif -%}
+      {%- if guest_os_family == 'FreeBSD' %}lsblk -d | grep -i '^[a-z]' | grep -v SIZE | grep -v cd0
+      {%- else %}lsblk -o NAME,TYPE,SIZE,FSTYPE -b --nodeps | grep disk
+      {%- endif %} | awk '{print $1}'
 
-- name: "Wait for device to be {{ wait_device_state | lower }}"
-  ansible.builtin.shell: |-
-    {%- if guest_os_family == 'FreeBSD' -%}{{ get_device_list_cmd }} | awk '{print $1}'
-    {%- else -%}{{ get_device_list_cmd }}| grep disk | awk '{print $1}'
-    {%- endif -%}
+- name: "List all disks in guest OS"
+  ansible.builtin.shell: "{{ get_device_list_cmd }}"
   delegate_to: "{{ vm_guest_ip }}"
   changed_when: false
-  register: lsblk_result
-  until:
-    - lsblk_result.stdout_lines is defined
-    - (lsblk_result.stdout_lines | length) - (device_list_before_change | length) == (wait_device_diff | int)
-  delay: 5
-  retries: 10
-  ignore_errors: true
-  ignore_unreachable: true
+  register: list_disks_result
 
-- name: "Guest OS unreachable"
-  ansible.builtin.fail:
-    msg: "{{ lsblk_result }}"
-  when:
-    - lsblk_result is defined
-    - lsblk_result.unreachable is defined
-    - lsblk_result.unreachable
+- name: "Set fact for device count changed"
+  ansible.builtin.set_fact:
+    guest_device_count_changed: "{{ list_disks_result.stdout_lines | default([]) | length == wait_device_count | int }}"
+
+- name: "Wait for device count changed"
+  include_tasks: "handle_{{ new_disk_ctrl_type }}_known_issue.yml"
+  when: not guest_device_count_changed
+  block:
+    - name: "Handle {{ new_disk_ctrl_type }} known issues on {{ vm_guest_os_distribution }}"
+      include_tasks: "handle_{{ new_disk_ctrl_type }}_known_issue.yml"
+      when: new_disk_ctrl_type in ['lsilogic', 'lsilogicsas', 'nvme']
+
+    - name: "Wait for device to be {{ wait_device_state | lower }} on {{ vm_guest_os_distribution }}"
+      ansible.builtin.shell: "{{ get_device_list_cmd }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      changed_when: false
+      register: lsblk_result
+      until:
+        - lsblk_result.stdout_lines is defined
+        - lsblk_result.stdout_lines | length == wait_device_count | int
+      delay: 5
+      retries: 10
+      ignore_errors: true
+      ignore_unreachable: true
+
+    - name: "Guest OS unreachable"
+      ansible.builtin.fail:
+        msg: "{{ lsblk_result }}"
+      when:
+        - lsblk_result is defined
+        - lsblk_result.unreachable is defined
+        - lsblk_result.unreachable

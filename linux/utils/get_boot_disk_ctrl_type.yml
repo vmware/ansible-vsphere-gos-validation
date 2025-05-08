@@ -1,0 +1,60 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the boot disk controler type on Linux
+# Return:
+#   guest_boot_disk_ctrl_type: The boot disk controller type
+#
+- name: "Initialze the fact of boot disk controller type in guest OS"
+  ansible.builtin.set_fact:
+    guest_boot_disk_ctrl_type: "{{ new_vm | ternary(boot_disk_controller, '') }}"
+
+- name: "Get boot disk controller type on existing VM"
+  when: not new_vm
+  block:
+    - name: "Get ansible facts of system devices in guest OS"
+      include_tasks: ../../common/get_system_info.yml
+      vars:
+        filter:
+          - 'ansible_mounts'
+          - 'ansible_devices'
+
+    - name: "Get boot disk partition in guest OS"
+      ansible.builtin.set_fact:
+        guest_boot_disk_partition: >-
+          {{
+            guest_system_info.ansible_mounts |
+            selectattr('mount', 'equalto', '/') |
+            map(attribute='device') |
+            first |
+            replace('/dev/', '')
+          }}
+
+    - name: "Get boot disk controller in guest OS"
+      ansible.builtin.set_fact:
+        guest_boot_disk_controller: >-
+          {{ 
+            guest_system_info.ansible_devices.values() |
+            selectattr('partitions', 'contains', guest_boot_disk_partition) |
+            map(attribute='host') | first
+          }}
+
+    - name: "Set fact of boot disk controller type in guest OS"
+      ansible.builtin.set_fact:
+        guest_boot_disk_ctrl_type: |-
+          {%- if guest_boot_disk_controller is search('PVSCSI') -%}paravirtual
+          {%- elif guest_boot_disk_controller is search('NVMe') -%}nvme
+          {%- elif guest_boot_disk_controller is search('SATA') -%}sata
+          {%- elif guest_boot_disk_controller is search('LSI.*SAS') -%}lsilogicsas
+          {%- elif guest_boot_disk_controller is search('LSI.*SCSI') -%}lsilogic
+          {%- endif -%}
+
+    - name: "Check boot disk controller type in guest OS"
+      ansible.builtin.assert:
+        that:
+          - guest_boot_disk_ctrl_type
+        fail_msg: "Failed to get boot disk controller type. The boot disk controller is {{ guest_boot_disk_controller }}"
+        success_msg: "The boot disk controller is {{ guest_boot_disk_ctrl_type }}"
+
+- name: "Display the boot disk controller type in guest OS"
+  ansible.builtin.debug: var=guest_boot_disk_ctrl_type
