@@ -1,0 +1,17 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Handle LSILogicSAS known issues
+#
+- name: "Handle LSILogicSAS known issue on {{ vm_guest_os_distribution }}"
+  when: guest_os_ansible_distribution == "Ubuntu"
+  block:
+    - name: "Known issue - workaround of detecting LSILogicSAS device changes"
+      ansible.builtin.debug:
+        msg:
+          - "Guest OS can't detect hot add disk attached to LSILogicSAS controller. Ignore this known issue."
+      tags:
+        - known_issue
+
+    - name: "Reboot guest OS to detect LSILogicSAS device changes"
+      include_tasks: ../utils/reboot.yml

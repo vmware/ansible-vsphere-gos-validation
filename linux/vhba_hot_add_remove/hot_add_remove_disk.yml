@@ -45,11 +45,29 @@
     dmesg_output_file_name: "dmesg_after_{{ new_disk_ctrl_state }}_ctrl_disk_hot_add.log"
     dmesg_no_log: true
 
+# Check whether there is call trace in dmesg after hot add
+- name: "Extract errors from guest OS dmesg"
+  include_tasks: ../../common/extract_errors_from_log.yml
+  vars:
+    extract_log_file_path: "{{ dmesg_output_file_path }}"
+
+- name: "Found call trace after hot adding a disk to {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller"
+  ansible.builtin.set_fact:
+    dmesg_call_trace_stack: >-
+      {{
+        dmesg_call_trace_stack |
+        union(['Found call trace after hot adding a disk to {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller\n' +
+               errors_in_log}])
+      }}
+  when:
+    - errors_in_log | length > 0
+    - errors_in_log is search('Call Trace')
+
 - name: "Wait for hot-added disk to {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller being present in guest OS"
   include_tasks: wait_device_list_changed.yml
   vars:
-    device_list_before_change: "{{ guest_disk_list_before_hotadd }}"
     wait_device_state: "present"
+    wait_device_count: "{{ guest_disk_list_before_hotadd | length + 1 }}"
 
 - name: "Get guest disk list after hot-add"
   include_tasks: ../utils/get_device_list.yml
@@ -144,12 +162,30 @@
     dmesg_output_file_name: "dmesg_after_{{ new_disk_ctrl_state }}_ctrl_disk_hot_remove.log"
     dmesg_no_log: true
 
+# Check whether there is call trace in dmesg after hot remove
+- name: "Extract errors from guest OS dmesg"
+  include_tasks: ../../common/extract_errors_from_log.yml
+  vars:
+    extract_log_file_path: "{{ dmesg_output_file_path }}"
+
+- name: "Found call trace after hot removing a disk the {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller"
+  ansible.builtin.set_fact:
+    dmesg_call_trace_stack: >-
+      {{
+        dmesg_call_trace_stack |
+        union(['Found call trace after hot removing a disk from the {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller\n' +
+               errors_in_log])
+      }}
+  when:
+    - errors_in_log | length > 0
+    - errors_in_log is search('Call Trace')
+
 - name: "Wait for disk being absent in guest OS"
   include_tasks: wait_device_list_changed.yml
   vars:
-    device_list_before_change: "{{ guest_disk_list_after_hotadd }}"
-    wait_device_name: "{{ new_guest_disk_info.name }}"
     wait_device_state: "absent"
+    wait_device_count: "{{ guest_disk_list_before_hotremove | length - 1 }}"
+    wait_device_name: "{{ new_guest_disk_info.name }}"
 
 - name: "Get guest disk list after hot-remove"
   include_tasks: ../utils/get_device_list.yml
