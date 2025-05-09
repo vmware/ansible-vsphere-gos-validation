@@ -134,7 +134,7 @@
             vc_cert_path: "{{ current_test_log_folder }}"
           when: key_provider_type is defined and key_provider_type
 
-        - name: "Add virtual TPM device to VM" 
+        - name: "Add virtual TPM device to VM"
           include_tasks: ../../common/vm_add_remove_vtpm.yml
           vars:
             vtpm_operation: 'present'
@@ -219,28 +219,35 @@
 - name: "Get Linux system info"
   include_tasks: ../utils/get_linux_system_info.yml
 
-- name: "Wait for guest OS service is ready"
-  when:
-    - guest_os_with_gui is defined
-    - (guest_os_family in ["RedHat", "Suse"] or
-       guest_os_ansible_distribution in ["Ubuntu", "Debian"])
+- name: "Wait for Linux system is ready for login"
+  when: guest_os_ansible_system == "linux"
   block:
-    # For SLE, RHEL8/CentOS8/OracleLinux8 with desktop: display-manager
-    # service running at the end of installation to wait user login.
-    # Otherwise, systemd-logind service running at the end of installaiton
-    # to wait user login
-    - name: "Set fact of service name for waiting at first time of OS boot"
-      ansible.builtin.set_fact:
-        wait_service_name: |-
-          {%- if guest_os_with_gui -%}display-manager
-          {%- else -%}systemd-logind
-          {%- endif -%}
-
-    - name: "Wait for service {{ wait_service_name }} is running"
+    # Wait for 'systemd-logind' service running if it exists
+    - name: "Wait for 'systemd-logind' service is running"
       include_tasks: ../utils/wait_for_service_status.yml
       vars:
-        service_name: "{{ wait_service_name }}"
+        wait_service_name: "systemd-logind"
         wait_service_status: "running"
+        wait_service_ignore_errors: true
+
+    - name: "Check guest OS desktop status"
+      when: guest_os_family in ["RedHat", "Suse", "Debian"]
+      block:
+        # Wait for 'display-manager' service running if it exists
+        # Even though it is not running at last, it is OK because
+        # it is not mandatory.
+        - name: "Wait for service 'display-manager' service is running"
+          include_tasks: ../utils/wait_for_service_status.yml
+          vars:
+            wait_service_name: "display-manager"
+            wait_service_status: "running"
+            wait_service_ignore_errors: true
+
+        # Check guest OS desktop again in case it is not ready
+        # when getting linux system info at the first time
+        - name: "Update facts about guest OS desktop environment"
+          include_tasks: ../utils/check_guest_os_gui.yml
+          when: service_info
 
 - name: "Upgrade Oracle Linux 9.0 kernel from UEK R7 GA to latest UEK R7"
   when:
@@ -298,4 +305,3 @@
               Oracle Linux 9.0 UEK R7 upgrading failed. Before upgrade, the UEK R7
               version is '{{ ol9_uekr7_before_upgrade }}', after upgrade the UEK R7
               version is '{{ ol9_uekr7_after_upgrade }}'.
-
