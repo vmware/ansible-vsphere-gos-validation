@@ -10,7 +10,9 @@
     guest_boot_disk_ctrl_type: "{{ new_vm | ternary(boot_disk_controller, '') }}"
 
 - name: "Get boot disk controller type on existing VM"
-  when: not new_vm
+  when:
+    - not new_vm
+    - guest_os_ansible_system == 'linux'
   block:
     - name: "Get ansible facts of system devices in guest OS"
       include_tasks: ../../common/get_system_info.yml
@@ -30,28 +32,30 @@
             map('replace', '/dev/', '')
           }}
 
-    - name: "Get boot disk controller"
-      when: guest_boot_disk_partitions | length > 0
-      block:
-        - name: "Get boot disk controller in guest OS"
-          ansible.builtin.set_fact:
-            guest_boot_disk_controller: >-
-              {{
-                guest_system_info.ansible_devices.values() |
-                selectattr('partitions', 'contains', guest_boot_disk_partitions[0]) |
-                map(attribute='host') | first
-              }}
+    - name: "Failed to find disk partitions for boot or root file system"
+      ansible.builtin.fail:
+        msg: "All disk partitions are {{ guest_system_info.ansible_mounts | selectattr('device', 'match', '/dev/(sd|nvme)') }}"
+      when: guest_boot_disk_partitions | length == 0
 
-        - name: "Set fact of boot disk controller type in guest OS"
-          ansible.builtin.set_fact:
-            guest_boot_disk_ctrl_type: |-
-              {%- if guest_boot_disk_controller is search('PVSCSI') -%}paravirtual
-              {%- elif guest_boot_disk_controller is search('NVMe') -%}nvme
-              {%- elif guest_boot_disk_controller is search('SATA') -%}sata
-              {%- elif guest_boot_disk_controller is search('LSI.*SAS') -%}lsilogicsas
-              {%- elif guest_boot_disk_controller is search('LSI.*SCSI') -%}lsilogic
-              {%- elif guest_boot_disk_controller is search('IDE') -%}ide
-              {%- endif -%}
+    - name: "Get boot disk controller in guest OS"
+      ansible.builtin.set_fact:
+        guest_boot_disk_controller: >-
+          {{
+            guest_system_info.ansible_devices.values() |
+            selectattr('partitions', 'contains', guest_boot_disk_partitions[0]) |
+            map(attribute='host') | first
+          }}
+
+    - name: "Set fact of boot disk controller type in guest OS"
+      ansible.builtin.set_fact:
+        guest_boot_disk_ctrl_type: |-
+          {%- if guest_boot_disk_controller is search('PVSCSI') -%}paravirtual
+          {%- elif guest_boot_disk_controller is search('NVMe') -%}nvme
+          {%- elif guest_boot_disk_controller is search('SATA') -%}sata
+          {%- elif guest_boot_disk_controller is search('LSI.*SAS') -%}lsilogicsas
+          {%- elif guest_boot_disk_controller is search('LSI.*SCSI') -%}lsilogic
+          {%- elif guest_boot_disk_controller is search('IDE') -%}ide
+          {%- endif -%}
 
     - name: "Check boot disk controller type in guest OS"
       ansible.builtin.assert:
