@@ -1,20 +1,49 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Wait service status as expected
+# Wait service status as expected in guest OS
 # Parameter:
-#   service_name: the name of the service
-#   wait_service_status: ['activating', 'running']
+#   wait_service_name: The name of the service
+#   wait_service_status: The expected service status, like 'activating', 'running', etc.
 #   wait_service_timeout: The timeout for waiting service status
+#   wait_service_ignore_errors: Whether to ignore errors when service status
+#     is not as expected. Default value is false.
 #
-- name: "Wait {{ service_name }} is {{ wait_service_status }} on {{ vm_name }}"
-  ansible.builtin.command: "systemctl status {{ service_name }}"
-  register: guest_service_status
-  delay: 5
-  retries: "{{ ((wait_service_timeout | default(300) | int) / 5) | int }}"
-  ignore_errors: true
-  until:
-    - guest_service_status is defined
-    - guest_service_status.stdout is defined
-    - wait_service_status in guest_service_status.stdout
-  delegate_to: "{{ vm_guest_ip }}"
+- name: "Get '{{ wait_service_name }}' service info in guest OS"
+  include_tasks: ../utils/get_service_info.yml
+  vars:
+    service_name: "{{ wait_service_name }}"
+
+- name: "Cannot wait service status because service doesn't exist"
+  ansible.builtin.fail:
+    msg: "Service '{{ wait_service_name }}' doesn't exist on {{ vm_guest_os_distribution }}"
+  when:
+    - not (wait_service_ignore_errors | default(false))
+    - service_info.state is undefined
+
+- name: "Wait for service status"
+  when:
+    - service_info.state is defined
+    - service_info.state != wait_service_status
+  block:
+    - name: "Wait '{{ wait_service_name }}' service is {{ wait_service_status }} on {{ vm_guest_os_distribution }}"
+      ansible.builtin.command: "systemctl status {{ service_name }}"
+      register: guest_service_status
+      delay: 5
+      retries: "{{ ((wait_service_timeout | default(300) | int) / 5) | int }}"
+      ignore_errors: true
+      until:
+        - guest_service_status is defined
+        - guest_service_status.stdout is defined
+        - wait_service_status in guest_service_status.stdout
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Timed out to wait for service status on {{ vm_guest_os_distribution }}"
+      ansible.builtin.fail:
+        msg: >-
+          It's timed out to wait '{{ wait_service_name }}' service status to be '{{ wait_service_status }}'.
+          Current service status is '{{ guest_service_status }}'
+      when:
+        - not (wait_service_ignore_errors | default(false))
+        - guest_service_status.failed is defined
+        - guest_service_status.failed
