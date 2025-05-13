@@ -38,6 +38,19 @@
     - guest_os_ansible_distribution is defined
     - guest_os_ansible_distribution == 'FreeBSD'
 
+- name: "Get '{{ vm_guest_id }}' guest config options with VM hardware version '{{ vm_hardware_version_num }}'"
+  when: guest_options_retrieved is undefined
+  block:    
+    - name: "Get VM guest options"
+      include_tasks: ../../common/esxi_get_guest_config_options.yml
+      vars:
+        guest_id: "{{ vm_guest_id }}"
+        esxi_hardware_version: "{{ vm_hardware_version_num }}"
+
+    - name: "Set fact of VM guest options retrieved"
+      ansible.builtin.set_fact:
+        guest_options_retrieved: true
+
 - name: "Get VM guest IP"
   include_tasks: ../../common/update_inventory.yml
 
