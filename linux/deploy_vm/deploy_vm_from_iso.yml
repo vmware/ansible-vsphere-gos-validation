@@ -3,18 +3,57 @@
 ---
 # Deploy a new VM and install guest OS automatically from an ISO image
 #
+- name: "Set fact of the new VM default hardware version"
+  ansible.builtin.set_fact:
+    hardware_version: "{{ esxi_latest_hardware_version }}"
+  when: hardware_version is undefined
+
+- name: "Get '{{ vm_guest_id }}' guest config options with VM hardware version '{{ hardware_version }}'"
+  include_tasks: ../../common/esxi_get_guest_config_options.yml
+  vars:
+    guest_id: "{{ vm_guest_id }}"
+    esxi_hardware_version: "{{ hardware_version }}"
+
 # Initialize undefined variables
 - name: "Initialize variables for new VM settings"
   ansible.builtin.set_fact:
-    boot_disk_controller: "{{ boot_disk_controller | lower if (boot_disk_controller is defined and boot_disk_controller) else 'paravirtual' }}"
-    network_adapter_type: "{{ network_adapter_type | lower if (network_adapter_type is defined and network_adapter_type) else 'vmxnet3' }}"
-    firmware: "{{ firmware | lower if (firmware is defined and firmware) else 'efi' }}"
+    boot_disk_controller: >-
+      {{ 
+         boot_disk_controller is defined and boot_disk_controller 
+         | ternary(boot_disk_controller | lower, guest_config_options.default_disk_controller) 
+      }}
+    network_adapter_type: >-
+      {{
+         network_adapter_type is defined and network_adapter_type 
+         | ternary(network_adapter_type | lower, guest_config_options.default_ethernet) 
+      }}
+    firmware: >-
+      {{
+         firmware is defined and firmware 
+         | ternary(firmware | lower, guest_config_options.rec_firmware) 
+      }} 
     secureboot_enabled: "{{ secureboot_enabled is defined and secureboot_enabled | bool }}"
     vm_video_memory_mb: ""
     unattend_installer: ""
     autoinstall_start_msg: ""
     autoinstall_ipv4_msg: ""
     autoinstall_complete_msg: "Autoinstall is completed."
+
+- name: "Check VM boot disk controller is supported"
+  ansible.builtin.assert:
+    that:
+      - boot_disk_controller in guest_config_options.support_disk_controller
+    fail_msg: >-
+      New VM boot disk controller '{{ boot_disk_controller }}' is not in the disk controller
+      support list in guest config options '{{ guest_config_options.support_disk_controller }}'.
+
+- name: "Check new VM network adatper is supported"
+  ansible.builtin.assert:
+    that:
+      - network_adapter_type in guest_config_options.support_ethernet_card
+    fail_msg: >-
+      New VM network adatper '{{ network_adapter_type }}' is not in the Ethernet support list in guest 
+      config options '{{ guest_config_options.support_ethernet_card }}'.
 
 - name: "Set CPU number to {{ cpu_cores_per_socket }}"
   ansible.builtin.set_fact:
