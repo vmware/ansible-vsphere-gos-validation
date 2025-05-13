@@ -50,27 +50,11 @@
             for i in `find /sys/ -iname scan`;do echo "- - -" >$i; done;
           delegate_to: "{{ vm_guest_ip }}"
 
-        - name: "Update hot removed SCSI disk state"
+        - name: "Update the state of hot removed SCSI disk '{{ wait_device_name }}'"
+          ansible.builtin.shell: "echo 1 > /sys/block/{{ wait_device_name }}/device/delete"
+          ignore_errors: true
+          delegate_to: "{{ vm_guest_ip }}"
           when: wait_device_state | lower == 'absent'
-          block:
-            - name: "Get ansible facts of devices in guest OS"
-              include_tasks: ../../common/get_system_info.yml
-              vars:
-                filter: "ansible_devices"
-
-            - name: "Set fact of hot removed disk '{{ wait_device_name }}'"
-              ansible.builtin.set_fact:
-                guest_ansible_devices: "{{ guest_system_info.ansible_devices }}"
-
-            - name: "Update the state of hot removed SCSI disk '{{ wait_device_name }}'"
-              ansible.builtin.shell: "echo 1 > /sys/block/{{ wait_device_name }}/device/delete"
-              ignore_errors: true
-              delegate_to: "{{ vm_guest_ip }}"
-              when:
-                - guest_ansible_devices is defined
-                - guest_ansible_devices[wait_device_name] is defined
-                - guest_ansible_devices[wait_device_name].size is defined
-                - guest_ansible_devices[wait_device_name].size == "0.00 Bytes"
 
 - name: "Rescan all SCSI buses on {{ vm_guest_os_distribution }}"
   ansible.builtin.command: "camcontrol rescan all"

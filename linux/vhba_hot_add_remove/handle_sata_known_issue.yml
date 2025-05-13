@@ -20,28 +20,7 @@
       tags:
         - known_issue
 
-    - name: "Get ansible facts of devices in guest OS"
-      include_tasks: ../../common/get_system_info.yml
-      vars:
-        filter: "ansible_devices"
-
-    - name: "Set fact of removed disk {{ wait_device_name }}"
-      ansible.builtin.set_fact:
-        guest_ansible_device: >
-          {{
-            guest_system_info.ansible_devices |
-            dict2items |
-            selectattr('key', 'equalto', wait_device_name) |
-            items2dict
-          }}
-
-    - name: "Rescan the deleted SATA disk '{{ wait_device_name }}'"
+    - name: "Update the state of hot removed SATA disk '{{ wait_device_name }}'"
       ansible.builtin.shell: "echo 1 > /sys/block/{{ wait_device_name }}/device/delete"
       ignore_errors: true
       delegate_to: "{{ vm_guest_ip }}"
-      when:
-        - guest_ansible_device is defined
-        - guest_ansible_device[wait_device_name] is defined
-        - guest_ansible_device[wait_device_name].size is defined
-        - guest_ansible_device[wait_device_name].size.endswith('GB')
-        - guest_ansible_device[wait_device_name].size.split()[0] | int == new_disk_size_gb
