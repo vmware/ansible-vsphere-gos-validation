@@ -4,7 +4,7 @@
 # Handle SATA known issues
 #
 # Pardus 21 XFCE can't detect SATA disk change after hot-remove
-# Here adds a work around to update SATA disk's state
+# Work around it by updating the disk state
 - name: "Handle SATA known issue on {{ vm_guest_os_distribution }}"
   when:
     - guest_os_ansible_distribution == 'Pardus GNU/Linux'
@@ -12,6 +12,14 @@
     - guest_os_edition == 'XFCE'
     - wait_device_state | lower == 'absent'
   block:
+    - name: "Known issue - workaround of detecting SATA device changes on {{ vm_guest_os_distribution }}"
+      ansible.builtin.debug:
+        msg:
+          - "Guest OS can't detect hot removed disk attached to SATA controller. Ignore this known issue."
+          - "Update the hot removed disk state as a workaround."
+      tags:
+        - known_issue
+
     - name: "Get ansible facts of devices in guest OS"
       include_tasks: ../../common/get_system_info.yml
       vars:
@@ -35,4 +43,5 @@
         - guest_ansible_device is defined
         - guest_ansible_device[wait_device_name] is defined
         - guest_ansible_device[wait_device_name].size is defined
+        - guest_ansible_device[wait_device_name].size.endswith('GB')
         - guest_ansible_device[wait_device_name].size.split()[0] | int == new_disk_size_gb
