@@ -24,22 +24,14 @@
     fail_msg: "wait_device_name is missing for waiting device absent"
   when: wait_device_state | lower == 'absent'
 
-- name: "Initialize the command to get device list"
-  ansible.builtin.set_fact:
-    get_device_list_cmd: |-
-      {%- if guest_os_family == 'FreeBSD' %}lsblk -d | grep -i '^[a-z]' | grep -v SIZE | grep -v 'cd[0-9]'
-      {%- else %}lsblk -o NAME,TYPE,SIZE,FSTYPE -b --nodeps | grep disk
-      {%- endif %} | awk '{print $1}'
-
-- name: "List all disks in guest OS"
-  ansible.builtin.shell: "{{ get_device_list_cmd }}"
-  delegate_to: "{{ vm_guest_ip }}"
-  changed_when: false
-  register: list_disks_result
+- name: "Get guest disk list after disk is {{ wait_device_state }}"
+  include_tasks: ../utils/get_device_list.yml
+  vars:
+    guest_device_type: "disk"
 
 - name: "Set fact for device count changed"
   ansible.builtin.set_fact:
-    guest_device_count_changed: "{{ list_disks_result.stdout_lines | default([]) | length == wait_device_count | int }}"
+    guest_device_count_changed: "{{ guest_device_list | length == wait_device_count | int }}"
 
 - name: "Wait for device count changed"
   when: not guest_device_count_changed
@@ -48,14 +40,21 @@
       include_tasks: "handle_{{ new_disk_ctrl_type }}_known_issue.yml"
       when: new_disk_ctrl_type in ['lsilogic', 'lsilogicsas', 'nvme', 'sata']
 
+    - name: "Initialize the command to get device list"
+      ansible.builtin.set_fact:
+        get_device_list_cmd: |-
+          {%- if guest_os_family == 'FreeBSD' %}lsblk -d | grep -i '^[a-z]' | grep -v SIZE | grep -v 'cd[0-9]'
+          {%- else %}lsblk -o NAME,TYPE,SIZE,FSTYPE -b --nodeps | grep -i disk
+          {%- endif %} | awk '{print $1}'
+
     - name: "Wait for device to be {{ wait_device_state | lower }} on {{ vm_guest_os_distribution }}"
       ansible.builtin.shell: "{{ get_device_list_cmd }}"
       delegate_to: "{{ vm_guest_ip }}"
       changed_when: false
-      register: lsblk_result
+      register: wait_device_change_result
       until:
-        - lsblk_result.stdout_lines is defined
-        - lsblk_result.stdout_lines | length == wait_device_count | int
+        - wait_device_change_result.stdout_lines is defined
+        - wait_device_change_result.stdout_lines | length == wait_device_count | int
       delay: 5
       retries: 10
       ignore_errors: true
@@ -63,8 +62,16 @@
 
     - name: "Guest OS unreachable"
       ansible.builtin.fail:
-        msg: "{{ lsblk_result }}"
+        msg: "{{ wait_device_change_result }}"
       when:
-        - lsblk_result is defined
-        - lsblk_result.unreachable is defined
-        - lsblk_result.unreachable
+        - wait_device_change_result is defined
+        - wait_device_change_result.unreachable is defined
+        - wait_device_change_result.unreachable
+
+    - name: "Update guest disk list after waiting for disk being {{ wait_device_state }}"
+      include_tasks: ../utils/get_device_list.yml
+      vars:
+        guest_device_type: "disk"
+      when:
+        - wait_device_change_result.failed is defined
+        - not wait_device_change_result.failed

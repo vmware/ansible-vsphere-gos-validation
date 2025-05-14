@@ -21,7 +21,7 @@
       delegate_to: "{{ vm_guest_ip }}"
       changed_when: false
       ignore_errors: true
-      register: lsblk_result
+      register: list_device_result
 
     - name: "Set fact of {{ guest_device_type }} device list on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
@@ -32,11 +32,11 @@
                       zip_longest(item.split(), fillvalue=''))
              ])
           }}
-      with_items: "{{ lsblk_result.stdout_lines }}"
+      with_items: "{{ list_device_result.stdout_lines }}"
       when:
-        - lsblk_result is defined
-        - lsblk_result.stdout_lines is defined
-        - lsblk_result.stdout_lines | length > 0
+        - list_device_result is defined
+        - list_device_result.stdout_lines is defined
+        - list_device_result.stdout_lines | length > 0
 
 - name: "Get device list on FreeBSD"
   when: guest_os_ansible_system == 'freebsd'
