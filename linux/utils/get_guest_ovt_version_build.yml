@@ -10,8 +10,10 @@
   ansible.builtin.set_fact:
     vmtools_info_from_vmtoolsd: ""
     vmtools_version: ""
+    vmtools_major_version: ""
     vmtools_build_number: ""
     vmtools_install_type: "unknown"
+    vmtools_info_retrieved: false
 
 - name: "Get path of vmware-toolbox-cmd"
   include_tasks: get_vmware_toolbox_cmd_path.yml
@@ -24,11 +26,21 @@
       register: ovt_version
       delegate_to: "{{ vm_guest_ip }}"
 
-    - name: "Set VMware Tools info from guest OS"
+    - name: "Set fact of VMware Tools info, major version and build number in guest OS"
       ansible.builtin.set_fact:
         vmtools_info_from_vmtoolsd: "{{ ovt_version.stdout }}"
-        vmtools_version: "{{ ovt_version.stdout.split()[0] | regex_search('([0-9]+\\.){2}[0-9]+') }}"
-        vmtools_build_number: "{{ ovt_version.stdout.split()[-1] | regex_search('[0-9]+') }}"
+        vmtools_major_version: "{{ ovt_version.stdout.split('.')[0] }}"
+        vmtools_build_number: "{{ ovt_version.stdout | regex_findall('\\d+') | last }}"
+
+    - name: "Set fact of VMware Tools version"
+      ansible.builtin.set_fact:
+        vmtools_version: "{{ vmtools_info_from_vmtoolsd | regex_search('(\\d+\\.){2}\\d+') }}"
+      when: vmtools_major_version | int <= 12
+
+    - name: "Set fact of VMware Tools version"
+      ansible.builtin.set_fact:
+        vmtools_version: "{{ vmtools_info_from_vmtoolsd | regex_search('(\\d+\\.){3}\\d+') }}"
+      when: vmtools_major_version | int > 12
 
     # Neither ovt_verify_pkg_install or ovt_verify_src_install was executed in current testing
     - name: "Get open-vm-tools install type on {{ guest_os_ansible_distribution }}"
@@ -38,7 +50,7 @@
       block:
         - name: "Get installed packages on guest OS"
           include_tasks: get_installed_packages.yml
-    
+
         # Check whether open-vm-tools or open-vm-tools-nox11 (for FreeBSD without GUI) is installed
         - name: "Set fact of open-vm-tools install type to 'package' for {{ guest_os_ansible_distribution }}"
           ansible.builtin.set_fact:
@@ -47,7 +59,7 @@
             - guest_installed_packages | length > 0
             - guest_installed_packages | select('match', 'open-vm-tools(-nox11)?') | length > 0
 
-    - name: "Set fact of open-vm-tools install type to 'package' for Flatcar"
+    - name: "Set fact of open-vm-tools install type to 'package' for {{ guest_os_ansible_distribution }}"
       ansible.builtin.set_fact:
         vmtools_install_type: "package"
       when: guest_os_ansible_distribution in ['Flatcar', 'RHCOS']
@@ -61,5 +73,11 @@
 - name: "Print open-vm-tools version, build and install type"
   ansible.builtin.debug:
     msg:
-      - "Guest OS open-vm-tools version is {{ vmtools_info_from_vmtoolsd }}"
+      - "Guest OS open-vm-tools info is {{ vmtools_info_from_vmtoolsd }}"
+      - "Guest OS open-vm-tools version is {{ vmtools_version }}"
+      - "Guest OS open-vm-tools build number is {{ vmtools_build_number }}"
       - "Guest OS open-vm-tools install type is {{ vmtools_install_type }}"
+
+- name: "Set fact that VMware Tools info has been retrieved"
+  ansible.builtin.set_fact:
+    vmtools_info_retrieved: true
