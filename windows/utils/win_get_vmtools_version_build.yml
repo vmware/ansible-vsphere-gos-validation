@@ -10,6 +10,7 @@
   ansible.builtin.set_fact:
     vmtools_info_from_vmtoolsd: ''
     vmtools_version: ''
+    vmtools_major_version: ''
     vmtools_build_number: ''
 
 - name: "Execute 'VMwareToolboxCmd.exe' to get VMware Tools info in guest OS"
@@ -24,21 +25,25 @@
     - win_powershell_cmd_output.stdout_lines is defined
     - win_powershell_cmd_output.stdout_lines | length == 1
 
-- name: "Set fact of VMware Tools version and build number"
+- name: "Set fact of VMware Tools major version and build number"
   ansible.builtin.set_fact:
-    vmtools_version: "{{ vmtools_info_from_vmtoolsd.split(' ')[0].rsplit('.', 1)[0] }}"
-    vmtools_build_number: "{{ vmtools_info_from_vmtoolsd.split(' ')[1][1:-1].split('-')[1] }}"
-  when:
-    - vmtools_info_from_vmtoolsd
-    - vmtools_info_from_vmtoolsd | regex_search('^(\\d+\\.){3}\\d+ \\(build\\-\\d+\\)')
+    vmtools_major_version: "{{ vmtools_info_from_vmtoolsd.split('.')[0] }}"
+    vmtools_build_number: "{{ vmtools_info_from_vmtoolsd | regex_findall('\\d+') | last }}"
+  when: vmtools_info_from_vmtoolsd
 
-- name: "Set fact of VMware Tools version and build number"
+- name: "Set fact of VMware Tools version"
   ansible.builtin.set_fact:
-    vmtools_version: "{{ '.'.join(vmtools_info_from_vmtoolsd.split('.')[:-1]) }}"
-    vmtools_build_number: "{{ vmtools_info_from_vmtoolsd.split('.')[-1] }}"
+    vmtools_version: "{{ vmtools_info_from_vmtoolsd | regex_search('^(\\d+\\.){2}\\d+') }}"
   when:
-    - vmtools_info_from_vmtoolsd
-    - vmtools_info_from_vmtoolsd | regex_search('^(\\d+\\.){4}\\d+')
+    - vmtools_major_version
+    - vmtools_major_version | int <= 12
+
+- name: "Set fact of VMware Tools version"
+  ansible.builtin.set_fact:
+    vmtools_version: "{{ vmtools_info_from_vmtoolsd | regex_search('^(\\d+\\.){3}\\d+') }}"
+  when:
+    - vmtools_major_version
+    - vmtools_major_version | int > 12
 
 - name: "Print VMware Tools info got in guest OS"
   ansible.builtin.debug: var=vmtools_info_from_vmtoolsd
