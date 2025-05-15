@@ -6,19 +6,52 @@
 #   vmtools_version: VMware Tools version
 #   vmtools_build_number: VMware Tools build number
 #
-- name: Initialize VMware Tools version info
+- name: "Initialize the facts of VMware Tools version and build info"
   ansible.builtin.set_fact:
     vmtools_info_from_vmtoolsd: ''
+    vmtools_version: ''
+    vmtools_major_version: ''
+    vmtools_build_number: ''
 
-- include_tasks: win_execute_cmd.yml
+- name: "Execute 'VMwareToolboxCmd.exe' to get VMware Tools info in guest OS"
+  include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "& 'C:\\Program Files\\VMware\\VMware Tools\\VMwareToolboxCmd.exe' -v"
 
-- name: Set fact of tools version and build number
+- name: "Set fact of VMware Tools info got in guest OS"
   ansible.builtin.set_fact:
     vmtools_info_from_vmtoolsd: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
-    vmtools_version: "{{ win_powershell_cmd_output.stdout_lines[0].split(' ')[0].rsplit('.', 1)[0] }}"
-    vmtools_build_number: "{{ win_powershell_cmd_output.stdout_lines[0].split(' ')[1][1:-1].split('-')[1] }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length == 1
 
-- name: "Print VMware Tools version and build"
+- name: "Set fact of VMware Tools major version and build number"
+  ansible.builtin.set_fact:
+    vmtools_major_version: "{{ vmtools_info_from_vmtoolsd.split('.')[0] }}"
+    vmtools_build_number: "{{ vmtools_info_from_vmtoolsd | regex_findall('\\d+') | last }}"
+  when: vmtools_info_from_vmtoolsd
+
+- name: "Set fact of VMware Tools version"
+  ansible.builtin.set_fact:
+    vmtools_version: "{{ vmtools_info_from_vmtoolsd | regex_search('^(\\d+\\.){2}\\d+') }}"
+  when:
+    - vmtools_major_version
+    - vmtools_major_version | int <= 12
+
+- name: "Set fact of VMware Tools version"
+  ansible.builtin.set_fact:
+    vmtools_version: "{{ vmtools_info_from_vmtoolsd | regex_search('^(\\d+\\.){3}\\d+') }}"
+  when:
+    - vmtools_major_version
+    - vmtools_major_version | int > 12
+
+- name: "Print VMware Tools info got in guest OS"
   ansible.builtin.debug: var=vmtools_info_from_vmtoolsd
+
+- name: "Print VMware Tools version and build number"
+  ansible.builtin.debug:
+    msg: "Installed VMware Tools version: {{ vmtools_version }}, build number: {{ vmtools_build_number }}"
+
+- name: "Set fact that VMware Tools info has been retrieved"
+  ansible.builtin.set_fact:
+    vmtools_info_retrieved: true
