@@ -1,0 +1,27 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get implemented NVMe spec version in Windows guest OS.
+# Return:
+#   win_nvme_spec_version: the NVMe spec version got in guest OS.
+#
+- name: "Initialize the NVMe spec version in Windows guest OS"
+  ansible.builtin.set_fact:
+    win_nvme_spec_version: ''
+
+- name: "Get NVMe spec version in Windows guest OS"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      Get-Physicaldisk | where-object {$_.Friendlyname -like '*NVMe*'} | 
+      Get-StorageFirmwareInformation).FirmwareVersionInSlot
+
+- name: "Set fact of NVMe spec version"
+  ansible.builtin.set_fact:
+    win_nvme_spec_version: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+
+- name: "Print NVMe spec version in Windows guest OS"
+  ansible.builtin.debug: var=win_nvme_spec_version
