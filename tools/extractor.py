@@ -86,7 +86,7 @@ def extract_calltrace_from_log(log_path):
                 calltrace_stack.append(stack_match.group(0))
 
     if len(calltrace_stack) > 0:
-        print("Found call trace in log file:\n" + "\n".join(calltrace_stack))
+        print("\n".join(calltrace_stack))
 
 def extract_error_from_log(log_path):
     errors = []
@@ -138,7 +138,7 @@ def extract_error_from_log(log_path):
 
 
     if len(errors) > 0:
-        print("Found error messages in log file:\n" + "\n".join(errors))
+        print("\n".join(errors))
 
 
 if __name__ == "__main__":

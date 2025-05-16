@@ -1,0 +1,62 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Handle LSI Logic Parallel SCSI known issues
+#
+- name: "Set fact of knowledge base article for LSI Logic Parallel SCSI known issue"
+  ansible.builtin.set_fact:
+    lsilogic_known_issue_kb: |-
+      {%- if guest_os_ansible_system == 'linux' -%}https://knowledge.broadcom.com/external/article?articleNumber=344007
+      {%- else -%}https://knowledge.broadcom.com/external/article?articleNumber=312179
+      {%- endif -%}
+
+- name: "Known issue - workaround of detecting LSI Logic Parallel SCSI device changes on {{ vm_guest_os_distribution }}"
+  ansible.builtin.debug:
+    msg:
+      - "Guest OS can't detect hot added or hot removed disk attached to LSI Logic Parallel SCSI controller. Ignore this known issue."
+      - "Rescan all SCSI buses to detect LSI Logic Parallel device changes as a workaround."
+      - "Please refer to {{ lsilogic_known_issue_kb }}."
+  tags:
+    - known_issue
+
+- name: "Handle LSI Logic Parallel SCSI known issue on Linux"
+  when: guest_os_ansible_system == 'linux'
+  block:
+    - name: "Set fact whether to use SCSI rescan script"
+      ansible.builtin.set_fact:
+        rescan_scsi_with_script: >-
+          {{
+            not (guest_os_ansible_distribution in ['Flatcar', 'Fedora', 'RHCOS'] or
+                (guest_os_ansible_distribution == "Ubuntu" and
+                 guest_os_ansible_distribution_major_ver | int >= 22) or
+                (guest_os_ansible_distribution == "Debian" and
+                 guest_os_ansible_distribution_major_ver | int >= 12) or
+                (guest_os_ansible_distribution == "Pardus GNU/Linux" and
+                 guest_os_ansible_distribution_major_ver | int >= 23))
+          }}
+
+    - name: "Rescan all SCSI buses with rescan script on {{ vm_guest_os_distribution }}"
+      ansible.builtin.command: "/usr/bin/rescan-scsi-bus.sh -a -r"
+      register: rescan_scsi_result
+      delegate_to: "{{ vm_guest_ip }}"
+      when: rescan_scsi_with_script
+
+    - name: "Rescan all SCSI buses with commands"
+      when: not rescan_scsi_with_script
+      block:
+        - name: "Rescan all SCSI buses on {{ vm_guest_os_distribution }}"
+          ansible.builtin.shell: |
+            for i in `find /sys/ -iname rescan`;do echo 1 >$i; done;
+            for i in `find /sys/ -iname scan`;do echo "- - -" >$i; done;
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - name: "Update the state of hot removed SCSI disk '{{ wait_device_name }}'"
+          ansible.builtin.shell: "echo 1 > /sys/block/{{ wait_device_name }}/device/delete"
+          ignore_errors: true
+          delegate_to: "{{ vm_guest_ip }}"
+          when: wait_device_state | lower == 'absent'
+
+- name: "Rescan all SCSI buses on {{ vm_guest_os_distribution }}"
+  ansible.builtin.command: "camcontrol rescan all"
+  delegate_to: "{{ vm_guest_ip }}"
+  when: guest_os_ansible_system == 'freebsd'
