@@ -5,7 +5,12 @@
 #
 - name: "Set facts of config files for building and checking open-vm-tools"
   ansible.builtin.set_fact:
-    ovt_install_prefix: "{{ '/usr' if guest_os_ansible_system == 'linux' else '/usr/local' }}"
+    ovt_install_prefix: "{{ (guest_os_ansible_system == 'linux') | ternary('/usr', '/usr/local') }}"
+    ovt_install_lib: |-
+      {%- if guest_os_ansible_system == 'freebsd' -%}/usr/local/lib
+      {%- elif guest_os_family == 'RedHat' -%}/usr/lib64
+      {%- else -%}/usr/lib
+      {%- endif -%}
     ovt_build_config_file_tmpl: "{{ guest_os_ansible_system }}_ovt_build_config.tmpl"
     ovt_build_config_file_path: "{{ current_test_log_folder }}/ovt_build_config.yml"
     ovt_check_config_file_tmpl: "{{ guest_os_ansible_system }}_ovt_check_config.tmpl"
@@ -24,6 +29,13 @@
   vars:
     _ovt_build_config: "{{ lookup('file', ovt_build_config_file_path) | from_yaml }}"
 
+- name: "Add '--without-x' option to configure because {{ vm_guest_os_distribution }} doesn't have GTK3"
+  ansible.builtin.set_fact:
+    ovt_configure_options: "{{ ovt_configure_options | union(['--without-x']) }}"
+  when:
+    - guest_os_ansible_system == 'linux'
+    - ovt_dependencies | select('search', 'gtk[^0-9]*3') | length < 2
+
 - name: "Check open-vm-tools dependencies are not empty"
   ansible.builtin.assert:
     that:
@@ -31,11 +43,17 @@
     fail_msg: "Missing dependencies for installing open-vm-tools from source on {{ vm_guest_os_distribution }}"
     success_msg: "Dependencies to be installed for open-vm-tools: {{ ovt_dependencies }}"
 
+# Inbox drivers might be missing, here ignore missing drivers and we only check existing
+# inbox drivers are not changed after installing open-vm-tools from source
 - name: "Get guest OS inbox drivers' files before installing open-vm-tools from source"
   ansible.builtin.shell: "modinfo -F filename vmxnet3 vmw_pvscsi vmw_balloon"
   delegate_to: "{{ vm_guest_ip }}"
   register: guest_inbox_drivers_before
-  when: guest_os_ansible_system == "linux"
+  ignore_errors: true
+  when:
+    - guest_os_ansible_system == "linux"
+    - not (guest_os_ansible_distribution == "VMware Photon OS" and
+           guest_os_ansible_distribution_major_ver | int < 4)
 
 - name: "Install open-vm-tools build dependencies"
   include_tasks: ../utils/install_uninstall_package.yml

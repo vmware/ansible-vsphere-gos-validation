@@ -50,10 +50,9 @@
         - name: "Set fact of GOSC support status to False for VMware Photon OS with not bundled open-vm-tools"
           ansible.builtin.set_fact:
             gosc_is_supported: false
-          when:
-            - package_info is defined
-            - package_info.Release is defined
-            - "'ph' not in package_info.Release | string"
+          when: >-
+            not (package_info.Release is defined and
+                 ('ph' in package_info.Release | string))
 
         - name: "Skip test case for not bundled open-vm-tools"
           include_tasks: ../../common/skip_test_case.yml
@@ -65,14 +64,14 @@
     - name: "Set default guest OS list not support GOSC"
       ansible.builtin.set_fact:
         gos_not_support_gosc:
-           - "Flatcar"
-           - "SLED"
-           - "FreeBSD"
-           - "Astra Linux (Orel)"
-           - "Fedora"
-           - "openSUSE Leap"
-           - "RHCOS"
-           - "Amazon"
+          - "Flatcar"
+          - "SLED"
+          - "FreeBSD"
+          - "Astra Linux (Orel)"
+          - "Fedora"
+          - "openSUSE Leap"
+          - "RHCOS"
+          - "Amazon"
 
     - name: "Set fact of GOSC support status to False for {{ guest_os_ansible_distribution }}"
       ansible.builtin.set_fact:
@@ -82,7 +81,7 @@
     - name: "Set cloud-init GOSC support status for {{ vm_guest_os_distribution }}"
       when:
         - enable_cloudinit_gosc
-        - ((guest_os_ansible_distribution == "Debian" and guest_os_ansible_distribution_major_ver | int == 12) or 
+        - ((guest_os_ansible_distribution == "Debian" and guest_os_ansible_distribution_major_ver | int == 12) or
            (guest_os_ansible_distribution == "Pardus GNU/Linux" and guest_os_ansible_distribution_major_ver | int <= 23))
       block:
         - name: "Set fact of cloud-init GOSC support status to False for {{ vm_guest_os_distribution }}"

@@ -118,7 +118,9 @@
             - name: "Set facts of packages and command for {{ guest_os_ansible_distribution }}"
               ansible.builtin.set_fact:
                 package_manage_cmd: |-
-                  {%- if package_state in [ 'installed', 'present', 'latest' ] -%}
+                  {%- if package_state in ['installed', 'present'] -%}
+                    dnf install --nobest -y {{ package_manage_list_str }}
+                  {%- elif package_state == 'latest' -%}
                     dnf install -y {{ package_manage_list_str }}
                   {%- else -%}
                     dnf remove --noautoremove -y {{ package_manage_list_str }}

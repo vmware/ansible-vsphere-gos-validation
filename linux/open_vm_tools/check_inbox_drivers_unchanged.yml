@@ -9,13 +9,14 @@
   ansible.builtin.shell: "modinfo -F filename vmxnet3 vmw_pvscsi vmw_balloon"
   delegate_to: "{{ vm_guest_ip }}"
   register: guest_inbox_drivers_after
+  ignore_errors: true
 
 - name: "Check guest OS inbox drivers are not changed"
   ansible.builtin.assert:
     that:
       - guest_inbox_drivers_before.stdout_lines is defined
       - guest_inbox_drivers_after.stdout_lines is defined
-      - guest_inbox_drivers_after.stdout_lines | length == 3
+      - guest_inbox_drivers_after.stdout_lines | length > 0
       - guest_inbox_drivers_after.stdout_lines == guest_inbox_drivers_before.stdout_lines
     fail_msg: >-
       At least one of inbox drivers' paths has been changed since installing open-vm-tools from source.
