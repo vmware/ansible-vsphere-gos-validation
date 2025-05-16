@@ -30,6 +30,8 @@ commands=("autoreconf -f -i"
           "ldconfig")
 rc=0
 
+CURRENT_DIR=$PWD
+
 system=$(uname -s)
 if [ "$system" == "FreeBSD" ]; then
     # Create the directory path of tools.conf on FreeBSD
@@ -40,32 +42,39 @@ if [ "$system" == "FreeBSD" ]; then
     freebsd_version=$(freebsd-version | cut -d '.' -f 1)
     echo "FreeBSD release version is $freebsd_version"
     freebsd_patches_dir="/usr/ports/emulators/open-vm-tools/files"
-    ovt_patches=""
-    if [ $freebsd_version -ge 14 ]; then
-        ovt_patches="$freebsd_patches_dir/patch-modules_freebsd_vmmemctl_os.c \
-                     $freebsd_patches_dir/patch-modules_freebsd_vmblock_vfsops.c"
-    elif [ $freebsd_version -ge 13 ]; then
-        ovt_patches="$freebsd_patches_dir/patch-services_plugins_dndcp_stringxx_string.hh"
-    fi
 
-    if [ "$ovt_patches" != "" ]; then
-        for ovt_patch in $ovt_patches; do
-            if [ -e "$ovt_patch" ]; then
-                 echo "Applying patch $ovt_patch"
-                 patch <$ovt_patch
-            fi
-        done
-    fi
+    module_patches=`find /usr/ports/emulators/open-vm-kmod/files -name 'patch-*' | grep -v Makefile`
+    cd modules/freebsd/
+    for module_patch in $module_patches; do
+        echo "Applying patch $module_patch"
+        patch <$module_patch
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to apply patch $module_patch" >&2
+        fi
+    done
+    cd $CURRENT_DIR
+
+    ovt_patches=`find /usr/ports/emulators/open-vm-tools/files -name 'patch-*' | grep -E 'vmmemctl_os.c|vmblock_vfsops.c|dndcp_stringxx_string.hh'`
+    for ovt_patch in $ovt_patches; do
+        echo "Applying patch $ovt_patch"
+        patch <$ovt_patch
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to apply patch $ovt_patch" >&2
+        fi
+    done
 fi
 
+cmd_index=1
 for cmd in  "${commands[@]}"; do
     echo ">>>Beginning of command: $cmd<<<"
-    eval "$cmd"
+    eval "$cmd 2>stderr.log" 
     rc=$?
     if [ $rc -ne 0 ]; then
-        echo "Failed to execute command: $cmd" >&2
-        exit $rc;
+        echo "ERROR: Failed to execute command '$cmd'" >&2
+        cat 'stderr.log' >&2
+        exit $cmd_index;
     fi
     echo ">>>End of command: $cmd<<<"
     echo ""
+    cmd_index=$((cmd_index+1))
 done
