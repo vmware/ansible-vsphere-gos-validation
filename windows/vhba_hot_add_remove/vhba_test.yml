@@ -11,8 +11,10 @@
     vm_nvme_spec13_enabled: >-
       {{
          vm_hardware_version_num | int >= 21 and 
-         ((guest_os_product_type == 'server' and guest_os_build_num | int >= 20348) or 
-         (guest_os_product_type == 'client' and guest_os_build_num | int >= 22000))
+         ((guest_os_product_type == 'server' and 
+         (vm_guest_id | regex_search('windows(\\d+)srvNext', '\\1'))[0] | int >= 2019) or 
+         (guest_os_product_type == 'client' and 
+         (vm_guest_id | regex_search('windows(\\d+)_', '\\1'))[0] | int >= 11))
       }}
   when:
     - test_disk_ctrl_type == 'nvme'
