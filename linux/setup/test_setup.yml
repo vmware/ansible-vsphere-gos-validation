@@ -17,6 +17,7 @@
 
 - name: "Get VM info after reverting to base snapshot"
   when:
+    - not new_vm
     - base_snapshot_exists | bool
     - vm_info_retrieved is undefined or not vm_info_retrieved
   block:
@@ -39,8 +40,8 @@
     - guest_os_ansible_distribution == 'FreeBSD'
 
 - name: "Get '{{ vm_guest_id }}' guest config options with VM hardware version '{{ vm_hardware_version_num }}'"
-  when: guest_options_retrieved is undefined
-  block:    
+  when: guest_options_retrieved is undefined or not guest_options_retrieved
+  block:
     - name: "Get VM guest options"
       include_tasks: ../../common/esxi_get_guest_config_options.yml
       vars:
