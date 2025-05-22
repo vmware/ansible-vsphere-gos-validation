@@ -1,6 +1,9 @@
 #!/bin/sh
 echo "{{ autoinstall_start_msg }}" >/dev/ttyu0
 
+echo "OS release info:" >/dev/ttyu0
+cat /etc/os-release >/dev/ttyu0
+
 machtype=$(uname -m)
 echo "Machine type is $machtype" > /dev/ttyu0
 
@@ -73,7 +76,7 @@ env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
 # Different packages between the 32bit image and 64bit image
 packages_to_install="bash sudo wget curl e2fsprogs iozone lsblk"
 if [ "$machtype" == "amd64" ] || [ "$machtype" == "x86_64" ]; then
-    packages_to_install="$packages_to_install xorg gnome slim xf86-video-vmware open-vm-tools xf86-input-vmmouse"
+    packages_to_install="$packages_to_install xorg gnome gnome-desktop gnome-shell gnome-session gdm slim xf86-video-vmware open-vm-tools xf86-input-vmmouse"
 else
     packages_to_install="$packages_to_install open-vm-tools-nox11"
 fi
