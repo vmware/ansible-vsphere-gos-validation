@@ -1,0 +1,37 @@
+# Copyright 2023-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+# Install WSL distribution
+
+- name: "Set the command for installing WSL distribution"
+  ansible.builtin.set_fact:
+    install_distro_cmd: "wsl --install --name {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_distro_install.txt"
+
+- name: "Install the WSL distribution"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ install_distro_cmd }}"
+    win_execute_cmd_ignore_error: true
+
+- name: "Process the WSL output message"
+  include_tasks: wsl_convert_binary_to_txt.yml
+  vars:
+    source_path: "{{ wsl_file_path_win }}\\wsl_distro_install.txt"
+    file_name: "wsl_distro_install.txt"
+
+- name: "Check the command result of installing WSL distribution"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.rc is defined
+      - win_powershell_cmd_output.rc == 0
+    fail_msg: "Failed to install the WSL distribution: {{ wsl_distribution_name }}."
+
+- name: "Check if the WSL distribution is installed"
+  include_tasks: check_wsl_distro.yml
+
+- name: "Assert if the WSL distribution is not installed"
+  ansible.builtin.assert:
+    that:
+      - wsl_distro_installed
+    fail_msg: "The WSL distribution {{ wsl_distribution_name }} is not installed."
