@@ -1,0 +1,38 @@
+# Copyright 2023-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+# Check if the expected WSL distribution is installed or not.
+# Return:
+#  wsl_distro_installed: true if the expected WSL distribution is installed.
+#
+- name: "Initialize the variables"
+  ansible.builtin.set_fact:
+    wsl_distro_installed: false
+    wsl_list_distro_file_name: "wsl_list_distro_after_install.txt"
+
+- name: "List installed WSL distribution"
+  ansible.windows.win_shell: "wsl --list | Out-File -FilePath {{ wsl_file_path_win }}\\{{ wsl_list_distro_file_name }}"
+  register: win_powershell_cmd_output
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_unreachable: true
+  until:
+    - win_powershell_cmd_output.rc is defined
+    - win_powershell_cmd_output.rc == 0
+  retries: 5
+  delay: 30
+
+- name: "Process the WSL output message"
+  include_tasks: wsl_convert_binary_to_txt.yml
+  vars:
+    source_path: "{{ wsl_file_path_win }}\\{{ wsl_list_distro_file_name }}"
+    file_name: "{{ wsl_list_distro_file_name }}"
+
+- name: "Set status for the WSL distribution installation"
+  ansible.builtin.set_fact:
+    wsl_distro_installed: lookup('ansible.builtin.file', wsl_new_file) is search(wsl_distribution_name)
+
+- name: "Display the result of checking the installed WSL distribution"
+  ansible.builtin.debug:
+    msg: "The WSL distribution {{ wsl_distribution_name }} installation status: {{ wsl_distro_installed }}."
