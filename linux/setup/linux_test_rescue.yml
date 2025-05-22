@@ -9,26 +9,19 @@
   vars:
     dmesg_ignore_errors: true
     dmesg_output_file_name: "dmesg_at_test_failure.log"
+    dmesg_check_call_trace: true
 
 - name: "No output file for dmesg"
   ansible.builtin.debug:
     msg: "There is no new messages in dmesg ring buffer or failed to get dmesg output"
   when: not dmesg_output_file_path
 
-- name: "Detect errors in dmesg output"
-  when: dmesg_output_file_path
-  block:
-    - name: "Extract errors from guest OS dmesg"
-      include_tasks: ../../common/extract_errors_from_log.yml
-      vars:
-        extract_log_file_path: "{{ dmesg_output_file_path }}"
-
-    - name: "Display detected errors from guest OS dmesg"
-      ansible.builtin.debug:
-        msg: "{{ errors_in_log }}"
-      tags:
-        - fail_message
-      when: errors_in_log | length > 0
+- name: "Display call trace stack detected in dmesg output"
+  ansible.builtin.debug:
+    msg: "{{ dmesg_call_trace_stack }}"
+  tags:
+    - fail_message
+  when: dmesg_call_trace_stack | length > 0
 
 - name: "Collect /var/log/messages at test case failure"
   include_tasks: ../utils/fetch_file.yml

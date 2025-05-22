@@ -118,10 +118,6 @@
       changed_when: false
       delegate_to: "{{ vm_guest_ip }}"
 
-    - name: "Initialize the fact of dmesg call trace stack"
-      ansible.builtin.set_fact:
-        dmesg_call_trace_stack: []
-
     # Firstly hot add a new disk controller and disk at the same time
     - name: "Set fact of the new disk controller state to 'new'"
       ansible.builtin.set_fact:
@@ -174,15 +170,6 @@
           VM disk controllers before hot-add are {{ disk_controllers_before_hotadd }},
           VM disk controllers after hot-remove are {{ disk_controllers_after_hotremove }}.
   rescue:
-    - name: "Display call trace"
-      ansible.builtin.debug:
-        msg: "{{ dmesg_call_trace_stack }}"
-      tags:
-        - fail_message
-      when:
-        - dmesg_call_trace_stack is defined
-        - dmesg_call_trace_stack | length > 0
-
     - name: "Collect Linux guest OS information for triage"
       include_tasks: ../setup/linux_test_rescue.yml
 

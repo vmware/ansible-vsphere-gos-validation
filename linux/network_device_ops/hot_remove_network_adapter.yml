@@ -7,7 +7,7 @@
   include_tasks: ../../common/vm_remove_network_adapter.yml
   vars:
     netadapter_mac_addr: "{{ new_network_adapter_mac_addr }}"
-    vm_remove_adapter_ignore_errors: True
+    vm_remove_adapter_ignore_errors: true
 
 - name: "Network adapter hot-remove succeeded"
   ansible.builtin.debug:
@@ -30,7 +30,7 @@
         - known_issue
       when:
         - remove_adapter.module_stderr is defined
-        - (remove_adapter.module_stderr | 
+        - (remove_adapter.module_stderr |
            regex_findall("The guest operating system did not respond to a hot-remove request for device '.*' in a timely manner.") | length > 0)
         - adapter_type == "pvrdma"
         - esxi_version is version('7.0.0', '>=')
@@ -46,6 +46,13 @@
   include_tasks: ../../common/vm_wait_connection.yml
   vars:
     vm_wait_connection_timeout: 60
+
+- name: "Collect dmesg after hot removing the new network adapter"
+  include_tasks: ../utils/collect_dmesg.yml
+  vars:
+    dmesg_options: '-c'
+    dmesg_output_file_name: 'dmesg_after_nic_hot_remove.log'
+    dmesg_check_call_trace: true
 
 - name: "Get network adapter status after hot-remove"
   include_tasks: ../utils/get_network_adapters_status.yml

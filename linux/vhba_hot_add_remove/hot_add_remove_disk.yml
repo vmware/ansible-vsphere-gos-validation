@@ -44,24 +44,7 @@
     dmesg_options: "-c"
     dmesg_output_file_name: "dmesg_after_{{ new_disk_ctrl_state }}_ctrl_disk_hot_add.log"
     dmesg_no_log: true
-
-# Check whether there is call trace in dmesg after hot add
-- name: "Extract errors from guest OS dmesg"
-  include_tasks: ../../common/extract_errors_from_log.yml
-  vars:
-    extract_log_file_path: "{{ dmesg_output_file_path }}"
-
-- name: "Found call trace after hot adding a disk to {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller"
-  ansible.builtin.set_fact:
-    dmesg_call_trace_stack: >-
-      {{
-        dmesg_call_trace_stack |
-        union(['Found call trace after hot adding a disk to {} {} controller'.format(new_disk_ctrl_state, new_disk_ctrl_type)]) |
-        union(errors_in_log)
-      }}
-  when:
-    - errors_in_log | length > 0
-    - errors_in_log is search('Call Trace')
+    dmesg_check_call_trace: true
 
 - name: "Wait for hot-added disk to {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller being present in guest OS"
   include_tasks: wait_device_list_changed.yml
@@ -140,24 +123,6 @@
     dmesg_options: "-c"
     dmesg_output_file_name: "dmesg_after_{{ new_disk_ctrl_state }}_ctrl_disk_hot_remove.log"
     dmesg_no_log: true
-
-# Check whether there is call trace in dmesg after hot remove
-- name: "Extract errors from guest OS dmesg"
-  include_tasks: ../../common/extract_errors_from_log.yml
-  vars:
-    extract_log_file_path: "{{ dmesg_output_file_path }}"
-
-- name: "Found call trace after hot removing a disk from {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller"
-  ansible.builtin.set_fact:
-    dmesg_call_trace_stack: >-
-      {{
-        dmesg_call_trace_stack |
-        union(['Found call trace after hot removing a disk from {} {} controller'.format(new_disk_ctrl_state, new_disk_ctrl_type)]) |
-        union(errors_in_log)
-      }}
-  when:
-    - errors_in_log | length > 0
-    - errors_in_log is search('Call Trace')
 
 - name: "Wait for disk being absent in guest OS"
   include_tasks: wait_device_list_changed.yml
