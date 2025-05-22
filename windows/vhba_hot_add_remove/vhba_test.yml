@@ -15,12 +15,16 @@
     - name: "For Windows {{ guest_os_product_type }} with guest ID {{ vm_guest_id }}"
       ansible.builtin.set_fact:
         vm_nvme_spec13_enabled: "{{ vm_guest_id | regex_search('windows(\\d+)srvNext', '\\1') | first | int >= 2019 }}"
-      when: guest_os_product_type == 'server'
+      when:
+        - guest_os_product_type == 'server'
+        - vm_guest_id | regex_search('windows(\\d+)srvNext')
 
     - name: "For Windows {{ guest_os_product_type }} with guest ID {{ vm_guest_id }}"
       ansible.builtin.set_fact:
         vm_nvme_spec13_enabled: "{{ vm_guest_id | regex_search('windows(\\d+)_', '\\1') | first | int >= 11 }}"
-      when: guest_os_product_type == 'client'
+      when:
+        - guest_os_product_type == 'client'
+        - vm_guest_id | regex_search('windows(\\d+)_')
 
 - name: "Skip test case"
   include_tasks: ../../common/skip_test_case.yml
