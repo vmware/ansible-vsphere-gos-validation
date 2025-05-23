@@ -44,17 +44,13 @@
     dmesg_options: "-c"
     dmesg_output_file_name: "dmesg_after_{{ new_disk_ctrl_state }}_ctrl_disk_hot_add.log"
     dmesg_no_log: true
+    dmesg_check_call_trace: true
 
 - name: "Wait for hot-added disk to {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller being present in guest OS"
   include_tasks: wait_device_list_changed.yml
   vars:
-    device_list_before_change: "{{ guest_disk_list_before_hotadd }}"
     wait_device_state: "present"
-
-- name: "Get guest disk list after hot-add"
-  include_tasks: ../utils/get_device_list.yml
-  vars:
-    guest_device_type: "disk"
+    wait_device_count: "{{ guest_disk_list_before_hotadd | length + 1 }}"
 
 - name: "Set the fact of guest disk list after hot-add"
   ansible.builtin.set_fact:
@@ -66,38 +62,14 @@
 - name: "Check new disk is recognized by guest OS"
   ansible.builtin.assert:
     that:
-      - guest_disk_list_after_hotadd | difference(guest_disk_list_before_hotadd) | length == 1
+      - guest_disk_list_after_hotadd | length - guest_disk_list_before_hotadd | length == 1
     fail_msg: "Guest OS failed to recognize the new disk hot added to {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller"
     success_msg: "Guest OS successfully recognized the new disk hot added to {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller"
 
-- name: "Set fact of the new guest disk info"
-  ansible.builtin.set_fact:
-    new_guest_disk_info: "{{ (guest_disk_list_after_hotadd | difference(guest_disk_list_before_hotadd))[0] }}"
-
-- name: "Change size with Gbytes to bytes for FreeBSD"
-  ansible.builtin.set_fact:
-    new_guest_disk_info: >
-      {{ new_guest_disk_info | combine({
-            'size': (new_guest_disk_info.size.split('G')[0].strip() | int) * 1024 * 1024 * 1024
-        })
-      }}
-  when:
-    - guest_os_family == "FreeBSD"
-    - new_guest_disk_info.size is defined
-    - new_guest_disk_info.size
-    - new_guest_disk_info.size is match("\\d+(\\.\\d+)?G")
-
-- name: "Print the new disk info"
-  ansible.builtin.debug: var=new_guest_disk_info
-
-- name: "Check the new disk name and size"
-  ansible.builtin.assert:
-    that:
-      - new_guest_disk_info.name is defined
-      - new_guest_disk_info.name
-      - new_guest_disk_info.size is defined
-      - new_guest_disk_info.size | int == new_disk_size_bytes
-    fail_msg: "The new disk '{{ new_guest_disk_info }}' has incorrect information"
+- name: "Get new disk info in guest OS after hot-add"
+  include_tasks: get_new_disk_info.yml
+  vars:
+    current_guest_disk_list: "{{ guest_disk_list_after_hotadd }}"
 
 - name: "Create new partition on the new disk {{ new_guest_disk_info.name }}"
   when: guest_os_family != 'FreeBSD'
@@ -129,6 +101,14 @@
 - name: "Print guest disk list before hot-remove"
   ansible.builtin.debug: var=guest_disk_list_before_hotremove
 
+# Disk I/O testing rebooted the guest OS, which might cause disk name changed
+# So here updates the new disk info if the disk name is changed
+- name: "Update new disk info in guest OS before hot-remove"
+  include_tasks: get_new_disk_info.yml
+  vars:
+    current_guest_disk_list: "{{ guest_disk_list_before_hotremove }}"
+  when: guest_disk_list_before_hotremove | difference(guest_disk_list_after_hotadd) | length != 0
+
 - name: "Hot remove the new disk from VM"
   include_tasks: ../../common/vm_hot_add_remove_disk.yml
   vars:
@@ -137,24 +117,20 @@
     unit_number: "{{ new_unit_number }}"
     disk_controller_type: "{{ new_disk_ctrl_type }}"
 
-- name: "Collect dmesg after hot removing the disk from the {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller"
+- name: "Collect dmesg after hot removing the disk from {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller"
   include_tasks: ../utils/collect_dmesg.yml
   vars:
     dmesg_options: "-c"
     dmesg_output_file_name: "dmesg_after_{{ new_disk_ctrl_state }}_ctrl_disk_hot_remove.log"
     dmesg_no_log: true
+    dmesg_check_call_trace: true
 
 - name: "Wait for disk being absent in guest OS"
   include_tasks: wait_device_list_changed.yml
   vars:
-    device_list_before_change: "{{ guest_disk_list_after_hotadd }}"
-    wait_device_name: "{{ new_guest_disk_info.name }}"
     wait_device_state: "absent"
-
-- name: "Get guest disk list after hot-remove"
-  include_tasks: ../utils/get_device_list.yml
-  vars:
-    guest_device_type: "disk"
+    wait_device_count: "{{ guest_disk_list_before_hotremove | length - 1 }}"
+    wait_device_name: "{{ new_guest_disk_info.name }}"
 
 - name: "Set the fact of guest disk list after hot-remove"
   ansible.builtin.set_fact:
@@ -166,6 +142,6 @@
 - name: "Check new disk is removed from guest OS"
   ansible.builtin.assert:
     that:
-      - guest_disk_list_before_hotremove | difference(guest_disk_list_after_hotremove) | length == 1
+      - guest_disk_list_before_hotremove | length - guest_disk_list_after_hotremove | length == 1
     fail_msg: "After the disk hot removed from {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller, it is still present in guest OS."
     success_msg: "After the disk hot removed from {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller, it is absent in guest OS."

@@ -1,0 +1,32 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the new disk information in guest OS
+# Parameter:
+#   current_guest_disk_list: A list of disks in guest OS
+#
+- name: "Initialize the fact of new disk info"
+  ansible.builtin.set_fact:
+    new_guest_disk_list: []
+    new_guest_disk_info: ""
+
+- name: "Set fact of new disk list in {{ vm_guest_os_distribution }} guest OS"
+  ansible.builtin.set_fact:
+    new_guest_disk_list: "{{ current_guest_disk_list | selectattr('size', 'equalto', new_disk_size_bytes | string) }}"
+
+- name: "Set fact of the new disk info on {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller"
+  ansible.builtin.set_fact:
+    new_guest_disk_info: "{{ new_guest_disk_list[0] }}"
+  when: new_guest_disk_list | length == 1
+
+- name: "Print the new disk info"
+  ansible.builtin.debug: var=new_guest_disk_info
+
+- name: "Failed to get the new disk on {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller"
+  ansible.builtin.assert:
+    that:
+      - new_guest_disk_info
+      - new_guest_disk_info.name is defined
+      - new_guest_disk_info.name
+    fail_msg: "Not found the new disk from disk list {{ current_guest_disk_list }}"
+    success_msg: "The new disk is {{ new_guest_disk_info }}"

@@ -8,8 +8,12 @@
 #   dmesg_output_file_name (optional): the file name for saving dmesg output in test case log folder
 #   dmesg_ignore_errors (optional): ignore errors when executing dmesg. Default is false.
 #   dmesg_no_log (optional): true to hide output on console. Default is false.
+#   dmesg_check_call_trace (optional): whether to check there is call trace or not in dmesg output.
+#     Default value is false.
 # Return:
 #   dmesg_output_file_path: the file path to save dmesg output at localhost
+#   dmesg_call_trace_stack: all call traces found in current test case when
+#     dmesg_check_call_trace is true.
 #
 - name: "Initialize facts of dmesg command result and output file path at localhost"
   ansible.builtin.set_fact:
@@ -50,6 +54,26 @@
         - save_dmesg_result.failed is defined
         - not save_dmesg_result.failed
 
-    - name: "Display the demst output file path"
+    - name: "Display the dmesg output file path"
       ansible.builtin.debug:
         msg: "The output of dmesg is saved into {{ dmesg_output_file_path }}"
+
+    - name: "Check whether there is call trace in dmesg output"
+      when: dmesg_check_call_trace | default(false)
+      block:
+        - name: "Extract errors from dmesg output in guest OS"
+          include_tasks: ../../common/extract_errors_from_log.yml
+          vars:
+            extract_log_file_path: "{{ dmesg_output_file_path }}"
+
+        - name: "Update fact of call traces found in test case {{ ansible_play_name }}"
+          ansible.builtin.set_fact:
+            dmesg_call_trace_stack: >-
+              {{
+                dmesg_call_trace_stack |
+                union(["Found call trace in "~ dmesg_output_file_name]) |
+                union(errors_in_log)
+              }}
+          when:
+            - errors_in_log | length > 0
+            - errors_in_log is search('Call Trace')
