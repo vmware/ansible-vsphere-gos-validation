@@ -14,46 +14,42 @@
   ansible.builtin.assert:
     that:
       - repo_name is defined and repo_name
-      - (repo_baseurl is defined and repo_baseurl) or (repo_mirrorlist is defined and repo_mirrorlist)
-    fail_msg: "Invalid parameters: repo_name={{ repo_name | default('undefined') }}, repo_baseurl={{ repo_baseurl | default('undefined') }}, repo_mirrorlist = {{ repo_mirrorlist | default('undefined') }}"
+      - repo_baseurl is defined and repo_baseurl
+    fail_msg: >-
+      Invalid parameters: repo_name is {{ repo_name | default('undefined') }},
+      repo_baseurl is {{ repo_baseurl | default('undefined') }}
 
-- name: "Set default RPM GPG key"
+- name: "Add yum repository on {{ vm_guest_os_distribution }}"
+  when: guest_os_ansible_pkg_mgr is match('yum|dnf')
   block:
-    - name: "Get default RPM GPG key file"
-      include_tasks: get_rpm_gpg_key_file.yml
-
     - name: "Set default RPM GPG key"
-      ansible.builtin.set_fact:
-        gpg_key_path: "file://{{ guest_rpm_gpg_key_path }}"
-      when: guest_rpm_gpg_key_path
-
-    - name: "Fail the test due to no RPM GPG key found"
-      ansible.builtin.fail:
-        msg: "Can't not add repository when GPG check is enabled but no RPM GPG key is found."
-      when: not guest_rpm_gpg_key_path
-  when:
-    - gpg_check is defined
-    - gpg_check
-    - gpg_key_path is undefined or not gpg_key_path
-
-- name: "Initialize the prefix for local repository"
-  ansible.builtin.set_fact:
-    repo_baseurl_prefix: ""
-
-- name: "Add yum repository for {{ guest_os_ansible_distribution }}"
-  block:
-    - name: "Set the prefix for local yum repository"
-      ansible.builtin.set_fact:
-        repo_baseurl_prefix: "file://"
       when:
-        - repo_baseurl is sequence
-        - repo_baseurl[0] == '/'
+        - gpg_check is defined
+        - gpg_check
+        - gpg_key_path is undefined or not gpg_key_path
+      block:
+        - name: "Get default RPM GPG key file"
+          include_tasks: get_rpm_gpg_key_file.yml
+
+        - name: "Set default RPM GPG key"
+          ansible.builtin.set_fact:
+            gpg_key_path: "file://{{ guest_rpm_gpg_key_path }}"
+          when: guest_rpm_gpg_key_path
+
+        - name: "Test failed because not found RPM GPG key"
+          ansible.builtin.fail:
+            msg: "Can't not add repository when GPG check is enabled but RPM GPG key is not found."
+          when: not guest_rpm_gpg_key_path
+
+    - name: "Set fact of the prefix of repository base URL"
+      ansible.builtin.set_fact:
+        repo_baseurl_prefix: "{{ (repo_baseurl.startswith('/')) | ternary('file://', '') }}"
 
     - name: "Add repository {{ repo_name }} from {{ repo_baseurl }}"
       ansible.builtin.yum_repository:
         name: "{{ repo_name }}"
         description: "{{ repo_description | default(repo_name) }}"
-        baseurl: "{{ (repo_baseurl_prefix ~ repo_baseurl) | default(omit) }}"
+        baseurl: "{{ repo_baseurl_prefix }}{{ repo_baseurl }}"
         mirrorlist: "{{ repo_mirrorlist | default(omit) }}"
         enabled: true
         gpgcheck: "{{ gpg_check | default(false) }}"
@@ -66,6 +62,10 @@
       ansible.builtin.debug: var=add_yum_repo_result
 
     - name: "Update yum repository file"
+      when:
+        - add_yum_repo_result is defined
+        - add_yum_repo_result.diff is defined
+        - add_yum_repo_result.diff.after_header is defined
       block:
         - name: "Get new repository file path"
           ansible.builtin.set_fact:
@@ -74,20 +74,13 @@
         - name: "Remove spaces in repository file"
           ansible.builtin.shell: "sed -i 's/ *= */=/' {{ new_yum_repo_path }}"
           delegate_to: "{{ vm_guest_ip }}"
-      when:
-        - add_yum_repo_result is defined
-        - add_yum_repo_result.diff is defined
-        - add_yum_repo_result.diff.after_header is defined
-  when: guest_os_family in ["RedHat", "VMware Photon OS"]
 
-- name: "Add zypper repository for {{ guest_os_ansible_distribution }}"
+- name: "Add zypper repository on {{ vm_guest_os_distribution }}"
+  when: guest_os_ansible_pkg_mgr == 'zypper'
   block:
-    - name: "Set the prefix for local zypper repository"
+    - name: "Set fact of the prefix of repository base URL"
       ansible.builtin.set_fact:
-        repo_baseurl_prefix: "dir:"
-      when:
-        - repo_baseurl is sequence
-        - repo_baseurl[0] == '/'
+        repo_baseurl_prefix: "{{ (repo_baseurl.startswith('/')) | ternary('dir:', '') }}"
 
     - name: "Add zypper repository {{ repo_name }}"
       community.general.zypper_repository:
@@ -98,4 +91,3 @@
         enabled: true
         runrefresh: true
       delegate_to: "{{ vm_guest_ip }}"
-  when: guest_os_family == "Suse"

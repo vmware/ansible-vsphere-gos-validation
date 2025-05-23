@@ -1,0 +1,76 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Config package repositories for guest OS release
+#
+- name: "Disable all existing repositories on {{ vm_guest_os_distribution }}"
+  include_tasks: enable_disable_repos.yml
+  vars:
+    repo_state: "disabled"
+  when: >-
+    guest_os_ansible_distribution in ['RedHat', 'ProLinux'] or
+    guest_os_family == 'Suse'
+
+- name: "Connect CDROM and add local repositories on {{ vm_guest_os_distribution }}"
+  include_tasks: add_local_dvd_repo.yml
+  when:
+    - guest_os_family in ['Suse', 'RedHat']
+    - os_installation_iso_list is defined
+    - os_installation_iso_list | length > 0
+
+- name: "Add guest OS official online repositories on {{ vm_guest_os_distribution }}"
+  include_tasks: add_official_online_repo.yml
+  when:
+    - guest_os_ansible_distribution not in ['SLES', 'SLED', 'RedHat', 'ProLinux', 'FreeBSD']
+    - guest_os_family != "Debian"
+
+- name: "Set guest OS official APT sources on {{ vm_guest_os_distribution }}"
+  include_tasks: add_official_apt_sources.yml
+  when: guest_os_family == "Debian"
+
+- name: "Add online repositories for installing open-vm-tools"
+  when:
+    - current_testcase_name is defined
+    - current_testcase_name is match("ovt_verify_(pkg|src)_install")
+    - guest_os_ansible_system == "linux"
+    - linux_ovt_install_type is defined
+  block:
+    - name: "Add user defined open-vm-tools online repository"
+      when:
+        - linux_ovt_install_type == "package"
+        - linux_ovt_repo_url is defined
+        - linux_ovt_repo_url
+      block:
+        - name: "Add user defined open-vm-tools online repository on {{ vm_guest_os_distribution }}"
+          include_tasks: add_repo_from_baseurl.yml
+          vars:
+            repo_name: "open-vm-tools"
+            repo_baseurl: "{{ linux_ovt_repo_url }}"
+            gpg_check: false
+          when: guest_os_ansible_pkg_mgr is match('yum|dnf|zypper')
+
+        - name: "Add user defined APT source on {{ vm_guest_os_distribution }}"
+          when: guest_os_ansible_pkg_mgr == 'apt'
+          block:
+            - name: "Set fact of the APT source on {{ vm_guest_os_distribution }}"
+              ansible.builtin.set_fact:
+                apt_source: >-
+                  deb [arch={{ guest_os_ansible_architecture | replace('x86_64', 'amd64') }} trusted=yes]
+                  {{ linux_ovt_repo_url }} {{ guest_os_ansible_distribution_release | lower }} main
+
+            - name: "Add APT source on {{ vm_guest_os_distribution }}"
+              ansible.builtin.apt_repository:
+                filename: "open-vm-tools"
+                repo: "{{ apt_source }}"
+                state: "present"
+              delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Add online development packages repository on {{ vm_guest_os_distribution }}"
+      include_tasks: rhel_add_devel_repo.yml
+      when:
+        - linux_ovt_install_type == "source"
+        - guest_os_ansible_distribution == "RedHat"
+        - guest_os_ansible_distribution_major_ver | int > 7
+
+- name: "Update packages metadata"
+  include_tasks: repo_update.yml

@@ -10,7 +10,8 @@
 #     If package_state is 'latest', installed packages in package_list will be upgraded, and missing
 #       packages will be installed.
 #     If package_state is 'absent' or 'removed', installed packages in package_list will be uninstalled.
-#   package_repo_enable (optional): Default value is true, then it will configure guest OS package repositories.
+#   package_repo_enabled (optional): Whether package repositories have been enabled. Default value is false,
+#     and then it will configure and enable package repositories before installing packages.
 #
 - name: "Set default value of package_state to 'present'"
   ansible.builtin.set_fact:
@@ -72,33 +73,18 @@
 - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }}"
   when: package_manage_list | length > 0
   block:
-    - name: "Set proxy and add repositories for installing or upgrading package"
-      when: package_state in ['installed', 'latest', 'present']
-      block:
-        - name: "Set proxy for installing package"
-          include_tasks: set_proxy.yml
-
-        - name: "Add OS release package repositories"
-          when: package_repo_enable | default(true)
-          block:
-            - name: "Add a local repo from ISO image for {{ guest_os_ansible_distribution }}"
-              include_tasks: ../utils/add_local_dvd_repo.yml
-              when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat', 'Rocky',
-                                                'AlmaLinux', 'openSUSE Leap', 'ProLinux']
-
-            - name: "Add known online repos for other Linux OS"
-              include_tasks: ../utils/add_official_online_repo.yml
-              when: guest_os_ansible_distribution not in ['SLES', 'SLED', 'RedHat', 'ProLinux']
+    - name: "Configure packages repositories"
+      include_tasks: config_repos.yml
+      when:
+        - package_state in ['installed', 'latest', 'present']
+        - not (package_repo_enabled | default(false))
 
     - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }}"
       when: guest_os_ansible_distribution in ["VMware Photon OS", "FreeBSD"]
       block:
         - name: "Set facts of packages and command for {{ guest_os_ansible_distribution }}"
           ansible.builtin.set_fact:
-            package_manager: |-
-              {%- if guest_os_ansible_distribution == "VMware Photon OS" -%}tdnf
-              {%- else -%}pkg
-              {%- endif -%}
+            package_manager: "{{ (guest_os_ansible_distribution == 'FreeBSD') | ternary('pkg', 'tdnf') }}"
 
         - name: "Set the command to {{ package_manage_op | lower }} packages on {{ guest_os_ansible_distribution }}"
           ansible.builtin.set_fact:
@@ -108,14 +94,6 @@
               {%- else -%}
                 {{ package_manager }} remove -y {{ package_manage_list_str }}
               {%- endif -%}
-
-        - name: "Update VMware Photon OS repo cache"
-          include_tasks: repo_update.yml
-          vars:
-            check_update_cmd: "tdnf makecache"
-          when:
-            - guest_os_ansible_distribution == "VMware Photon OS"
-            - package_state in ['installed', 'latest', 'present']
 
         - name: "{{ package_manage_op }} packages on {{ guest_os_ansible_distribution }}"
           ansible.builtin.command: "{{ package_manage_cmd }}"

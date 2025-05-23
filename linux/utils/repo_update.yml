@@ -3,24 +3,61 @@
 ---
 # Update package metadata by checking repo update
 # Parameters:
-#   check_update_cmd: The command to check repo update
-#   clean_cache_cmd: The command to clean all cache and metadata
+#   clean_repo_cache(Optional): True to clean cached packages metadata before update.
+#     The default value is false.
 #
-- name: "Update package metadata"
-  when: check_update_cmd is defined and check_update_cmd
+- name: "Initialize facts of commands to update and clean packages metadata"
+  ansible.builtin.set_fact:
+    check_update_cmd: ""
+    clean_cache_cmd: ""
+
+- name: "Set commands to check and clean packages metadata on {{ guest_os_ansible_distribution }}"
+  ansible.builtin.set_fact:
+    check_update_cmd: "tdnf makecache"
+    clean_cache_cmd: "tdnf clean all"
+  when: guest_os_ansible_distribution == "VMware Photon OS"
+
+- name: "Set commands to check and clean packages metadata on {{ guest_os_ansible_distribution }}"
+  ansible.builtin.set_fact:
+    check_update_cmd: "{{ package_mgr_cmd }} check-update"
+    clean_cache_cmd: "{{ package_mgr_cmd }} clean all"
+  vars:
+    package_mgr_cmd: "{{ (guest_os_ansible_pkg_mgr == 'yum') | ternary('yum', 'dnf') }}"
+  when:
+    - guest_os_family == "RedHat"
+    - guest_os_ansible_pkg_mgr is match('yum|dnf')
+
+- name: "Set commands to check and clean packages metadata on {{ guest_os_ansible_distribution }}"
+  ansible.builtin.set_fact:
+    check_update_cmd: "zypper ref"
+    clean_cache_cmd: "zypper clean -a"
+  when: guest_os_family == "Suse"
+
+- name: "Set commands to check and clean packages metadata on {{ guest_os_ansible_distribution }}"
+  ansible.builtin.set_fact:
+    check_update_cmd: "apt-get update"
+    clean_cache_cmd: "apt-get clean"
+  when: guest_os_family in ["Debian", "Astra Linux (Orel)"]
+
+- name: "Set commands to check and clean packages metadata on {{ guest_os_ansible_distribution }}"
+  ansible.builtin.set_fact:
+    check_update_cmd: "pkg update"
+    clean_cache_cmd: "pkg clean -y"
+  when: guest_os_family == "FreeBSD"
+
+- name: "Update packages metadata"
+  when: check_update_cmd
   block:
     # Clean all cache and metadata if necessary
     - name: "Clean all cache and metadata"
       ansible.builtin.command: "{{ clean_cache_cmd }}"
       delegate_to: "{{ vm_guest_ip }}"
-      when: clean_cache_cmd is defined and clean_cache_cmd
+      when:
+        - clean_repo_cache is defined
+        - clean_repo_cache | bool
 
-    - name: "Print check update command"
-      ansible.builtin.debug: var=check_update_cmd
-
-    # Maybe failed to update part of repos due to network issue.
-    # This issue may cause open-vm-tools installation fail.
-    - name: "Get OS packages updates"
+    # It maybe fail to update metadata due to network issue.
+    - name: "Update cached packages metadata"
       ansible.builtin.command: "{{ check_update_cmd }}"
       async: 300
       poll: 0
@@ -29,12 +66,12 @@
       delegate_to: "{{ vm_guest_ip }}"
       register: repo_update_result
 
-    - name: "Asnyc task to check OS packages update status"
+    - name: "Asnyc task to check packages metadata update status"
       when:
         - repo_update_result.ansible_job_id is defined
         - repo_update_result.finished is undefined or repo_update_result.finished != 1
       block:
-        - name: "Check OS packages updates status"
+        - name: "Check packages metadata update status"
           ansible.builtin.async_status:
             jid: "{{ repo_update_result.ansible_job_id }}"
           register: job_result
@@ -44,5 +81,5 @@
           delay: 15
           ignore_errors: true
 
-        - name: "Print check update result"
+        - name: "Print packages metadata update result"
           ansible.builtin.debug: var=repo_update_result
