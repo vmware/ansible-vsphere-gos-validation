@@ -6,6 +6,36 @@
 # - lsilogic: no inbox driver in Windows guest OS now, so no testing.
 # - buslogic: not supported in 64bit Windows guest OS, so no testing.
 #
+- name: "Set fact of whether VM NVMe version 1.3 is enabled by default"
+  when:
+    - vm_hardware_version_num | int >= 21
+    - test_disk_ctrl_type == 'nvme'
+    - vm_nvme_spec13_enabled is undefined
+  block:
+    - name: "For Windows {{ guest_os_product_type }} with guest ID {{ vm_guest_id }}"
+      ansible.builtin.set_fact:
+        vm_nvme_spec13_enabled: "{{ vm_guest_id | regex_search('windows(\\d+)srvNext', '\\1') | first | int >= 2019 }}"
+      when: vm_guest_id | regex_search('windows(\\d+)srvNext')
+
+    - name: "For Windows {{ guest_os_product_type }} with guest ID {{ vm_guest_id }}"
+      ansible.builtin.set_fact:
+        vm_nvme_spec13_enabled: "{{ vm_guest_id | regex_search('windows(\\d+)_', '\\1') | first | int >= 11 }}"
+      when: vm_guest_id | regex_search('windows(\\d+)_')
+
+- name: "Skip test case"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      Skip testing on this guest OS '{{ guest_os_ansible_distribution }}' with VM hardware version
+      '{{ vm_hardware_version_num }}', since NVMe version is 1.3 by default for Windows Server 2022,
+      Windows 11 and later VMs with hardware version 21 on ESXi 8.0.2 and later.
+      So skip this test case and only run test case 'nvme_vhba_device_ops' with default NVMe v1.3.
+    skip_reason: "Not Applicable"
+  when:
+    - test_disk_ctrl_type == 'nvme'
+    - test_purpose == "hot-add-spec13"
+    - vm_nvme_spec13_enabled is defined and vm_nvme_spec13_enabled
+
 - name: "Get VM current disk controller info"
   include_tasks: get_vm_disk_ctrl_info.yml
 
