@@ -147,6 +147,15 @@
       delegate_to: "{{ vm_guest_ip }}"
       with_items: "{{ photon_repo_names }}"
 
+- name: "Set fact of online repositories for {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    guest_online_repos: "{{ guest_online_repos | union([{'name': miracle_repo_id, 'baseurl': miracle_repo_baseurl}]) }}"
+  vars:
+    miracle_repo_id: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_{{ item }}"
+    miracle_repo_baseurl: "https://repo.dist.miraclelinux.net/miraclelinux/{{ guest_os_ansible_distribution_major_ver }}-latest/{{ item }}/$basearch/os/"
+  with_items: ["BaseOS", "AppStream", "PowerTools"]
+  when: guest_os_ansible_distribution == 'MIRACLE'
+
 - name: "Add online repositories for {{ vm_guest_os_distribution }}"
   include_tasks: add_repo_from_baseurl.yml
   vars:
