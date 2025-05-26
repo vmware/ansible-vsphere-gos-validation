@@ -36,6 +36,19 @@
           vars:
             create_test_log_folder: true
 
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case {{ ansible_play_name }} because secure boot is not supported
+              for {{ vm_guest_os_distribution }} guest OS on ARM ESXi host.
+            skip_reason: "Not Supported"
+          when:
+            - esxi_cpu_vendor == 'arm'
+            - (guest_os_ansible_distribution == "VMware Photon OS" and guest_os_ansible_distribution_ver is version('5.0', '<=')) or
+              (guest_os_ansible_distribution == "RedHat" and (guest_os_ansible_distribution_ver is version('9.6', '<=') or
+              guest_os_ansible_distribution_ver == "10.0"))
+
         - name: "Check secure boot is supported or not"
           include_tasks: check_secureboot_support_status.yml
 
