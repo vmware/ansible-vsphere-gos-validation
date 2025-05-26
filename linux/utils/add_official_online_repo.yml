@@ -42,21 +42,28 @@
 
 - name: "Set online repositories for {{ vm_guest_os_distribution }}"
   when:
-    - guest_os_ansible_distribution in ["AlmaLinux", "Rocky", "CentOS"]
+    - guest_os_ansible_distribution in ["AlmaLinux", "Rocky", "CentOS", "MIRACLE"]
     - guest_os_ansible_distribution_major_ver | int >= 8
   block:
     - name: "Set facts about guest OS online repositories"
       ansible.builtin.set_fact:
         guest_online_repo_url: |-
-          {%- if guest_os_ansible_distribution == "AlmaLinux" -%}https://repo.almalinux.org/almalinux/$releasever
-          {%- elif guest_os_ansible_distribution == "Rocky" -%}http://dl.rockylinux.org/$contentdir/$releasever
-          {%- elif guest_os_ansible_distribution_ver is version('8.5', '>') -%}http://mirror.stream.centos.org/$releasever-stream
-          {%- else -%}http://vault.centos.org/$contentdir/$releasever
+          {%- if guest_os_ansible_distribution == "AlmaLinux" -%}
+              https://repo.almalinux.org/almalinux/$releasever
+          {%- elif guest_os_ansible_distribution == "Rocky" -%}
+              http://dl.rockylinux.org/$contentdir/$releasever
+          {%- elif guest_os_ansible_distribution == "MIRACLE" -%}
+              https://repo.dist.miraclelinux.net/miraclelinux/{{ guest_os_ansible_distribution_major_ver }}-latest
+          {%- elif guest_os_ansible_distribution_ver is version('8.5', '>') -%}
+              http://mirror.stream.centos.org/$releasever-stream
+          {%- else -%}
+              http://vault.centos.org/$contentdir/$releasever
           {%- endif -%}
         guest_online_repo_ids:
           - 'BaseOS'
           - 'AppStream'
-          - "{{ (guest_os_ansible_distribution_major_ver | int == 8) | ternary('PowerTools', 'CRB') }}"
+          - "{{ (guest_os_ansible_distribution == 'MIRACLE' or guest_os_ansible_distribution_major_ver | int == 8) |
+                ternary('PowerTools', 'CRB') }}"
 
     # guest OS may have pre-configured these online repositories with mirrolists. Enable them if they exist
     - name: "Enable existing online repositories on {{ vm_guest_os_distribution }}"
@@ -65,6 +72,7 @@
         repo_ids: "{{ guest_online_repo_ids | map('lower') }}"
         repo_state: "enabled"
         repo_state_ignore_errors: true
+      when: guest_os_ansible_distribution != "MIRACLE"
 
     - name: "Set online repositories for {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
@@ -131,7 +139,7 @@
   block:
     - name: "Set fact of online repository names on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
-        photon_repo_names: ["photon", "photon-updates"]
+        photon_repo_names: ["photon-release", "photon-updates"]
       when: guest_os_ansible_distribution_major_ver | int < 4
 
     - name: "Set fact of online repository names on {{ vm_guest_os_distribution }}"
@@ -147,18 +155,13 @@
       with_items: "{{ photon_repo_names }}"
 
     - name: "Update repository's baseurl"
-      ansible.builtin.command: "sed -i 's#dl.bintray.com/vmware/#packages.vmware.com/photon/$releasever/#' /etc/yum.repos.d/{{ item }}.repo"
+      ansible.builtin.shell: |-
+        invalid_repo_files=`grep -l 'dl.bintray.com/vmware' /etc/yum.repos.d/*.repo`;
+        if [ "$invalid_repo_files" != "" ] ; then
+          sed -i 's#dl.bintray.com/vmware/#packages.vmware.com/photon/$releasever/#' $invalid_repo_files;
+        fi
       delegate_to: "{{ vm_guest_ip }}"
       with_items: "{{ photon_repo_names }}"
-
-- name: "Set fact of online repositories for {{ vm_guest_os_distribution }}"
-  ansible.builtin.set_fact:
-    guest_online_repos: "{{ guest_online_repos | union([{'name': miracle_repo_id, 'baseurl': miracle_repo_baseurl}]) }}"
-  vars:
-    miracle_repo_id: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_{{ item }}"
-    miracle_repo_baseurl: "https://repo.dist.miraclelinux.net/miraclelinux/{{ guest_os_ansible_distribution_major_ver }}-latest/{{ item }}/$basearch/os/"
-  with_items: ["BaseOS", "AppStream", "PowerTools"]
-  when: guest_os_ansible_distribution == 'MIRACLE'
 
 - name: "Add online repositories for {{ vm_guest_os_distribution }}"
   include_tasks: add_repo_from_baseurl.yml
