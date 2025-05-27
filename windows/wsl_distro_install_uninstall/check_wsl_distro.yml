@@ -1,4 +1,4 @@
-# Copyright 2023-2024 VMware, Inc.
+# Copyright 2023-2025 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
@@ -9,10 +9,10 @@
 - name: "Initialize the variables"
   ansible.builtin.set_fact:
     wsl_distro_installed: false
-    wsl_list_distro_file_name: "wsl_list_distro_after_install.txt"
+    wsl_distro_list_file_name: "wsl_list_distro_after_install.txt"
 
 - name: "List installed WSL distribution"
-  ansible.windows.win_shell: "wsl --list | Out-File -FilePath {{ wsl_file_path_win }}\\{{ wsl_list_distro_file_name }}"
+  ansible.windows.win_shell: "wsl --list | Out-File -FilePath {{ wsl_file_path_win }}\\{{ wsl_distro_list_file_name }}"
   register: win_powershell_cmd_output
   ignore_errors: true
   delegate_to: "{{ vm_guest_ip }}"
@@ -26,12 +26,12 @@
 - name: "Process the WSL output message"
   include_tasks: wsl_convert_binary_to_txt.yml
   vars:
-    source_path: "{{ wsl_file_path_win }}\\{{ wsl_list_distro_file_name }}"
-    file_name: "{{ wsl_list_distro_file_name }}"
+    source_path: "{{ wsl_file_path_win }}\\{{ wsl_distro_list_file_name }}"
+    file_name: "{{ wsl_distro_list_file_name }}"
 
 - name: "Set status for the WSL distribution installation"
   ansible.builtin.set_fact:
-    wsl_distro_installed: "{{lookup('ansible.builtin.file', wsl_new_file) is search(wsl_distribution_name)}}"
+    wsl_distro_installed: "{{ lookup('ansible.builtin.file', wsl_new_file) is search(wsl_distribution_name) }}"
 
 - name: "Display the status for the WSL distribution installation"
   ansible.builtin.debug:
