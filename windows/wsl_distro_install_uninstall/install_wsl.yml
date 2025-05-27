@@ -9,9 +9,10 @@
 # and the support of inbox version is removed from Windows build 25267, the test case will install inbox version for
 # build lower than 25267 until the known issue is resolved.
 #
-- name: "Initialize the fact of skipping set WSL version"
+- name: "Initialize the variables"
   ansible.builtin.set_fact:
     skip_set_wsl_ver: false
+    wsl_install_result: ""
 
 - name: "Install WSL for Windows Client"
   when: guest_os_product_type == 'client'
@@ -36,6 +37,10 @@
         win_powershell_cmd: "{{ wsl_install_cmd }}"
         win_execute_cmd_ignore_error: true
 
+    - name: "Set the fact of WSL installation result for Windows Client"
+      ansible.builtin.set_fact:
+        wsl_install_result: "{{ win_powershell_cmd_output }}"
+
 - name: "Install WSL for Windows Server"
   when: guest_os_product_type == 'server'
   block:
@@ -53,6 +58,10 @@
       become: true
       become_method: runas
       become_user: Administrator
+
+    - name: "Set the fact of WSL installation result for Windows Server"
+      ansible.builtin.set_fact:
+        wsl_install_result: "{{ win_powershell_cmd_output }}"
 
     # For Windows Server 2022
     # 1. The default WSL version is 1.
@@ -72,8 +81,8 @@
   ansible.builtin.fail:
     msg: "WSL installation failed. Please check log file wsl_install.txt."
   when:
-    - win_powershell_cmd_output.rc is defined
-    - win_powershell_cmd_output.rc != 0
+    - wsl_install_result.rc is defined
+    - wsl_install_result.rc != 0
     - not skip_set_wsl_ver
 
 - name: "Restart the guest OS"
