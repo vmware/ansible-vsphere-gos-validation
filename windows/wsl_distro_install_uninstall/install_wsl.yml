@@ -12,7 +12,6 @@
 - name: "Initialize the variables"
   ansible.builtin.set_fact:
     skip_set_wsl_ver: false
-    wsl_install_result: ""
 
 - name: "Install WSL for Windows Client"
   when: guest_os_product_type == 'client'
@@ -37,10 +36,6 @@
         win_powershell_cmd: "{{ wsl_install_cmd }}"
         win_execute_cmd_ignore_error: true
 
-    - name: "Set the fact of WSL installation result for Windows Client"
-      ansible.builtin.set_fact:
-        wsl_install_result: "{{ win_powershell_cmd_output }}"
-
 - name: "Install WSL for Windows Server"
   when: guest_os_product_type == 'server'
   block:
@@ -53,10 +48,6 @@
       become: true
       become_method: runas
       become_user: Administrator
-
-    - name: "Set the fact of WSL installation result for Windows Server"
-      ansible.builtin.set_fact:
-        wsl_install_result: "{{ win_powershell_cmd_output }}"
 
     # For Windows Server 2022
     # 1. The default WSL version is 1.
@@ -72,14 +63,6 @@
     source_path: "{{ wsl_file_path_win }}\\wsl_install.txt"
     file_name: "wsl_install.txt"
 
-- name: "Check WSL installation command result"
-  ansible.builtin.fail:
-    msg: "WSL installation failed. Please check log file wsl_install.txt."
-  when:
-    - wsl_install_result.rc is defined
-    - wsl_install_result.rc != 0
-    - not skip_set_wsl_ver
-
 - name: "Restart the guest OS"
   include_tasks: ../utils/win_shutdown_restart.yml
   vars:
@@ -92,6 +75,12 @@
 
 - name: "Check WSL version"
   include_tasks: check_wsl_version.yml
+
+# If WSL is installed successfully, the default version should be retrievable.
+- name: "Validate WSL status"
+  ansible.builtin.fail:
+    msg: "WSL installation failed. Please check log file wsl_install.txt."
+  when: not wsl_default_version
 
 # Set WSL default version to 2
 - name: "Set WSL default version to 2"
