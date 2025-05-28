@@ -59,11 +59,12 @@
   vars:
     win_powershell_cmd: "Set-Service -Name InstallService -StartupType Automatic; Start-Service InstallService"
 
-# Create temp directory on Guest OS to store the WSL output message
+# 1. Create temp directory on Guest OS to store the WSL output message
+# 2. Due to issue https://github.com/microsoft/WSL/issues/9258, install "Debian" for Windows Server.
 - name: "Set fact of file path and distribution name"
   ansible.builtin.set_fact:
     wsl_file_path_win: "C:\\temp"
-    wsl_distribution_name: "Ubuntu"
+    wsl_distribution_name: "{{ (guest_os_product_type == 'server') | ternary('Debian', 'Ubuntu') }}"
 
 - name: "Check if folder {{ wsl_file_path_win }} exists on guest OS"
   include_tasks: ../utils/win_is_folder.yml
