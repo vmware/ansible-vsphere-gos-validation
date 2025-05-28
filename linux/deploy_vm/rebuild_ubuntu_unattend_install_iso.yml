@@ -89,13 +89,19 @@
       ansible.builtin.replace:
         path: "{{ unattend_iso_cache }}/grub.cfg"
         regexp: '(.*vmlinuz )(.*)'
-        replace: "{%- if vm_guest_os_distribution.find('aarch64') != -1 -%}\\1autoinstall {%- else -%}\\1autoinstall \\2 console=ttyS0,115200n8{%- endif -%}"
+        replace: |-
+          {%- if vm_guest_os_distribution is defined and vm_guest_os_distribution.find('aarch64') != -1 -%}\\1autoinstall 
+          {%- else -%}\\1autoinstall \\2 console=ttyS0,115200n8
+          {%- endif -%}
 
     - name: "Update boot command options in isolinux/txt.cfg"
       ansible.builtin.replace:
         path: "{{ unattend_iso_cache }}/txt.cfg"
         regexp: '(.*initrd )(.*)'
-        replace: "{%- if vm_guest_os_distribution.find('aarch64') != -1 -%}\\1autoinstall {%- else -%}\\1autoinstall \\2 console=ttyS0,115200n8{%- endif -%}"
+        replace: |-
+          {%- if vm_guest_os_distribution is defined and vm_guest_os_distribution.find('aarch64') != -1 -%}\\1autoinstall 
+          {%- else -%}\\1autoinstall \\2 console=ttyS0,115200n8
+          {%- endif -%}
       when: ubuntu_bios_cfg_exist | bool
 
     - name: "Set facts of files to be updated or added into Ubuntu ISO"
