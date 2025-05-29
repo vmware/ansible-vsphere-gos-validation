@@ -1,17 +1,12 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Refresh guest networking info with VMware Tools {{ vmtools_version }}"
+- name: "Immediately refresh guest networking info with VMware Tools {{ vmtools_version }}"
+  ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} info update network"
+  delegate_to: "{{ vm_guest_ip }}"
   when:
     - vmtools_version is defined
     - vmtools_version is version('10.1.0', '>=')
-  block:
-    - name: "Get VMware Tools toolbox command"
-      include_tasks: ../utils/get_vmware_toolbox_cmd_path.yml
-
-    - name: "Immediately refresh networking information in guest info"
-      ansible.builtin.command: "{{ vmware_toolbox_cmd_path }} info update network"
-      delegate_to: "{{ vm_guest_ip }}"
 
 # VMware Tools ealier than 10.1.0 needs to restart open-vm-tools service
 # to refresh networking information in guest info

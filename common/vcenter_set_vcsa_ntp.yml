@@ -1,0 +1,47 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Set NTP servers and time zone in vCenter Server Appliance settings
+# Parameter:
+#   vcsa_ntp_servers: A list of NTP servers to set in vCenter Server Appliance settings.
+#   vcsa_timezone (optional): The time zone to set in vCenter Server Appliance settings.
+#     Default is UTC.
+#   vcsa_shell_enabled (optional): Whether to enable shell in vCenter Server Appliance settings.
+#     Default is true.
+#   vcsa_ssh_enabled (optional): Whether to enable SSH in vCenter Server Appliance settings.
+#     Default is true.
+#
+- name: "Check parameter 'vcsa_ntp_servers' is set"
+  ansible.builtin.assert:
+    that:
+      - vcsa_ntp_servers is defined
+      - vcsa_ntp_servers | type_debug == "list"
+      - vcsa_ntp_servers | length > 0
+    fail_msg: >-
+      Parameter 'vcsa_ntp_server' must be set for configuring vCenter Server
+      Appliance settings
+
+# After NTP servers are added, vCenter Server Appliance will sync time with NTP servers,
+# and the time sync might fail at the first time. So here add retries for setting NTP servers.
+- name: "Set NTP servers in vCenter Server Appliance settings"
+  vmware.vmware.vcsa_settings:
+    hostname: '{{ vcenter_hostname }}'
+    username: '{{ vcenter_username }}'
+    password: '{{ vcenter_password }}'
+    validate_certs: "{{ validate_certs | default(false) }}"
+    timesync_mode: "ntp"
+    ntp_servers: "{{ vcsa_ntp_servers }}"
+    timezone: "{{ vcsa_timezone | default('UTC') }}"
+    shell_enabled: "{{ vcsa_shell_enabled | default(true) }}"
+    shell_timeout: 86400
+    ssh_enabled: "{{ vcsa_ssh_enabled | default(true) }}"
+  register: vcsa_set_result
+  retries: 5
+  delay: 10
+  until:
+    - vcsa_set_result.failed is defined
+    - not vcsa_set_result.failed
+
+- name: "Display the result of setting NTP servers in vCenter Server Appliance settings"
+  ansible.builtin.debug: var=vcsa_set_result
+  when: enable_debug

@@ -27,6 +27,7 @@
     - not (fetch_file_ignore_errors | default(false))
 
 - name: "Fetch guest OS file"
+  when: guest_file_exists | bool
   block:
     - name: "Fetch file from guest OS and save it at localhost"
       ansible.builtin.fetch:
@@ -34,6 +35,11 @@
         dest: "{{ fetch_file_dst_path }}"
         flat: "{{ fetch_file_dst_path.endswith('/') }}"
       register: fetch_guest_file
+      retries: 5
+      delay: 10
+      until:
+        - fetch_guest_file.failed is defined
+        - not fetch_guest_file.failed
       ignore_errors: "{{ fetch_file_ignore_errors | default(false) }}"
       delegate_to: "{{ vm_guest_ip }}"
 
@@ -45,6 +51,7 @@
       ansible.builtin.set_fact:
         fetch_file_local_path: "{{ fetch_guest_file.dest }}"
       when:
+        - fetch_guest_file.failed is defined
+        - not fetch_guest_file.failed
         - fetch_guest_file.dest is defined
         - fetch_guest_file.dest
-  when: guest_file_exists | bool

@@ -1,0 +1,44 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Gather information of vCenter Server Appliance time settings
+# including NTP servers, time sync mode and time zone.
+# Return:
+#   vcsa_ntp_servers_get: A list of NTP servers in vCenter Server Appliance settings
+#   vcsa_timesync_mode_get: The time sync mode in vCenter Server Appliance settings
+#   vcsa_timezone_get: The time zone in vCenter Server Appliance settings
+#
+- name: "Initialize facts of vCenter Server Appliance time settings"
+  ansible.builtin.set_fact:
+    vcsa_ntp_servers_get: []
+    vcsa_timesync_mode_get: ""
+    vcsa_timezone_get: ""
+
+- name: "Gather information of vCenter Server Appliance time settings"
+  vmware.vmware.appliance_info:
+    hostname: '{{ vcenter_hostname }}'
+    username: '{{ vcenter_username }}'
+    password: '{{ vcenter_password }}'
+    validate_certs: "{{ validate_certs | default(false) }}"
+    properties: ["time"]
+  register: vcsa_get_result
+
+- name: "Display the result of getting vCenter Server Appliance time settings"
+  ansible.builtin.debug: var=vcsa_get_result
+  when: enable_debug
+
+- name: "Set facts of vCenter Server Appliance time settings"
+  ansible.builtin.set_fact:
+    vcsa_ntp_servers_get: "{{ vcsa_get_result.appliance.time.time_sync.servers | default([]) }}"
+    vcsa_timesync_mode_get: "{{ vcsa_get_result.appliance.time.time_sync.mode | default('') }}"
+    vcsa_timezone_get: "{{ vcsa_get_result.appliance.time.time_zone | default('') }}"
+  when:
+    - vcsa_get_result.appliance.time is defined
+    - vcsa_get_result.appliance.time
+
+- name: "Display information of vCenter Server Appliance time setting"
+  ansible.builtin.debug:
+    msg:
+      - "Current NTP servers in vCenter Server Appliance settings: {{ vcsa_ntp_servers_get }}"
+      - "Current time sync mode in vCenter Server Appliance settings: {{ vcsa_timesync_mode_get }}"
+      - "Current time zone in vCenter Server Appliance settings: {{ vcsa_timezone_get }}"

@@ -1,0 +1,55 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Set NTP servers on ESXi server
+# Parameters:
+#   esxi_ntp_servers: A list of NTP servers to set on ESXi server.
+#   esxi_ntp_servers_state(optional): The state of NTP servers on ESXi server:
+#     'present' or 'absent'. Default value is 'present', which is to add NTP servers
+#     on ESXi server. Otherwise, NTP servers will be removed on ESXi server.
+# Return:
+#   esxi_ntp_servers_set: A list of NTP servers after setting on ESXi server
+#
+- name: "Check parameter 'esxi_ntp_servers' is set"
+  ansible.builtin.assert:
+    that:
+      - esxi_ntp_servers is defined
+      - esxi_ntp_servers | type_debug == "list"
+      - esxi_ntp_servers | length > 0
+    fail_msg: "Parameter 'esxi_ntp_server' must be set for setting NTP servers on ESXi server"
+
+- name: "Initialize fact of NTP servers on ESXi server"
+  ansible.builtin.set_fact:
+    esxi_ntp_servers_set: []
+
+- name: "Set NTP servers on ESXi server"
+  community.vmware.vmware_host_ntp:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+    ntp_servers: "{{ esxi_ntp_servers }}"
+    state: "{{ esxi_ntp_servers_state | default('present') }}"
+  register: esxi_set_ntp_result
+
+- name: "Display the result of setting NTP servers on ESXi server"
+  ansible.builtin.debug: var=esxi_set_ntp_result
+  when: enable_debug
+
+- name: "Update fact of NTP servers after setting on ESXi server"
+  ansible.builtin.set_fact:
+    esxi_ntp_servers_set: >-
+      {{
+        esxi_set_ntp_result.host_ntp_status.values() |
+        selectattr('ntp_servers_current', 'defined') |
+        map(attribute='ntp_servers_current') | flatten
+      }}
+  when:
+    - esxi_set_ntp_result.host_ntp_status is defined
+    - esxi_set_ntp_result.host_ntp_status | length > 0
+
+- name: "Display information of NTP servers on ESXi server"
+  ansible.builtin.debug:
+    msg:
+      - "Current NTP servers on ESXi server: {{ esxi_ntp_servers_set }}"

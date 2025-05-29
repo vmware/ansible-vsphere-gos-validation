@@ -8,20 +8,25 @@ WORKDIR /root/ansible-vsphere-gos-validation
 
 # Install the required packages
 RUN tdnf makecache && \
-    tdnf install -y python3 zip vim wget python3-pip \
+    tdnf install -y zip vim wget python3 python3-pip git \
     sshpass gawk nfs-utils iana-etc python3-lxml python3-setuptools \
-    python3-wheel  python3-jmespath python3-netaddr && \
-    pip3 install pycdlib pywinrm pyvmomi pypsrp passlib
+    python3-wheel  python3-jmespath python3-netaddr
+
+# Install required python libraries
+RUN pip3 install pycdlib pywinrm pyvmomi pypsrp passlib
 
 # Install ansible-core
-RUN pip3 install ansible-core==2.15.12
+RUN pip3 install ansible-core==2.15.13
+# Install vSphere Automation SDK which is required by ansible vmware.vmware collection
+RUN pip3 install git+https://github.com/vmware/vsphere-automation-sdk-python.git
 
 # Install Ansible collections
 # You can set https proxy if collections are failed to install from Galaxy server, e.g.,
 # ENV HTTPS_PROXY="https://proxy.xxxx.com:xxxx"
 # Ansible 2.14.0 or later requires the locale encoding to be UTF-8
 ENV LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
-RUN ansible-galaxy collection install ansible.netcommon ansible.posix community.general community.vmware community.windows community.crypto
+RUN ansible-galaxy collection install ansible.netcommon ansible.posix community.general \
+    community.vmware vmware.vmware community.windows community.crypto
 
 # Download latest 'ansible-vsphere-gos-validation' release to working dir
 RUN wget --no-check-certificate https://github.com/vmware/ansible-vsphere-gos-validation/archive/refs/heads/main.tar.gz -O /tmp/test.tar.gz && \
