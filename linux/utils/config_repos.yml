@@ -3,6 +3,10 @@
 ---
 # Config package repositories for guest OS release
 #
+# SLES, SLED and RedHat online resistories require subscription and we can't use them in automation testing,
+# so os_installation_iso_list must be set to add local repositories for them.
+# ProLinux online repositories is not accessible, so it also requires os_installation_iso_list to add
+# local repositories.
 - name: "Check OS installation ISO for {{ vm_guest_os_distribution }}"
   ansible.builtin.assert:
     that:
@@ -20,6 +24,8 @@
     guest_os_ansible_distribution in ['RedHat', 'ProLinux'] or
     guest_os_family == 'Suse'
 
+# If os_installation_iso_list is set for openSUSE, AlmaLinux, Rocky, CentOS, OracleLinux, MIRACLE LINUX and etc,
+# we can configure local DVD repositories for package installation.
 - name: "Connect CDROM and add local repositories on {{ vm_guest_os_distribution }}"
   include_tasks: add_local_dvd_repo.yml
   when:
@@ -27,12 +33,15 @@
     - os_installation_iso_list is defined
     - os_installation_iso_list | length > 0
 
+# For OS which has official online repositories without subscription, like openSUSE, AlmaLinux, Rocky,
+# CentOS, OracleLinux, MIRACLE LINUX and etc, we can also configure their official online repositories.
 - name: "Add guest OS official online repositories on {{ vm_guest_os_distribution }}"
   include_tasks: add_official_online_repo.yml
   when:
     - guest_os_ansible_distribution not in ['SLES', 'SLED', 'RedHat', 'ProLinux', 'FreeBSD']
     - guest_os_family != "Debian"
 
+# Debian family OS like Debian, Ubuntu, Pardus, we can just add their official APT sources
 - name: "Set guest OS official APT sources on {{ vm_guest_os_distribution }}"
   include_tasks: add_official_apt_sources.yml
   when: guest_os_family == "Debian"
@@ -74,6 +83,7 @@
                 state: "present"
               delegate_to: "{{ vm_guest_ip }}"
 
+    # RedHat can use AlmaLinux or CentOS online repositories to install development packages
     - name: "Add online development packages repository on {{ vm_guest_os_distribution }}"
       include_tasks: rhel_add_devel_repo.yml
       when:
