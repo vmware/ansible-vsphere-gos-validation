@@ -12,17 +12,12 @@
   include_tasks: ../utils/disable_auto_update.yml
   when: guest_os_ansible_distribution in ["Ubuntu"]
 
-- name: "Configure package repositories on {{ vm_guest_os_distribution }}"
-  include_tasks: ../utils/config_repos.yml
-  when: guest_os_ansible_system == "linux"
-
 # 'python3-libdnf5' is required by dnf5 module
 - name: "Install 'python3-libdnf5' on {{ vm_guest_os_distribution }}"
   include_tasks: ../utils/install_uninstall_package.yml
   vars:
     package_list: ["python3-libdnf5"]
     package_state: "latest"
-    package_repo_enabled: true
   when: guest_os_ansible_pkg_mgr == 'dnf5'
 
 # Install Python3 RPM library on RedHat and Suse family OS
@@ -31,7 +26,6 @@
   vars:
     package_list: ["python3*-rpm"]
     package_state: "latest"
-    package_repo_enabled: true
   when:
     - guest_os_python_version is version('3.0.0', '>=')
     - guest_os_ansible_pkg_mgr is match('yum|dnf|zypper')
@@ -58,7 +52,6 @@
       vars:
         package_list: ["sudo", "gawk", "tar"]
         package_state: "latest"
-        package_repo_enabled: true
 
 - name: "Reconfigure {{ guest_os_ansible_distribution }}"
   when:
