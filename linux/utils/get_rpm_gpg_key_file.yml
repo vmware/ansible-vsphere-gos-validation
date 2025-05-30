@@ -62,7 +62,7 @@
           ansible.builtin.shell: "{{ guest_gpg_key_update_cmd }}"
           delegate_to: "{{ vm_guest_ip }}"
 
-        - name: "Update RPM GPG key files in repo files"
+        - name: "Update RPM GPG key files in repositories config"
           ansible.builtin.shell: "sed -r -i 's#gpgkey=(file:///etc/pki/rpm-gpg/VMWARE-RPM-GPG-KEY)$#gpgkey=\\1 \\1-4096#' /etc/yum.repos.d/*.repo"
           delegate_to: "{{ vm_guest_ip }}"
           ignore_errors: true
@@ -76,6 +76,11 @@
   ansible.builtin.set_fact:
     guest_rpm_gpg_key_path: "/etc/pki/rpm-gpg/RPM-GPG-KEY-prolinux-{{ guest_os_ansible_distribution_major_ver }}-release"
   when: guest_os_ansible_distribution == "ProLinux"
+
+- name: "Set default RPM GPG key file for ProLinux"
+  ansible.builtin.set_fact:
+    guest_rpm_gpg_key_path: "/etc/pki/rpm-gpg/RPM-GPG-KEY"
+  when: guest_os_ansible_distribution == "MIRACLE"
 
 - name: "Check GPG key file '{{ guest_rpm_gpg_key_path }}' exists or not"
   when: guest_rpm_gpg_key_path
@@ -101,7 +106,7 @@
       when: guest_os_ansible_distribution != "VMware Photon OS"
       block:
         - name: "Look for RPM GPG key files"
-          ansible.builtin.command: "ls -1 /etc/pki/rpm-gpg/RPM-GPG-KEY-*"
+          ansible.builtin.command: "find /etc/pki/rpm-gpg/ -name 'RPM-GPG-KEY-*'"
           delegate_to: "{{ vm_guest_ip }}"
           register: list_rpm_gpg_keys
           changed_when: false

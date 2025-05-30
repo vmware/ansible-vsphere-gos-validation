@@ -1,6 +1,6 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
-#
+---
 # Eject CDROM device in Linux guest OS
 # Parameters:
 #   guest_cdrom_device_num: If defined, the specified cdrom device will be ejected.
@@ -10,53 +10,37 @@
   ansible.builtin.set_fact:
     guest_cdroms: []
 
-- name: "Set CDROM device to be ejected"
+- name: "Get all CDROM devices in guest OS"
+  include_tasks: get_device_list.yml
+  vars:
+    guest_device_type: "rom"
+
+- name: "Get CDROM devices connected to ISO in guest OS"
   ansible.builtin.set_fact:
-    eject_cdrom_name: "sr{{ guest_cdrom_device_num | int }}"
+    guest_cdroms: >-
+      {{
+        guest_device_list |
+        selectattr('fstype', 'in', ['iso9660', 'udf']) |
+        map(attribute='name') |
+        map('regex_replace', '^', '/dev/')
+      }}
+
+- name: "Get the CDROM device to eject in guest OS"
+  ansible.builtin.set_fact:
+    guest_cdroms: "{{ guest_cdroms | select('match', '/dev/sr' ~ guest_cdrom_device_num) }}"
   when:
     - guest_cdrom_device_num is defined
     - guest_cdrom_device_num is match('^[0-9]$')
 
-- name: "All CDROM connected to ISO will be ejected"
-  ansible.builtin.set_fact:
-    eject_cdrom_name: ""
-  when: >
-    guest_cdrom_device_num is undefined or
-    guest_cdrom_device_num is not match('^[0-9]$')
-
-- name: "Get the fact of all block devices"
-  ansible.builtin.command: "lsblk -o NAME,TYPE,FSTYPE"
-  register: lsblk_result
-  delegate_to: "{{ vm_guest_ip }}"
-
-- name: "Get connected CDROM devices"
-  when:
-    - lsblk_result is defined
-    - lsblk_result.stdout_lines is defined
-    - lsblk_result.stdout_lines | length > 0
-  block:
-    - name: "Set the fact of guest CDROM devices with ISO connected"
-      ansible.builtin.set_fact:
-        guest_cdroms: "{{ guest_cdroms | union(['/dev/' ~ lsblk_item.split()[0]]) }}"
-      when:
-        - lsblk_item.split() | length == 3
-        - lsblk_item.split()[1] | lower == 'rom'
-        - lsblk_item.split()[-1] | lower in ['iso9660', 'udf']
-      with_items: "{{ lsblk_result.stdout_lines }}"
-      loop_control:
-        loop_var: lsblk_item
-
-    - name: "Print the CDROM devices connecting to ISO"
-      ansible.builtin.debug: var=guest_cdroms
-
 - name: "Unmount and eject CDROM devices"
   when: guest_cdroms | length > 0
   block:
-    - include_tasks: ../../common/get_system_info.yml
+    - name: "Get mounted CDROM devices in guest OS"
+      include_tasks: ../../common/get_system_info.yml
       vars:
         filter: "ansible_mounts"
 
-    - name: "Get the fact about all OS mounts"
+    - name: "Set fact of mounted CDROM devices in guest OS"
       ansible.builtin.set_fact:
         guest_os_mounted_cdroms: "{{ guest_system_info.ansible_mounts | selectattr('device', 'in', guest_cdroms) }}"
 
@@ -77,9 +61,6 @@
       ansible.builtin.command: "eject -v {{ guest_cdrom_device }}"
       delegate_to: "{{ vm_guest_ip }}"
       register: eject_cdrom_result
-      when: >
-        not eject_cdrom_name or
-        guest_cdrom_device.split('/')[-1] == eject_cdrom_name
       with_items: "{{ guest_cdroms }}"
       loop_control:
         loop_var: guest_cdrom_device

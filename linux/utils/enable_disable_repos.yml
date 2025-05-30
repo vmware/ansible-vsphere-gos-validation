@@ -1,0 +1,136 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Enable or disable RPM package reposiotories
+# Parameters:
+#   repo_state: The state of repository: enabled or disabled.
+#   repo_ids (Optional): A list of repository ids to enable or disable.
+#     If it is not set, all repositories will be enabled or disabled.
+#   repo_state_ignore_errors (Optional): Whether to ignore errors when enabling or disabling repositories.
+#     The default value is false.
+#
+- name: "Check repo_state is set"
+  ansible.builtin.assert:
+    that:
+      - repo_state is defined
+      - repo_state in ['enabled', 'disabled']
+    fail_msg: "Parameter 'repo_state' must be set as 'enabled' or 'disabled'"
+
+- name: "Set facts of repository operation and enabled value"
+  ansible.builtin.set_fact:
+    repo_op: "{{ repo_state[0:-1] | capitalize }}"
+    repo_enabled: "{{ (repo_state == 'enabled') | ternary(1, 0) }}"
+    existing_repo_ids: []
+
+- name: "Get repositories on {{ vm_guest_os_distribution }}"
+  include_tasks: list_repos.yml
+
+- name: "Set fact of existing enabled repository ids"
+  ansible.builtin.set_fact:
+    enabled_repo_ids: >-
+      {{
+        guest_repo_list |
+        selectattr('status', 'defined') |
+        selectattr('status', 'equalto', 'enabled') |
+        map(attribute='id')
+      }}
+
+- name: "Set fact of existing repositories can be {{ repo_state }}"
+  ansible.builtin.set_fact:
+    existing_repos: >-
+      {{
+        guest_repo_list |
+        selectattr('status', 'defined') |
+        rejectattr('status', 'equalto', repo_state)
+      }}
+
+- name: "Set fact of repository ids need to be {{ repo_state }}"
+  ansible.builtin.set_fact:
+    existing_repo_ids: "{{ existing_repos | map(attribute='id') }}"
+  when:
+    - existing_repos | length > 0
+    - repo_ids is undefined or not repo_ids
+
+- name: "Set fact of repository ids need to be {{ repo_state }}"
+  ansible.builtin.set_fact:
+    existing_repo_ids: >-
+      {{
+        existing_repos |
+        selectattr('id', 'defined') |
+        selectattr('id', 'in', repo_ids) |
+        map(attribute='id')
+      }}
+  when:
+    - existing_repos | length > 0
+    - repo_ids is defined
+    - repo_ids | length > 0
+
+- name: "{{ repo_op }} repositories on {{ vm_guest_os_distribution }}"
+  when: existing_repo_ids | length > 0
+  block:
+    # RedHat family
+    - name: "{{ repo_op }} repositories on {{ vm_guest_os_distribution }}"
+      when: guest_os_family == 'RedHat'
+      block:
+        - name: "Set fact of repository config command for setting option"
+          ansible.builtin.set_fact:
+            repo_config_cmd: |-
+              {%- if guest_os_ansible_pkg_mgr == "yum" -%}yum-config-manager --{{ repo_state }}
+              {%- else -%}dnf config-manager --set-{{ repo_state }}
+              {%- endif -%}
+
+        - name: "{{ repo_op }} {{ guest_os_ansible_pkg_mgr }} repositories on {{ vm_guest_os_distribution }}"
+          ansible.builtin.command: "{{ repo_config_cmd }} '{{ item }}'"
+          delegate_to: "{{ vm_guest_ip }}"
+          with_items: "{{ existing_repo_ids }}"
+          ignore_errors: "{{ repo_state_ignore_errors | default(false) }}"
+
+        - name: "Update fact of enabled repository ids on {{ vm_guest_os_distribution }}"
+          ansible.builtin.set_fact:
+            enabled_repo_ids: "{{ enabled_repo_ids | union(existing_repo_ids) }}"
+          when: repo_state == 'enabled'
+
+        - name: "Update fact of enabled repository ids on {{ vm_guest_os_distribution }}"
+          ansible.builtin.set_fact:
+            enabled_repo_ids: "{{ enabled_repo_ids | difference(existing_repo_ids) }}"
+          when: repo_state == 'disabled'
+
+    # VMware Photon OS
+    - name: "{{ repo_op }} yum repositories on {{ vm_guest_os_distribution }}"
+      ansible.builtin.shell: |-
+        repo_files=`grep -l '\\[{{ item }}\\]' /etc/yum.repos.d/*.repo`;
+        if [ "$repo_files" != "" ]; then
+            sed -i 's/enabled *= *1/enabled={{ repo_enabled }}/' $repo_files;
+        fi
+      delegate_to: "{{ vm_guest_ip }}"
+      with_items: "{{ existing_repo_ids }}"
+      ignore_errors: "{{ repo_state_ignore_errors | default(false) }}"
+      when: guest_os_ansible_distribution == 'VMware Photon OS'
+
+    # SUSE family
+    - name: "{{ repo_op }} zypper repositories on {{ vm_guest_os_distribution }}"
+      ansible.builtin.command: "zypper modifyrepo --{{ repo_op | lower }} '{{ item }}'"
+      delegate_to: "{{ vm_guest_ip }}"
+      with_items: "{{ existing_repo_ids }}"
+      ignore_errors: "{{ repo_state_ignore_errors | default(false) }}"
+      when: guest_os_family == "Suse"
+
+# Unavailable yum or dnf repositories will cause errors when installing packages,
+# here adds 'skip_if_unavailable=true' option to enabled repositories.
+- name: "Allow to skip unavailabe {{ guest_os_ansible_pkg_mgr }} reporitories"
+  when:
+    - guest_os_family == 'RedHat'
+    - enabled_repo_ids | length > 0
+  block:
+    - name: "Set fact of repository config command for setting option"
+      ansible.builtin.set_fact:
+        repo_config_cmd: |-
+          {%- if guest_os_ansible_pkg_mgr == "yum" -%}yum-config-manager --save
+          {%- else -%}dnf config-manager --save
+          {%- endif -%}
+
+    - name: "Add 'skip_if_unavailable=true' option to repositories on {{ vm_guest_os_distribution }}"
+      ansible.builtin.command: "{{ repo_config_cmd }} --setopt={{ item }}.skip_if_unavailable=true"
+      delegate_to: "{{ vm_guest_ip }}"
+      with_items: "{{ enabled_repo_ids }}"
+      ignore_errors: "{{ repo_state_ignore_errors | default(false) }}"

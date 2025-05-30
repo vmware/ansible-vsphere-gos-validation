@@ -35,10 +35,6 @@
   vars:
     vm_cdrom_iso_file: "{{ os_installation_iso_list[0] }}"
 
-- name: "Disable all existing repositories"
-  include_tasks: ../utils/disable_repo.yml
-  when: guest_os_ansible_distribution in ['RedHat', 'SLES', 'SLED', 'openSUSE Leap', 'ProLinux']
-
 - name: "Get the fact of system devices"
   include_tasks: ../../common/get_system_info.yml
   vars:
@@ -99,11 +95,11 @@
 
 - name: "Set the local DVD repository name"
   ansible.builtin.set_fact:
-    dvd_repo_name: "{{ guest_os_ansible_distribution }}-{{ guest_os_ansible_distribution_ver }}-dvd"
+    dvd_repo_name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_DVD"
 
-# Add repository from CDROM for RHEL/SLES/SLED/Rocky/AlmaLinux/openSUSE Leap
-- name: "Add repositories from CDROM for {{ guest_os_ansible_distribution }}"
-  when: guest_os_ansible_distribution in ['RedHat', 'SLES', 'SLED', 'Rocky', 'AlmaLinux', 'openSUSE Leap', 'ProLinux']
+# Add repository from CDROM for RedHat and Suse family OS
+- name: "Add repositories from CDROM for {{ vm_guest_os_distribution }}"
+  when: guest_os_family in ['Suse', 'RedHat']
   block:
     # Find the dir having repodata
     - name: "Find repodata in {{ guest_cdrom_mount_path }}"
@@ -117,12 +113,12 @@
           - find_repodata_result.stdout_lines is defined
           - find_repodata_result.stdout_lines | length >= 1
         fail_msg: "Not found repodata under {{ guest_cdrom_mount_path }}"
-        success_msg: "Found repodata: {{ ','.join(find_repodata_result.stdout_lines) }}"
+        success_msg: "Found repodata: {{ find_repodata_result.stdout_lines | default('') }}"
 
     - name: "Add package repositories from the CDROM device"
       include_tasks: add_repo_from_baseurl.yml
       vars:
-        repo_name: "{{ dvd_repo_name }}-{{ repodata_path | dirname | basename }}"
+        repo_name: "{{ dvd_repo_name }}_{{ repodata_path | dirname | basename }}"
         repo_baseurl: "{{ repodata_path | dirname }}"
         gpg_check: "{{ guest_os_ansible_distribution == 'RedHat' }}"
       with_items: "{{ find_repodata_result.stdout_lines }}"

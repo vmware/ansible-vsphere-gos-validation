@@ -1,0 +1,71 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Add official APT sources for Debian family OS
+#
+- name: "Set fact of APT sources list file and sources"
+  ansible.builtin.set_fact:
+    apt_sources_list: "/etc/apt/sources.list"
+    apt_sources: []
+
+- name: "Set fact of official APT sources on {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    apt_sources:
+      - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }} main restricted universe"
+      - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }}-updates main restricted"
+  when: guest_os_ansible_distribution == "Ubuntu"
+
+- name: "Set fact of official APT sources on {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    apt_sources:
+      - "deb http://deb.debian.org/debian/ {{ guest_os_ansible_distribution_release }} main"
+      - "deb http://deb.debian.org/debian/ {{ guest_os_ansible_distribution_release }} main contrib"
+  when: guest_os_ansible_distribution == "Debian"
+
+- name: "Set fact of official APT sources on {{ vm_guest_os_distribution }}"
+  when: guest_os_ansible_distribution == "Pardus GNU/Linux"
+  block:
+    - name: "Set the APT sources for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+      ansible.builtin.set_fact:
+        apt_sources:
+          - "deb http://depo.pardus.org.tr/pardus {{ guest_os_ansible_distribution_release }} main contrib non-free"
+          - "deb http://depo.pardus.org.tr/guvenlik {{ guest_os_ansible_distribution_release }} main contrib non-free"
+      when: ansible_distribution_major_version | int == 21
+
+    - name: "Set the APT sources for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+      ansible.builtin.set_fact:
+        apt_sources:
+          - "deb http://depo.pardus.org.tr/pardus {{ guest_os_ansible_distribution_release }} main contrib non-free non-free-firmware"
+          - "deb http://depo.pardus.org.tr/pardus {{ guest_os_ansible_distribution_release }}-deb main contrib non-free non-free-firmware"
+          - "deb http://depo.pardus.org.tr/guvenlik {{ guest_os_ansible_distribution_release }}-deb main contrib non-free non-free-firmware"
+      when: ansible_distribution_major_version | int >= 23
+
+- name: "Add missing APT sources on {{ vm_guest_os_distribution }}"
+  when: apt_sources | length > 0
+  block:
+    - name: "Get all APT sources on {{ vm_guest_os_distribution }}"
+      include_tasks: list_repos.yml
+
+    - name: "Set fact of missing APT sources on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        missing_apt_sources: "{{ apt_sources | difference(guest_repo_list) }}"
+
+    - name: "Add missing APT sources on {{ vm_guest_os_distribution }"
+      include_tasks: replace_or_add_line_in_file.yml
+      vars:
+        file: "{{ apt_sources_list }}"
+        reg_exp: "{{ apt_source_item }}"
+        line_content: "{{ apt_source_item }}"
+      with_list: "{{ missing_apt_sources }}"
+      loop_control:
+        loop_var: apt_source_item
+      when: missing_apt_sources | length > 0
+
+# Remove repositories from universe and multiverse
+- name: "Remove repositories from universe and multiverse"
+  ansible.builtin.replace:
+    path: "{{ apt_sources_list }}"
+    regexp: "^(deb .*multiverse.*)"
+    replace: "#\\1"
+  delegate_to: "{{ vm_guest_ip }}"
+  when: guest_os_ansible_distribution == "Ubuntu"

@@ -1,7 +1,12 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Add official online package repository
+# Add official online RPM package repositories
+#
+- name: "Initialize the fact of guest OS online repositories"
+  ansible.builtin.set_fact:
+    guest_online_repos: []
+
 - name: "Set online repositories for CentOS"
   when: guest_os_ansible_distribution == "CentOS"
   block:
@@ -9,6 +14,7 @@
       ansible.builtin.shell: "grep -rGl 'mirror\\(list\\)\\?.centos.org' /etc/yum.repos.d/"
       ignore_errors: true
       delegate_to: "{{ vm_guest_ip }}"
+      no_log: true
       register: list_centos_repos
 
     - name: "Display repositories which use CentOS mirrors"
@@ -29,54 +35,65 @@
 
     - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
       ansible.builtin.set_fact:
-        online_repos:
+        guest_online_repos:
           - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}"
             baseurl: "http://vault.centos.org/$contentdir/$releasever/os/$basearch"
       when: guest_os_ansible_distribution_major_ver | int < 8
 
-    - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
+- name: "Set online repositories for {{ vm_guest_os_distribution }}"
+  when:
+    - guest_os_ansible_distribution in ["AlmaLinux", "Rocky", "CentOS", "MIRACLE"]
+    - guest_os_ansible_distribution_major_ver | int >= 8
+  block:
+    - name: "Set facts about guest OS online repositories"
       ansible.builtin.set_fact:
-        online_repos:
-          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
-            baseurl: "http://vault.centos.org/$contentdir/$releasever/BaseOS/$basearch/os/"
-          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
-            baseurl: "http://vault.centos.org/$contentdir/$releasever/AppStream/$basearch/os/"
-          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
-            baseurl: "http://vault.centos.org/$contentdir/$releasever/PowerTools/$basearch/os/"
-      when: guest_os_ansible_distribution_major_ver | int == 8
+        guest_online_repo_url: |-
+          {%- if guest_os_ansible_distribution == "AlmaLinux" -%}
+              https://repo.almalinux.org/almalinux/$releasever
+          {%- elif guest_os_ansible_distribution == "Rocky" -%}
+              http://dl.rockylinux.org/$contentdir/$releasever
+          {%- elif guest_os_ansible_distribution == "MIRACLE" -%}
+              https://repo.dist.miraclelinux.net/miraclelinux/{{ guest_os_ansible_distribution_major_ver }}-latest
+          {%- elif guest_os_ansible_distribution_ver is version('8.5', '>') -%}
+              http://mirror.stream.centos.org/$releasever-stream
+          {%- else -%}
+              http://vault.centos.org/$contentdir/$releasever
+          {%- endif -%}
+        guest_online_repo_ids:
+          - 'BaseOS'
+          - 'AppStream'
+          - "{{ (guest_os_ansible_distribution == 'MIRACLE' or guest_os_ansible_distribution_major_ver | int == 8) |
+                ternary('PowerTools', 'CRB') }}"
 
-    - name: "Set online repositories for CentOS {{ guest_os_ansible_distribution_ver }}"
+    # guest OS may have pre-configured these online repositories with mirrolists. Enable them if they exist
+    - name: "Enable existing online repositories on {{ vm_guest_os_distribution }}"
+      include_tasks: enable_disable_repos.yml
+      vars:
+        repo_ids: "{{ guest_online_repo_ids | map('lower') }}"
+        repo_state: "enabled"
+        repo_state_ignore_errors: true
+      when: guest_os_ansible_distribution != "MIRACLE"
+
+    - name: "Set online repositories for {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
-        online_repos:
-          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
-            baseurl: "http://mirror.stream.centos.org/$releasever-stream/BaseOS/$basearch/os/"
-          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
-            baseurl: "http://mirror.stream.centos.org/$releasever-stream/AppStream/$basearch/os/"
-          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
-            baseurl: "http://mirror.stream.centos.org/$releasever-stream/CRB/$basearch/os/"
-      when: guest_os_ansible_distribution_major_ver | int >= 9
-
-- name: "Set online repositories for Rocky Linux {{ guest_os_ansible_distribution_ver }}"
-  ansible.builtin.set_fact:
-    online_repos:
-      - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_BaseOS"
-        baseurl: "http://mirror.rockylinux.org/$contentdir/$releasever/BaseOS/$basearch/os/"
-      - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_AppStrem"
-        baseurl: "http://mirror.rockylinux.org/$contentdir/$releasever/AppStream/$basearch/os/"
-      - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_PowerTools"
-        baseurl: "http://mirror.rockylinux.org/$contentdir/$releasever/PowerTools/$basearch/os/"
-  when: guest_os_ansible_distribution == "Rocky"
+        guest_online_repos: "{{ guest_online_repos | union([{'name': online_repo_name, 'baseurl': online_repo_baseurl}]) }}"
+      vars:
+        online_repo_name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_{{ item }}"
+        online_repo_baseurl: "{{ guest_online_repo_url }}/{{ item }}/$basearch/os/"
+      with_items: "{{ guest_online_repo_ids }}"
 
 - name: "Set online repositories for Oracle Linux"
   when: guest_os_ansible_distribution == "OracleLinux"
   block:
     - name: "Set Oracle Linux online repository website"
       ansible.builtin.set_fact:
-        oraclelinux_repo_url: "https://yum$ociregion.oracle.com/repo/OracleLinux/OL{{ guest_os_ansible_distribution_major_ver }}"
+        oraclelinux_repo_url: "https://yum.oracle.com/repo/OracleLinux/OL{{ guest_os_ansible_distribution_major_ver }}"
 
+    # Refer to https://blogs.oracle.com/scoter/post/oracle-linux-and-unbreakable-enterprise-kernel-uek-releases for
+    # supported UEK release version
     - name: "Set default online repository for OracleLinux {{ guest_os_ansible_distribution_ver }}"
       ansible.builtin.set_fact:
-        online_repos:
+        guest_online_repos:
           - name: "ol{{ guest_os_ansible_distribution_major_ver }}_u{{ guest_os_ansible_distribution_minor_ver }}_base"
             baseurl: "{{ oraclelinux_repo_url }}/{{ guest_os_ansible_distribution_minor_ver | int }}/base/$basearch/"
           - name: "ol{{ guest_os_ansible_distribution_major_ver }}_UEKR3"
@@ -92,131 +109,67 @@
     - name: "Set default online repository for OracleLinux {{ guest_os_ansible_distribution_ver }}"
       when: guest_os_ansible_distribution_major_ver | int >= 8
       block:
-        - name: "Set default UEK release packaged in OracleLinux {{ guest_os_ansible_distribution_ver }}"
+        - name: "Set default UEK release packaged on {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
             oraclelinux_uek_release: |-
-              {%- if guest_os_ansible_distribution_major_ver == 8 -%}UEKR6
+              {%- if guest_os_ansible_distribution_ver is version('8.6', '<=') -%}UEKR6
               {%- else -%}UEKR7{%- endif -%}
 
-        - name: "Set default online repository for OracleLinux {{ guest_os_ansible_distribution_ver }}"
+        - name: "Set default online repository for {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
-            online_repos:
-              - name: "ol{{ guest_os_ansible_distribution_major_ver }}_u{{ guest_os_ansible_distribution_minor_ver }}_BaseOS"
+            guest_online_repos:
+              - name: "ol{{ guest_os_ansible_distribution_ver }}_BaseOS"
                 baseurl: "{{ oraclelinux_repo_url }}/{{ guest_os_ansible_distribution_minor_ver | int }}/baseos/base/$basearch/"
               - name: "ol{{ guest_os_ansible_distribution_major_ver }}_AppStream"
                 baseurl: "{{ oraclelinux_repo_url }}/appstream/$basearch/"
+              - name: "ol{{ guest_os_ansible_distribution_major_ver }}_CodeReady_Builder"
+                baseurl: "{{ oraclelinux_repo_url }}/codeready/builder/$basearch/"
               - name: "ol{{ guest_os_ansible_distribution_major_ver }}_{{ oraclelinux_uek_release }}"
                 baseurl: "{{ oraclelinux_repo_url }}/{{ oraclelinux_uek_release }}/$basearch/"
 
 - name: "Set online repositories for {{ vm_guest_os_distribution }}"
   ansible.builtin.set_fact:
-    online_repos:
+    guest_online_repos:
       - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_OSS"
         baseurl: "http://download.opensuse.org/distribution/leap/$releasever/repo/oss"
   when: guest_os_ansible_distribution == "openSUSE Leap"
+
+- name: "Add VMware Photon OS online repositories"
+  when: guest_os_ansible_distribution == 'VMware Photon OS'
+  block:
+    - name: "Set fact of online repository names on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        photon_repo_names: ["photon-release", "photon-updates"]
+      when: guest_os_ansible_distribution_major_ver | int < 4
+
+    - name: "Set fact of online repository names on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        photon_repo_names: ["photon", "photon-release", "photon-updates"]
+      when: guest_os_ansible_distribution_major_ver | int >= 4
+
+    - name: "Set fact of online repositories on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_online_repos: "{{ guest_online_repos | union([{'name': item, 'baseurl': repo_baseurl}]) }}"
+      vars:
+        repo_baseurl: "https://packages.vmware.com/photon/$releasever/{{ item | replace('-', '_') }}_$releasever_$basearch"
+      with_items: "{{ photon_repo_names }}"
+
+    - name: "Update repository's baseurl"
+      ansible.builtin.shell: |-
+        invalid_repo_files=`grep -l 'dl.bintray.com/vmware' /etc/yum.repos.d/*.repo`;
+        if [ "$invalid_repo_files" != "" ] ; then
+          sed -i 's#dl.bintray.com/vmware/#packages.vmware.com/photon/$releasever/#' $invalid_repo_files;
+        fi
+      delegate_to: "{{ vm_guest_ip }}"
+      with_items: "{{ photon_repo_names }}"
 
 - name: "Add online repositories for {{ vm_guest_os_distribution }}"
   include_tasks: add_repo_from_baseurl.yml
   vars:
     repo_name: "{{ online_repo.name }}"
     repo_baseurl: "{{ online_repo.baseurl }}"
-    gpg_check: "{{ guest_os_family == 'RedHat' }}"
-  with_list: "{{ online_repos }}"
+    gpg_check: "{{ guest_os_family in ['RedHat', 'VMware Photon OS'] }}"
+  with_list: "{{ guest_online_repos }}"
   loop_control:
     loop_var: "online_repo"
-  when: guest_os_ansible_distribution in ["CentOS", "Rocky", "OracleLinux",
-                                          "ProLinux", "openSUSE Leap"]
-
-- name: "Set APT sources list for {{ guest_os_ansible_distribution }}"
-  when: guest_os_family == "Debian"
-  block:
-    - name: "Set fact of APT sources list file and sources"
-      ansible.builtin.set_fact:
-        apt_sources_list: "/etc/apt/sources.list"
-        apt_sources: ""
-
-    - name: "Set the APT sources for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-      ansible.builtin.set_fact:
-        apt_sources:
-          - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }} main restricted"
-          - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }}-updates main restricted"
-          - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }} universe"
-      when: guest_os_ansible_distribution == "Ubuntu"
-
-    - name: "Set the APT sources for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-      ansible.builtin.set_fact:
-        apt_sources:
-          - "deb http://deb.debian.org/debian/ {{ guest_os_ansible_distribution_release }} main"
-          - "deb http://deb.debian.org/debian/ {{ guest_os_ansible_distribution_release }} main contrib"
-      when: guest_os_ansible_distribution == "Debian"
-
-    - name: "Set the APT sources for {{ guest_os_ansible_distribution }}"
-      when: guest_os_ansible_distribution == "Pardus GNU/Linux"
-      block:
-        - name: "Set the APT sources for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-          ansible.builtin.set_fact:
-            apt_sources:
-              - "deb http://depo.pardus.org.tr/pardus {{ guest_os_ansible_distribution_release }} main contrib non-free"
-              - "deb http://depo.pardus.org.tr/guvenlik {{ guest_os_ansible_distribution_release }} main contrib non-free"
-          when: ansible_distribution_major_version | int == 21
-
-        - name: "Set the APT sources for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-          ansible.builtin.set_fact:
-            apt_sources:
-              - "deb http://depo.pardus.org.tr/pardus {{ guest_os_ansible_distribution_release }} main contrib non-free non-free-firmware"
-              - "deb http://depo.pardus.org.tr/pardus {{ guest_os_ansible_distribution_release }}-deb main contrib non-free non-free-firmware"
-              - "deb http://depo.pardus.org.tr/guvenlik {{ guest_os_ansible_distribution_release }}-deb main contrib non-free non-free-firmware"
-          when: ansible_distribution_major_version | int >= 23
-
-    - name: "Add apt sources list for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
-      include_tasks: replace_or_add_line_in_file.yml
-      vars:
-        file: "{{ apt_sources_list }}"
-        reg_exp: "{{ apt_source_item }}"
-        line_content: "{{ apt_source_item }}"
-      with_list: "{{ apt_sources }}"
-      loop_control:
-        loop_var: "apt_source_item"
-      when: apt_sources
-
-    # Remove repositories from universe and multiverse
-    - name: "Remove repositories from universe and multiverse"
-      ansible.builtin.replace:
-        path: "{{ apt_sources_list }}"
-        regexp: "^(deb .*multiverse.*)"
-        replace: "#\\1"
-      delegate_to: "{{ vm_guest_ip }}"
-      when: guest_os_ansible_distribution == "Ubuntu"
-
-- name: "Enable VMware Photon OS online repositories"
-  when: guest_os_ansible_distribution == 'VMware Photon OS'
-  block:
-    - name: "Get default RPM GPG key file"
-      include_tasks: get_rpm_gpg_key_file.yml
-
-    - name: "Set the fact of VMware Photon OS {{ guest_os_ansible_distribution_major_ver }} online repositories"
-      ansible.builtin.set_fact:
-        photon_online_repos: ["photon", "photon-updates"]
-      when: guest_os_ansible_distribution_major_ver | int < 4
-
-    - name: "Set the fact of VMware Photon OS {{ guest_os_ansible_distribution_major_ver }} online repositories"
-      ansible.builtin.set_fact:
-        photon_online_repos: ["photon", "photon-release", "photon-updates"]
-      when: guest_os_ansible_distribution_major_ver | int >= 4
-
-    - name: "Enable VMware Photon OS online repositories"
-      include_tasks: ../../common/update_ini_style_file.yml
-      vars:
-        file_path: "/etc/yum.repos.d/{{ item }}.repo"
-        section_name: "{{ item }}"
-        option_name: "enabled"
-        option_value: 1
-      with_items: "{{ photon_online_repos }}"
-
-    - name: "Update baseurl to repositories on https://packages.vmware.com/photon"
-      block:
-        - name: "Update repo's baseurl"
-          ansible.builtin.command: "sed -i 's#dl.bintray.com/vmware/#packages.vmware.com/photon/$releasever/#' /etc/yum.repos.d/{{ item }}.repo"
-          delegate_to: "{{ vm_guest_ip }}"
-          with_items: "{{ photon_online_repos }}"
-      when: guest_os_ansible_distribution_major_ver | int < 4
+  when: guest_online_repos | length > 0

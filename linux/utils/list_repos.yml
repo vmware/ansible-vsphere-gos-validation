@@ -1,0 +1,127 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# List all RPM package reposiotories or APT sources
+# Return:
+#   guest_repo_list: A list of repositories with details or APT sources in guest OS
+#
+# For RPM package repositories, guest_repo_list is a list of dictionaries, each dictionary
+# is a RPM package repository with details.
+# For APT sources, guest_repo_list is just a list of strings, each string is an APT source.
+- name: "Initialize the fact of repository list"
+  ansible.builtin.set_fact:
+    guest_repo_list: []
+
+- name: "Get a list of repositories on {{ vm_guest_os_distribution }}"
+  when:
+    - guest_os_ansible_pkg_mgr is match('yum|dnf')
+    - guest_os_family != "VMware Photon OS"
+  block:
+    - name: "Remove unavailable online repositories on {{ vm_guest_os_distribution }}"
+      ansible.builtin.shell: |-
+        repo_files=`grep -l prolinux-repo.tmaxos.com /etc/yum.repos.d/*.repo`;
+        if [ "$repo_files" != "" ]; then
+            rm -f $repo_files;
+        fi
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      when: guest_os_ansible_distribution == 'ProLinux'
+
+    - name: "List all repositories on {{ vm_guest_os_distribution }}"
+      ansible.builtin.shell: "{{ package_manager_cmd }} {{ package_manager_opts }} | grep -E 'Repo-(id|name|status|mirrors|baseurl|filename)'"
+      vars:
+        package_manager_cmd: "{{ guest_os_ansible_pkg_mgr[0:3] }} repolist"
+        package_manager_opts: "{{ (guest_os_ansible_pkg_mgr == 'dnf') | ternary('--all ', '') }}--verbose"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      register: list_repo_details
+
+    - name: "Set fact of a list of repositories with details on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_repo_list: >-
+          {{
+            list_repo_details.stdout |
+            regex_findall('Repo-id[\s\S]*?Repo-filename[^\n]*') |
+            map('regex_replace', 'Repo-(\w+)', '\1') |
+            map('from_yaml')
+          }}
+      when:
+        - list_repo_details.stdout is defined
+        - list_repo_details.stdout
+
+- name: "Get a list of repositories on {{ vm_guest_os_distribution }}"
+  when: guest_os_ansible_distribution == "VMware Photon OS"
+  block:
+    - name: "List all repositories on {{ vm_guest_os_distribution }}"
+      ansible.builtin.shell: "tdnf repolist | sed '0,/repo id/d'"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      register: list_repo_details
+
+    - name: "Set fact of a list of repositories with details on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_repo_list: "{{ guest_repo_list | union([{'id': item[0], 'name': ' '.join(item[1:-1]), 'status': item[-1]}]) }}"
+      with_list: "{{ list_repo_details.stdout_lines | map('split') }}"
+      when:
+        - list_repo_details.stdout_lines is defined
+        - list_repo_details.stdout_lines | length > 0
+
+- name: "Get a list of repositories on {{ vm_guest_os_distribution }}"
+  when: guest_os_ansible_pkg_mgr == 'zypper'
+  block:
+    - name: "List all repositories on {{ vm_guest_os_distribution }}"
+      ansible.builtin.shell: "zypper lr -pun | grep '|'"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      register: list_repo_details
+
+    - name: "Get repositories with details on {{ vm_guest_os_distribution }}"
+      when:
+        - list_repo_details.stdout_lines is defined
+        - list_repo_details.stdout_lines | length > 1
+      block:
+        - name: "Set fact of repository properties"
+          ansible.builtin.set_fact:
+            guest_repo_properties: >-
+              {{
+                list_repo_details.stdout_lines[0].split('|') |
+                map('trim') |
+                map('lower') |
+                map('regex_replace', 'uri', 'baseurl') |
+                map('regex_replace', 'alias', 'id')
+              }}
+
+        - name: "Set fact of a list of repositories with details on {{ vm_guest_os_distribution }}"
+          ansible.builtin.set_fact:
+            guest_repo_list: >-
+              {{
+                guest_repo_list |
+                union([
+                       repo_detail |
+                       combine({
+                                'status': (repo_detail['enabled'] | lower == 'yes') | ternary('enabled', 'disabled')
+                                })
+                      ])
+               }}
+          vars:
+            repo_detail: "{{ dict(guest_repo_properties | zip(item | map('trim'))) }}"
+          with_list: "{{ list_repo_details.stdout_lines[1:] | map('split', '|') }}"
+
+- name: "Get a list of APT sources on {{ vm_guest_os_distribution }}"
+  when: guest_os_ansible_pkg_mgr == 'apt'
+  block:
+    - name: "List all APT sources on {{ vm_guest_os_distribution }}"
+      ansible.builtin.shell: "apt-add-repository --list | grep '^deb'"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      register: list_apt_sources
+
+    - name: "Set fact of a list of repositories with details on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_repo_list: "{{ list_apt_sources.stdout_lines | map('trim') }}"
+      when:
+        - list_apt_sources.stdout_lines is defined
+        - list_apt_sources.stdout_lines | length > 0
+
+- name: "Display repositories with details on {{ vm_guest_os_distribution }}"
+  ansible.builtin.debug: var=guest_repo_list
