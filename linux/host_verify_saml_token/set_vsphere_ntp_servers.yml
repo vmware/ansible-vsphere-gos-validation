@@ -1,0 +1,33 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Set NTP servers on vCenter Server and ESXi Server
+#
+- name: "Get current NTP servers on vCenter Server"
+  include_tasks: ../../common/vcenter_get_vcsa_ntp.yml
+
+- name: "Set NTP servers in vCenter Server Appliance settings"
+  include_tasks: ../../common/vcenter_set_vcsa_ntp.yml
+  vars:
+    vcsa_ntp_servers: "{{ ntp_servers }}"
+  when: >-
+    vcsa_timesync_mode_get != "NTP" or
+    vcsa_ntp_servers_get | sort != ntp_servers | sort
+
+- name: "Get current NTP servers on ESXi server"
+  include_tasks: ../../common/esxi_get_ntp.yml
+
+- name: "Update NTP servers on ESXi server"
+  when: esxi_ntp_servers_get | sort != ntp_servers | sort
+  block:
+    - name: "Remove old NTP servers settings on ESXi server"
+      include_tasks: ../../common/esxi_set_ntp.yml
+      vars:
+        esxi_ntp_servers: "{{ esxi_ntp_servers_get }}"
+        esxi_ntp_servers_state: "absent"
+      when: esxi_ntp_servers_get | length > 0
+
+    - name: "Set NTP servers on ESXi server"
+      include_tasks: ../../common/esxi_set_ntp.yml
+      vars:
+        esxi_ntp_servers: "{{ ntp_servers }}"
