@@ -43,18 +43,6 @@
     fail_msg: "Missing dependencies for installing open-vm-tools from source on {{ vm_guest_os_distribution }}"
     success_msg: "Dependencies to be installed for open-vm-tools: {{ ovt_dependencies }}"
 
-# Inbox drivers might be missing, here ignore missing drivers and we only check existing
-# inbox drivers are not changed after installing open-vm-tools from source
-- name: "Get guest OS inbox drivers' files before installing open-vm-tools from source"
-  ansible.builtin.shell: "modinfo -F filename vmxnet3 vmw_pvscsi vmw_balloon"
-  delegate_to: "{{ vm_guest_ip }}"
-  register: guest_inbox_drivers_before
-  ignore_errors: true
-  when:
-    - guest_os_ansible_system == "linux"
-    - not (guest_os_ansible_distribution == "VMware Photon OS" and
-           guest_os_ansible_distribution_major_ver | int < 4)
-
 - name: "Install open-vm-tools build dependencies"
   include_tasks: ../utils/install_uninstall_package.yml
   vars:
