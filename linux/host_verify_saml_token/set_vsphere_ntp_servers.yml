@@ -3,6 +3,10 @@
 ---
 # Set NTP servers on vCenter Server and ESXi Server
 #
+- name: "Disable VMware Tools time synchronization on vCenter Server"
+  ansible.builtin.shell: "/usr/bin/vmware-toolbox-cmd timesync disable"
+  delegate_to: "{{ vcenter_hostname }}"
+
 - name: "Get current NTP servers on vCenter Server"
   include_tasks: ../../common/vcenter_get_vcsa_ntp.yml
 
@@ -31,3 +35,39 @@
       include_tasks: ../../common/esxi_set_ntp.yml
       vars:
         esxi_ntp_servers: "{{ vsphere_ntp_servers }}"
+
+# Set firewall rule for NTP traffic if it is not enabled
+- name: "Get firewall rule for NTP traffic on ESXi server"
+  include_tasks: ../../common/esxi_get_firewall_rule.yml
+  vars:
+    esxi_firewall_rule_name: "ntpClient"
+
+- name: "Enable firewall rule for NTP traffic on ESXi server"
+  include_tasks: ../../common/esxi_set_firewall_rule.yml
+  vars:
+    rule_name: "ntpClient"
+    rule_enabled: true
+  when: >-
+    esxi_firewall_rule_info.enabled is undefined or
+    not esxi_firewall_rule_info.enabled or
+    esxi_firewall_rule_info.allowed_hosts.all_ip is undefined or
+    not esxi_firewall_rule_info.allowed_hosts.all_ip
+
+# Start ntpd service if it is not started
+- name: "Get 'ntpd' service info on ESXi server"
+  include_tasks: ../../common/esxi_get_service_info.yml
+  vars:
+    esxi_service_name: "ntpd"
+
+- name: "Set facts of 'ntpd' service status and policy on ESXi server"
+  ansible.builtin.set_fact:
+    esxi_service_running: "{{ esxi_service_info.running | default(false) }}"
+    esxi_service_policy_on: "{{ esxi_service_info.policy | default('') == 'on' }}"
+
+- name: "Start 'ntpd' service on ESXi server"
+  include_tasks: ../../common/esxi_manage_service.yml
+  vars:
+    esxi_service_name: "ntpd"
+    esxi_service_state: "{{ esxi_service_running | ternary('unchanged', 'start') }}"
+    esxi_service_policy: "on"
+  when: (not esxi_service_running) or (not esxi_service_policy_on)
