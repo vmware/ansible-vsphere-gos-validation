@@ -1,11 +1,11 @@
 # Copyright 2025 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Set fact of the default hardware version for new VM"
+- name: "Set fact of the hardware version for new VM"
   ansible.builtin.set_fact:
     hardware_version: "{{ hardware_version | default(esxi_latest_hardware_version) | int }}"
 
-- name: "Check hardware version set for new VM in ESXi supported hardware versions list"
+- name: "Check hardware version for new VM in ESXi supported hardware versions list"
   ansible.builtin.assert:
     that:
       - hardware_version in esxi_hardware_versions
@@ -87,7 +87,7 @@
 - name: "Check CPU number and cores per socket values for new VM"
   ansible.builtin.assert:
     that:
-      - cpu_number | int % cpu_cores_per_socket | int == 0
+      - (cpu_number | int) % (cpu_cores_per_socket | int) == 0
     fail_msg: >-
       Configured CPU number '{{ cpu_number }}' is not divisible by the configured cores per socket value
       '{{ cpu_cores_per_socket }}'.
@@ -101,7 +101,7 @@
   ansible.builtin.set_fact:
     cpu_cores_per_socket: >-
       {{
-          (cpu_number | int % guest_config_options.rec_cpu_cores_per_socket | int == 0)
+          ((cpu_number | int) % (guest_config_options.rec_cpu_cores_per_socket | int) == 0)
           | ternary(guest_config_options.rec_cpu_cores_per_socket, 1)
       }}
   when:
@@ -115,6 +115,9 @@
     cpu_cores_per_socket: "{{ guest_config_options.rec_cpu_cores_per_socket }}"
   when: cpu_number is undefined or not cpu_number
 
+- name: "Check VM CPU socket number"
+  include_tasks: check_cpu_socket.yml
+
 # Installing FreeBSD 32bit on lsilogic/lsilogicsas/nvme disk will
 # fail when memory size >= 4 GB
 - name: "Set fact of the memory size in MB for new VM"
@@ -122,7 +125,7 @@
     vm_memory_mb: |-
       {%- if guest_id is match('freebsd\\d+Guest') and
        boot_disk_controller in ['lsilogic', 'lsilogicsas', 'nvme'] -%}
-      {{ [3072, memory_mb | default(guest_config_options.rec_memory_mb) | int ] | min }}
+      {{ [3072, (memory_mb | default(guest_config_options.rec_memory_mb) | int)] | min }}
       {%- else -%}
       {{ memory_mb | default(guest_config_options.rec_memory_mb) | int  }}
       {%- endif -%}
@@ -131,7 +134,7 @@
   ansible.builtin.set_fact:
     boot_disk_size_gb: >-
       {{
-          (boot_disk_size_gb is defined and boot_disk_size_gb | int >= (guest_config_options.rec_disk_mb | int / 1024))
+          (boot_disk_size_gb is defined and (boot_disk_size_gb | int >= (guest_config_options.rec_disk_mb | int / 1024)))
           | ternary(boot_disk_size_gb, (guest_config_options.rec_disk_mb | int / 1024))
       }}
 
