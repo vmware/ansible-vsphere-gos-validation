@@ -1,0 +1,30 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Not cleanup old snapshot by default"
+  ansible.builtin.set_fact:
+    cleanup_old_snapshots: false
+  when: cleanup_old_snapshots is undefined
+
+- name: "Revert and cleanup existing snapshots on existing VM if required"
+  include_tasks: ../common/vm_cleanup_snapshot.yml
+  when: cleanup_old_snapshots | bool
+
+- name: "Get existing VM info"
+  include_tasks: ../common/vm_get_vm_info.yml
+
+- name: "Set fact of the datastore path for existing VM"
+  ansible.builtin.set_fact:
+    vm_datastore_path: "/vmfs/volumes/{{ datastore }}"
+
+- name: "Get VM's power state"
+  include_tasks: ../common/vm_get_power_state.yml
+
+- name: "Power on VM"
+  include_tasks: ../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "powered-on"
+  when: vm_power_state_get == "poweredOff"
+
+- name: "Wait for VM primary network adapter has MAC address"
+  include_tasks: ../common/vm_wait_primary_nic_mac.yml

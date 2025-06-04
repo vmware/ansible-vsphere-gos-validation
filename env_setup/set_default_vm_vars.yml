@@ -1,0 +1,154 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of the default hardware version for new VM"
+  ansible.builtin.set_fact:
+    hardware_version: "{{ hardware_version | default(esxi_latest_hardware_version) | int }}"
+
+- name: "Check hardware version set for new VM in ESXi supported hardware versions list"
+  ansible.builtin.assert:
+    that:
+      - hardware_version in esxi_hardware_versions
+    fail_msg: >-
+      The hardware verion '{{ hardware_version }}' set for new VM is not in the supported
+      hardware versions list '{{ esxi_hardware_versions }}' on ESXi host '{{ esxi_version }}'.
+      Please check your configuration in vars/test.yml.
+
+- name: "Get '{{ guest_id }}' guest config options with VM hardware version '{{ hardware_version }}'"
+  include_tasks: ../common/esxi_get_guest_config_options.yml
+  vars:
+    esxi_hardware_version: "{{ hardware_version }}"
+
+- name: "Set facts of the virtual hardware configurations for new VM"
+  ansible.builtin.set_fact:
+    boot_disk_controller: >-
+      {{
+         (boot_disk_controller is defined and boot_disk_controller)
+         | ternary(boot_disk_controller | lower, guest_config_options.default_disk_controller)
+      }}
+    network_adapter_type: >-
+      {{
+         (network_adapter_type is defined and network_adapter_type)
+         | ternary(network_adapter_type | lower, guest_config_options.default_ethernet)
+      }}
+    firmware: >-
+      {{
+         (firmware is defined and firmware)
+         | ternary(firmware | lower, guest_config_options.rec_firmware)
+      }}
+
+- name: "Set fact of whether enable EFI secure boot on new VM"
+  ansible.builtin.set_fact:
+    secureboot_enabled: >-
+      {{ 
+         (secureboot_enabled is defined and secureboot_enabled | type_debug == 'bool') 
+         | ternary(secureboot_enabled, guest_config_options.default_secure_boot)
+      }}
+  when: firmware == 'efi'
+
+- name: "Check boot disk controller type for new VM"
+  ansible.builtin.assert:
+    that:
+      - boot_disk_controller in guest_config_options.support_disk_controller
+    fail_msg: >-
+      Boot disk controller '{{ boot_disk_controller }}' for new VM is not in the supported disk controller
+      list in guest config options '{{ guest_config_options.support_disk_controller }}'.
+      Please check your configuration in vars/test.yml.
+
+- name: "Check network adatper type for new VM"
+  ansible.builtin.assert:
+    that:
+      - network_adapter_type in guest_config_options.support_ethernet_card
+    fail_msg: >-
+      Network adatper '{{ network_adapter_type }}' for new VM is not in the supported Ethernet list
+      in guest config options '{{ guest_config_options.support_ethernet_card }}'.
+      Please check your configuration in vars/test.yml.
+
+- name: "Check firmware for new VM"
+  ansible.builtin.assert:
+    that:
+      - firmware in ['bios', 'efi']
+    fail_msg: >-
+      Firmware '{{ firmware }}' for new VM is not in the valid firmware type list ['bios', 'efi'].
+      Please check your configuration in vars/test.yml.
+
+- name: "Check EFI secure boot for new VM"
+  ansible.builtin.assert:
+    that:
+      - secureboot_enabled == guest_config_options.support_secure_boot
+    fail_msg: >-
+      Enable EFI secure boot for new VM is set to '{{ secureboot_enabled }}', but secure boot support
+      status in guest config options is '{{ guest_config_options.support_secure_boot }}'.
+      Please check your configuration in vars/test.yml.
+  when:
+    - firmware == 'efi'
+    - secureboot_enabled
+
+- name: "Check CPU number and cores per socket values for new VM"
+  ansible.builtin.assert:
+    that:
+      - cpu_number | int % cpu_cores_per_socket | int == 0
+    fail_msg: >-
+      Configured CPU number '{{ cpu_number }}' is not divisible by the configured cores per socket value
+      '{{ cpu_cores_per_socket }}'.
+      Please check your configuration in vars/test.yml.
+  when:
+    - cpu_number is defined and cpu_number
+    - cpu_cores_per_socket is defined and cpu_cores_per_socket
+
+# CPU number is defined, but cores per socket is not defined
+- name: "Set fact of CPU cores per socket for new VM"
+  ansible.builtin.set_fact:
+    cpu_cores_per_socket: >-
+      {{
+          (cpu_number | int % guest_config_options.rec_cpu_cores_per_socket | int == 0)
+          | ternary(guest_config_options.rec_cpu_cores_per_socket, 1)
+      }}
+  when:
+    - cpu_number is defined and cpu_number
+    - cpu_cores_per_socket is undefined or not cpu_cores_per_socket
+
+# CPU number is not defined, then set the recommended ones
+- name: "Set fact of the default CPU number and cores per socket for new VM"
+  ansible.builtin.set_fact:
+    cpu_number: "{{ (guest_config_options.rec_cpu_cores_per_socket | int) * (guest_config_options.rec_cpu_socket | int) }}"
+    cpu_cores_per_socket: "{{ guest_config_options.rec_cpu_cores_per_socket }}"
+  when: cpu_number is undefined or not cpu_number
+
+# Installing FreeBSD 32bit on lsilogic/lsilogicsas/nvme disk will
+# fail when memory size >= 4 GB
+- name: "Set fact of the memory size in MB for new VM"
+  ansible.builtin.set_fact:
+    vm_memory_mb: |-
+      {%- if guest_id is match('freebsd\\d+Guest') and
+       boot_disk_controller in ['lsilogic', 'lsilogicsas', 'nvme'] -%}
+      {{ [3072, memory_mb | default(guest_config_options.rec_memory_mb) | int ] | min }}
+      {%- else -%}
+      {{ memory_mb | default(guest_config_options.rec_memory_mb) | int  }}
+      {%- endif -%}
+
+- name: "Set fact of the boot disk size in GB for new VM"
+  ansible.builtin.set_fact:
+    boot_disk_size_gb: >-
+      {{
+          (boot_disk_size_gb is defined and boot_disk_size_gb | int >= (guest_config_options.rec_disk_mb | int / 1024))
+          | ternary(boot_disk_size_gb, (guest_config_options.rec_disk_mb | int / 1024))
+      }}
+
+- name: "Set fact of the VM datastore path"
+  ansible.builtin.set_fact:
+    vm_datastore_path: "/vmfs/volumes/{{ datastore }}"
+
+- name: "Display the facts of the new VM configurations"
+  ansible.builtin.debug:
+    msg:
+      - "Will locate New VM in this datastore path: {{ vm_datastore_path }}, with below configurations:"
+      - "Hardware version: {{ hardware_version }}"
+      - "Boot disk controller: {{ boot_disk_controller }}"
+      - "Network adapter: {{ network_adapter_type }}"
+      - "Firmware: {{ firmware }}"
+      - "Secure boot enabled: {{ (firmware == 'efi') | ternary(secureboot_enabled, '') }}"
+      - "CPU number: {{ cpu_number }}"
+      - "CPU cores per socket: {{ cpu_cores_per_socket }}"
+      - "Memory size in MB: {{ vm_memory_mb }}"
+      - "Disk size in GB: {{ boot_disk_size_gb }}"

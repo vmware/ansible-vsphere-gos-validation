@@ -65,17 +65,14 @@
       include_tasks: existing_vm_setup.yml
       when: vm_exists
 
-    - name: "Set fact of the VM datastore path"
-      ansible.builtin.set_fact:
-        vm_datastore_path: "/vmfs/volumes/{{ datastore }}"
-
-    - name: "Display the datatore path of VM files"
-      ansible.builtin.debug: var=vm_datastore_path
+    - name: "Set facts of new VM configurations"
+      include_tasks: set_default_vm_vars.yml
+      when: new_vm
 
     - name: "Add vSphere hosts into memory inventory"
       include_tasks: ../common/add_vsphere_hosts_in_inventory.yml
 
-    - name: "Enable guest IP hack on ESXi host to get VM IP address when there is no VMware tools installed or VMware tools is not up"
+    - name: "Enable guest IP hack on ESXi host to get IP address of VM without VMware Tools available"
       include_tasks: ../common/esxi_enable_guest_ip_hack.yml
 
     - name: "Test Tesseract OCR engine is installed or not for extracting text from screenshot"
