@@ -624,6 +624,94 @@
     <ntp_servers t="list"/>
     <ntp_sync>manual</ntp_sync>
   </ntp-client>
+  <partitioning t="list">
+    <drive t="map">
+      <device>/dev/{{ boot_disk_name }}</device>
+      <disklabel>gpt</disklabel>
+      <enable_snapshots t="boolean">true</enable_snapshots>
+      <partitions t="list">
+        <partition t="map">
+          <create t="boolean">true</create>
+          <filesystem t="symbol">vfat</filesystem>
+          <format t="boolean">true</format>
+{% if firmware is defined and firmware | lower == 'efi' %}
+          <fstopt>utf8</fstopt>
+          <mount>/boot/efi</mount>
+          <mountby t="symbol">uuid</mountby>
+{% endif %}
+          <partition_id t="integer">259</partition_id>
+          <partition_nr t="integer">1</partition_nr>
+          <resize t="boolean">false</resize>
+          <size>536870912</size>
+        </partition>
+        <partition t="map">
+          <create t="boolean">true</create>
+          <create_subvolumes t="boolean">true</create_subvolumes>
+          <filesystem t="symbol">btrfs</filesystem>
+          <format t="boolean">true</format>
+          <mount>/</mount>
+          <mountby t="symbol">uuid</mountby>
+          <partition_id t="integer">131</partition_id>
+          <partition_nr t="integer">2</partition_nr>
+          <quotas t="boolean">true</quotas>
+          <resize t="boolean">false</resize>
+          <size>15323889664</size>
+          <subvolumes t="list">
+            <subvolume t="map">
+              <copy_on_write t="boolean">false</copy_on_write>
+              <path>var</path>
+            </subvolume>
+            <subvolume t="map">
+              <copy_on_write t="boolean">true</copy_on_write>
+              <path>usr/local</path>
+            </subvolume>
+            <subvolume t="map">
+              <copy_on_write t="boolean">true</copy_on_write>
+              <path>tmp</path>
+            </subvolume>
+            <subvolume t="map">
+              <copy_on_write t="boolean">true</copy_on_write>
+              <path>srv</path>
+            </subvolume>
+            <subvolume t="map">
+              <copy_on_write t="boolean">true</copy_on_write>
+              <path>root</path>
+            </subvolume>
+            <subvolume t="map">
+              <copy_on_write t="boolean">true</copy_on_write>
+              <path>opt</path>
+            </subvolume>
+            <subvolume t="map">
+              <copy_on_write t="boolean">true</copy_on_write>
+              <path>home</path>
+            </subvolume>
+            <subvolume t="map">
+              <copy_on_write t="boolean">true</copy_on_write>
+              <path>boot/grub2/x86_64-efi</path>
+            </subvolume>
+            <subvolume t="map">
+              <copy_on_write t="boolean">true</copy_on_write>
+              <path>boot/grub2/i386-pc</path>
+            </subvolume>
+          </subvolumes>
+          <subvolumes_prefix>@</subvolumes_prefix>
+        </partition>
+        <partition t="map">
+          <create t="boolean">true</create>
+          <filesystem t="symbol">swap</filesystem>
+          <format t="boolean">true</format>
+          <mount>swap</mount>
+          <mountby t="symbol">uuid</mountby>
+          <partition_id t="integer">130</partition_id>
+          <partition_nr t="integer">3</partition_nr>
+          <resize t="boolean">false</resize>
+          <size>1318043136</size>
+        </partition>
+      </partitions>
+      <type t="symbol">CT_DISK</type>
+      <use>all</use>
+    </drive>
+  </partitioning>
   <proxy t="map">
     <enabled t="boolean">false</enabled>
   </proxy>
@@ -1454,8 +1542,6 @@
 {% if new_user is defined and new_user != 'root' %}
         echo '{{ new_user }} ALL=(ALL) NOPASSWD:ALL' >/etc/sudoers.d/{{ new_user }}
 {% endif %}
-        echo 'Disable service firewalld.service' >/dev/ttyS0
-        systemctl disable firewalld >/dev/ttyS0
         echo 'Mask service packagekit.service' >/dev/ttyS0
         systemctl mask packagekit >/dev/ttyS0
         echo '{{ autoinstall_complete_msg }}' >/dev/ttyS0
