@@ -24,6 +24,27 @@
   ignore_errors: true
   register: extract_bios_cfg
 
+- name: "Get Release file path from md5sum.txt"
+  ansible.builtin.shell: "grep '/dists/.*/Release$' {{ src_iso_dir_path }}/md5sum.txt | cut -d  ' ' -f 3 | | sed 's#^\./##'"
+  register: release_file_path_result
+  failed_when: (release_file_path_result.rc != 0) or (not release_file_path_result.stdout)
+
+- name: "Try to extract Release file from ISO"
+  community.general.iso_extract:
+    image: "{{ src_iso_file_path }}"
+    dest: "{{ src_iso_dir_path }}"
+    files:
+      - "{{ release_file_path_result.stdout }}"
+
+- name: "Get architectures from Release file"
+  ansible.builtin.shell: "grep '^Architectures:' {{ src_iso_dir_path }}/Release | cut -d ' ' -f 2"
+  register: ubuntu_arch_result
+  failed_when: (ubuntu_arch_result.rc != 0) or (not ubuntu_arch_result.stdout)
+
+- name: "Set fact of Ubuntu OS architecture"
+  ansible.builtin.set_fact:
+    ubuntu_arch: "{{ ubuntu_arch_result.stdout }}"
+
 - name: "Set fact of BIOS boot config file isolinux.cfg exists or not"
   ansible.builtin.set_fact:
     ubuntu_bios_cfg_exist: "{{ extract_bios_cfg.failed is defined and not extract_bios_cfg.failed }}"
@@ -90,7 +111,7 @@
         path: "{{ unattend_iso_cache }}/grub.cfg"
         regexp: '(.*vmlinuz )(.*)'
         replace: |-
-          {%- if ubuntu_arch is defined and ubuntu_arch == 'aarch64' -%}\1autoinstall \2
+          {%- if ubuntu_arch == 'arm64' -%}\1autoinstall \2
           {%- else -%}\1autoinstall \2 console=ttyS0,115200n8
           {%- endif -%}
 
@@ -99,7 +120,7 @@
         path: "{{ unattend_iso_cache }}/txt.cfg"
         regexp: '(.*initrd )(.*)'
         replace: |-
-          {%- if ubuntu_arch is defined and ubuntu_arch == 'aarch64' -%}\1autoinstall \2
+          {%- if ubuntu_arch == 'arm64' -%}\1autoinstall \2
           {%- else -%}\1autoinstall \2 console=ttyS0,115200n8
           {%- endif -%}
       when: ubuntu_bios_cfg_exist | bool
