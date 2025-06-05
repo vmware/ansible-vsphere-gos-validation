@@ -27,7 +27,7 @@
 - name: "Get Release file path from md5sum.txt"
   ansible.builtin.shell: "grep '/dists/.*/Release$' '{{ src_iso_dir_path }}/md5sum.txt' | cut -d  ' ' -f 3 | sed 's#^\\./##'"
   register: release_file_path_result
-  failed_when: (release_file_path_result.rc != 0) or (not release_file_path_result.stdout)
+  failed_when: not (release_file_path_result.stdout is defined and release_file_path_result.stdout)
 
 - name: "Try to extract Release file from ISO"
   community.general.iso_extract:
@@ -39,7 +39,7 @@
 - name: "Get architectures from Release file"
   ansible.builtin.shell: "grep '^Architectures:' {{ src_iso_dir_path }}/Release | cut -d ' ' -f 2"
   register: ubuntu_arch_result
-  failed_when: (ubuntu_arch_result.rc != 0) or (not ubuntu_arch_result.stdout)
+  failed_when: not (ubuntu_arch_result.stdout is defined and ubuntu_arch_result.stdout)
 
 - name: "Set fact of Ubuntu OS architecture"
   ansible.builtin.set_fact:
