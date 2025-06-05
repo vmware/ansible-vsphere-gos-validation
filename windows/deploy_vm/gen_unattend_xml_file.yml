@@ -6,11 +6,13 @@
   ansible.builtin.set_fact:
     unattend_install_conf_path: "{{ main_playbook_path }}/autoinstall/{{ unattend_install_conf }}"
     unattend_dest_path: "{{ local_cache }}/{{ current_test_timestamp }}"
+
 - name: "Set fact of target Autounattend.xml file path"
   ansible.builtin.set_fact:
     created_unattend_file: "{{ unattend_dest_path }}/{{ unattend_install_conf | basename }}"
 
-- include_tasks: ../../common/create_directory.yml
+- name: "Create directory of dest path for Autounattend.xml file"
+  include_tasks: ../../common/create_directory.yml
   vars:
     dir_path: "{{ unattend_dest_path }}"
 
@@ -21,24 +23,27 @@
     - "'srv' not in guest_id | lower"
     - "'server' not in guest_id | lower"
 
-- include_tasks: ../utils/win_gen_base64_password.yml
+- name: "Generate encoded VM password"
+  include_tasks: ../utils/win_gen_base64_password.yml
   vars:
     win_original_password: "{{ vm_password }}"
     win_append_string: Password
-- name: "Set fact of encoded VM password"
+
+- name: "Set fact of the encoded VM password"
   ansible.builtin.set_fact:
     win_encoded_password: "{{ win_passwd_base64 }}"
 
 - name: "Handle Administrator password"
+  when: vm_username | lower == "administrator"
   block:
-    - include_tasks: ../utils/win_gen_base64_password.yml
+    - name: "Generate encoded VM password"
+      include_tasks: ../utils/win_gen_base64_password.yml
       vars:
         win_original_password: "{{ vm_password }}"
         win_append_string: AdministratorPassword
-    - name: "Set fact of encoded VM administrator password"
+    - name: "Set fact of the encoded VM administrator password"
       ansible.builtin.set_fact:
         win_encoded_admin_password: "{{ win_passwd_base64 }}"
-  when: vm_username | lower == "administrator"
 
 - name: "Create unattend config file from template"
   ansible.builtin.template:
@@ -46,5 +51,7 @@
     dest: "{{ created_unattend_file }}"
     mode: "0644"
   register: create_unattend_file_result
-- name: "Display result"
+
+- name: "Display the result of generating unattend config file"
   ansible.builtin.debug: var=create_unattend_file_result
+  when: enable_debug
