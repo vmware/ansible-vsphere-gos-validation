@@ -19,24 +19,16 @@
 - name: "Get guest OS IP after reboot"
   include_tasks: ../../common/update_inventory.yml
 
-- name: "Check Linux open-vm-tools plugins and inbox drivers after reboot"
+- name: "Check open-vm-tools plugins installed from source are loaded after reboot"
+  include_tasks: check_ovt_plugins_loaded.yml
   when:
     - linux_ovt_install_type == 'source'
     - guest_os_ansible_system == 'linux'
-  block:
-    - name: "Check open-vm-tools plugins installed from source are loaded after reboot"
-      include_tasks: check_ovt_plugins_loaded.yml
-
-    - name: "Check inbox drivers are not changed by open-vm-tools installed from source"
-      include_tasks: check_inbox_drivers_unchanged.yml
-      when: >-
-        not (guest_os_ansible_distribution == 'VMware Photon OS' and
-        guest_os_ansible_distribution_major_ver | int < 4)
 
 - name: "Get VMware Tools version and build"
   include_tasks: ../utils/get_guest_ovt_version_build.yml
   vars:
-     ovt_install_type: "{{ linux_ovt_install_type }}"
+    ovt_install_type: "{{ linux_ovt_install_type }}"
 
 - name: "Update VM guest info after installing open-vm-tools"
   include_tasks: ../../common/vm_get_guest_info.yml

@@ -72,19 +72,20 @@
     - linux_ovt_install_type == 'source'
     - linux_ovt_tarball_url is undefined or not linux_ovt_tarball_url
 
-# At present, only Debian, Ubuntu, Pardus and FreeBSD are supported to
-# install open-vm-tools from source.
-# We will gradually expand guest OS support scope in future
+# Testing open-vm-tools source install is not supported on ProLinux,
+# and RHEL/CentOS/OracleLinux 7 or earlier releases.
 - name: "Skip test case for {{ guest_os_ansible_distribution }}"
   include_tasks: ../../common/skip_test_case.yml
   vars:
     skip_msg: >-
       Skip test case {{ ansible_play_name }} because installing open-vm-tools from
-      source is not supported on {{ guest_os_ansible_distribution }} at present.
+      source is not supported on {{ vm_guest_os_distribution }}.
     skip_reason: "Not Supported"
   when:
     - linux_ovt_install_type == "source"
-    - guest_os_family not in ["Suse", "Debian", "FreeBSD"]
+    - (guest_os_ansible_distribution == 'ProLinux' or
+       (guest_os_ansible_distribution in ['RedHat', 'CentOS', 'OracleLinux'] and
+        guest_os_ansible_distribution_major_ver | int <= 7))
 
 - name: "Initialize fact whether to uninstall open-vm-tools"
   ansible.builtin.set_fact:
