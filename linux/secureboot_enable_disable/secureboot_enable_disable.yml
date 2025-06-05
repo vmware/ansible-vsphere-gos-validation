@@ -71,7 +71,7 @@
               - boot_facts.vm_boot_info.current_secure_boot_enabled is defined
               - boot_facts.vm_boot_info.current_secure_boot_enabled
             fail_msg: "Failed to enable secure boot on VM"
-            success_msg: "VM current secure boot is enabled"
+            success_msg: "Successfully enabled secure boot on VM"
 
         - name: "Power on VM"
           include_tasks: ../../common/vm_set_power_state.yml
@@ -89,23 +89,17 @@
             vm_wait_log_retries: 1
             vm_wait_log_ignore_errors: true
 
-        - name: "Get messages in dmesg ring buffer after secure boot is enabled"
-          include_tasks: ../utils/collect_dmesg.yml
+        - name: "Not found 'Image APPROVED' in vmware.log"
+          ansible.builtin.fail:
+            msg: >-
+              Test failed because there is no keyword 'Image APPROVED' in VM's
+              vmware.log when secure boot is enabled
+          when: not vm_wait_log_msg_success
+
+        - name: "Check secure boot state in guest OS after secure boot is enabled"
+          include_tasks: check_secureboot_state.yml
           vars:
-            dmesg_output_file_name: "dmesg_after_secureboot_enabled.log"
-
-        - name: "Set fact of guest OS secure boot state after secure boot is enabled"
-          ansible.builtin.set_fact:
-            guest_secureboot_state: "{{ dmesg_cmd_result.stdout | default('') |
-                                        regex_search('Secure boot (enabled|disabled)', ignorecase=True) |
-                                        regex_replace('Secure boot ', '', ignorecase=True) | lower }}"
-
-        - name: "Set fact of secure boot enable test result"
-          ansible.builtin.set_fact:
-            secureboot_enabled_pass: true
-          when:
-            - vm_wait_log_msg_success
-            - guest_secureboot_state == 'enabled'
+            vm_secureboot_state: "enabled"
 
         # Disable secureboot
         - name: "Shutdown guest OS"
@@ -122,7 +116,7 @@
               - boot_facts.vm_boot_info.current_secure_boot_enabled is defined
               - not boot_facts.vm_boot_info.current_secure_boot_enabled
             fail_msg: "Failed to disable secure boot on VM"
-            success_msg: "VM current secure boot is disabled"
+            success_msg: "Successfully disabled secure boot on VM"
 
         - name: "Power on VM after disabling secure boot"
           include_tasks: ../../common/vm_set_power_state.yml
@@ -132,28 +126,10 @@
         - name: "Update inventory"
           include_tasks: ../../common/update_inventory.yml
 
-        - name: "Get messages in dmesg ring buffer after secure boot is disabled"
-          include_tasks: ../utils/collect_dmesg.yml
+        - name: "Check secure boot state in guest OS after secure boot is disabled"
+          include_tasks: check_secureboot_state.yml
           vars:
-            dmesg_output_file_name: "dmesg_after_secureboot_disabled.log"
-
-        - name: "Set fact of guest OS secure boot state after secure boot is disabled"
-          ansible.builtin.set_fact:
-            guest_secureboot_state: "{{ dmesg_cmd_result.stdout | default('') |
-                                        regex_search('Secure boot (enabled|disabled)', ignorecase=True) |
-                                        regex_replace('Secure boot ', '', ignorecase=True) | lower }}"
-
-        - name: "Set fact of secure boot disable test result"
-          ansible.builtin.set_fact:
-            secureboot_disabled_pass: true
-          when: guest_secureboot_state == 'disabled'
-
-        - name: "Check secure boot enable and disable test results"
-          ansible.builtin.assert:
-            that:
-              - secureboot_enabled_pass and secureboot_disabled_pass
-            fail_msg: "Enable secureboot result: {{ secureboot_enabled_pass }}, disable secureboot result: {{ secureboot_disabled_pass }}"
-            success_msg: "Enable secureboot result: {{ secureboot_enabled_pass }}, disable secureboot result: {{ secureboot_disabled_pass }}"
+            vm_secureboot_state: "disabled"
       rescue:
         - name: "Collect Linux guest OS information for triage"
           include_tasks: ../setup/linux_test_rescue.yml

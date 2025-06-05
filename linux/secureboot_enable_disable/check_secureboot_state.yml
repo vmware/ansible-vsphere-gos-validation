@@ -1,0 +1,35 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check secure boot state in guest OS after secure boot is
+# enabled or disabled on VM
+#
+- name: "Initialize fact of secure boot state in guest OS"
+  ansible.builtin.set_fact:
+    guest_secureboot_state: ""
+
+- name: "Get dmesg after secure boot is {{ vm_secureboot_state }}"
+  include_tasks: ../utils/collect_dmesg.yml
+  vars:
+    dmesg_output_file_name: "dmesg_after_secureboot_{{ vm_secureboot_state }}.log"
+
+- name: "Set fact of secure boot state in guest OS after secure boot is {{ vm_secureboot_state }}"
+  ansible.builtin.set_fact:
+    guest_secureboot_state: "{{ (secureboot_match | length == 1) | ternary(secureboot_match[0], '') }}"
+  vars:
+    secureboot_match: >-
+      {{
+        dmesg_cmd_result.stdout | default('') |
+        regex_search('secure *boot.*(enabled|disabled)', '\1', ignorecase=True)
+      }}
+
+- name: "Check secure boot in guest OS is {{ vm_secureboot_state }}"
+  ansible.builtin.assert:
+    that:
+      - guest_secureboot_state | lower == vm_secureboot_state
+    fail_msg: >-
+      After secure boot is {{ vm_secureboot_state }} on VM, the secure boot state in guest OS
+      is {{ guest_secureboot_state }}, not as expected {{ vm_secureboot_state }}.
+    success_msg: >-
+      After secure boot is {{ vm_secureboot_state }} on VM, the secure boot state in guest OS
+      is {{ guest_secureboot_state }}.
