@@ -53,11 +53,11 @@
     that:
       - ubuntu_arch_result.stdout is defined
       - ubuntu_arch_result.stdout
-    fail_msg: "Not found architectures in file {{ release_file_path_result.stdout }}"
+    fail_msg: "Not found architectures in file {{ release_file_path_result.stdout }} from the ISO image"
 
-- name: "Set fact of Ubuntu OS architecture"
+- name: "Set fact of grub parameters"
   ansible.builtin.set_fact:
-    ubuntu_arch: "{{ ubuntu_arch_result.stdout }}"
+    ubuntu_grub_opts: "{{ (ubuntu_arch_result.stdout == 'arm64') | ternary('', 'console=ttyS0,115200n8') }}"
 
 - name: "Set fact of BIOS boot config file isolinux.cfg exists or not"
   ansible.builtin.set_fact:
@@ -124,19 +124,13 @@
       ansible.builtin.replace:
         path: "{{ unattend_iso_cache }}/grub.cfg"
         regexp: '(.*vmlinuz )(.*)'
-        replace: |-
-          {%- if ubuntu_arch == 'arm64' -%}\1autoinstall \2
-          {%- else -%}\1autoinstall \2 console=ttyS0,115200n8
-          {%- endif -%}
+        replace: "\\1autoinstall \\2 {{ubuntu_grub_opts}} "
 
     - name: "Update boot command options in isolinux/txt.cfg"
       ansible.builtin.replace:
         path: "{{ unattend_iso_cache }}/txt.cfg"
         regexp: '(.*initrd )(.*)'
-        replace: |-
-          {%- if ubuntu_arch == 'arm64' -%}\1autoinstall \2
-          {%- else -%}\1autoinstall \2 console=ttyS0,115200n8
-          {%- endif -%}
+        replace: "\\1autoinstall \\2 {{ubuntu_grub_opts}} "
       when: ubuntu_bios_cfg_exist | bool
 
     - name: "Set facts of files to be updated or added into Ubuntu ISO"
