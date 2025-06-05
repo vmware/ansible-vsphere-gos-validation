@@ -24,6 +24,41 @@
   ignore_errors: true
   register: extract_bios_cfg
 
+- name: "Get Release file path from md5sum.txt"
+  ansible.builtin.shell: "grep '/dists/.*/Release$' '{{ src_iso_dir_path }}/md5sum.txt' | awk '{print $NF}' | sed 's#^\\./##'"
+  register: release_file_path_result
+  ignore_errors: true
+
+- name: "Check Release file path"
+  ansible.builtin.assert:
+    that:
+      - release_file_path_result.stdout is defined
+      - release_file_path_result.stdout
+    fail_msg: "Not found Release file path in md5sum.txt from the ISO image"
+
+- name: "Extract Release file from ISO"
+  community.general.iso_extract:
+    image: "{{ src_iso_file_path }}"
+    dest: "{{ src_iso_dir_path }}"
+    files:
+      - "{{ release_file_path_result.stdout }}"
+
+- name: "Get architectures from Release file"
+  ansible.builtin.shell: "grep '^Architectures:' {{ src_iso_dir_path }}/Release | awk '{print $NF}'"
+  register: ubuntu_arch_result
+  ignore_errors: true
+
+- name: "Check architectures in Release file"
+  ansible.builtin.assert:
+    that:
+      - ubuntu_arch_result.stdout is defined
+      - ubuntu_arch_result.stdout
+    fail_msg: "Not found architectures in file {{ release_file_path_result.stdout }} from the ISO image"
+
+- name: "Set fact of grub parameters"
+  ansible.builtin.set_fact:
+    ubuntu_grub_opts: "{{ (ubuntu_arch_result.stdout == 'arm64') | ternary('', 'console=ttyS0,115200n8') }}"
+
 - name: "Set fact of BIOS boot config file isolinux.cfg exists or not"
   ansible.builtin.set_fact:
     ubuntu_bios_cfg_exist: "{{ extract_bios_cfg.failed is defined and not extract_bios_cfg.failed }}"
@@ -89,13 +124,13 @@
       ansible.builtin.replace:
         path: "{{ unattend_iso_cache }}/grub.cfg"
         regexp: '(.*vmlinuz )(.*)'
-        replace: "\\1autoinstall \\2 console=ttyS0,115200n8 "
+        replace: "\\1autoinstall \\2 {{ ubuntu_grub_opts }} "
 
     - name: "Update boot command options in isolinux/txt.cfg"
       ansible.builtin.replace:
         path: "{{ unattend_iso_cache }}/txt.cfg"
         regexp: '(.*initrd )(.*)'
-        replace: "\\1autoinstall \\2 console=ttyS0,115200n8"
+        replace: "\\1autoinstall \\2 {{ ubuntu_grub_opts }} "
       when: ubuntu_bios_cfg_exist | bool
 
     - name: "Set facts of files to be updated or added into Ubuntu ISO"
