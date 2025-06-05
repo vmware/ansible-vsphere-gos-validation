@@ -1,0 +1,39 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Download VMware Tools installation ISO file to local path
+#
+- name: "Set fact of the VMware Tools ISO file name"
+  ansible.builtin.set_fact:
+    win_vmtools_iso: "{{ download_vmtools_url.split('/')[-1] }}"
+
+- name: "Print VMware Tools download info"
+  ansible.builtin.debug:
+    msg:
+      - "Will download VMware Tools installation ISO file from: {{ download_vmtools_url }}"
+
+- name: "Set fact of the local path for VMware Tools ISO file"
+  ansible.builtin.set_fact:
+    download_vmtools_iso_path: "{{ local_cache }}/{{ win_vmtools_iso }}"
+
+- name: "Download the VMware Tools ISO file to local machine"
+  ansible.builtin.get_url:
+    url: "{{ download_vmtools_url }}"
+    dest: "{{ download_vmtools_iso_path }}"
+    validate_certs: false
+    use_proxy: "{{ use_localhost_proxy | default(false) }}"
+  environment:
+    HTTPS_PROXY: "{{ http_proxy_localhost | default(omit) }}"
+
+- name: "Get downloaded VMware Tools ISO file status"
+  ansible.builtin.stat:
+    path: "{{ download_vmtools_iso_path }}"
+  register: vmtools_iso_status
+
+- name: "Check downloaded VMware Tools ISO file status"
+  ansible.builtin.assert:
+    that:
+      - vmtools_iso_status.stat.exists is defined
+      - vmtools_iso_status.stat.exists
+    fail_msg: "Not found VMware Tools ISO file in local path: {{ download_vmtools_iso_path }}"
+    success_msg: "Downloaded VMware Tools ISO file exists locally: {{ download_vmtools_iso_path }}"

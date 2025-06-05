@@ -1,0 +1,35 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get VMXNET3 driver files from VMware Tools installation ISO
+#
+- name: "Set fact of the VMware Tools download URL"
+  ansible.builtin.set_fact:
+    download_vmtools_url: "https://packages.vmware.com/tools/releases/12.5.2/windows/VMware-tools-windows-arm-12.5.2-24697584.iso"
+
+- name: "Download VMware Tools ISO file from URL"
+  include_tasks: download_vmtools_iso.yml
+
+- name: "Extract VMware Tools ISO file to get VMXNET3 driver"
+  community.general.iso_extract:
+    image: "{{ download_vmtools_iso_path }}"
+    dest: "{{ local_cache }}/"
+    files:
+      - "vmxnet3/vmxnet3.cat"
+      - "vmxnet3/vmxnet3.inf"
+      - "vmxnet3/vmxnet3.sys"
+  register: vmtools_iso_extract
+
+- name: "Display the VMware Tools ISO file extract result"
+  ansible.builtin.debug: var=vmtools_iso_extract
+  when: enable_debug
+
+- name: "Set facts of the file paths of VMXNET3 driver on local machine"
+  ansible.builtin.set_fact:
+    vmxnet3_file_path_list:
+      - "{{ local_cache }}/pvscsi.cat"
+      - "{{ local_cache }}/pvscsi.inf"
+      - "{{ local_cache }}/pvscsi.sys"
+
+- name: "Print the file paths of VMXNET3 driver"
+  ansible.builtin.debug: var=vmxnet3_file_path_list
