@@ -25,7 +25,7 @@
   register: extract_bios_cfg
 
 - name: "Get Release file path from md5sum.txt"
-  ansible.builtin.shell: "grep '/dists/.*/Release$' '{{ src_iso_dir_path }}/md5sum.txt' | cut -d  ' ' -f 3 | sed 's#^\\./##'"
+  ansible.builtin.shell: "grep '/dists/.*/Release$' '{{ src_iso_dir_path }}/md5sum.txt' | awk '{print $NF}' | sed 's#^\\./##'"
   register: release_file_path_result
   ignore_errors: true
 
@@ -34,7 +34,7 @@
     that:
       - release_file_path_result.stdout is defined
       - release_file_path_result.stdout
-    fail_msg: "Not found Release file path in md5sum.txt"
+    fail_msg: "Not found Release file path in md5sum.txt from the ISO image"
 
 - name: "Extract Release file from ISO"
   community.general.iso_extract:
@@ -44,7 +44,7 @@
       - "{{ release_file_path_result.stdout }}"
 
 - name: "Get architectures from Release file"
-  ansible.builtin.shell: "grep '^Architectures:' {{ src_iso_dir_path }}/Release | cut -d ' ' -f 2"
+  ansible.builtin.shell: "grep '^Architectures:' {{ src_iso_dir_path }}/Release | awk '{print $NF}'"
   register: ubuntu_arch_result
   ignore_errors: true
   
@@ -53,7 +53,7 @@
     that:
       - ubuntu_arch_result.stdout is defined
       - ubuntu_arch_result.stdout
-    fail_msg: "Not found architectures in file {{ src_iso_dir_path }}/Release"
+    fail_msg: "Not found architectures in file {{ release_file_path_result.stdout }}"
 
 - name: "Set fact of Ubuntu OS architecture"
   ansible.builtin.set_fact:
