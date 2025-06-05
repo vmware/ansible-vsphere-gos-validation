@@ -1,0 +1,39 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check if the WSL distribution is installed or not.
+# Parameters:
+#  wsl_distro_list_timeout: default is 150 seconds.
+#  wsl_distro_list_file_name: the file name for saving output of listing the WSL distribution.
+# Return:
+#  wsl_distro_installed: true if the WSL distribution is installed.
+#
+- name: "Initialize the variables"
+  ansible.builtin.set_fact:
+    wsl_distro_installed: false
+
+- name: "List installed WSL distribution"
+  ansible.windows.win_shell: "wsl --list | Out-File -FilePath {{ wsl_file_path_win }}\\{{ wsl_distro_list_file_name }}"
+  register: win_powershell_cmd_output
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_unreachable: true
+  until:
+    - win_powershell_cmd_output.rc is defined
+    - win_powershell_cmd_output.rc == 0
+  retries: "{{ wsl_distro_list_timeout | default (150) // 30 }}"
+  delay: 30
+
+- name: "Process the WSL output message"
+  include_tasks: wsl_convert_binary_to_txt.yml
+  vars:
+    source_path: "{{ wsl_file_path_win }}\\{{ wsl_distro_list_file_name }}"
+    file_name: "{{ wsl_distro_list_file_name }}"
+
+- name: "Set status for the WSL distribution installation"
+  ansible.builtin.set_fact:
+    wsl_distro_installed: "{{ lookup('ansible.builtin.file', wsl_new_file) is search(wsl_distribution_name) }}"
+
+- name: "Display the status for the WSL distribution installation"
+  ansible.builtin.debug:
+    msg: "The WSL distribution {{ wsl_distribution_name }} installation status: {{ wsl_distro_installed }}."

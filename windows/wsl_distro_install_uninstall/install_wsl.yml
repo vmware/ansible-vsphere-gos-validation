@@ -9,7 +9,7 @@
 # and the support of inbox version is removed from Windows build 25267, the test case will install inbox version for
 # build lower than 25267 until the known issue is resolved.
 #
-- name: "Initialize the fact of skipping set WSL version"
+- name: "Initialize the variables"
   ansible.builtin.set_fact:
     skip_set_wsl_ver: false
 
@@ -39,11 +39,6 @@
 - name: "Install WSL for Windows Server"
   when: guest_os_product_type == 'server'
   block:
-    # Due to issue https://github.com/microsoft/WSL/issues/9258, install "Debian" for Server.
-    - name: "Set the distribution name"
-      ansible.builtin.set_fact:
-        wsl_distribution_name: "Debian"
-
     - name: "Install WSL and distribution"
       ansible.windows.win_shell: "wsl --install -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_install.txt"
       register: win_powershell_cmd_output
@@ -68,18 +63,11 @@
     source_path: "{{ wsl_file_path_win }}\\wsl_install.txt"
     file_name: "wsl_install.txt"
 
-- name: "Check WSL installation command result"
-  ansible.builtin.fail:
-    msg: "WSL installation failed. Please check log file wsl_install.txt."
-  when:
-    - win_powershell_cmd_output.rc is defined
-    - win_powershell_cmd_output.rc != 0
-    - not skip_set_wsl_ver
-
 - name: "Restart the guest OS"
   include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"
+    win_reboot_timeout: 1800
 
 - name: "Wait 60 seconds for downloading WSL distribution"
   ansible.builtin.pause:
@@ -88,6 +76,12 @@
 
 - name: "Check WSL version"
   include_tasks: check_wsl_version.yml
+
+# If WSL is installed successfully, the default version should be retrievable.
+- name: "Validate WSL status"
+  ansible.builtin.fail:
+    msg: "WSL installation failed. Please check log file wsl_install.txt."
+  when: not wsl_default_version
 
 # Set WSL default version to 2
 - name: "Set WSL default version to 2"
@@ -132,3 +126,16 @@
       - wsl_default_version | int == 1
     fail_msg: "WSL default version is: {{ wsl_default_version }}, not the expected version: 1"
   when: skip_set_wsl_ver
+
+- name: "Check if the WSL distribution is installed"
+  include_tasks: check_wsl_distro.yml
+  vars:
+    wsl_distro_list_file_name: "wsl_list_after_install_wsl.txt"
+
+- name: "Set the installation status of WSL distribution"
+  ansible.builtin.set_fact:
+    wsl_distro_install_status: "{{ wsl_distro_installed }}"
+
+- name: "Install the WSL distribution"
+  include_tasks: install_wsl_distro.yml
+  when: not wsl_distro_install_status
