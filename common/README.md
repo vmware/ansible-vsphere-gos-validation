@@ -56,7 +56,7 @@
 * vm_get_netadapter_number.yml: Get VM network adapters number with different types
 
 ### Tasks for VM disk settings
-* vm_hot_add_remove_disk_ctrl.yml: Hotadd or remove VM disk controller
+* vm_hot_add_remove_ctrl.yml: Hotadd or remove VM controller
 * vm_hot_add_remove_disk.yml: Hotadd or remove VM disk
 * vm_get_new_vhba_bus_number.yml: Get bus number of a new disk controller
 * vm_get_disk_facts.yml: Get VM disk info
