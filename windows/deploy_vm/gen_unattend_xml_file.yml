@@ -16,12 +16,13 @@
   vars:
     dir_path: "{{ unattend_dest_path }}"
 
-- name: "Set fact of bitness info"
+- name: "Set fact of the 'processorArchitecture' info in Autounattend.xml"
   ansible.builtin.set_fact:
-    win_client_unattend_bitness: "{{ 'amd64' if '64' in guest_id else 'x86' }}"
-  when:
-    - "'srv' not in guest_id | lower"
-    - "'server' not in guest_id | lower"
+    win_unattend_arch: >-
+      {%- if esxi_cpu_vendor == 'arm' -%}arm64
+      {%- elif guest_id is search('64') -%}amd64
+      {%- else -%}x86
+      {%- endif -%}
 
 - name: "Generate encoded VM password"
   include_tasks: ../utils/win_gen_base64_password.yml
