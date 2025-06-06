@@ -26,10 +26,13 @@
 #     'e1000e', 'vmxnet3', default value is 'vmxnet3'.
 #   vm_network_name (optional): the name of network to connect, default is 'VM Network',
 #     and type of of IP assignment is set to 'dhcp'.
-#
-# VM with IDE boot disk can not be created directly. To create a VM with IDE boot disk,
+#   usb_controller (optional): the USB controller version, if not set, will not add USB controller
+#     to the new created VM.
+# Notes:
+#   VM with IDE boot disk can not be created directly. To create a VM with IDE boot disk,
 # here needs to create a VM with PVSCSI boot disk firstly and then remove the PVSCSI
 # disk and controller, then add an IDE disk to the VM as boot disk
+#
 - name: "Initialize the fact of VM's boot disk controller type"
   ansible.builtin.set_fact:
     vm_boot_disk_controller: >-
@@ -90,7 +93,7 @@
         unit_number: 0
 
     - name: "Remove pre-added PVSCSI controller from VM"
-      include_tasks: vm_hot_add_remove_disk_ctrl.yml
+      include_tasks: vm_hot_add_remove_ctrl.yml
       vars:
         disk_controller_ops: "absent"
         disk_controller_type: "paravirtual"
@@ -117,3 +120,12 @@
     - name: "Print the result of adding IDE boot disk"
       ansible.builtin.debug: var=add_ide_disk_result
       when: enable_debug
+
+- name: "Add USB controller to the new created VM"
+  include_tasks: vm_hot_add_remove_ctrl.yml
+  vars:
+    disk_controller_ops: "present"
+    disk_controller_type: "{{ usb_controller }}"
+  when:
+    - usb_controller is defined
+    - usb_controller | lower in ['usb2', 'usb3']
