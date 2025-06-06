@@ -1,26 +1,31 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Initialize the fact of cpu information"
+- name: "Initialize facts of CPU number and cores per socket in guest OS"
   ansible.builtin.set_fact:
     guest_cpu_num: ""
     guest_cpu_cores: ""
 
-- name: "Get CPU info for {{ guest_os_ansible_distribution }}"
-  when: guest_os_family != "FreeBSD"
+- name: "Get CPU info on {{ vm_guest_os_ansible_distribution }}"
+  when: guest_os_ansible_system == "linux"
   block:
-    - name: "Get system processor information"
-      include_tasks: ../../common/get_system_info.yml
-      vars:
-        filter: "ansible_processor*"
+    - name: "Get CPU number and cores per socket in guest OS"
+      ansible.builtin.shell: "lscpu | grep -e '^CPU(s)' -e '^Core(s) per socket'"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: lscpu_result
 
-    - name: "Set the fact of CPU number and cores in guest"
+    - name: "Set fact of CPU number and cores per socket in guest OS"
       ansible.builtin.set_fact:
-        guest_cpu_num: "{{ guest_system_info.ansible_processor_vcpus }}"
-        guest_cpu_cores: "{{ guest_system_info.ansible_processor_cores }}"
+        guest_cpu_num: "{{ guest_cpu_details['CPU(s)'] | default('') }}"
+        guest_cpu_cores: "{{ guest_cpu_details['Core(s) per socket'] | default('') }}"
+      vars:
+        guest_cpu_details: "{{ lscpu_result.stdout | from_yaml }}"
+      when:
+        - lscpu_result.stdout is defined
+        - lscpu_result.stdout
 
-- name: "Get CPU info for FreeBSD"
-  when: guest_os_family == "FreeBSD"
+- name: "Get CPU info on {{ vm_guest_os_ansible_distribution }}"
+  when: guest_os_ansible_system == "freebsd"
   block:
     - name: "Get number of CPUs"
       ansible.builtin.command: "sysctl -n hw.ncpu"
@@ -43,5 +48,6 @@
         guest_cpu_num: "{{ get_ncpu_results.stdout }}"
         guest_cpu_cores: "{{ get_cpu_cores_results.stdout.split(':')[-1].split('core')[0].split()[-1] }}"
 
-- ansible.builtin.debug:
-    msg: "Guest OS has {{ guest_cpu_num }} CPU, and {{ guest_cpu_cores }} core(s) per socket"
+- name: "Display guest OS CPU numbers and cores per socket"
+  ansible.builtin.debug:
+    msg: "Guest OS has {{ guest_cpu_num }} CPU(s), and {{ guest_cpu_cores }} core(s) per socket"
