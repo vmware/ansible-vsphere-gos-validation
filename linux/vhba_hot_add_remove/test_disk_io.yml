@@ -38,10 +38,9 @@
   block:
     - name: "Set fact of the iozone file path"
       ansible.builtin.set_fact:
-        iozone_tools_path: |-
-          {%- if guest_os_bit == '64-bit' -%}../../tools/iozone_64bit
-          {%- else -%}../../tools/iozone_32bit
-          {%- endif -%}
+        iozone_tools_path: "../../tools/iozone_{{ iozone_suffix }}"
+      vars:
+        iozone_suffix: "{{ (esxi_cpu_vendor == 'arm') | ternary('arm', guest_os_bit | replace('-', '')) }}"
 
     - name: "Transfer iozone tool to remote guest OS from local machine"
       include_tasks: ../../common/transfer_file_remote.yml
