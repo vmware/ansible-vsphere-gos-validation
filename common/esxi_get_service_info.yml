@@ -1,0 +1,55 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Gather service information on ESXi server
+# Parameter:
+#   esxi_service_name: The service name on ESXi server
+# Return:
+#   esxi_service_info: The service information on ESXi server
+#
+- name: "Check parameter 'esxi_service_name' is set"
+  ansible.builtin.assert:
+    that:
+      - esxi_service_name is defined
+      - esxi_service_name
+    fail_msg: >-
+      Parameter 'esxi_service_name' must be set for getting service
+      information on ESXi server
+
+- name: "Initialize the fact of service information on ESXi server"
+  ansible.builtin.set_fact:
+    esxi_service_info: {}
+
+- name: "Gather services information on ESXi server"
+  community.vmware.vmware_host_service_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+  register: esxi_get_service_result
+
+- name: "Display the result of getting ESXi services"
+  ansible.builtin.debug: var=esxi_get_service_result
+  when: enable_debug
+
+- name: "Get information of service '{{ esxi_service_name }}' on ESXi server"
+  when:
+    - esxi_get_service_result.host_service_info[esxi_hostname] is defined
+    - esxi_get_service_result.host_service_info[esxi_hostname] | length > 0
+  block:
+    - name: "Set fact of services matching '{{ esxi_service_name }}' on ESXi server"
+      ansible.builtin.set_fact:
+        esxi_service_list: >-
+          {{
+            esxi_get_service_result.host_service_info[esxi_hostname] |
+            selectattr('key', 'equalto', esxi_service_name)
+          }}
+
+    - name: "Set fact of service '{{ esxi_service_name }}' on ESXi server"
+      ansible.builtin.set_fact:
+        esxi_service_info: "{{ esxi_service_list | first }}"
+      when: esxi_service_list | length == 1
+
+- name: "Display information of service '{{ esxi_service_name }}' on ESXi server"
+  ansible.builtin.debug: var=esxi_service_info

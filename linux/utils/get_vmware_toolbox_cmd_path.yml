@@ -1,7 +1,8 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
-# Get the path to vmware-toolbox-cmd in Linux guests
-# This task shall be executed when VMTools/OVT is installed
+---
+# Get the path to vmware-toolbox-cmd in guest OS
+# This task shall be executed when VMware Tools is installed
 # Return:
 #    vmware_toolbox_cmd_path: the path to vmware-toolbox-cmd
 
@@ -14,13 +15,19 @@
   environment:
     PATH: "/sbin:/bin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/share/oem/bin"
   register: which_toolbox_result
-  failed_when: which_toolbox_result.stdout_lines | length == 0
   changed_when: false
   delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Print the result of getting path to vmware-toolbox-cmd"
+  ansible.builtin.debug: var=which_toolbox_result
+
+- name: "Not found vmware-toolbox-cmd in guest OS"
+  ansible.builtin.fail:
+    msg: "Not found 'vmware-toolbox-cmd' under system binary paths"
+  when: >-
+    which_toolbox_result.stdout_lines is undefined or
+    which_toolbox_result.stdout_lines | length == 0
 
 - name: "Set fact of vmware-toolbox-cmd path"
   ansible.builtin.set_fact:
     vmware_toolbox_cmd_path: "{{ which_toolbox_result.stdout_lines[0] }}"
-
-- name: "Print the path to vmware-toolbox-cmd"
-  ansible.builtin.debug: var=vmware_toolbox_cmd_path

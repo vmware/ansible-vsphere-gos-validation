@@ -1,0 +1,52 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Gather NTP servers and time zone information on ESXi server
+# Returns:
+#   esxi_ntp_servers_get: A list of NTP servers on ESXi server
+#   esxi_timezone_get: The time zone on ESXi server
+#
+- name: "Initialize facts of NTP and time zone information on ESXi server"
+  ansible.builtin.set_fact:
+    esxi_ntp_info_get: []
+    esxi_ntp_servers_get: []
+    esxi_timezone_get: ""
+
+- name: "Gather NTP information configured on ESXi server"
+  community.vmware.vmware_host_ntp_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+  register: esxi_get_ntp_result
+
+- name: "Display the result of getting NTP information on ESXi server"
+  ansible.builtin.debug: var=esxi_get_ntp_result
+  when: enable_debug
+
+- name: "Set fact of NTP information on ESXi server"
+  ansible.builtin.set_fact:
+    esxi_ntp_info_get: "{{ esxi_get_ntp_result.hosts_ntp_info.values() | flatten }}"
+  when:
+    - esxi_get_ntp_result.hosts_ntp_info is defined
+    - esxi_get_ntp_result.hosts_ntp_info.values() | length > 0
+
+- name: "Get NTP servers and time zone configured on ESXi server"
+  when: esxi_ntp_info_get | length > 0
+  block:
+    - name: "Set fact of NTP servers configured on ESXi server"
+      ansible.builtin.set_fact:
+        esxi_ntp_servers_get: "{{ esxi_ntp_info_get[0].ntp_servers }}"
+      when: esxi_ntp_info_get[0].ntp_servers is defined
+
+    - name: "Set fact of time zone configured on ESXi server"
+      ansible.builtin.set_fact:
+        esxi_timezone_get: "{{ esxi_ntp_info_get[0].time_zone_identifier }}"
+      when: esxi_ntp_info_get[0].time_zone_identifier is defined
+
+- name: "Display information of NTP servers and time zone on ESXi server"
+  ansible.builtin.debug:
+    msg:
+      - "Current NTP servers on ESXi server: {{ esxi_ntp_servers_get }}"
+      - "Current time zone on ESXi server: {{ esxi_timezone_get }}"

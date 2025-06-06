@@ -1,0 +1,51 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get firewall rule information on ESXi server
+# Parameter:
+#   esxi_firewall_rule_name: The firewall rule name on ESXi server.
+# Return:
+#   esxi_firewall_rule_info: The firewall rule information on ESXi server
+#
+- name: "Check parameter 'esxi_firewall_rule_name' is set"
+  ansible.builtin.assert:
+    that:
+      - esxi_firewall_rule_name is defined
+      - esxi_firewall_rule_name
+    fail_msg: >-
+      Parameter 'esxi_firewall_rule_name' must be set for getting firewall
+      rule information on ESXi server
+
+- name: "Initialize the fact of firewall rule information on ESXi server"
+  ansible.builtin.set_fact:
+    esxi_firewall_rule_info: {}
+
+- name: "Get firewall rules on ESXi server"
+  community.vmware.vmware_host_firewall_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+  register: esxi_get_firewall_result
+
+- name: "Get firewall rule about '{{ esxi_firewall_rule_name }}' on ESXi server"
+  when:
+    - esxi_get_firewall_result.hosts_firewall_info[esxi_hostname] is defined
+    - esxi_get_firewall_result.hosts_firewall_info[esxi_hostname] | length > 0
+  block:
+    - name: "Set fact of firewall rules matching '{{ esxi_firewall_rule_name }}' on ESXi server"
+      ansible.builtin.set_fact:
+        esxi_firewall_rules: >-
+          {{
+            esxi_get_firewall_result.hosts_firewall_info[esxi_hostname] |
+            selectattr('key', 'equalto', esxi_firewall_rule_name)
+          }}
+
+    - name: "Set fact of firewall rule '{{ esxi_firewall_rule_name }}' on ESXi server"
+      ansible.builtin.set_fact:
+        esxi_firewall_rule_info: "{{ esxi_firewall_rules | first }}"
+      when: esxi_firewall_rules | length == 1
+
+- name: "Display information about firewall rule '{{ esxi_firewall_rule_name }}' on ESXi server"
+  ansible.builtin.debug: var=esxi_firewall_rule_info

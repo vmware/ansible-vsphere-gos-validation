@@ -1,0 +1,41 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Manage host service on ESXi server
+# Parameters:
+#   esxi_service_name: The service name on ESXi server
+#   esxi_service_state (optional): The service state on ESXi server, which can be:
+#     start, stop, restart, unchanged. Default value is started.
+#   esxi_service_policy (optional): The service policy setting on ESXi server,
+#     which can be: automatic, off, on. Default value is off.
+#
+- name: "Check parameters for managing ESXi service"
+  ansible.builtin.assert:
+    that:
+      - esxi_service_name is defined and esxi_service_name
+      - (esxi_service_state is undefined or
+         esxi_service_state in ['start', 'stop', 'restart', 'unchanged'])
+      - (esxi_service_policy is undefined or
+         esxi_service_policy in ['automatic', 'off', 'on'])
+    fail_msg: >-
+      There is at least one parameter has incorrect value for managing ESXi service.
+      Current parameters are
+      esxi_service_name={{ esxi_service_name | default('undefined') }},
+      esxi_service_state={{ esxi_service_state | default('undefined') }},
+      esxi_service_policy={{ esxi_service_policy | default('undefined') }}.
+
+- name: "Manage service '{{ esxi_service_name }}' on ESXi server"
+  community.vmware.vmware_host_service_manager:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+    service_name: "{{ esxi_service_name }}"
+    state: "{{ esxi_service_state | default('start') }}"
+    service_policy: "{{ esxi_service_policy | default('off') }}"
+  register: esxi_manage_service_result
+
+- name: "Display the result of managing ESXi services information"
+  ansible.builtin.debug: var=esxi_manage_service_result
+  when: enable_debug

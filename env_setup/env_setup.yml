@@ -53,16 +53,10 @@
     - name: "Get ESXi server model info"
       include_tasks: ../common/esxi_get_model.yml
 
-    - name: "Set ESXi server default shell to /bin/sh on {{ esxi_version }}"
+    # Refer to https://knowledge.broadcom.com/external/article?articleId=313271
+    - name: "Set ESXi server default shell on {{ esxi_version }}"
       ansible.builtin.set_fact:
-        esxi_shell: "/bin/sh"
-      when: esxi_version is version('8.0.0', '<')
-
-    # Refer to https://knowledge.broadcom.com/external/article?legacyId=87386
-    - name: "Set ESXi server default shell to /bin/supershell on {{ esxi_version }}"
-      ansible.builtin.set_fact:
-        esxi_shell: "/bin/supershell"
-      when: esxi_version is version('8.0.0', '>=')
+        esxi_shell: "{{ (esxi_version is version('8.0.0', '<')) | ternary('/bin/sh', '/bin/supershell') }}"
 
     - name: "Cleanup snapshots and get VM related information for existing VM"
       when: vm_exists is defined and vm_exists

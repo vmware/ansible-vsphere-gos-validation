@@ -125,6 +125,11 @@
 * esxi_set_firewall_rule.yml: Enable or disable a firewall rule on ESXi host
 * esxi_enable_pvrdma_configs.yml: Tag VMkernel network adapter and enable firewall rule on ESXi host for PVRDMA communication
 * esxi_disable_pvrdma_configs.yml: Remove VMkernel network adapter tag and disable firewall rule on ESXi host for PVRDMA communication
+* esxi_get_firewall_rule.yml: Get firewall rule information on ESXi server
+* esxi_get_ntp.yml: Get NTP servers and time zone information on ESXi server
+* esxi_set_ntp.yml: Set NTP servers on ESXi server
+* esxi_get_service_info.yml: Get host service information on ESXi server
+* esxi_manage_service.yml: Manage host service on ESXi server
 
 ### Tasks for ESXi datastores
 * esxi_add_datastore.yml: Add NFS or VMFS datastore to ESXi host
@@ -133,7 +138,14 @@
 * esxi_check_delete_datastore_file.yml: Get datastore file status or delete file
 * esxi_upload_datastore_file.yml: Upload file to ESXi datastore
 * esxi_download_datastore_file.yml: Download file from ESXi datastore
-* vcenter_add_standard_kp.yml: Add Standard Key Provider on vCenter
+
+### Tasks for features on vCenter Server
+* vcenter_add_key_provider.yml: Add a Key Provider on vCenter Server
+* vcenter_add_standard_kp.yml: Add Standard Key Provider on vCenter Server
+* vcenter_get_vcsa_ntp.yml: Get information of vCenter Server Appliance time settings including NTP servers, time sync mode and time zone.
+* vcenter_set_vcsa_ntp.yml: Set NTP servers and time zone in vCenter Server Appliance settings
+* vcenter_get_domain_user_info.yml: Get domain user information on vCenter Server
+* vcenter_manage_domain_user.yml: Manage domain user on vCenter Server
 
 ### Tasks for server information
 * esxi_get_host_facts.yml: Get ESXi server host facts
