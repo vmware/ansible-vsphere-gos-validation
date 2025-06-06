@@ -1,0 +1,34 @@
+# Copyright 2021-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# For Windows 10 VM, max CPU socket is 2 when ESXi version < 7.0.2.
+# From ESXi 7.0.2, the max CPU socket is changed to 4 for Windows 10
+# and later Windows client versions.
+#
+- name: "Print the CPU info configured for new VM"
+  ansible.builtin.debug:
+    msg:
+      - "VM CPU number is: {{ cpu_number }}"
+      - "Cores per socket number is: {{ cpu_cores_per_socket }}"
+
+- name: "Set fact of the maximum CPU socket for Windows 10"
+  ansible.builtin.set_fact:
+    max_socket: "{{ (esxi_version is version('7.0.2', '>=')) | ternary(4, 2) }}"
+  when: guest_id == 'windows9Guest' or guest_id == 'windows9_64Guest'
+
+- name: "Set fact of the maximum CPU socket for VM with guest ID '{{ guest_id }}'"
+  ansible.builtin.set_fact:
+    max_socket: 4
+  when:
+    - guest_id | regex_search('windows(\\d+)_')
+    - guest_id | regex_search('windows(\\d+)_', '\\1') | first | int >= 11
+
+- name: "Check VM CPU socket number"
+  ansible.builtin.assert:
+    that:
+      - (cpu_number | int) / (cpu_cores_per_socket | int) <= max_socket | int
+    fail_msg: >-
+      Configured CPU number is '{{ cpu_number }}', cores per socket is '{{ cpu_cores_per_socket }}'
+      for new VM, then the calculated socket is '{{ (cpu_number | int) / (cpu_cores_per_socket | int) }}',
+      which exceeds the maximum CPU socket number '{{ max_socket }}' for VM with guest ID '{{ guest_id }}'.
+  when: guest_id == 'windows9Guest' or guest_id | regex_search('windows(\\d+)_64Guest')
