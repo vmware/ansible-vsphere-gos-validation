@@ -32,8 +32,8 @@
 - name: "Check Release file path"
   ansible.builtin.assert:
     that:
-      - release_file_path_result.stdout is defined
-      - release_file_path_result.stdout
+      - release_file_path_result.stdout_lines is defined
+      - release_file_path_result.stdout_lines
     fail_msg: "Not found Release file path in md5sum.txt from the ISO image"
 
 - name: "Extract Release file from ISO"
@@ -41,10 +41,10 @@
     image: "{{ src_iso_file_path }}"
     dest: "{{ src_iso_dir_path }}"
     files:
-      - "{{ release_file_path_result.stdout }}"
+      - "{{ release_file_path_result.stdout_lines[0] }}"
 
 - name: "Get architectures from Release file"
-  ansible.builtin.shell: "grep '^Architectures:' {{ src_iso_dir_path }}/Release | awk '{print $NF}'"
+  ansible.builtin.shell: "grep '^Architecture.*:' {{ src_iso_dir_path }}/Release | awk '{print $NF}'"
   register: ubuntu_arch_result
   ignore_errors: true
 
