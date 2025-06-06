@@ -19,14 +19,22 @@
 - name: "Print guest disk list before hot-add"
   ansible.builtin.debug: var=guest_disk_list_before_hotadd
 
-- name: "Hot add a new disk on a new {{ new_disk_ctrl_type }} controller"
-  include_tasks: ../../common/vm_hot_add_ctrl_disk.yml
-  vars:
-    disk_controller_type: "{{ new_disk_ctrl_type }}"
-    disk_size_gb: "{{ new_disk_size_gb }}"
-    ctrl_number: "{{ new_ctrl_number }}"
-    unit_number: "{{ new_unit_number }}"
+- name: "Hot add a new {{ new_disk_ctrl_type }} controller and a new disk together"
   when: new_disk_ctrl_state == "new"
+  block:
+    - name: "Hot add a new disk on a new {{ new_disk_ctrl_type }} controller"
+      include_tasks: ../../common/vm_hot_add_ctrl_disk.yml
+      vars:
+        disk_controller_type: "{{ new_disk_ctrl_type }}"
+        disk_size_gb: "{{ new_disk_size_gb }}"
+        ctrl_number: "{{ new_ctrl_number }}"
+        unit_number: "{{ new_unit_number }}"
+
+    # Hot-add disk controller is not fully supported on ARM ESXi server now,
+    # here reboots the guest OS to recognized new added disk controller
+    - name: "Reboot guest OS after hot adding disk to VM on ARM ESXi server"
+      include_tasks: ../utils/reboot.yml
+      when: esxi_cpu_vendor == 'arm'
 
 - name: "Hot add a new disk on an existing {{ new_disk_ctrl_type }} controller"
   include_tasks: ../../common/vm_hot_add_remove_disk.yml
