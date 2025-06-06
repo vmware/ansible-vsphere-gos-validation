@@ -25,7 +25,7 @@
   register: extract_bios_cfg
 
 - name: "Get Release file path from md5sum.txt"
-  ansible.builtin.shell: "grep '/dists/.*/Release$' '{{ src_iso_dir_path }}/md5sum.txt' | awk '{print $NF}' | sed 's#^\\./##'"
+  ansible.builtin.shell: "grep -e '/dists/[^/]*/Release$' '{{ src_iso_dir_path }}/md5sum.txt' | awk '{print $NF}' | sed 's#^\\./##'"
   register: release_file_path_result
   ignore_errors: true
 
@@ -33,7 +33,7 @@
   ansible.builtin.assert:
     that:
       - release_file_path_result.stdout_lines is defined
-      - release_file_path_result.stdout_lines
+      - release_file_path_result.stdout_lines | length > 0
     fail_msg: "Not found Release file path in md5sum.txt from the ISO image"
 
 - name: "Extract Release file from ISO"
