@@ -3,7 +3,11 @@
 ---
 - name: "Set fact of the hardware version for new VM"
   ansible.builtin.set_fact:
-    hardware_version: "{{ hardware_version | default(esxi_latest_hardware_version) | int }}"
+    hardware_version: "{{ esxi_latest_hardware_version }}"
+  when: >
+    hardware_version is undefined or
+    (not hardware_version) or
+    (hardware_version | lower == 'latest')
 
 - name: "Check hardware version for new VM in ESXi supported hardware versions list"
   ansible.builtin.assert:
@@ -11,7 +15,7 @@
       - hardware_version | int in esxi_hardware_versions
     fail_msg: >-
       Configured VM hardware verion '{{ hardware_version }}' is not in the supported
-      hardware versions list '{{ esxi_hardware_versions }}' on ESXi host '{{ esxi_version }}'.
+      hardware versions list '{{ esxi_hardware_versions }}' on ESXi '{{ esxi_version }}'.
       Please check your configuration in vars/test.yml.
 
 - name: "Get '{{ guest_id }}' guest config options with VM hardware version '{{ hardware_version }}'"
@@ -23,19 +27,46 @@
   ansible.builtin.set_fact:
     boot_disk_controller: >-
       {{
-         (boot_disk_controller is defined and boot_disk_controller)
-         | ternary(boot_disk_controller | lower, guest_config_options.default_disk_controller)
+          (boot_disk_controller is defined and boot_disk_controller)
+          | ternary(boot_disk_controller | lower, guest_config_options.default_disk_controller)
       }}
     network_adapter_type: >-
       {{
-         (network_adapter_type is defined and network_adapter_type)
-         | ternary(network_adapter_type | lower, guest_config_options.default_ethernet)
+          (network_adapter_type is defined and network_adapter_type)
+          | ternary(network_adapter_type | lower, guest_config_options.default_ethernet)
       }}
     firmware: >-
       {{
-         (firmware is defined and firmware)
-         | ternary(firmware | lower, guest_config_options.rec_firmware)
+          (firmware is defined and firmware)
+          | ternary(firmware | lower, guest_config_options.rec_firmware)
       }}
+    memory_mb: >-
+      {{
+          (memory_mb is defined and memory_mb)
+          | ternary(memory_mb, guest_config_options.rec_memory_mb)
+      }}
+    boot_disk_size_gb: >-
+      {{
+          (boot_disk_size_gb is defined and (boot_disk_size_gb | int >= (guest_config_options.rec_disk_mb | int / 1024)))
+          | ternary(boot_disk_size_gb, (guest_config_options.rec_disk_mb | int / 1024))
+      }}
+    secureboot_enabled: >-
+      {%- if firmware == 'efi' -%}
+      {{
+          (secureboot_enabled is defined and secureboot_enabled | type_debug == 'bool')
+          | ternary(secureboot_enabled, guest_config_options.default_secure_boot)
+      }}
+      {%- else -%}false
+      {%- endif -%}
+
+# Installing FreeBSD 32bit on lsilogic/lsilogicsas/nvme disk will
+# fail when memory size >= 4 GB
+- name: "Set fact of the memory size in MB for new VM"
+  ansible.builtin.set_fact:
+    memory_mb: "{{ [3072, memory_mb | int] | min }}"
+  when:
+    - guest_id is match('freebsd\\d+Guest')
+    - boot_disk_controller in ['lsilogic', 'lsilogicsas', 'nvme']
 
 - name: "Set fact of whether enable EFI secure boot on new VM"
   ansible.builtin.set_fact:
@@ -51,8 +82,9 @@
     that:
       - boot_disk_controller in guest_config_options.support_disk_controller
     fail_msg: >-
-      Boot disk controller '{{ boot_disk_controller }}' for new VM is not in the supported disk controller
-      list in guest config options '{{ guest_config_options.support_disk_controller }}'.
+      Boot disk controller '{{ boot_disk_controller }}' for new VM is not in the supported
+      disk controller list in guest config options '{{ guest_config_options.support_disk_controller }}'
+      for VM with guest ID '{{ guest_id }}' and hardware version '{{ hardware_version }}'.
       Please check your configuration in vars/test.yml.
 
 - name: "Check network adatper type for new VM"
@@ -60,8 +92,9 @@
     that:
       - network_adapter_type in guest_config_options.support_ethernet_card
     fail_msg: >-
-      Network adatper '{{ network_adapter_type }}' for new VM is not in the supported Ethernet list
-      in guest config options '{{ guest_config_options.support_ethernet_card }}'.
+      Network adatper '{{ network_adapter_type }}' for new VM is not in the supported
+      Ethernet list in guest config options '{{ guest_config_options.support_ethernet_card }}'
+      for VM with guest ID '{{ guest_id }}' and hardware version '{{ hardware_version }}'.
       Please check your configuration in vars/test.yml.
 
 - name: "Check firmware for new VM"
@@ -77,8 +110,9 @@
     that:
       - secureboot_enabled == guest_config_options.support_secure_boot
     fail_msg: >-
-      Enable EFI secure boot for new VM is set to '{{ secureboot_enabled }}', but secure boot support
-      status in guest config options is '{{ guest_config_options.support_secure_boot }}'.
+      Enable EFI secure boot is set to '{{ secureboot_enabled }}' for new VM, but secure boot support
+      status in guest config options is '{{ guest_config_options.support_secure_boot }}'
+      for VM with guest ID '{{ guest_id }}' and hardware version '{{ hardware_version }}'.
       Please check your configuration in vars/test.yml.
   when:
     - firmware == 'efi'
@@ -118,26 +152,6 @@
 - name: "Check VM CPU socket number"
   include_tasks: check_cpu_socket.yml
 
-# Installing FreeBSD 32bit on lsilogic/lsilogicsas/nvme disk will
-# fail when memory size >= 4 GB
-- name: "Set fact of the memory size in MB for new VM"
-  ansible.builtin.set_fact:
-    vm_memory_mb: |-
-      {%- if guest_id is match('freebsd\\d+Guest') and
-       boot_disk_controller in ['lsilogic', 'lsilogicsas', 'nvme'] -%}
-      {{ [3072, (memory_mb | default(guest_config_options.rec_memory_mb) | int)] | min }}
-      {%- else -%}
-      {{ memory_mb | default(guest_config_options.rec_memory_mb) | int  }}
-      {%- endif -%}
-
-- name: "Set fact of the boot disk size in GB for new VM"
-  ansible.builtin.set_fact:
-    boot_disk_size_gb: >-
-      {{
-          (boot_disk_size_gb is defined and (boot_disk_size_gb | int >= (guest_config_options.rec_disk_mb | int / 1024)))
-          | ternary(boot_disk_size_gb, (guest_config_options.rec_disk_mb | int / 1024))
-      }}
-
 - name: "Set fact of the VM datastore path"
   ansible.builtin.set_fact:
     vm_datastore_path: "/vmfs/volumes/{{ datastore }}"
@@ -145,7 +159,7 @@
 - name: "Display the facts of the new VM configurations"
   ansible.builtin.debug:
     msg:
-      - "Will locate New VM in this datastore path: {{ vm_datastore_path }}, with below configurations:"
+      - "The New VM will be located: {{ vm_datastore_path }}, with below configurations:"
       - "Hardware version: {{ hardware_version }}"
       - "Boot disk controller: {{ boot_disk_controller }}"
       - "Network adapter: {{ network_adapter_type }}"
@@ -153,5 +167,5 @@
       - "Secure boot enabled: {{ (firmware == 'efi') | ternary(secureboot_enabled, '') }}"
       - "CPU number: {{ cpu_number }}"
       - "CPU cores per socket: {{ cpu_cores_per_socket }}"
-      - "Memory size in MB: {{ vm_memory_mb }}"
+      - "Memory size in MB: {{ memory_mb }}"
       - "Disk size in GB: {{ boot_disk_size_gb }}"
