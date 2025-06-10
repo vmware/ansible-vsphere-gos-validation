@@ -12,9 +12,10 @@
   ansible.builtin.set_fact:
     win_vmtools_bit: "{{ 'amd64' if guest_id is search('64') else 'i386' }}"
 
-- name: "Set fact of the VMware Tools download URL"
+- name: "Set fact of the VMware Tools download URL and PVSCSI driver path in ISO"
   ansible.builtin.set_fact:
     download_vmtools_url: "https://packages.vmware.com/tools/releases/11.3.5/windows/VMware-tools-windows-11.3.5-18557794.iso"
+    vmtools_iso_driver_path: "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/"
 
 - name: "Download VMware Tools ISO file from URL"
   include_tasks: download_vmtools_iso.yml
@@ -24,17 +25,17 @@
     image: "{{ download_vmtools_iso_path }}"
     dest: "{{ local_cache }}/"
     files:
-      - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/pvscsi.cat"
-      - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/pvscsi.inf"
-      - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/pvscsi.sys"
-      - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/txtsetup.oem"
+      - "{{ vmtools_iso_driver_path }}{{ win_vmtools_bit }}/pvscsi.cat"
+      - "{{ vmtools_iso_driver_path }}{{ win_vmtools_bit }}/pvscsi.inf"
+      - "{{ vmtools_iso_driver_path }}{{ win_vmtools_bit }}/pvscsi.sys"
+      - "{{ vmtools_iso_driver_path }}{{ win_vmtools_bit }}/txtsetup.oem"
   register: vmtools_iso_extract
 
 - name: "Display the VMware Tools ISO file extract result"
   ansible.builtin.debug: var=vmtools_iso_extract
   when: enable_debug
 
-- name: "Set facts of the file paths of PVSCSI driver on local machine"
+- name: "Set fact of the list of PVSCSI driver files paths on local machine"
   ansible.builtin.set_fact:
     pvscsi_file_path_list:
       - "{{ local_cache }}/pvscsi.cat"
@@ -42,5 +43,5 @@
       - "{{ local_cache }}/pvscsi.sys"
       - "{{ local_cache }}/txtsetup.oem"
 
-- name: "Print the file paths of PVSCSI driver"
+- name: "Print the list of PVSCSI driver files paths"
   ansible.builtin.debug: var=pvscsi_file_path_list
