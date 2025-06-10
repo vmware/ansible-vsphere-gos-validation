@@ -13,6 +13,7 @@
   ansible.builtin.assert:
     that:
       - hardware_version | int in esxi_hardware_versions
+      - hardware_version | int >= 13
     fail_msg: >-
       Configured VM hardware verion '{{ hardware_version }}' is not in the supported
       hardware versions list '{{ esxi_hardware_versions }}' on ESXi '{{ esxi_version }}'.
@@ -22,6 +23,10 @@
   include_tasks: ../common/esxi_get_guest_config_options.yml
   vars:
     esxi_hardware_version: "{{ hardware_version }}"
+
+- name: "Set fact of VM guest options retrieved"
+  ansible.builtin.set_fact:
+    guest_options_retrieved: true
 
 - name: "Set facts of the virtual hardware configurations for new VM"
   ansible.builtin.set_fact:
