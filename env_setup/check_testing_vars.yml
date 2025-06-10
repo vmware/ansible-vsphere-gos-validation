@@ -35,9 +35,9 @@
     - name: "Check VM deploy method"
       ansible.builtin.assert:
         that:
-          - vm_deploy_method in ['iso', 'ova']
+          - vm_deploy_method is defined
+          - vm_deploy_method | lower in ['iso', 'ova']
         fail_msg: "vm_deploy_method must be set to 'iso' or 'ova'"
-      when: vm_deploy_method is defined
 
     - name: "Check datastore is defined"
       ansible.builtin.assert:
@@ -54,17 +54,16 @@
              (not ova_nfs_server_path) or
              ova_nfs_server_path.split(':') | length == 2)
         fail_msg: "Invalid variables for deploying OVA"
-      when: vm_deploy_method is defined and vm_deploy_method == "ova"
+      when: vm_deploy_method | lower == "ova"
 
     - name: "Check variables for deploying VM from ISO"
-      when: vm_deploy_method is undefined or vm_deploy_method == "iso"
+      when: vm_deploy_method | lower == "iso"
       block:
-        - name: "Check variables for new VM settings"
+        - name: "Check 'guest_id' for new VM"
           ansible.builtin.assert:
             that:
               - guest_id is defined and guest_id
-              - hardware_version is undefined or (hardware_version and hardware_version | int >= 13)
-            fail_msg: "Invalid variables for new VM settings"
+            fail_msg: "Parameter 'guest_id' is set to '{{ guest_id | default('') }}', which must be set to a valid value in vars/test.yml"
 
         - name: "Check variables for installing OS from ISO images"
           ansible.builtin.assert:
