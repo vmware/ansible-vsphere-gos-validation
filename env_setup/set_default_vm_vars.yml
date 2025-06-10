@@ -68,15 +68,6 @@
     - guest_id is match('freebsd\\d+Guest')
     - boot_disk_controller in ['lsilogic', 'lsilogicsas', 'nvme']
 
-- name: "Set fact of whether enable EFI secure boot on new VM"
-  ansible.builtin.set_fact:
-    secureboot_enabled: >-
-      {{ 
-         (secureboot_enabled is defined and secureboot_enabled | type_debug == 'bool') 
-         | ternary(secureboot_enabled, guest_config_options.default_secure_boot)
-      }}
-  when: firmware == 'efi'
-
 - name: "Check boot disk controller type for new VM"
   ansible.builtin.assert:
     that:
@@ -149,17 +140,14 @@
     cpu_cores_per_socket: "{{ guest_config_options.rec_cpu_cores_per_socket }}"
   when: cpu_number is undefined or not cpu_number
 
-- name: "Check VM CPU socket number"
+- name: "Check Windows VM CPU socket number"
   include_tasks: check_cpu_socket.yml
-
-- name: "Set fact of the VM datastore path"
-  ansible.builtin.set_fact:
-    vm_datastore_path: "/vmfs/volumes/{{ datastore }}"
+  when: testing_testcase_file | dirname | basename == "windows"
 
 - name: "Display the facts of the new VM configurations"
   ansible.builtin.debug:
     msg:
-      - "The New VM will be located: {{ vm_datastore_path }}, with below configurations:"
+      - "The new VM will be located: {{ vm_datastore_path }}, with below configurations:"
       - "Hardware version: {{ hardware_version }}"
       - "Boot disk controller: {{ boot_disk_controller }}"
       - "Network adapter: {{ network_adapter_type }}"
