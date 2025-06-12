@@ -42,18 +42,22 @@
           {%- else -%}nvme
           {%- endif -%}
 
-    - name: "Get module information of driver {{ guest_module_name }} on {{ vm_guest_os_distribution }}"
+    - name: "Get module information of {{ guest_module_name }} driver on {{ vm_guest_os_distribution }}"
       include_tasks: ../utils/get_module_info.yml
       vars:
         module_name: "{{ guest_module_name }}"
+
+    - name: "Set fact of module information about {{ new_disk_ctrl_type }} driver on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_vhba_module_info: "{{ guest_module_info }}"
 
     - name: "Skip test case for unsupported driver"
       include_tasks: ../../common/skip_test_case.yml
       vars:
         skip_msg: >-
-          Skip test case because there is no driver for {{ new_disk_ctrl_type }}
-          on {{ vm_guest_os_distribution }}
+          Skip test case because there is no driver {{ guest_module_name }} for
+          {{ new_disk_ctrl_type }} controller on {{ vm_guest_os_distribution }}
         skip_reason: "Not Supported"
       when: >-
-        guest_module_info.filename is undefined or
-        not (guest_module_name in guest_module_info.filename)
+        guest_vhba_module_info.name is undefined or
+        not guest_vhba_module_info.name
