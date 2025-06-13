@@ -8,79 +8,40 @@
 # 2022-05-26, change to use VMware Tools 11.3.5 due to there are
 # some changes from VMware Tools 12.0.0 for pvscsi driver.
 #
-- name: Set fact of the guest OS bitness
+- name: "Set fact of the guest OS bitness"
   ansible.builtin.set_fact:
     win_vmtools_bit: "{{ 'amd64' if guest_id is search('64') else 'i386' }}"
 
-# - name: Set fact of the latest VMware Tools download URL
-#   ansible.builtin.set_fact:
-#     win_vmtools_url: "https://packages.vmware.com/tools/releases/latest/windows"
-# - name: Get VMware Tools ISO file URL for Windows
-#   get_url:
-#     url: "{{ win_vmtools_url }}"
-#     dest: "{{ local_cache }}/windows_iso_page"
-#     validate_certs: false
-#     use_proxy: "{{ use_localhost_proxy | default(false) }}"
-#   environment:
-#     HTTPS_PROXY: "{{ http_proxy_localhost | default(omit) }}"
-
-# - name: Get VMware Tools ISO file name
-#   command: "cat {{ local_cache }}/windows_iso_page"
-#   register: get_vmtools_iso_file_result
-# - name: Set fact of the full path of VMware Tools ISO URL
-#   ansible.builtin.set_fact:
-#     win_vmtools_iso: "{{ ((get_vmtools_iso_file_result.stdout | regex_findall('<A HREF=.*.iso'))[0].split('/')[1]) }}"
-
-- name: Set fact of the VMware Tools download URL
+- name: "Set fact of the VMware Tools download URL and PVSCSI driver path in ISO"
   ansible.builtin.set_fact:
     download_vmtools_url: "https://packages.vmware.com/tools/releases/11.3.5/windows/VMware-tools-windows-11.3.5-18557794.iso"
-- name: Set fact of the VMware Tools ISO file name
-  ansible.builtin.set_fact:
-    win_vmtools_iso: "{{ download_vmtools_url.split('/')[-1] }}"
-- ansible.builtin.debug:
-    msg: "Will download VMware Tools install ISO file from: {{ download_vmtools_url }}, for '{{ win_vmtools_bit }}' guest OS"
-- name: Set fact of VMware Tools ISO file path
-  ansible.builtin.set_fact:
-    download_vmtools_iso_path: "{{ local_cache }}/{{ win_vmtools_iso }}"
-- name: Download latest VMware Tools ISO to local
-  get_url:
-    url: "{{ download_vmtools_url }}"
-    dest: "{{ download_vmtools_iso_path }}"
-    validate_certs: false
-    use_proxy: "{{ use_localhost_proxy | default(false) }}"
-  environment:
-    HTTPS_PROXY: "{{ http_proxy_localhost | default(omit) }}"
+    vmtools_iso_driver_path: "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/"
 
-- name: Get downloaded VMware Tools ISO file status
-  ansible.builtin.stat:
-    path: "{{ download_vmtools_iso_path }}"
-  register: vmtools_iso_status
-- name: Check downloaded VMware Tools ISO file status
-  ansible.builtin.assert:
-    that:
-      - "'exists' in vmtools_iso_status.stat"
-      - vmtools_iso_status.stat.exists
-    fail_msg: "Downloaded VMware Tools ISO file not exist {{ download_vmtools_iso_path }}"
-    success_msg: "Downloaded VMware Tools ISO file exists {{ download_vmtools_iso_path }}"
+- name: "Download VMware Tools ISO file from URL"
+  include_tasks: download_vmtools_iso.yml
 
-- name: Extract ISO file to get PVSCSI driver
+- name: "Extract VMware Tools ISO file to get PVSCSI driver"
   community.general.iso_extract:
     image: "{{ download_vmtools_iso_path }}"
     dest: "{{ local_cache }}/"
     files:
-      - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/pvscsi.cat"
-      - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/pvscsi.inf"
-      - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/pvscsi.sys"
-      - "Program Files/VMware/VMware Tools/Drivers/pvscsi/Win8/{{ win_vmtools_bit }}/txtsetup.oem"
+      - "{{ vmtools_iso_driver_path }}{{ win_vmtools_bit }}/pvscsi.cat"
+      - "{{ vmtools_iso_driver_path }}{{ win_vmtools_bit }}/pvscsi.inf"
+      - "{{ vmtools_iso_driver_path }}{{ win_vmtools_bit }}/pvscsi.sys"
+      - "{{ vmtools_iso_driver_path }}{{ win_vmtools_bit }}/txtsetup.oem"
   register: vmtools_iso_extract
-- name: Display the VMware Tools ISO file extract result
-  ansible.builtin.debug: var=vmtools_iso_extract
-  when: enable_debug is defined and enable_debug
 
-- name: Set fact of the PVSCSI file path list
+- name: "Display the VMware Tools ISO file extract result"
+  ansible.builtin.debug: var=vmtools_iso_extract
+  when: enable_debug
+
+- name: "Set fact of the list of PVSCSI driver files paths on local machine"
   ansible.builtin.set_fact:
     pvscsi_file_path_list:
       - "{{ local_cache }}/pvscsi.cat"
       - "{{ local_cache }}/pvscsi.inf"
       - "{{ local_cache }}/pvscsi.sys"
       - "{{ local_cache }}/txtsetup.oem"
+
+- name: "Print the list of PVSCSI driver files paths"
+  ansible.builtin.debug: var=pvscsi_file_path_list
