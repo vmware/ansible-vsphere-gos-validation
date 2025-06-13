@@ -45,6 +45,7 @@
   ansible.builtin.set_fact:
     guest_pvrdma_module_info: "{{ guest_module_info }}"
 
+# If vmw_pvrdma module exists, the module info should have name or filename
 - name: "Skip test case due to no vmw_pvrdma module"
   include_tasks: ../../common/skip_test_case.yml
   vars:
@@ -52,9 +53,7 @@
       Test case '{{ ansible_play_name }}' is not supported because {{ guest_os_ansible_distribution }}
       {{ guest_os_ansible_distribution_ver }} doesn't have vmw_pvrdma module.
     skip_reason: "Not Supported"
-  when: >
-    (guest_pvrdma_module_info.filename is undefined) or
-    ('vmw_pvrdma' not in guest_pvrdma_module_info.filename)
+  when: guest_pvrdma_module_info | length == 0
 
 - name: "Block test case due to no vCenter Server"
   include_tasks: ../../common/skip_test_case.yml
