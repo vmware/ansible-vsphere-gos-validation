@@ -3,13 +3,13 @@
 ---
 # Hot add or remove VM disk or USB controller using 'vmware_guest_controller' module.
 # Parameters:
-#   vm_controller_ops: valid value is 'present' or 'absent'.
+#   vm_controller_state: valid value is 'present' or 'absent'.
 #   vm_controller_type: supported value is 'buslogic', 'lsilogic', 'lsilogicsas', 'paravirtual',
 #     'sata', 'nvme', 'usb2', or 'usb3'.
 #   disk_controller_number: disk controller bus number, valid value is 0, 1, 2, or 3.
-#     Required when 'vm_controller_ops' is set to 'absent' and 'vm_controller_type' is not 'usb2'
+#     Required when 'vm_controller_state' is set to 'absent' and 'vm_controller_type' is not 'usb2'
 #     or 'usb3'.
-#   sleep_time_vm_controller_ops: default is 10 seconds.
+#   vm_controller_sleep_time (optional): the sleep time in seconds after VM reconfiguration.
 # Return:
 #   vm_controller_facts
 #
@@ -28,12 +28,12 @@
 - name: "Check required parameters"
   ansible.builtin.assert:
     that:
-      - vm_controller_ops is defined
-      - vm_controller_ops | lower in ['present', 'absent']
+      - vm_controller_state is defined
+      - vm_controller_state | lower in ['present', 'absent']
       - vm_controller_type is defined
       - vm_controller_type | lower in vm_controller_list
     fail_msg: >-
-      Parameter 'vm_controller_ops' is set to '{{ vm_controller_ops | default('') }}',
+      Parameter 'vm_controller_state' is set to '{{ vm_controller_state | default('') }}',
       valid value is 'present' or 'absent'.
       Paremeter 'vm_controller_type' is set to '{{ vm_controller_type | default('') }}',
       valid value is in this list '{{ vm_controller_list }}'.
@@ -47,14 +47,14 @@
       Parameter 'disk_controller_number' is set to '{{ disk_controller_number | default('') }}',
       which is not a valid value in [0, 1, 2, 3].
   when:
-    - vm_controller_ops | lower == 'absent'
+    - vm_controller_state | lower == 'absent'
     - vm_controller_type | lower is not search('usb')
 
 - name: "Initialize the result of operation on VM controller"
   ansible.builtin.set_fact:
     vm_controller_facts: {}
 
-- name: "Hot add or remove VM controller"
+- name: "Manage VM '{{ vm_controller_type }}' controller"
   community.vmware.vmware_guest_controller:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -62,9 +62,9 @@
     datacenter: "{{ vsphere_host_datacenter }}"
     validate_certs: "{{ validate_certs | default(false) }}"
     name: "{{ vm_name }}"
-    sleep_time: "{{ sleep_time_vm_controller_ops | default(omit) }}"
+    sleep_time: "{{ vm_controller_sleep_time | default(omit) }}"
     controllers:
-      - state: "{{ vm_controller_ops | lower }}"
+      - state: "{{ vm_controller_state | lower }}"
         type: "{{ vm_controller_type | lower }}"
         controller_number: "{{ disk_controller_number | default(omit) }}"
   register: vm_controller_facts
