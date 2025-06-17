@@ -39,6 +39,18 @@
       ansible.builtin.set_fact:
         unattend_install_file_list: "{{ unattend_install_file_list + pvscsi_file_path_list }}"
 
+- name: "Add VMXNET3 driver for unattend install on ARM ESXi host"
+  when:
+    - esxi_cpu_vendor == 'arm'
+    - network_adapter_type == 'vmxnet3'
+  block:
+    - name: "Get VMXNET3 driver"
+      include_tasks: get_vmxnet3_driver.yml
+
+    - name: "Add VMXNET3 driver files to unattend install file list"
+      ansible.builtin.set_fact:
+        unattend_install_file_list: "{{ unattend_install_file_list + vmxnet3_file_path_list }}"
+
 - name: "Create unattend install ISO file"
   include_tasks: ../../common/create_iso.yml
   vars:

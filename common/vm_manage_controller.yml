@@ -1,0 +1,74 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Add or remove VM disk or USB controller using 'vmware_guest_controller' module.
+# Parameters:
+#   vm_controller_state: valid value is 'present' or 'absent'.
+#   vm_controller_type: supported value is 'buslogic', 'lsilogic', 'lsilogicsas', 'paravirtual',
+#     'sata', 'nvme', 'usb2', or 'usb3'.
+#   disk_controller_number: disk controller bus number, valid value is 0, 1, 2, or 3.
+#     Required when 'vm_controller_state' is set to 'absent' and 'vm_controller_type' is not 'usb2'
+#     or 'usb3'.
+#   vm_controller_sleep_time (optional): the sleep time in seconds after VM reconfiguration.
+# Return:
+#   vm_controller_facts: the info of VM controllers after reconfiguration.
+#
+- name: "Set fact of the list of supported VM controllers in this task"
+  ansible.builtin.set_fact:
+    vm_controller_list:
+      - 'buslogic'
+      - 'lsilogic'
+      - 'lsilogicsas'
+      - 'paravirtual'
+      - 'sata'
+      - 'nvme'
+      - 'usb2'
+      - 'usb3'
+
+- name: "Check required parameters"
+  ansible.builtin.assert:
+    that:
+      - vm_controller_state is defined
+      - vm_controller_state in ['present', 'absent']
+      - vm_controller_type is defined
+      - vm_controller_type in vm_controller_list
+    fail_msg: >-
+      Parameter 'vm_controller_state' is set to '{{ vm_controller_state | default('') }}',
+      valid value is 'present' or 'absent'.
+      Paremeter 'vm_controller_type' is set to '{{ vm_controller_type | default('') }}',
+      valid value is in this list '{{ vm_controller_list }}'.
+
+- name: "Check parameter 'disk_controller_number'"
+  ansible.builtin.assert:
+    that:
+      - disk_controller_number is defined
+      - disk_controller_number | int in [0, 1, 2, 3]
+    fail_msg: >-
+      Parameter 'disk_controller_number' is set to '{{ disk_controller_number | default('') }}',
+      which is not a valid value in [0, 1, 2, 3].
+  when:
+    - vm_controller_state == 'absent'
+    - vm_controller_type is not search('usb')
+
+- name: "Initialize the result of operation on VM controller"
+  ansible.builtin.set_fact:
+    vm_controller_facts: {}
+
+- name: "Manage VM '{{ vm_controller_type }}' controller"
+  community.vmware.vmware_guest_controller:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    name: "{{ vm_name }}"
+    sleep_time: "{{ vm_controller_sleep_time | default(omit) }}"
+    controllers:
+      - state: "{{ vm_controller_state }}"
+        type: "{{ vm_controller_type }}"
+        controller_number: "{{ disk_controller_number | default(omit) }}"
+  register: vm_controller_facts
+
+- name: "Display the result of operation on VM controller"
+  ansible.builtin.debug: var=vm_controller_facts
+  when: enable_debug

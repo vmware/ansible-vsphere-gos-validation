@@ -40,9 +40,9 @@
 * vm_answer_question.yml: Answer question at VM power on
 
 ### Tasks for VM CPU or Memory settings
-* vm_enable_cpu_hotadd.yml: Enable VM CPU hotadd
+* vm_enable_cpu_hotadd.yml: Enable VM CPU hot add
 * vm_set_cpu_number.yml: Set VM CPU number, cores per socket is 1 by default
-* vm_enable_memory_hotadd.yml: Enable VM memory hotadd
+* vm_enable_memory_hotadd.yml: Enable VM memory hot add
 * vm_set_memory_size.yml: Set VM memory size in MB
 * vm_set_nested_virtual.yml: Set if CPU virtualization can be exposed to the guest operating system
 
@@ -56,8 +56,8 @@
 * vm_get_netadapter_number.yml: Get VM network adapters number with different types
 
 ### Tasks for VM disk settings
-* vm_hot_add_remove_disk_ctrl.yml: Hotadd or remove VM disk controller
-* vm_hot_add_remove_disk.yml: Hotadd or remove VM disk
+* vm_manage_controller.yml: Add or remove VM controller
+* vm_hot_add_remove_disk.yml: Hot add or remove VM disk
 * vm_get_new_vhba_bus_number.yml: Get bus number of a new disk controller
 * vm_get_disk_facts.yml: Get VM disk info
 * vm_get_disk_controller_facts.yml: Get VM disk controller info
