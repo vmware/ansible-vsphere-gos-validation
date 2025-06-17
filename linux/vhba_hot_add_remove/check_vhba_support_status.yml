@@ -1,0 +1,60 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check whether disk controller is supported in guest OS
+#
+- name: "Skip test case for unsupported guest OS"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: "Skip test case because guest OS doesn't support {{ new_disk_ctrl_type }} controller"
+    skip_reason: "Not Supported"
+  when:
+    - new_disk_ctrl_type in ["lsilogic", "lsilogicsas"]
+    - guest_os_family == "RedHat"
+    - ((guest_os_ansible_distribution == "RHCOS" and
+        guest_os_ansible_distribution_ver is version('4.16', '>=')) or
+       (guest_os_ansible_distribution not in ["RHCOS",  "Kylin Linux Advanced Server"] and
+       guest_os_ansible_distribution_major_ver | int >= 8))
+    - not (guest_os_ansible_kernel is search('uek'))
+
+- name: "Skip test case for unsupported hardware version"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      Skip test case because VM with hardware version {{ vm_hardware_version_num }} doesn't
+      support {{ new_disk_ctrl_type }} controller hot add or hot remove
+    skip_reason: "Not Supported"
+  when:
+    - new_disk_ctrl_type == "nvme"
+    - ((guest_os_ansible_distribution != "VMware Photon OS" and vm_hardware_version_num | int < 13) or
+       (guest_os_ansible_distribution == "VMware Photon OS" and vm_hardware_version_num | int < 19))
+
+- name: "Check device driver on {{ vm_guest_os_distribution }}"
+  when:
+    - guest_os_ansible_system == "linux"
+    - not (guest_os_ansible_distribution == "VMware Photon OS" and
+           guest_os_ansible_distribution_major_ver | int < 4)
+    - new_disk_ctrl_type in ['paravirtual', 'nvme']
+  block:
+    - name: "Set the module name of {{ new_disk_ctrl_type }} driver on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_module_name: "{{ (new_disk_ctrl_type == 'paravirtual') | ternary('vmw_pvscsi', 'nvme') }}"
+
+    - name: "Get module information of {{ guest_module_name }} driver on {{ vm_guest_os_distribution }}"
+      include_tasks: ../utils/get_module_info.yml
+      vars:
+        module_name: "{{ guest_module_name }}"
+
+    - name: "Set fact of module information about {{ new_disk_ctrl_type }} driver on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_vhba_module_info: "{{ guest_module_info }}"
+
+    # If the module exists, the module info should have name or filename
+    - name: "Skip test case for missing driver {{ guest_module_name }}"
+      include_tasks: ../../common/skip_test_case.yml
+      vars:
+        skip_msg: >-
+          Skip test case because there is no driver {{ guest_module_name }} for
+          {{ new_disk_ctrl_type }} controller on {{ vm_guest_os_distribution }}
+        skip_reason: "Not Supported"
+      when: guest_vhba_module_info | length == 0
