@@ -7,23 +7,31 @@
 #   win_driver_inf: the .inf file of the driver you want detailed
 #   information about.
 #
-- name: Check driver inf file name is set
-  ansible.builtin.fail:
-    msg: "Driver inf file name must be specified by parameter 'win_driver_inf'."
-  when: win_driver_inf is undefined or not win_driver_inf
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - win_driver_inf is defined
+      - win_driver_inf
+    fail_msg: "Parameter 'win_driver_inf' must be set to the driver inf file name."
 
-- name: Initialize driver info
+- name: "Initialize driver info"
   ansible.builtin.set_fact:
     win_driver_info: []
-- include_tasks: win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "(Get-WindowsDriver -Online -Driver '{{ win_driver_inf }}')[0] | select Driver, Date, Version, Inbox, ManufacturerName, OriginalFileName, BootCritical, ClassName"
 
-- name: Set fact of the driver info
+- name: "Get driver info in guest OS"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      (Get-WindowsDriver -Online -Driver '{{ win_driver_inf }}')[0] | 
+      select Driver, Date, Version, Inbox, ManufacturerName, OriginalFileName, BootCritical, ClassName
+    win_execute_cmd_ignore_error: true
+
+- name: "Set fact of the driver info"
   ansible.builtin.set_fact:
     win_driver_info: "{{ win_powershell_cmd_output.stdout_lines }}"
   when:
-    - win_powershell_cmd_output is defined
-    - win_powershell_cmd_output.stdout_lines is defined
-- ansible.builtin.debug:
-    msg: "Get the driver '{{ win_driver_inf }}' info: {{ win_driver_info }}"
+    - win_powershell_cmd_output.rc is defined
+    - win_powershell_cmd_output.rc == 0
+
+- name: "Print the driver info"
+  ansible.builtin.debug: var=win_driver_info

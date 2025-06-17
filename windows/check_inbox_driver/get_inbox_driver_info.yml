@@ -42,6 +42,7 @@
 
 # Collect inbox drivers info in json file
 - name: "Save inbox drivers info"
+  when: inbox_drivers_info | length != 0
   block:
     - name: "Set fact of the file path for recording inbox drivers info"
       ansible.builtin.set_fact:
@@ -50,4 +51,11 @@
       ansible.builtin.copy:
         dest: "{{ drivers_info_file_path }}"
         content: "{{ inbox_drivers_info | to_nice_json }}"
-  when: inbox_drivers_info | length != 0
+
+- name: "Check inbox drivers info"
+  ansible.builtin.assert:
+    that:
+      - inbox_drivers_info | length == 2
+    fail_msg: >-
+      Either PVSCSI driver info '{{ inbox_pvscsi_info }}' or VMXNET3 driver info '{{ inbox_vmxnet3_info }}'
+      got in online guest OS is empty.
