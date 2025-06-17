@@ -38,11 +38,7 @@
   block:
     - name: "Set the module name of {{ new_disk_ctrl_type }} driver on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
-        guest_module_name: |-
-          {%- if new_disk_ctrl_type == 'paravirtual' -%}
-              {{ (guest_os_ansible_system == 'linux') | ternary('vmw_pvscsi', 'pvscsi') }}
-          {%- else -%}nvme
-          {%- endif -%}
+        guest_module_name: "{{ (new_disk_ctrl_type == 'paravirtual') | ternary('vmw_pvscsi', 'nvme') }}"
 
     - name: "Get module information of {{ guest_module_name }} driver on {{ vm_guest_os_distribution }}"
       include_tasks: ../utils/get_module_info.yml
@@ -53,8 +49,8 @@
       ansible.builtin.set_fact:
         guest_vhba_module_info: "{{ guest_module_info }}"
 
-    # If the  module exists, the module info should have name or filename
-    - name: "Skip test case for unsupported driver"
+    # If the module exists, the module info should have name or filename
+    - name: "Skip test case for missing driver {{ guest_module_name }}"
       include_tasks: ../../common/skip_test_case.yml
       vars:
         skip_msg: >-
