@@ -83,6 +83,17 @@
       for VM with guest ID '{{ guest_id }}' and hardware version '{{ hardware_version }}'.
       Please check your configuration in vars/test.yml.
 
+- name: "Check boot disk controller type for new VM on ARM ESXi host"
+  ansible.builtin.assert:
+    that:
+      - boot_disk_controller != 'paravirtual'
+    fail_msg: >-
+      Boot disk controller '{{ boot_disk_controller }}' is not supported for VM on ARM ESXi host since
+      PVSCSI driver is not available in OS distributions except Photon OS currently.
+  when:
+    - esxi_cpu_vendor == 'arm'
+    - guest_id != 'vmwarePhoton64'
+
 - name: "Check network adatper type for new VM"
   ansible.builtin.assert:
     that:
