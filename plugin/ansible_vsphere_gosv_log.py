@@ -263,6 +263,11 @@ class VmDetailInfo(VmGuestInfo):
             self.Guest_OS_Distribution = ansible_gosv_facts.get('vm_guest_os_distribution', '')
             self.IP = ansible_gosv_facts.get('vm_guest_ip', '')
             self.GUI_Installed = str(ansible_gosv_facts.get('guest_os_with_gui', ''))
+            if self.GUI_Installed == 'True':
+                display_manager = ansible_gosv_facts.get('guest_os_display_manager', '').upper()
+                session_type = ansible_gosv_facts.get('guest_os_session_type', '')
+                if display_manager and session_type:
+                    self.GUI_Installed = f"{self.GUI_Installed} ({display_manager} {session_type})"
             self.CloudInit_Version = ansible_gosv_facts.get('cloudinit_version', '')
             super().__init__(ansible_gosv_facts)
 
