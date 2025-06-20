@@ -1,6 +1,16 @@
 # Copyright 2022-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+#
+- name: "Initialize Xorg server version and VMware video driver version to 'N/A'"
+  ansible.builtin.set_fact:
+    inbox_drivers_versions: >-
+      {{
+        inbox_drivers_versions |
+        combine({'xorg-server': 'N/A'}) |
+        combine({'xorg-video-driver-vmware': 'N/A'})
+      }}
+
 - name: "Check whether Xorg server is installed"
   ansible.builtin.command: "which Xorg"
   register: which_xorg_server
@@ -8,65 +18,52 @@
   failed_when: false
   delegate_to: "{{ vm_guest_ip }}"
 
-- block:
-    - name: "Check Xorg server"
+- name: "Collect Xorg server and video driver version"
+  when:
+    - which_xorg_server.rc is defined
+    - which_xorg_server.rc == 0
+  block:
+    - name: "Check Xorg server version"
       ansible.builtin.command: "Xorg -version"
       register: xorg_version_result
       failed_when: false
       delegate_to: "{{ vm_guest_ip }}"
 
-    - block:
-        - name: "Get Xorg server version"
-          ansible.builtin.set_fact:
-            xorg_version: "{{ xorg_version_result.stderr_lines | select('match','X.Org X Server') }}"
-
-        - name: "Collect Xorg server version"
-          ansible.builtin.set_fact:
-            inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'xorg server': xorg_version[0].split()[-1] }) }}"
-          when: xorg_version and xorg_version | length > 0
+    - name: "Collect Xorg server version"
       when:
         - xorg_version_result.rc is defined
         - xorg_version_result.rc == 0
         - xorg_version_result.stderr_lines is defined
         - xorg_version_result.stderr_lines | length > 0
+      block:
+        - name: "Get Xorg server version"
+          ansible.builtin.set_fact:
+            xorg_version: "{{ xorg_version_result.stderr_lines | select('match', 'X.Org X Server') }}"
+
+        - name: "Collect Xorg server version"
+          ansible.builtin.set_fact:
+            inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'xorg-server': xorg_version[0].split()[-1]}) }}"
+          when: xorg_version and xorg_version | length > 0
 
     - name: "Initialize VMware video driver package name"
       ansible.builtin.set_fact:
         video_driver_pkg_name: |-
           {%- if guest_os_family == "RedHat" -%}xorg-x11-drv-vmware
-          {%- elif guest_os_family == "Suse" -%}xf86-video-vmware
+          {%- elif guest_os_family in ["Suse", "FreeBSD"] -%}xf86-video-vmware
+          {%- elif guest_os_family in ["Debian", "Astra Linux (Orel)"] -%}xserver-xorg-video-vmware
           {%- else -%}{%- endif -%}
 
-    - block:
-        - name: "Looking for VMware video driver package"
-          ansible.builtin.shell: "dpkg -l xserver-xorg-video-vmware* | grep xserver-xorg-video-vmware"
-          failed_when: false
-          register: vmware_video_package_result
-          delegate_to: "{{ vm_guest_ip }}"
-
-        - name: "Get VMware video driver package name"
-          ansible.builtin.set_fact:
-            video_driver_pkg_name: "{{ vmware_video_package_result.stdout.split()[1] }}"
-          when:
-            - vmware_video_package_result.rc is defined
-            - vmware_video_package_result.rc == 0
-            - vmware_video_package_result.stdout is defined
-            - vmware_video_package_result.stdout
-      when: guest_os_family in ["Debian", "Astra Linux (Orel)"]
-
-    - block:
-        - include_tasks: ../utils/get_installed_package_info.yml
+    - name: "Collect VMware video driver version"
+      when: video_driver_pkg_name
+      block:
+        - name: "Get information of video driver package '{{ video_driver_pkg_name }}'"
+          include_tasks: ../utils/get_installed_package_info.yml
           vars:
             package_name: "{{ video_driver_pkg_name }}"
 
         - name: "Get the VMware video driver version"
           ansible.builtin.set_fact:
-            inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'xf86-video-vmware': package_info.Version.split(':')[-1] }) }}"
+            inbox_drivers_versions: "{{ inbox_drivers_versions | combine({'xorg-video-driver-vmware': package_info.Version.split(':')[-1]}) }}"
           when:
             - package_info.Version is defined
             - package_info.Version
-      when: video_driver_pkg_name
-  when:
-    - which_xorg_server is defined
-    - which_xorg_server.rc is defined
-    - which_xorg_server.rc == 0
