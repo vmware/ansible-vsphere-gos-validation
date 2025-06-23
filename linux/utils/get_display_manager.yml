@@ -1,0 +1,45 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get display manager and service in the guest OS
+#
+- name: "Initialize fact of the display manager and service on {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    guest_os_display_manager: ""
+    guest_os_display_manager_service: ""
+
+- name: "Get display mananger and service on {{ vm_guest_os_distribution }}"
+  when: guest_os_ansible_system == "linux"
+  block:
+    # The display-manager.service is typically a symlink (alias) to
+    # the actual desktop environment's display manager
+    - name: "Get the file display manager service on {{ vm_guest_os_distribution }}"
+      include_tasks: get_file_real_path.yml
+      vars:
+        src_file: "/etc/systemd/system/display-manager.service"
+    
+    - name: "Set facts of the display manager and service on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_os_display_manager: "{{ _real_display_manager_service.split('.')[0] }}"
+        guest_os_display_manager_service: "{{ _real_display_manager_service }}"
+      vars:
+        _real_display_manager_service: "{{ file_real_path.split('/')[-1] }}"
+      when: file_real_path
+
+- name: "Get display mananger on {{ vm_guest_os_distribution }}"
+  when: guest_os_ansible_system == "freebsd"
+  block:
+    - name: "Check display manager on {{ vm_guest_os_distribution }}"
+      ansible.builtin.shell: "grep -io -E '^(gdm|slim|lightdm|sddm|xdm)_enable=.*YES' /etc/rc.conf"
+      ignore_errors: true
+      delegate_to: "{{ vm_guest_ip }}"
+      register: check_dm_result
+
+    - name: "Set fact of display manager on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_os_display_manager: "{{ check_dm_result.stdout_lines[0].split('_')[0] }}"
+      when:
+        - check_dm_result.rc is defined
+        - check_dm_result.rc == 0
+        - check_dm_result.stdout_lines is defined
+        - check_dm_result.stdout_lines | length > 0

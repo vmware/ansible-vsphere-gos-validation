@@ -50,34 +50,22 @@
         - name: "Get display manager, session type and desktop in guest OS"
           when: guest_login_sessions | length > 0
           block:
-            - name: "Set facts of desktop environment and session type in guest OS"
-              ansible.builtin.set_fact:
-                guest_os_with_gui: true
-                guest_os_session_type: "{{ guest_login_sessions[0].Type }}"
-                guest_os_session_desktop: "{{ guest_login_sessions[0].Desktop }}"
+            - name: "Get display manager and service in guest OS"
+              include_tasks: get_display_manager.yml
 
-            - name: "Get guest OS display manager service detail"
-              ansible.builtin.shell: "systemctl status display-manager.service"
-              register: display_manager_status
-              changed_when: false
-              ignore_errors: true
-              delegate_to: "{{ vm_guest_ip }}"
+            - name: "Check display manager service state"
+              when: guest_os_display_manager_service
+              block:
+                - name: "Get display manager service info in guest OS"
+                  include_tasks: get_service_info.yml
+                  vars:
+                    service_name: "{{ guest_os_display_manager_service }}"
 
-            - name: "Set fact of display manager in guest OS"
-              ansible.builtin.set_fact:
-                guest_os_display_manager: |-
-                  {%- if "GNOME Display Manager" in display_manager_status.stdout_lines[0] -%}gdm
-                  {%- elif "Light Display Manager" in display_manager_status.stdout_lines[0] -%}lightdm
-                  {%- elif "X Display Manager" in display_manager_status.stdout_lines[0] -%}xdm
-                  {%- elif "LXDE Display Manager" in display_manager_status.stdout_lines[0] -%}lxdm
-                  {%- elif "Simple Desktop Display Manager" in display_manager_status.stdout_lines[0] -%}sddm
-                  {%- elif guest_os_ansible_distribution == 'Astra Linux (Orel)' -%}fly-dm
-                  {%- endif -%}
-              when:
-                - display_manager_status.rc is defined
-                - display_manager_status.rc == 0
-                - display_manager_status.stdout_lines is defined
-                - display_manager_status.stdout_lines | length > 0
+                - name: "Set facts of desktop environment and session type in guest OS"
+                  ansible.builtin.set_fact:
+                    guest_os_with_gui: "{{ service_info.state is defined and service_info.state == 'running' }}"
+                    guest_os_session_type: "{{ guest_login_sessions[0].Type | default('') }}"
+                    guest_os_session_desktop: "{{ guest_login_sessions[0].Desktop | default('') }}"
 
 - name: "Check FreeBSD has desktop environment or not"
   when: guest_os_ansible_system == "freebsd"
@@ -103,20 +91,8 @@
               {%- elif 'Xwayland' in pgrep_result.stdout -%}wayland
               {%- endif -%}
 
-        - name: "Check display manager on {{ vm_guest_os_distribution }}"
-          ansible.builtin.shell: "grep -io -E '^(gdm|slim|lightdm|sddm|xdm)_enable=.*YES' /etc/rc.conf"
-          ignore_errors: true
-          delegate_to: "{{ vm_guest_ip }}"
-          register: check_dm_result
-
-        - name: "Set fact of guest OS display manager"
-          ansible.builtin.set_fact:
-            guest_os_display_manager: "{{ check_dm_result.stdout_lines[0].split('_')[0] }}"
-          when:
-            - check_dm_result.rc is defined
-            - check_dm_result.rc == 0
-            - check_dm_result.stdout_lines is defined
-            - check_dm_result.stdout_lines | length > 0
+        - name: "Get display manager in guest OS"
+          include_tasks: get_display_manager.yml
 
 - name: "Display guest OS desktop facts"
   ansible.builtin.debug:

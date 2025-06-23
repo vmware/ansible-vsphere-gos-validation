@@ -266,8 +266,11 @@ class VmDetailInfo(VmGuestInfo):
             if self.GUI_Installed == 'True':
                 display_manager = ansible_gosv_facts.get('guest_os_display_manager', '').upper()
                 session_type = ansible_gosv_facts.get('guest_os_session_type', '')
-                if display_manager and session_type:
-                    self.GUI_Installed = f"{self.GUI_Installed} ({display_manager} {session_type})"
+                if display_manager:
+                    self.GUI_Installed = f"{self.GUI_Installed} ({display_manager}"
+                    if session_type:
+                        self.GUI_Installed += f" {session_type}"
+                    self.GUI_Installed += ")"
             self.CloudInit_Version = ansible_gosv_facts.get('cloudinit_version', '')
             super().__init__(ansible_gosv_facts)
 
@@ -948,6 +951,7 @@ class CallbackModule(CallbackBase):
                            "get_linux_system_info.yml",
                            "get_cloudinit_version.yml",
                            "check_guest_os_gui.yml",
+                           "get_display_manager.yml",
                            "get_guest_ovt_version_build.yml",
                            "get_windows_system_info.yml",
                            "win_get_vmtools_version_build.yml",

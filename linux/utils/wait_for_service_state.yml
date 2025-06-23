@@ -1,0 +1,59 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Wait servie state as expected in the guest OS
+# Parameters:
+#   wait_service_name: The name of the service
+#   wait_service_state: The expected servie state, which can be
+#     'activating', 'inactive', 'active', 'running', 'stopped', etc.
+#   wait_service_timeout(optional): The timeout for waiting servie state
+#   wait_service_ignore_errors(optional): Whether to ignore errors when servie state
+#     is not as expected. Default value is false.
+# Returns:
+#   wait_service_current_state: Current state of the service
+#
+- name: "Check parameter are set"
+  ansible.builtin.assert:
+    that:
+      - wait_service_name is defined
+      - wait_service_name
+      - wait_service_state is defined
+      - wait_service_state in ['activating', 'inactive', 'active', 'running', 'stopped']
+    fail_msg: >-
+      Parameters 'wait_service_name' and 'wait_service_state' must be set
+
+- name: "Initialize fact of the service current state"
+  ansible.builtin.set_fact:
+    wait_service_current_state: ""
+
+- name: "Wait '{{ wait_service_name }}' is {{ wait_service_state }} on {{ vm_guest_os_distribution }}"
+  ansible.builtin.command: "systemctl status {{ service_name }}"
+  register: guest_service_status
+  delay: 5
+  retries: "{{ ((wait_service_timeout | default(600) | int) / 5) | int }}"
+  ignore_errors: true
+  until:
+    - guest_service_status is defined
+    - guest_service_status.stdout is defined
+    - guest_service_status.stdout is search('[^a-z]' ~ wait_service_state)
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Update '{{ wait_service_name }}' service info in the guest OS"
+  include_tasks: ../utils/get_service_info.yml
+  vars:
+    service_name: "{{ wait_service_name }}"
+
+- name: "Check service state is {{ wait_service_state }}"
+  ansible.builtin.assert:
+    that:
+      - service_info.state is defined
+      - service_info.state == wait_service_state
+    fail_msg: >-
+      It's timed out to wait '{{ wait_service_name }}' service state to be '{{ wait_service_state }}'.
+      Current service state is '{{ service_info.state | default('') }}'
+    success_msg: "The service state of '{{ wait_service_name }}' is '{{ wait_service_state }}' now"
+  when: not (wait_service_ignore_errors | default(false))
+
+- name: "Update fact of the service current state"
+  ansible.builtin.set_fact:
+    wait_service_current_state: "{{ service_info.state }}"
