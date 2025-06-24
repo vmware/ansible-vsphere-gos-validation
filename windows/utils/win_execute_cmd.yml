@@ -3,11 +3,13 @@
 ---
 # Execute specified PowerShell command in Windows guest OS
 # Parameters:
-#   win_powershell_cmd: PowerShell command
-#   win_execute_cmd_ignore_error: true or false
-#   win_execute_cmd_no_log: true or false, default false.
+#   win_powershell_cmd: PowerShell command to be executed in guest OS.
+#   win_execute_cmd_ignore_error: whether to ignore the failure returned
+#     by executing command in guest OS. Default value is false.
+#   win_execute_cmd_no_log: whether to print the output of executing command
+#     task. Default value is false.
 # Return:
-#   win_powershell_cmd_output
+#   win_powershell_cmd_output: the output of executing command task.
 #
 - name: "Check required parameter"
   ansible.builtin.assert:
@@ -28,27 +30,25 @@
   ignore_unreachable: true
   no_log: "{{ win_execute_cmd_no_log | default(false) }}"
 
-- name: "Test VM and guest connection when guest unreachable"
+- name: "Test network connection when guest OS unreachable"
+  when:
+    - win_powershell_cmd_output.unreachable is defined
+    - win_powershell_cmd_output.unreachable
   block:
-    - name: "Test connection to VM"
+    - name: "Test network connection to VM"
       ansible.builtin.command: ping -c 10 "{{ vm_guest_ip }}"
       register: ping_vm_result
       changed_when: false
       ignore_errors: true
-    - ansible.builtin.debug: var=ping_vm_result
-    - name: "Test connection into guest"
-      ansible.windows.setup:
-        filter: "ansible_all_ipv4_addresses"
-      register: setup_vm_connection
-      delegate_to: "{{ vm_guest_ip }}"
-      ignore_errors: true
-    - ansible.builtin.debug: var=setup_vm_connection
-    - name: "Guest OS unreachable"
+    - name: "Print the result of ping VM IP"
+      ansible.builtin.debug: var=ping_vm_result
+
+    - name: "Execute PowerShell command in guest OS failed"
       ansible.builtin.fail:
-        msg: "{{ win_powershell_cmd_output }}"
-  when:
-    - win_powershell_cmd_output.unreachable is defined
-    - win_powershell_cmd_output.unreachable
+        msg: >-
+          Execute PowerShell command '{{ win_powershell_cmd }}' in guest OS failed
+          due to guest OS is unreachable, and ping guest OS IP '{{ vm_guest_ip }}'
+          {{ (ping_vm_result.rc | default(1) == 0) | ternary('passed', 'failed') }}.
 
 - name: "Display the PowerShell command result"
   ansible.builtin.debug: var=win_powershell_cmd_output
