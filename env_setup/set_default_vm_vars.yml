@@ -1,13 +1,17 @@
 # Copyright 2025 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Set fact of the hardware version for new VM"
+- name: "Set fact of the default hardware version for new VM"
   ansible.builtin.set_fact:
-    hardware_version: "{{ esxi_latest_hardware_version }}"
+    hardware_version: "{{ esxi_default_hardware_version }}"
   when: >
     hardware_version is undefined or
-    (not hardware_version) or
-    (hardware_version | lower == 'latest')
+    not hardware_version
+
+- name: "Set fact of the latest hardware version for new VM"
+  ansible.builtin.set_fact:
+    hardware_version: "{{ esxi_latest_hardware_version }}"
+  when: hardware_version | lower == 'latest'
 
 - name: "Check hardware version for new VM in ESXi supported hardware versions list"
   ansible.builtin.assert:
@@ -83,12 +87,12 @@
       for VM with guest ID '{{ guest_id }}' and hardware version '{{ hardware_version }}'.
       Please check your configuration in vars/test.yml.
 
-- name: "Check boot disk controller type for new VM on ARM ESXi host"
+- name: "Check boot disk controller type for new VM on ESXi on ARM"
   ansible.builtin.assert:
     that:
       - boot_disk_controller != 'paravirtual'
     fail_msg: >-
-      Boot disk controller '{{ boot_disk_controller }}' is not supported for VM on ARM ESXi host since
+      Boot disk controller '{{ boot_disk_controller }}' is not supported for VM on ESXi on ARM since
       PVSCSI driver is not available in OS distributions except Photon OS currently.
   when:
     - esxi_cpu_vendor == 'arm'
@@ -159,6 +163,22 @@
 - name: "Check Windows VM CPU socket number"
   include_tasks: check_cpu_socket.yml
   when: gosv_test_suite == "windows"
+
+- name: "Set USB controller to 'usb3' for new VM on ESXi on ARM"
+  ansible.builtin.set_fact:
+    usb_controller: 'usb3'
+  when: esxi_cpu_vendor == 'arm'
+
+- name: "Check USB controller for new VM"
+  ansible.builtin.assert:
+    that:
+      - usb_controller in guest_config_options.support_usb_controller
+    fail_msg: >-
+      USB controller '{{ usb_controller }}' for new VM is not in the supported
+      USB controller list in guest config options '{{ guest_config_options.support_usb_controller }}'
+      for VM with guest ID '{{ guest_id }}' and hardware version '{{ hardware_version }}'.
+      Please check your configuration in vars/test.yml.
+  when: usb_controller is defined
 
 - name: "Display the facts of the new VM configurations"
   ansible.builtin.debug:
