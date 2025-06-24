@@ -222,37 +222,32 @@
 - name: "Wait for Linux system is ready for login"
   when: guest_os_ansible_system == "linux"
   block:
-    # Wait for 'systemd-logind' service running
-    - name: "Wait for 'systemd-logind' service running"
+    - name: "Set facts of desktop environment is not ready in guest OS"
+      ansible.builtin.set_fact:
+        systemd_logind_not_ready: "{{ (guest_os_systemd_logind_service and not systemd_logind_is_running) | bool }}"
+        display_manager_not_ready: "{{ (guest_os_display_manager_service and not display_manager_is_running) | bool }}"
+
+    # Wait for systemd logind service running
+    - name: "Wait for '{{ guest_os_systemd_logind_service }}' running"
       include_tasks: wait_for_service_state.yml
       vars:
-        wait_service_name: "systemd-logind"
+        wait_service_name: "{{ guest_os_systemd_logind_service }}"
         wait_service_state: "running"
+      when: systemd_logind_not_ready
 
-    # If guest_os_with_gui is true, it means the guest OS desktop environment is ready.
-    # Then it doesn't need to wait for display manager service running
-    - name: "Set fact of desktop environment is not ready in guest OS"
-      ansible.builtin.set_fact:
-        guest_desktop_not_ready: "{{ guest_os_display_manager_service is defined and
-                                     guest_os_display_manager_service and
-                                     not guest_os_with_gui }}"
+    # Wait for 'display-manager' service running. Even though it is not running at last,
+    # it is OK because it is not mandatory.
+    - name: "Wait for display manager '{{ guest_os_display_manager_service }}' running"
+      include_tasks: wait_for_service_state.yml
+      vars:
+        wait_service_name: "{{ guest_os_display_manager_service }}"
+        wait_service_state: "running"
+        wait_service_ignore_errors: true
+      when: display_manager_not_ready
 
-    - name: "Wait for guest OS desktop environment ready"
-      when: guest_desktop_not_ready
-      block:
-        # Wait for 'display-manager' service running. Even though it is not running at last,
-        # it is OK because it is not mandatory.
-        - name: "Wait for display manager service '{{ guest_os_display_manager_service }}' running"
-          include_tasks: wait_for_service_state.yml
-          vars:
-            wait_service_name: "{{ guest_os_display_manager_service }}"
-            wait_service_state: "running"
-            wait_service_ignore_errors: true
-
-        # Update guest OS desktop facts
-        - name: "Update facts about guest OS desktop environment"
-          include_tasks: ../utils/check_guest_os_gui.yml
-          when: wait_service_current_state == 'running'
+    - name: "Check guest OS desktop environment again"
+      include_tasks: ../utils/check_guest_os_gui.yml
+      when: systemd_logind_not_ready or display_manager_not_ready
 
 - name: "Upgrade Oracle Linux 9.0 kernel from UEK R7 GA to latest UEK R7"
   when:

@@ -9,12 +9,19 @@
 #
 - name: "Initialize the fact of file real path"
   ansible.builtin.set_fact:
-    file_real_path: "{{ src_file }}"
+    file_real_path: ""
 
 - name: "Get stats of {{ src_file }}"
   include_tasks: get_file_stat_info.yml
   vars:
     guest_file_path: "{{ src_file }}"
+
+- name: "Set fact of the real path of {{ src_file }}"
+  ansible.builtin.set_fact:
+    file_real_path: "{{ src_file }}"
+  when:
+    - guest_file_exists
+    - not (guest_file_stat.islnk | default(false))
 
 - name: "Get the source file path of symlink {{ src_file }}"
   ansible.builtin.set_fact:

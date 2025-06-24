@@ -1,28 +1,42 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
-#
+---
 # Get network config files for Ubuntu Server,
 # different distributions have different network config files
-- block:
-    - name: Get all files of dir /etc/netplan
-      ansible.builtin.command: ls /etc/netplan/
+#
+- name: "Get netplan config file on {{ vm_guest_os_distribution }}"
+  when:
+    - guest_os_ansible_distribution == "Ubuntu"
+    - guest_os_edition != "Desktop"
+  block:
+    - name: "Set fact of valid netplan config file list on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        valid_netplan_config_files:
+          - 00-installer-config.yaml
+          - 50-cloud-init.yaml
+          - 01-netcfg.yaml
+        existing_netplan_config_files: []
+
+    - name: "Get all files of dir /etc/netplan"
+      ansible.builtin.command: "ls /etc/netplan/"
       register: all_config_files_for_netplan
       delegate_to: "{{ vm_guest_ip }}"
 
-    - ansible.builtin.debug: var=all_config_files_for_netplan
+    - name: "Display all netplan config files"
+      ansible.builtin.debug: var=all_config_files_for_netplan
 
-    - name: Set fact of the network configure file for ubuntu server
+    - name: "Set fact of existing netplan config files on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
-        netplan_config_file: "/etc/netplan/{{ netplan_config_file_item }}"
-      when: all_config_files_for_netplan.stdout.find(netplan_config_file_item) != -1
-      with_items:
-        - 00-installer-config.yaml
-        - 50-cloud-init.yaml
-        - 01-netcfg.yaml
-      loop_control:
-        loop_var: netplan_config_file_item
+        existing_netplan_config_files: >-
+          {{
+            all_config_files_for_netplan.stdout_lines |
+            select('in', valid_netplan_config_files)
+          }}
 
-    - ansible.builtin.debug: var=netplan_config_file
-  when:
-    - guest_os_ansible_distribution == "Ubuntu"
-    - guest_os_with_gui is defined and not guest_os_with_gui
+    - name: "Set fact of the netplan config file on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        netplan_config_file: "/etc/netplan/{{ existing_netplan_config_files[0] }}"
+      when: existing_netplan_config_files | length > 0
+
+    - name: "Display the netplan config file on {{ vm_guest_os_distribution }}"
+      ansible.builtin.debug: var=netplan_config_file

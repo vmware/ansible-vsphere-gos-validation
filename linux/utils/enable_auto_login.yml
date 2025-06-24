@@ -14,9 +14,7 @@
 - name: "Can not enable auto login for unknown display manager"
   ansible.builtin.fail:
     msg: "Can not enable auto login when guest_os_display_manager is {{ guest_os_display_manager | default('') }}."
-  when: >
-    guest_os_display_manager is undefined or
-    guest_os_display_manager not in ["gdm", "xdm", "lightdm", "lxdm", "slim"]
+  when: guest_os_display_manager not in ["gdm", "xdm", "lightdm", "lxdm", "slim"]
 
 - name: "Set facts for enabling GDM auto login"
   when: guest_os_display_manager == "gdm"
@@ -72,13 +70,13 @@
   ansible.builtin.set_fact:
     dm_conf_path: "/etc/lxdm/lxdm.conf"
     dm_conf_section: "base"
-    dm_autologin_options:  {"autologin": "{{ autologin_user }}"}
+    dm_autologin_options: {"autologin": "{{ autologin_user }}"}
   when: guest_os_display_manager == "lxdm"
 
 - name: "Set facts for enabling SLIM auto login"
   ansible.builtin.set_fact:
     dm_conf_path: "/usr/local/etc/slim.conf"
-    dm_autologin_options:  {"default_user": "{{ autologin_user }}", "auto_login": "yes"}
+    dm_autologin_options: {"default_user": "{{ autologin_user }}", "auto_login": "yes"}
   when:
     - guest_os_display_manager == "slim"
     - guest_os_ansible_distribution == "FreeBSD"

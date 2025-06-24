@@ -1,17 +1,30 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Check whether guest OS has desktop environment
-# If desktop environment is running, get display manager and session type
+# Check whether guest OS has desktop environment, 
+# If desktop environment is running, and get session type and desktop.
+#
 - name: "Initialize facts about guest OS desktop environment"
   ansible.builtin.set_fact:
     guest_os_with_gui: false
-    guest_os_display_manager: ""
     guest_os_session_type: "tty"
     guest_os_session_desktop: ""
 
-- name: "Check Linux guest OS has desktop environment or not"
-  when: guest_os_ansible_system == "linux"
+- name: "Get display manager and services in guest OS"
+  include_tasks: get_display_manager.yml
+
+- name: "Set fact of guest OS has desktop environment"
+  ansible.builtin.set_fact:
+    guest_os_with_gui: true
+  when:
+    - guest_os_display_manager
+    - display_manager_is_running
+
+- name: "Get login session type and desktop on Linux"
+  when:
+    - guest_os_ansible_system == "linux"
+    - guest_os_with_gui
+    - systemd_logind_is_running
   block:
     - name: "List all login sessions in guest OS"
       ansible.builtin.shell: "loginctl --no-legend list-sessions | awk '{print $1}'"
@@ -35,7 +48,7 @@
           loop_control:
             loop_var: session_id
 
-        - name: "Set fact of all login session types"
+        - name: "Set fact of all login session types for desktop environment"
           ansible.builtin.set_fact:
             guest_login_sessions: >-
               {{
@@ -47,28 +60,16 @@
                 select('search', 'x11|wayland', ignorecase=true)
               }}
 
-        - name: "Get display manager, session type and desktop in guest OS"
+        - name: "Set facts of login session type and desktop in guest OS"
+          ansible.builtin.set_fact:
+            guest_os_session_type: "{{ guest_login_sessions[0].Type | default('') }}"
+            guest_os_session_desktop: "{{ guest_login_sessions[0].Desktop | default('') }}"
           when: guest_login_sessions | length > 0
-          block:
-            - name: "Get display manager and service in guest OS"
-              include_tasks: get_display_manager.yml
 
-            - name: "Check display manager service state"
-              when: guest_os_display_manager_service
-              block:
-                - name: "Get display manager service info in guest OS"
-                  include_tasks: get_service_info.yml
-                  vars:
-                    service_name: "{{ guest_os_display_manager_service }}"
-
-                - name: "Set facts of desktop environment and session type in guest OS"
-                  ansible.builtin.set_fact:
-                    guest_os_with_gui: "{{ service_info.state is defined and service_info.state == 'running' }}"
-                    guest_os_session_type: "{{ guest_login_sessions[0].Type | default('') }}"
-                    guest_os_session_desktop: "{{ guest_login_sessions[0].Desktop | default('') }}"
-
-- name: "Check FreeBSD has desktop environment or not"
-  when: guest_os_ansible_system == "freebsd"
+- name: "Get login session type and desktop on FreeBSD"
+  when:
+    - guest_os_ansible_system == "freebsd"
+    - guest_os_with_gui
   block:
     - name: "Check Xorg or Xwayland is running or not"
       ansible.builtin.shell: "pgrep -l 'Xorg|Xwayland'"
@@ -76,23 +77,17 @@
       delegate_to: "{{ vm_guest_ip }}"
       register: pgrep_result
 
-    - name: "Set facts of guest OS desktop environment for {{ vm_guest_os_distribution }}"
+    - name: "Set fact of login session type in guest OS"
+      ansible.builtin.set_fact:
+        guest_os_session_type: |-
+          {%- if 'Xorg' in pgrep_result.stdout -%}x11
+          {%- elif 'Xwayland' in pgrep_result.stdout -%}wayland
+          {%- endif -%}
       when:
         - pgrep_result.rc is defined
         - pgrep_result.rc == 0
         - pgrep_result.stdout is defined
         - pgrep_result.stdout
-      block:
-        - name: "Set fact of guest OS having desktop environment"
-          ansible.builtin.set_fact:
-            guest_os_with_gui: true
-            guest_os_session_type: |-
-              {%- if 'Xorg' in pgrep_result.stdout -%}x11
-              {%- elif 'Xwayland' in pgrep_result.stdout -%}wayland
-              {%- endif -%}
-
-        - name: "Get display manager in guest OS"
-          include_tasks: get_display_manager.yml
 
 - name: "Display guest OS desktop facts"
   ansible.builtin.debug:

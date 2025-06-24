@@ -25,20 +25,16 @@
           {%- endif -%}
       when: guest_installed_packages | length > 0
 
-- name: "Get Pardus edition"
-  when: guest_os_ansible_distribution is match("Pardus.*")
-  block:
-    - name: "Get display manager on {{ guest_os_ansible_distribution }}"
-      include_tasks: check_guest_os_gui.yml
-      when: guest_os_display_manager is undefined
-
-    - name: "Set fact of Pardus edition"
-      ansible.builtin.set_fact:
-        guest_os_edition: |-
-          {%- if guest_os_display_manager == 'lightdm' -%}XFCE
-          {%- elif guest_os_display_manager == 'gdm' -%}GNOME
-          {%- else -%}Server
-          {%- endif -%}
+- name: "Set fact of Pardus edition"
+  ansible.builtin.set_fact:
+    guest_os_edition: |-
+      {%- if guest_os_display_manager == 'lightdm' -%}XFCE
+      {%- elif guest_os_display_manager == 'gdm' -%}GNOME
+      {%- else -%}Server
+      {%- endif -%}
+  when:
+    - guest_os_ansible_distribution is match("Pardus.*")
+    - guest_os_display_manager is defined
 
 - name: "Get Fedora Edition"
   ansible.builtin.set_fact:
