@@ -1,0 +1,104 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get display manager and services in the guest OS, and check whether systemd-logind
+# and display manager is running.
+#
+- name: "Initialize fact of display manager and service on {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    guest_os_display_manager: ""
+    guest_os_display_manager_service: ""
+    guest_os_systemd_logind_service: ""
+    systemd_logind_is_running: false
+    display_manager_is_running: false
+
+- name: "Get display mananger and services on {{ vm_guest_os_distribution }}"
+  when: guest_os_ansible_system == "linux"
+  block:
+    - name: "Get facts of all services"
+      ansible.builtin.service_facts:
+      register: service_facts_result
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Set facts of Linux services on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        linux_services: "{{ service_facts_result.ansible_facts.services }}"
+        default_display_manager_service: "display-manager.service"
+        default_systemd_logind_service: "systemd-logind.service"
+
+    - name: "Set fact of '{{ default_systemd_logind_service }}' running state"
+      ansible.builtin.set_fact:
+        guest_os_systemd_logind_service: "{{ default_systemd_logind_service }}"
+        systemd_logind_is_running: "{{ linux_services[default_systemd_logind_service].state | default('') == 'running' }}"
+      when: linux_services[default_systemd_logind_service] is defined
+
+    - name: "Get {{ default_display_manager_service }} on {{ vm_guest_os_distribution }}"
+      when: linux_services[default_display_manager_service] is defined
+      block:
+        - name: "Get display manager service's fragment path and description on {{ vm_guest_os_distribution }}"
+          include_tasks: get_systemd_unit_properties.yml
+          vars:
+            guest_systemd_unit: "{{ default_display_manager_service }}"
+            guest_systemd_show_properties: "FragmentPath,Description"
+
+        - name: "Set facts of display manager and service on {{ vm_guest_os_distribution }}"
+          ansible.builtin.set_fact:
+            guest_os_display_manager: "{{ _real_display_manager_service.split('.')[0] }}"
+            guest_os_display_manager_service: "{{ _real_display_manager_service }}"
+          vars:
+            _real_display_manager_service: "{{ guest_systemd_unit_properties.FragmentPath | basename }}"
+          when:
+            - guest_systemd_unit_properties.FragmentPath is defined
+            - guest_systemd_unit_properties.FragmentPath
+
+        - name: "Set fact of display manager running state on {{ vm_guest_os_distribution }}"
+          ansible.builtin.set_fact:
+            display_manager_is_running: "{{ linux_services[guest_os_display_manager_service].state | default('') == 'running' }}"
+          when: guest_os_display_manager_service
+
+        - name: "Set fact of the real display manager on {{ vm_guest_os_distribution }}"
+          ansible.builtin.set_fact:
+            guest_os_display_manager: |-
+              {%- if "GNOME Display Manager" in guest_systemd_unit_properties.Description -%}gdm
+              {%- elif "Light Display Manager" in guest_systemd_unit_properties.Description -%}lightdm
+              {%- elif "X Display Manager" in guest_systemd_unit_properties.Description -%}xdm
+              {%- elif "LXDE Display Manager" in guest_systemd_unit_properties.Description -%}lxdm
+              {%- elif "Simple Desktop Display Manager" in guest_systemd_unit_properties.Description -%}sddm
+              {%- endif -%}
+          when:
+            - guest_os_display_manager_service == default_display_manager_service
+            - guest_systemd_unit_properties.Description is defined
+            - guest_systemd_unit_properties.Description
+
+- name: "Get display mananger on {{ vm_guest_os_distribution }}"
+  when: guest_os_ansible_system == "freebsd"
+  block:
+    - name: "Check display manager on {{ vm_guest_os_distribution }}"
+      ansible.builtin.shell: "grep -io -E '^(gdm|slim|lightdm|sddm|xdm)_enable=.*YES' /etc/rc.conf"
+      ignore_errors: true
+      delegate_to: "{{ vm_guest_ip }}"
+      register: check_dm_result
+
+    - name: "Set fact of display manager on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_os_display_manager: "{{ check_dm_result.stdout_lines[0].split('_')[0] }}"
+      when:
+        - check_dm_result.rc is defined
+        - check_dm_result.rc == 0
+        - check_dm_result.stdout_lines is defined
+        - check_dm_result.stdout_lines | length > 0
+
+    - name: "Get status of display manager on {{ vm_guest_os_distribution }}"
+      ansible.builtin.shell: "service {{ guest_os_display_manager }} status"
+      ignore_errors: true
+      delegate_to: "{{ vm_guest_ip }}"
+      register: service_status_result
+
+    - name: "Set fact of display manager running state on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        display_manager_is_running: true
+      when:
+        - service_status_result.rc is defined
+        - service_status_result.rc == 0
+        - service_status_result.stdout is defined
+        - service_status_result.stdout is search('is running')

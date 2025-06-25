@@ -1,42 +1,75 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Check whether guest OS has desktop environment and
-# get display manager if deskotp environment is installed
-- name: "Initialize facts of guest OS having desktop environment and display manager"
+# Check whether guest OS has desktop environment, 
+# If desktop environment is running, and get session type and desktop.
+#
+- name: "Initialize facts about guest OS desktop environment"
   ansible.builtin.set_fact:
     guest_os_with_gui: false
-    guest_os_display_manager: ""
+    guest_os_session_type: "tty"
+    guest_os_session_desktop: ""
 
-- name: "Check Linux guest OS has desktop environment or not"
-  when: guest_os_ansible_system == "linux"
+- name: "Get display manager and services in guest OS"
+  include_tasks: get_display_manager.yml
+
+- name: "Set fact of guest OS has desktop environment"
+  ansible.builtin.set_fact:
+    guest_os_with_gui: true
+  when:
+    - guest_os_display_manager
+    - display_manager_is_running
+
+- name: "Get login session type and desktop on Linux"
+  when:
+    - guest_os_ansible_system == "linux"
+    - guest_os_with_gui
+    - systemd_logind_is_running
   block:
-    - name: "Get guest OS display manager service detail"
-      ansible.builtin.shell: "systemctl status display-manager.service"
-      register: display_manager_status
-      changed_when: false
-      ignore_errors: true
+    - name: "List all login sessions in guest OS"
+      ansible.builtin.shell: "loginctl --no-legend list-sessions | awk '{print $1}'"
       delegate_to: "{{ vm_guest_ip }}"
+      register: list_login_sessions
+      ignore_errors: true
 
-    - name: "Set facts of guest OS desktop environment for {{ guest_os_ansible_distribution }}"
-      ansible.builtin.set_fact:
-        guest_os_with_gui: true
-        guest_os_display_manager: |-
-          {%- if "GNOME Display Manager" in display_manager_status.stdout_lines[0] -%}gdm
-          {%- elif "Light Display Manager" in display_manager_status.stdout_lines[0] -%}lightdm
-          {%- elif "X Display Manager" in display_manager_status.stdout_lines[0] -%}xdm
-          {%- elif "LXDE Display Manager" in display_manager_status.stdout_lines[0] -%}lxdm
-          {%- elif "Simple Desktop Display Manager" in display_manager_status.stdout_lines[0] -%}sddm
-          {%- elif guest_os_ansible_distribution == 'Astra Linux (Orel)' -%}fly-dm
-          {%- endif -%}
+    - name: "Get desktop session from login sessions"
       when:
-        - display_manager_status.rc is defined
-        - display_manager_status.rc == 0
-        - display_manager_status.stdout_lines is defined
-        - display_manager_status.stdout_lines | length > 0
+        - list_login_sessions.rc is defined
+        - list_login_sessions.rc == 0
+        - list_login_sessions.stdout_lines is defined
+        - list_login_sessions.stdout_lines | length > 0
+      block:
+        - name: "Get types of all login sessions"
+          ansible.builtin.shell: "loginctl -p Type -p Desktop show-session {{ session_id }}"
+          delegate_to: "{{ vm_guest_ip }}"
+          register: get_session_types
+          ignore_errors: true
+          with_items: "{{ list_login_sessions.stdout_lines }}"
+          loop_control:
+            loop_var: session_id
 
-- name: "Check FreeBSD has desktop environment or not"
-  when: guest_os_ansible_system == "freebsd"
+        - name: "Set fact of all login session types for desktop environment"
+          ansible.builtin.set_fact:
+            guest_login_sessions: >-
+              {{
+                get_session_types.results |
+                selectattr('stdout', 'defined') |
+                map(attribute='stdout') |
+                map('replace', '=', ': ') |
+                map('from_yaml') |
+                select('search', 'x11|wayland', ignorecase=true)
+              }}
+
+        - name: "Set facts of login session type and desktop in guest OS"
+          ansible.builtin.set_fact:
+            guest_os_session_type: "{{ guest_login_sessions[0].Type | default('') }}"
+            guest_os_session_desktop: "{{ guest_login_sessions[0].Desktop | default('') }}"
+          when: guest_login_sessions | length > 0
+
+- name: "Get login session type and desktop on FreeBSD"
+  when:
+    - guest_os_ansible_system == "freebsd"
+    - guest_os_with_gui
   block:
     - name: "Check Xorg or Xwayland is running or not"
       ansible.builtin.shell: "pgrep -l 'Xorg|Xwayland'"
@@ -44,34 +77,22 @@
       delegate_to: "{{ vm_guest_ip }}"
       register: pgrep_result
 
-    - name: "Set facts of guest OS desktop environment for {{ vm_guest_os_distribution }}"
+    - name: "Set fact of login session type in guest OS"
+      ansible.builtin.set_fact:
+        guest_os_session_type: |-
+          {%- if 'Xorg' in pgrep_result.stdout -%}x11
+          {%- elif 'Xwayland' in pgrep_result.stdout -%}wayland
+          {%- endif -%}
       when:
         - pgrep_result.rc is defined
         - pgrep_result.rc == 0
-        - pgrep_result.stdout_lines is defined
-        - pgrep_result.stdout_lines | length > 0
-      block:
-        - name: "Set fact of guest OS having desktop environment"
-          ansible.builtin.set_fact:
-            guest_os_with_gui: true
-
-        - name: "Check display manager on {{ vm_guest_os_distribution }}"
-          ansible.builtin.shell: "grep -io -E '^(gdm|slim|lightdm|sddm|xdm)_enable=.*YES' /etc/rc.conf"
-          ignore_errors: true
-          delegate_to: "{{ vm_guest_ip }}"
-          register: check_dm_result
-
-        - name: "Set fact of guest OS display manager"
-          ansible.builtin.set_fact:
-            guest_os_display_manager: "{{ check_dm_result.stdout_lines[0].split('_')[0] }}"
-          when:
-            - check_dm_result.rc is defined
-            - check_dm_result.rc == 0
-            - check_dm_result.stdout_lines is defined
-            - check_dm_result.stdout_lines | length > 0
+        - pgrep_result.stdout is defined
+        - pgrep_result.stdout
 
 - name: "Display guest OS desktop facts"
   ansible.builtin.debug:
     msg:
       - "Guest OS has desktop environment: {{ guest_os_with_gui }}"
       - "Guest OS display manager: {{ guest_os_display_manager }}"
+      - "Guest OS session type: {{ guest_os_session_type }}"
+      - "Guest OS session desktop: {{ guest_os_session_desktop }}"

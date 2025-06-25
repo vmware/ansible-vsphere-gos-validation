@@ -118,9 +118,9 @@
 - name: "Set network configuration file for {{ vm_guest_os_distribution }}"
   when: >
     (guest_os_ansible_distribution == "Ubuntu") and
-    (((guest_os_with_gui is undefined or not guest_os_with_gui | bool) and
+    ((guest_os_edition != 'Desktop' and
       guest_os_ansible_distribution_ver is version('17.10', '>=')) or
-     (guest_os_with_gui is defined and guest_os_with_gui | bool and
+     (guest_os_edition == 'Desktop' and
       guest_os_ansible_distribution_ver is version('19.10', '>=')))
   block:
     - name: "Set traditional GOSC network configuration file on Ubuntu {{ guest_os_ansible_distribution_ver }}"
@@ -140,7 +140,7 @@
     (guest_os_ansible_distribution == "Debian") or
     (guest_os_ansible_distribution == "Ubuntu" and
      guest_os_ansible_distribution_ver is version('19.10', '<') and
-     guest_os_with_gui is defined and guest_os_with_gui | bool)
+     guest_os_edition == 'Desktop')
   block:
     - name: "Set traditional GOSC network configuration file on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
