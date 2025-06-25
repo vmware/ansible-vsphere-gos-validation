@@ -29,17 +29,11 @@
     - name: "Set fact of '{{ default_systemd_logind_service }}' running state"
       ansible.builtin.set_fact:
         guest_os_systemd_logind_service: "{{ default_systemd_logind_service }}"
-        systemd_logind_is_running: true
-      when:
-        - linux_services[default_systemd_logind_service] is defined
-        - linux_services[default_systemd_logind_service].state is defined
-        - linux_services[default_systemd_logind_service].state == 'running'
+        systemd_logind_is_running: "{{ linux_services[default_systemd_logind_service].state | default('') == 'running' }}"
+      when: linux_services[default_systemd_logind_service] is defined
 
     - name: "Get {{ default_display_manager_service }} on {{ vm_guest_os_distribution }}"
-      when:
-        - linux_services[default_display_manager_service] is defined
-        - linux_services[default_display_manager_service].state is defined
-        - linux_services[default_display_manager_service].state in ['active', 'running']
+      when: linux_services[default_display_manager_service] is defined
       block:
         - name: "Get display manager service's fragment path and description on {{ vm_guest_os_distribution }}"
           include_tasks: get_systemd_unit_properties.yml
@@ -59,11 +53,8 @@
 
         - name: "Set fact of display manager running state on {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
-            display_manager_is_running: true
-          when:
-            - guest_os_display_manager_service
-            - linux_services[guest_os_display_manager_service].state is defined
-            - linux_services[guest_os_display_manager_service].state == 'running'
+            display_manager_is_running: "{{ linux_services[guest_os_display_manager_service].state | default('') == 'running' }}"
+          when: guest_os_display_manager_service
 
         - name: "Set fact of the real display manager on {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
