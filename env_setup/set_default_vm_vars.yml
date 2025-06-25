@@ -52,12 +52,12 @@
     memory_mb: >-
       {{
           (memory_mb is defined and memory_mb)
-          | ternary(memory_mb, guest_config_options.rec_memory_mb)
+          | ternary(memory_mb | int, guest_config_options.rec_memory_mb)
       }}
     boot_disk_size_gb: >-
       {{
-          (boot_disk_size_gb is defined and (boot_disk_size_gb | int >= (guest_config_options.rec_disk_mb | int / 1024)))
-          | ternary(boot_disk_size_gb, (guest_config_options.rec_disk_mb | int / 1024))
+          (boot_disk_size_gb is defined and (boot_disk_size_gb | int >= (guest_config_options.rec_disk_mb | int // 1024)))
+          | ternary(boot_disk_size_gb | int, (guest_config_options.rec_disk_mb | int // 1024))
       }}
     secureboot_enabled: >-
       {%- if firmware == 'efi' -%}
@@ -183,7 +183,7 @@
 - name: "Display the facts of the new VM configurations"
   ansible.builtin.debug:
     msg:
-      - "The new VM will be located: {{ vm_datastore_path }}, with below configurations:"
+      - "The new VM will be located in '{{ vm_datastore_path }}' with below configurations:"
       - "Hardware version: {{ hardware_version }}"
       - "Boot disk controller: {{ boot_disk_controller }}"
       - "Network adapter: {{ network_adapter_type }}"
