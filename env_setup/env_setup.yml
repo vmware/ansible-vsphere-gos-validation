@@ -9,8 +9,8 @@
     - name: "Get ansible info"
       include_tasks: get_ansible_info.yml
 
-    - name: "Set default variables"
-      include_tasks: set_default_variables.yml
+    - name: "Set default testing variables"
+      include_tasks: set_default_testing_vars.yml
 
     - name: "Create this test run log files path"
       include_tasks: create_local_log_path.yml
@@ -53,49 +53,32 @@
     - name: "Get ESXi server model info"
       include_tasks: ../common/esxi_get_model.yml
 
+    - name: "Get ESXi hardware versions"
+      include_tasks: ../common/esxi_get_hardware_versions.yml
+
     # Refer to https://knowledge.broadcom.com/external/article?articleId=313271
     - name: "Set ESXi server default shell on {{ esxi_version }}"
       ansible.builtin.set_fact:
         esxi_shell: "{{ (esxi_version is version('8.0.0', '<')) | ternary('/bin/sh', '/bin/supershell') }}"
 
     - name: "Cleanup snapshots and get VM related information for existing VM"
-      when: vm_exists is defined and vm_exists
-      block:
-        - name: "Not cleanup old snapshot by default"
-          ansible.builtin.set_fact:
-            cleanup_old_snapshots: false
-          when: cleanup_old_snapshots is undefined
+      include_tasks: existing_vm_setup.yml
+      when: vm_exists
 
-        - name: "Revert and cleanup existing snapshots on existing VM if required"
-          include_tasks: ../common/vm_cleanup_snapshot.yml
-          when: cleanup_old_snapshots | bool
-
-        - name: "Get existing VM info"
-          include_tasks: ../common/vm_get_vm_info.yml
-
-        - name: "Get VM's power state"
-          include_tasks: ../common/vm_get_power_state.yml
-
-        - name: "Power on VM"
-          include_tasks: ../common/vm_set_power_state.yml
-          vars:
-            vm_power_state_set: "powered-on"
-          when: vm_power_state_get == "poweredOff"
-
-        - name: "Wait for VM primary network adapter has MAC address"
-          include_tasks: ../common/vm_wait_primary_nic_mac.yml
-
-    - name: "Set fact of the VM datastore path"
+    - name: "Set fact of the VM path in ESXi datastore"
       ansible.builtin.set_fact:
         vm_datastore_path: "/vmfs/volumes/{{ datastore }}"
 
-    - name: "Display the datatore path of VM files"
-      ansible.builtin.debug: var=vm_datastore_path
+    - name: "Set facts of new VM configurations"
+      include_tasks: set_default_vm_vars.yml
+      when:
+        - new_vm
+        - vm_deploy_method == "iso"
 
     - name: "Add vSphere hosts into memory inventory"
       include_tasks: ../common/add_vsphere_hosts_in_inventory.yml
 
-    - name: "Enable guest IP hack on ESXi host to get VM IP address when there is no VMware tools installed or VMware tools is not up"
+    - name: "Enable guest IP hack on ESXi host to get IP address of VM without VMware Tools available"
       include_tasks: ../common/esxi_enable_guest_ip_hack.yml
 
     - name: "Test Tesseract OCR engine is installed or not for extracting text from screenshot"
