@@ -1,43 +1,20 @@
-# Copyright 2021-2024 VMware, Inc.
+# Copyright 2025 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Add new vSwitch and portgroup to ESXi host and deploy a router VM
-# Parameters:
-#   vswitch_name: the name of vSwitch to be added for new network
-#     interface testing or GOSC testing.
-#   portgroup_name: the name of vSwitch portgroup to be added for
-#     new network interface testing or GOSC testing.
-#
-- name: "Set facts for setting testbed network"
+- name: "Setup network environment for testing on ESXi on X86"
+  include_tasks: vss_network_setup.yml
+  when:
+    - esxi_cpu_vendor != 'arm'
+    - vss_network_is_setup is undefined or not vss_network_is_setup
+
+- name: "Setup network environment for testing on ESXi on ARM"
+  include_tasks: vds_network_setup.yml
+  when:
+    - esxi_cpu_vendor == 'arm'
+    - vds_network_is_setup is undefined or not vds_network_is_setup
+
+# 192.168.192.1 is the static IP address configured on the new added
+# network adapter on router VM
+- name: "Set fact of the gateway for VM new network adapter"
   ansible.builtin.set_fact:
-    vswitch_name: "vSwitch{{ testrun_timestamp }}"
-    portgroup_name: "vSwitch{{ testrun_timestamp }}_PG"
-
-# Add a new standard vSwitch without physical network adapters
-- include_tasks: esxi_add_vswitch.yml
-
-# Create a new portgroup for VM network
-- include_tasks: esxi_add_portgroup.yml
-
-# Deploy a router VM
-- include_tasks: router_vm_deploy.yml
-
-# Hotadd a new e1000 network adapter to router VM
-- include_tasks: vm_add_network_adapter.yml
-  vars:
-    adapter_type: e1000
-    vm_name: "{{ router_vm_name }}"
-    vm_portgroup_name: "{{ portgroup_name }}"
-
-# Power on the router VM
-- include_tasks: vm_set_power_state.yml
-  vars:
-    vm_power_state_set: 'powered-on'
-    vm_name: "{{ router_vm_name }}"
-- name: "Wait 10 seconds to let router VM start up"
-  ansible.builtin.pause:
-    seconds: 10
-
-- name: "Set fact of router_vm_deployed to True"
-  ansible.builtin.set_fact:
-    router_vm_deployed: true
+    new_nic_gateway: "{{ (esxi_cpu_vendor == 'arm') | ternary(vds_vmk_ip_addr, '192.168.192.1') }}"

@@ -1,15 +1,16 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get Ethernet name of new added network adapter
-- include_tasks: ../utils/win_get_ethernet_name.yml
+- name: "Get Ethernet name of new added network adapter"
+  include_tasks: ../utils/win_get_ethernet_name.yml
   vars:
     win_get_ethernet_name_mac: "{{ new_nic_mac_address }}"
 
-# Get IP address of new added network adapter
-- include_tasks: ../utils/win_get_ethernet_ip.yml
+- name: "Get IP address of new added network adapter"
+  include_tasks: ../utils/win_get_ethernet_ip.yml
   vars:
     ethernet_name: "{{ win_get_ethernet_name_result }}"
+
 - name: "Set fact of IP address of new added network adapter"
   ansible.builtin.set_fact:
     new_nic_ip_address: "{{ (ethernet_ip | ansible.utils.ipv4)[0] }}"
@@ -18,73 +19,89 @@
     - ethernet_ip | length != 0
     - ethernet_ip | ansible.utils.ipv4 | length != 0
 
-# Ping vlan gateway after network adapter hotadd
-- include_tasks: ../utils/win_ping_target.yml
+- name: "Ping gateway after new network adapter added"
+  include_tasks: ../utils/win_ping_target.yml
   vars:
-    win_ping_target_ip: "{{ vlan_gateway }}"
+    win_ping_target_ip: "{{ new_nic_gateway }}"
     win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
-- name: Set fact of the ping vlan gateway result
+
+- name: "Save the ping gateway result"
   ansible.builtin.set_fact:
     ping_result_after_hotadd: "{{ win_ping_target_result }}"
 
-# Ping vlan gateway after network adapter disabled
-- include_tasks: ../utils/win_set_netadapter_status.yml
+- name: "Disable new added network adapter in guest OS"
+  include_tasks: ../utils/win_set_netadapter_status.yml
   vars:
     win_set_netadapter_operation: "Disabled"
     win_set_netadapter_name: "{{ win_get_ethernet_name_result }}"
-- include_tasks: ../utils/win_ping_target.yml
+
+- name: "Ping gateway after new network adapter disabled"
+  include_tasks: ../utils/win_ping_target.yml
   vars:
-    win_ping_target_ip: "{{ vlan_gateway }}"
+    win_ping_target_ip: "{{ new_nic_gateway }}"
     win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
-- name: Set fact of the ping vlan gateway result after disable
+
+- name: "Save the ping gateway result"
   ansible.builtin.set_fact:
     ping_result_after_disable: "{{ win_ping_target_result }}"
 
-# Ping vlan gateway after network adapter enabled
-- include_tasks: ../utils/win_set_netadapter_status.yml
+- name: "Enable new added network adapter in guest OS"
+  include_tasks: ../utils/win_set_netadapter_status.yml
   vars:
     win_set_netadapter_operation: "Up"
     win_set_netadapter_name: "{{ win_get_ethernet_name_result }}"
-- include_tasks: ../utils/win_ping_target.yml
+
+- name: "Ping gateway after new network adapter enabled"
+  include_tasks: ../utils/win_ping_target.yml
   vars:
-    win_ping_target_ip: "{{ vlan_gateway }}"
+    win_ping_target_ip: "{{ new_nic_gateway }}"
     win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
-- name: Set fact of the ping vlan gateway result after re-enable
+
+- name: "Save the ping gateway result"
   ansible.builtin.set_fact:
     ping_result_after_enable: "{{ win_ping_target_result }}"
 
-# Ping vlan gateway after network adapter disconnected
-- include_tasks: ../../common/vm_configure_network_adapter.yml
+- name: "Disconnect new network adapter on VM"
+  include_tasks: ../../common/vm_configure_network_adapter.yml
   vars:
     netadapter_mac_addr: "{{ new_nic_mac_address }}"
     netadapter_connect: false
-- name: Check disconnect network adapter to VM succeed
+
+- name: "Check disconnect new network adapter operation"
   ansible.builtin.assert:
     that:
+      - reconfig_result.changed is defined
       - reconfig_result.changed
-    fail_msg: "Disconnect VM network adapter task result is not changed."
-- include_tasks: ../utils/win_ping_target.yml
+    fail_msg: "The result of VM network adapter disconnection task is not changed."
+
+- name: "Ping gateway after new network adapter disconnected"
+  include_tasks: ../utils/win_ping_target.yml
   vars:
-    win_ping_target_ip: "{{ vlan_gateway }}"
+    win_ping_target_ip: "{{ new_nic_gateway }}"
     win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
-- name: Set fact of the ping vlan gateway result after disconnect
+
+- name: "Save the ping gateway result"
   ansible.builtin.set_fact:
     ping_result_after_disconnect: "{{ win_ping_target_result }}"
 
-# Ping vlan gateway after network adapter connected
-- include_tasks: ../../common/vm_configure_network_adapter.yml
+- name: "Reconnect new network adapter on VM"
+  include_tasks: ../../common/vm_configure_network_adapter.yml
   vars:
     netadapter_mac_addr: "{{ new_nic_mac_address }}"
     netadapter_connect: true
-- name: Check reconnect network adapter to VM succeed
+
+- name: "Check reconnect new network adapter operation"
   ansible.builtin.assert:
     that:
       - reconfig_result.changed
-    fail_msg: "Re-connect VM network adapter task result is not changed."
-- include_tasks: ../utils/win_ping_target.yml
+    fail_msg: "The result of VM network adapter reconnection task is not changed."
+
+- name: "Ping gateway after network adapter reconnected"
+  include_tasks: ../utils/win_ping_target.yml
   vars:
-    win_ping_target_ip: "{{ vlan_gateway }}"
+    win_ping_target_ip: "{{ new_nic_gateway }}"
     win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
-- name: Set fact of the ping vlan gateway result after re-connect
+
+- name: "Save the ping gateway result"
   ansible.builtin.set_fact:
     ping_result_after_reconnect: "{{ win_ping_target_result }}"

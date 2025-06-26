@@ -1,62 +1,69 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get network adapter info of VM and in guest OS before network
-# adapter hotadd operation
-#
-# Get network adapter number before hotadd
-- include_tasks: network_adapter_number_check.yml
-- name: Set fact of the NIC info before hotadd
+- name: "Prepare network environment for new network adapter"
+  include_tasks: ../../common/network_testbed_setup.yml
+
+- name: "Get network adapter number before hot add"
+  include_tasks: network_adapter_number_check.yml
+
+- name: "Set fact of network adapter info before hot add"
   ansible.builtin.set_fact:
     nic_num_before_hotadd: "{{ vm_nic_num_get }}"
     nic_mac_addr_list_before_hotadd: "{{ vm_nic_mac_addr_list_get }}"
     nic_num_before_hotadd_guest: "{{ guest_nic_num_get }}"
 
-# Hotadd a new network adapter to VM
-- include_tasks: ../../common/vm_add_network_adapter.yml
+- name: "Hot add a new network adapter to VM"
+  include_tasks: ../../common/vm_add_network_adapter.yml
   vars:
     adapter_type: "{{ nic_type | lower }}"
     vm_portgroup_name: "{{ portgroup_name }}"
-- name: Verify new network adapter hotadd operation succeed
+
+- name: "Check new network adapter hot add operation"
   ansible.builtin.assert:
     that:
       - add_adapter.changed
-    fail_msg: "Hotadd new network adapter task result is not changed."
-- name: Wait 10 seconds after network adapter hotadd
+    fail_msg: "The result of hot adding VM network adapter task is not changed."
+
+- name: "Wait 10 seconds after network adapter hot added"
   ansible.builtin.pause:
     seconds: 10
 
-# Get network adapter number after hotadd
-- include_tasks: network_adapter_number_check.yml
-- name: Set fact of the NIC info after hotadd
+- name: "Get network adapter number after hot add"
+  include_tasks: network_adapter_number_check.yml
+
+- name: "Set fact of network adapter info after hot add"
   ansible.builtin.set_fact:
     nic_num_after_hotadd: "{{ vm_nic_num_get }}"
     nic_mac_addr_list_after_hotadd: "{{ vm_nic_mac_addr_list_get }}"
     nic_num_after_hotadd_guest: "{{ guest_nic_num_get }}"
 
-- name: Get MAC address of new added network adapter
+- name: "Set fact of MAC address of new added network adapter"
   ansible.builtin.set_fact:
     new_nic_mac_address: "{{ (nic_mac_addr_list_after_hotadd | difference(nic_mac_addr_list_before_hotadd))[0] | default('') }}"
 
-# Check disconnect and reconnect of newwork adapter
-- include_tasks: network_adapter_status_check.yml
+- name: "Disconnection and reconnection test"
+  include_tasks: network_adapter_status_check.yml
 
-# Remove new added network adapter of VM
-- include_tasks: ../../common/vm_remove_network_adapter.yml
+- name: "Remove new added network adapter"
+  include_tasks: ../../common/vm_remove_network_adapter.yml
   vars:
     netadapter_mac_addr: "{{ new_nic_mac_address }}"
-- name: Check remove network adapter to VM succeed
+
+- name: "Check network adapter remove operation"
   ansible.builtin.assert:
     that:
       - remove_adapter.changed
-    fail_msg: "Hot remove network adapter task result is not changed."
-- name: Wait 10 seconds after network adapter hot remove
+    fail_msg: "The result of hot removing VM network adapter task is not changed."
+
+- name: "Wait 10 seconds after network adapter hot remove"
   ansible.builtin.pause:
     seconds: 10
 
-# Get the number of VM network adapter after hot remove
-- include_tasks: network_adapter_number_check.yml
-- name: Set fact of the NIC info after hot remove
+- name: "Get the number of VM network adapter after hot remove"
+  include_tasks: network_adapter_number_check.yml
+
+- name: "Set fact of network adapter info after hot remove"
   ansible.builtin.set_fact:
     nic_num_after_hotremove: "{{ vm_nic_num_get }}"
     nic_num_after_hotremove_guest: "{{ guest_nic_num_get }}"
@@ -77,7 +84,7 @@
       - "Ping vlan gateway result after disconnect from VM: {{ ping_result_after_disconnect }}"
       - "Ping vlan gateway result after re-connect from VM: {{ ping_result_after_reconnect }}"
 
-- name: Verify network adapter numbers and connect status to VLAN gateway
+- name: "Verify the number of network adapter and network connection status"
   ansible.builtin.assert:
     that:
       - new_nic_mac_address | ansible.utils.hwaddr
