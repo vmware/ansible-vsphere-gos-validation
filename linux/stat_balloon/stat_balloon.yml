@@ -18,6 +18,20 @@
           vars:
             skip_test_no_vmtools: true
 
+        - name: "Get module info about 'vmw_balloon' module"
+          include_tasks: ../utils/get_module_info.yml
+          vars:
+            module_name: "vmw_balloon"
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case '{{ ansible_play_name }}' because there is no 'vmw_balloon'
+              module on {{ vm_guest_os_distribution }}.
+            skip_reason: "Not Supported"
+          when: guest_module_info | length == 0
+
         - name: "Stat balloon on {{ vm_name }}"
           ansible.builtin.shell: "{{ vmware_toolbox_cmd_path }} stat balloon"
           register: stat_balloon_result
