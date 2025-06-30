@@ -7,12 +7,13 @@
       include_tasks: ../../common/skip_test_case.yml
       vars:
         skip_msg: >-
-          Skip test case '{{ ansible_play_name }}' because '{{ new_disk_ctrl_type }}'
-          controller type is not supported on ESXi on ARM.
+          Skip test case '{{ ansible_play_name }}' because the disk controller type
+          '{{ new_disk_ctrl_type }}' is not in the supported disk controller list
+          in guest config options '{{ guest_config_options.support_disk_controller }}'
+          for VM with guest ID '{{ vm_guest_id }}' and hardware version
+          '{{ vm_hardware_version_num }}'.
         skip_reason: "Not Supported"
-      when:
-        - esxi_cpu_vendor == 'arm'
-        - new_disk_ctrl_type in ["lsilogic", "lsilogicsas"]
+      when: new_disk_ctrl_type not in guest_config_options.support_disk_controller
 
     - name: "Test setup"
       include_tasks: ../setup/test_setup.yml
