@@ -7,7 +7,16 @@
 #
 - name: "Configure package repositories on {{ vm_guest_os_distribution }}"
   include_tasks: ../utils/config_repos.yml
-  when: guest_os_ansible_system == "linux"
+  when:
+    - guest_os_ansible_system == "linux"
+    - guest_os_ansible_distribution is not match('^(FusionOS|(Kylin.*))$')
+
+- name: "Install xmlsec1-devel on {{ vm_guest_os_distribution }}"
+  include_tasks: ../utils/install_uninstall_package.yml
+  vars:
+    package_list: ["xmlsec1-devel"]
+    package_state: "latest"
+  when: guest_os_ansible_distribution is match('^(FusionOS|(Kylin.*))$')
 
 # Install open-vm-tools packages
 - name: "Install packages {{ ovt_packages }}"
