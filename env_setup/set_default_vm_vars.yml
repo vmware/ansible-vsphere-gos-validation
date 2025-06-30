@@ -20,7 +20,8 @@
       - hardware_version | int >= 13
     fail_msg: >-
       Configured VM hardware verion '{{ hardware_version }}' is not in the supported
-      hardware versions list '{{ esxi_hardware_versions }}' on ESXi '{{ esxi_version }}'.
+      hardware versions list '{{ esxi_hardware_versions }}' on ESXi '{{ esxi_version }}',
+      or it's less than 13, which is the lowest hardware version supported in this test suite.
       Please check your configuration in vars/test.yml.
 
 - name: "Get '{{ guest_id }}' guest config options with VM hardware version '{{ hardware_version }}'"
@@ -59,6 +60,9 @@
           (boot_disk_size_gb is defined and (boot_disk_size_gb | int >= (guest_config_options.rec_disk_mb | int // 1024)))
           | ternary(boot_disk_size_gb | int, (guest_config_options.rec_disk_mb | int // 1024))
       }}
+
+- name: "Set fact of the EFI secure boot enable status for new VM"
+  ansible.builtin.set_fact:
     secureboot_enabled: >-
       {%- if firmware == 'efi' -%}
       {{
@@ -67,15 +71,6 @@
       }}
       {%- else -%}false
       {%- endif -%}
-
-# Installing FreeBSD 32bit on lsilogic/lsilogicsas/nvme disk will
-# fail when memory size >= 4 GB
-- name: "Set fact of the memory size in MB for new VM"
-  ansible.builtin.set_fact:
-    memory_mb: "{{ [3072, memory_mb | int] | min }}"
-  when:
-    - guest_id is match('freebsd\\d+Guest')
-    - boot_disk_controller in ['lsilogic', 'lsilogicsas', 'nvme']
 
 - name: "Check boot disk controller type for new VM"
   ansible.builtin.assert:
@@ -97,6 +92,15 @@
   when:
     - esxi_cpu_vendor == 'arm'
     - guest_id != 'vmwarePhoton64'
+
+# Installing FreeBSD 32bit on lsilogic/lsilogicsas/nvme disk will
+# fail when memory size >= 4 GB
+- name: "Set fact of the memory size in MB for new VM"
+  ansible.builtin.set_fact:
+    memory_mb: "{{ [3072, memory_mb | int] | min }}"
+  when:
+    - guest_id is match('freebsd\\d+Guest')
+    - boot_disk_controller in ['lsilogic', 'lsilogicsas', 'nvme']
 
 - name: "Check network adatper type for new VM"
   ansible.builtin.assert:
