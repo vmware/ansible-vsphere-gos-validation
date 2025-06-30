@@ -4,13 +4,17 @@
 # Handle LSI Logic SAS SCSI known issues
 #
 - name: "Handle LSI Logic SAS SCSI known issue on {{ vm_guest_os_distribution }}"
-  when: guest_os_ansible_distribution == "Ubuntu"
+  when: >-
+    guest_os_ansible_distribution == "Ubuntu" or
+    (guest_os_ansible_distribution == "SLES" and
+     guest_os_ansible_distribution_major_ver | int >= 16)
   block:
     - name: "Known issue - workaround of detecting LSI Logic SAS SCSI device changes"
       ansible.builtin.debug:
         msg:
           - "Guest OS can't detect hot added disk attached to LSI Logic SAS SCSI controller. Ignore this known issue."
-          - "Reboot guest OS to detect LSI Logic SAS SCSI device changes as a workaround"
+          - "Reboot guest OS to detect LSI Logic SAS SCSI device changes as a workaround."
+          - "Please refer to https://knowledge.broadcom.com/external/article?articleId=399003."
       tags:
         - known_issue
 
