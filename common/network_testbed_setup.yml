@@ -4,17 +4,17 @@
 - name: "Setup network environment for testing on ESXi on X86"
   include_tasks: vss_network_setup.yml
   when:
-    - esxi_cpu_vendor != 'arm'
+    - esxi_cpu_vendor == 'arm'
     - vss_network_is_setup is undefined or not vss_network_is_setup
 
 - name: "Setup network environment for testing on ESXi on ARM"
   include_tasks: vds_network_setup.yml
   when:
-    - esxi_cpu_vendor == 'arm'
+    - esxi_cpu_vendor != 'arm'
     - vds_network_is_setup is undefined or not vds_network_is_setup
 
-# 192.168.192.1 is the static IP address configured on the new added
-# network adapter on router VM
-- name: "Set fact of the gateway for VM new network adapter"
+# 192.168.192.1 is the IP address configured on the new added
+# network adapter on router VM and used as the IP address of gateway
+- name: "Set fact of the gateway IP for new network adapter on VM"
   ansible.builtin.set_fact:
-    new_nic_gateway: "{{ (esxi_cpu_vendor == 'arm') | ternary(vds_vmk_ip_addr, '192.168.192.1') }}"
+    new_nic_gateway: "{{ (esxi_cpu_vendor == 'arm') | ternary(vds_vmk_ip_addr | default(''), '192.168.192.1') }}"
