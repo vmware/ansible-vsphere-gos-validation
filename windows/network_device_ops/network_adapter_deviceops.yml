@@ -17,7 +17,7 @@
   include_tasks: ../../common/vm_add_network_adapter.yml
   vars:
     adapter_type: "{{ nic_type | lower }}"
-    vm_portgroup_name: "{{ portgroup_name }}"
+    vm_portgroup_name: "{{ new_network_name }}"
 
 - name: "Check new network adapter hot add operation"
   ansible.builtin.assert:
@@ -41,6 +41,9 @@
 - name: "Set fact of MAC address of new added network adapter"
   ansible.builtin.set_fact:
     new_nic_mac_address: "{{ (nic_mac_addr_list_after_hotadd | difference(nic_mac_addr_list_before_hotadd))[0] | default('') }}"
+
+- name: "Get IP address of new added network adapter"
+  include_tasks: get_network_adapter_ip.yml
 
 - name: "Disconnection and reconnection test"
   include_tasks: network_adapter_status_check.yml
@@ -72,17 +75,17 @@
   ansible.builtin.debug:
     msg:
       - "New network adapter MAC address: {{ new_nic_mac_address }}"
-      - "Network adapter number on VM before hotadd: {{ nic_num_before_hotadd }}"
-      - "Network adapter number on VM after hotadd: {{ nic_num_after_hotadd }}"
-      - "Network adapter number in guest before hotadd: {{ nic_num_before_hotadd_guest }}"
-      - "Network adapter number in guest after hotadd: {{ nic_num_after_hotadd_guest }}"
+      - "Network adapter number on VM before hot add: {{ nic_num_before_hotadd }}"
+      - "Network adapter number on VM after hot add: {{ nic_num_after_hotadd }}"
+      - "Network adapter number in guest before hot add: {{ nic_num_before_hotadd_guest }}"
+      - "Network adapter number in guest after hot add: {{ nic_num_after_hotadd_guest }}"
       - "Network adapter number on VM after hot remove: {{ nic_num_after_hotremove }}"
       - "Network adapter number in guest after hot remove: {{ nic_num_after_hotremove_guest }}"
-      - "Ping vlan gateway result after hotadd: {{ ping_result_after_hotadd }}"
-      - "Ping vlan gateway result after disable in guest: {{ ping_result_after_disable }}"
-      - "Ping vlan gateway result after re-enable in guest: {{ ping_result_after_enable }}"
-      - "Ping vlan gateway result after disconnect from VM: {{ ping_result_after_disconnect }}"
-      - "Ping vlan gateway result after re-connect from VM: {{ ping_result_after_reconnect }}"
+      - "Ping network gateway result after hot add: {{ ping_result_after_hotadd }}"
+      - "Ping network gateway result after disable in guest: {{ ping_result_after_disable }}"
+      - "Ping network gateway result after re-enable in guest: {{ ping_result_after_enable }}"
+      - "Ping network gateway result after disconnect from VM: {{ ping_result_after_disconnect }}"
+      - "Ping network gateway result after re-connect from VM: {{ ping_result_after_reconnect }}"
 
 - name: "Verify the number of network adapter and network connection status"
   ansible.builtin.assert:

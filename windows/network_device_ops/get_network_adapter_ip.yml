@@ -1,0 +1,31 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Get Ethernet name of new added network adapter"
+  include_tasks: ../utils/win_get_ethernet_name.yml
+  vars:
+    win_get_ethernet_name_mac: "{{ new_nic_mac_address }}"
+
+- name: "Set static IP address of new added network adapter"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      Set-NetIPInterface -InterfaceAlias "{{ win_get_ethernet_name }}" -Dhcp Disabled;
+      New-NetIPAddress -InterfaceAlias "{{ win_get_ethernet_name }}" -IPAddress "{{ new_network_adapter_ip }}" -PrefixLength "{{ new_network_netmask_bits }}" -DefaultGateway "{{ new_network_gateway }}"
+    win_execute_cmd_ignore_error: true
+  when: vds_network_is_setup is defined and vds_network_is_setup
+
+- name: "Get IP address of new added network adapter"
+  include_tasks: ../utils/win_get_ethernet_ip.yml
+  vars:
+    ethernet_name: "{{ win_get_ethernet_name }}"
+
+- name: "Check IP address of new added network adapter"
+  ansible.builtin.assert:
+    that:
+      - ethernet_ip | ansible.utils.ipv4 | length != 0
+    fal_msg: "Failed to get the IPv4 address of new added network adapter with MAC address '{{ new_nic_mac_address }}': {{ ethernet_ip }}"
+
+- name: "Set fact of IP address of new added network adapter"
+  ansible.builtin.set_fact:
+    new_nic_ip_address: "{{ (ethernet_ip | ansible.utils.ipv4)[0] }}"

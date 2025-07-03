@@ -8,16 +8,21 @@
 #   - Add a new network adapter on router VM and set its network
 #     to the new created port group above
 #
-- name: "Set facts of new vSwitch and port group names"
+- name: "Set facts of new standard switch and port group names"
   ansible.builtin.set_fact:
-    vswitch_name: "vSwitch{{ testrun_timestamp }}"
-    portgroup_name: "vSwitch{{ testrun_timestamp }}_PG"
+    vss_name: "vSwitch{{ testrun_timestamp }}"
+    vss_portgroup_name: "vSwitch{{ testrun_timestamp }}_PG"
 
 - name: "Add a new vSphere Standard Switch without assigning physical network adapter"
   include_tasks: esxi_add_vswitch.yml
+  vars:
+    vswitch_name: "{{ vss_name }}"
 
 - name: "Add a new port group on the new created standard switch"
   include_tasks: esxi_add_portgroup.yml
+  vars:
+    vswitch_name: "{{ vss_name }}"
+    portgroup_name: "{{ vss_portgroup_name }}"
 
 - name: "Deploy a router VM"
   include_tasks: router_vm_deploy.yml
@@ -27,7 +32,7 @@
   vars:
     adapter_type: e1000
     vm_name: "{{ router_vm_name }}"
-    vm_portgroup_name: "{{ portgroup_name }}"
+    vm_portgroup_name: "{{ vss_portgroup_name }}"
 
 - name: "Power on the router VM"
   include_tasks: vm_set_power_state.yml
@@ -39,6 +44,11 @@
   ansible.builtin.pause:
     seconds: 10
 
+# 192.168.192.1 is the IP address configured on the new added
+# network adapter on router VM and used as the IP address of gateway
 - name: "Set fact that vSphere Standard Switch network environment has been set up"
   ansible.builtin.set_fact:
     vss_network_is_setup: true
+    new_network_gateway: "192.168.192.1"
+    new_network_name: "{{ vss_portgroup_name }}"
+    new_network_adapter_ip: "192.168.192.10"
