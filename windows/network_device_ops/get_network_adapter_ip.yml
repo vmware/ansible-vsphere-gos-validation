@@ -29,3 +29,10 @@
 - name: "Set fact of IP address of new added network adapter"
   ansible.builtin.set_fact:
     new_nic_ip_address: "{{ (ethernet_ip | ansible.utils.ipv4)[0] }}"
+
+- name: "Check static IP address is configured on new added network adapter"
+  ansible.builtin.assert:
+    that:
+      - new_nic_ip_address == new_network_adapter_ip
+    fail_msg: "Get IPv4 address of new added network adapter in guest OS is '{{ new_nic_ip_address }}', which is not the one to be configured '{{ new_network_adapter_ip }}'"
+  when: vds_network_is_setup is defined and vds_network_is_setup
