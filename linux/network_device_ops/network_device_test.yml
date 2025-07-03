@@ -14,12 +14,17 @@
     - name: "Prepare network environment for new network adapter"
       include_tasks: ../../common/network_testbed_setup.yml
 
-    - name: "Set the port group name for new network adapter"
+    - name: "Set fact of the static IP address info for new network adapter"
       ansible.builtin.set_fact:
-        vm_portgroup_name: "{{ portgroup_name }}"
+        new_nic_ipv4: "{{ new_network_adapter_ip }}"
+        new_nic_net_prefix: "{{ new_network_netmask_bits }}"
+        new_nic_gateway: "{{ new_network_gateway }}"
+      when: vds_network_is_setup is defined and vds_network_is_setup
 
     - name: "Hot add a new {{ adapter_type }} network adapter on VM and apply network config"
       include_tasks: hot_add_network_adapter.yml
+      vars:
+        new_nic_ipv4_method: "{{ (vds_network_is_setup is defined and vds_network_is_setup) | ternary('static', 'dhcp') }}"
 
     - name: "Validate network adapter status changes"
       include_tasks: network_status_validate.yml
