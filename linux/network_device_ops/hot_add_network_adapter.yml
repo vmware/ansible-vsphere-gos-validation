@@ -10,16 +10,6 @@
     new_network_adapter_mac_addr: ""
     new_network_adapter_ip: ""
 
-- name: "Set fact of new {{ adapter_type }} network adapter IPv4 assignment method"
-  ansible.builtin.set_fact:
-    new_nic_ipv4_method: >-
-      {{
-        (new_nic_ipv4 is defined and new_nic_ipv4 and
-         new_nic_net_prefix is defined and new_nic_net_prefix and
-         new_nic_gateway is defined and new_nic_gateway) |
-        ternary('static', 'dhcp')
-      }}
-
 - name: "Clear dmesg ring buffer"
   include_tasks: ../utils/collect_dmesg.yml
   vars:
@@ -35,6 +25,8 @@
 
 - name: "Hot add a new {{ adapter_type }} network adapter to VM"
   include_tasks: ../../common/vm_add_network_adapter.yml
+  vars:
+    vm_portgroup_name: "{{ new_network_name }}"
 
 - name: "Power on VM and refresh guest OS IP in the in-memory inventory hosts info"
   include_tasks: ../../common/update_inventory.yml

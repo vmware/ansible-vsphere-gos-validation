@@ -1,29 +1,11 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Get Ethernet name of new added network adapter"
-  include_tasks: ../utils/win_get_ethernet_name.yml
-  vars:
-    win_get_ethernet_name_mac: "{{ new_nic_mac_address }}"
-
-- name: "Get IP address of new added network adapter"
-  include_tasks: ../utils/win_get_ethernet_ip.yml
-  vars:
-    ethernet_name: "{{ win_get_ethernet_name_result }}"
-
-- name: "Set fact of IP address of new added network adapter"
-  ansible.builtin.set_fact:
-    new_nic_ip_address: "{{ (ethernet_ip | ansible.utils.ipv4)[0] }}"
-  when:
-    - ethernet_ip is defined
-    - ethernet_ip | length != 0
-    - ethernet_ip | ansible.utils.ipv4 | length != 0
-
-- name: "Ping gateway after new network adapter added"
+- name: "Ping gateway from new network adapter"
   include_tasks: ../utils/win_ping_target.yml
   vars:
-    win_ping_target_ip: "{{ new_nic_gateway }}"
-    win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
+    win_ping_target_ip: "{{ new_network_gateway }}"
+    win_ping_src_ip: "{{ new_nic_ip_address }}"
 
 - name: "Save the ping gateway result"
   ansible.builtin.set_fact:
@@ -33,13 +15,13 @@
   include_tasks: ../utils/win_set_netadapter_status.yml
   vars:
     win_set_netadapter_operation: "Disabled"
-    win_set_netadapter_name: "{{ win_get_ethernet_name_result }}"
+    win_set_netadapter_name: "{{ win_get_ethernet_name }}"
 
 - name: "Ping gateway after new network adapter disabled"
   include_tasks: ../utils/win_ping_target.yml
   vars:
-    win_ping_target_ip: "{{ new_nic_gateway }}"
-    win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
+    win_ping_target_ip: "{{ new_network_gateway }}"
+    win_ping_src_ip: "{{ new_nic_ip_address }}"
 
 - name: "Save the ping gateway result"
   ansible.builtin.set_fact:
@@ -49,13 +31,13 @@
   include_tasks: ../utils/win_set_netadapter_status.yml
   vars:
     win_set_netadapter_operation: "Up"
-    win_set_netadapter_name: "{{ win_get_ethernet_name_result }}"
+    win_set_netadapter_name: "{{ win_get_ethernet_name }}"
 
 - name: "Ping gateway after new network adapter enabled"
   include_tasks: ../utils/win_ping_target.yml
   vars:
-    win_ping_target_ip: "{{ new_nic_gateway }}"
-    win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
+    win_ping_target_ip: "{{ new_network_gateway }}"
+    win_ping_src_ip: "{{ new_nic_ip_address }}"
 
 - name: "Save the ping gateway result"
   ansible.builtin.set_fact:
@@ -77,8 +59,8 @@
 - name: "Ping gateway after new network adapter disconnected"
   include_tasks: ../utils/win_ping_target.yml
   vars:
-    win_ping_target_ip: "{{ new_nic_gateway }}"
-    win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
+    win_ping_target_ip: "{{ new_network_gateway }}"
+    win_ping_src_ip: "{{ new_nic_ip_address }}"
 
 - name: "Save the ping gateway result"
   ansible.builtin.set_fact:
@@ -99,8 +81,8 @@
 - name: "Ping gateway after network adapter reconnected"
   include_tasks: ../utils/win_ping_target.yml
   vars:
-    win_ping_target_ip: "{{ new_nic_gateway }}"
-    win_ping_src_ip: "{{ new_nic_ip_address | default('') }}"
+    win_ping_target_ip: "{{ new_network_gateway }}"
+    win_ping_src_ip: "{{ new_nic_ip_address }}"
 
 - name: "Save the ping gateway result"
   ansible.builtin.set_fact:

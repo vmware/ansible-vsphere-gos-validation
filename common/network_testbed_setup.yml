@@ -1,6 +1,11 @@
 # Copyright 2025 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+- name: "Set fact of the new network netmask"
+  ansible.builtin.set_fact:
+    new_network_netmask: "255.255.255.0"
+    new_network_netmask_bits: 24
+
 - name: "Setup network environment for testing on ESXi on X86"
   include_tasks: vss_network_setup.yml
   when:
@@ -12,9 +17,3 @@
   when:
     - esxi_cpu_vendor != 'arm'
     - vds_network_is_setup is undefined or not vds_network_is_setup
-
-# 192.168.192.1 is the IP address configured on the new added
-# network adapter on router VM and used as the IP address of gateway
-- name: "Set fact of the gateway IP for new network adapter on VM"
-  ansible.builtin.set_fact:
-    new_nic_gateway: "{{ (esxi_cpu_vendor == 'arm') | ternary(vds_vmk_ip_addr | default(''), '192.168.192.1') }}"
