@@ -3,37 +3,13 @@
 ---
 # Deploy a new VM and install guest OS automatically from an ISO image
 #
-# Initialize undefined variables
-- name: "Initialize variables for new VM settings"
+- name: "Initialize variables"
   ansible.builtin.set_fact:
-    boot_disk_controller: "{{ boot_disk_controller | lower if (boot_disk_controller is defined and boot_disk_controller) else 'paravirtual' }}"
-    network_adapter_type: "{{ network_adapter_type | lower if (network_adapter_type is defined and network_adapter_type) else 'vmxnet3' }}"
-    firmware: "{{ firmware | lower if (firmware is defined and firmware) else 'efi' }}"
-    secureboot_enabled: "{{ secureboot_enabled is defined and secureboot_enabled | bool }}"
     vm_video_memory_mb: ""
     unattend_installer: ""
     autoinstall_start_msg: ""
     autoinstall_ipv4_msg: ""
     autoinstall_complete_msg: "Autoinstall is completed."
-
-- name: "Set CPU number to {{ cpu_cores_per_socket }}"
-  ansible.builtin.set_fact:
-    cpu_number: "{{ cpu_cores_per_socket }}"
-  when:
-    - cpu_number is undefined or not cpu_number
-    - cpu_cores_per_socket is defined and cpu_cores_per_socket
-
-# Installing FreeBSD 32bit on lsilogic/lsilogicsas/nvme disk will
-# fail when memory size >= 4 GB
-- name: "Set the fact of memory size for the new VM"
-  ansible.builtin.set_fact:
-    vm_memory_mb: |-
-      {%- if guest_id is match('freebsd\\d+Guest') and
-       boot_disk_controller in ['lsilogic', 'lsilogicsas', 'nvme'] -%}
-      {{ [3072, memory_mb | default(4096) | int ] | min }}
-      {%- else -%}
-      {{ memory_mb | default(4096) | int  }}
-      {%- endif -%}
 
 - name: "Update test case name for deploying VM from ISO image"
   ansible.builtin.set_fact:
@@ -71,15 +47,8 @@
 - name: "Compose VM CDROMs to mount OS install ISO files"
   include_tasks: ../../common/compose_vm_cdroms.yml
 
-- name: "Set fact of adding USB controller to the new created VM on ARM ESXi host"
-  ansible.builtin.set_fact:
-    usb_controller: 'usb3'
-  when: esxi_cpu_vendor == 'arm'
-
 - name: "Create a new VM with boot disk of controller type {{ boot_disk_controller }}"
   include_tasks: ../../common/vm_create.yml
-  vars:
-    memory_mb: "{{ vm_memory_mb }}"
 
 - name: "Get VM info"
   include_tasks: ../../common/vm_get_vm_info.yml

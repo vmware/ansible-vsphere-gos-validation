@@ -4,19 +4,6 @@
 # Deploy a new Windows VM and install guest OS automatically
 # from ISO image
 #
-# Initialize VM virtual hardware config variables
-- name: "Initialize variables for new VM settings"
-  ansible.builtin.set_fact:
-    boot_disk_controller: >-
-      {%- if boot_disk_controller is defined and boot_disk_controller -%}{{ boot_disk_controller | lower }}
-      {%- elif esxi_cpu_vendor == 'arm' -%}nvme
-      {%- else -%}lsilogicsas
-      {%- endif -%}
-    secureboot_enabled: "{{ secureboot_enabled is defined and secureboot_enabled | lower == 'true' }}"
-    network_adapter_type: "{{ network_adapter_type | lower if (network_adapter_type is defined and network_adapter_type) else 'e1000e' }}"
-    firmware: "{{ firmware | lower if (firmware is defined and firmware) else 'efi' }}"
-    boot_disk_size_gb: "{{ [64, boot_disk_size_gb | default(64) | int] | max }}"
-
 - name: "Update test case name for deploying VM from ISO image"
   ansible.builtin.set_fact:
     current_testcase_name: "deploy_vm_{{ firmware }}_{{ boot_disk_controller }}_{{ network_adapter_type }}"
@@ -25,15 +12,13 @@
   ansible.builtin.set_fact:
     win_boot_disk_ctrl_type: "{{ boot_disk_controller }}"
 
-- name: "Check configured VM CPU number and cores per socket number"
-  include_tasks: check_cpu_socket.yml
-
 - name: "Get configured ISO file list"
   include_tasks: ../../common/get_iso_file_list.yml
 
 - name: "Generate unattend install ISO file"
   include_tasks: create_unattend_install_iso.yml
   when: unattend_install_conf is defined and unattend_install_conf
+
 - name: "Not Generate unattend install ISO file"
   ansible.builtin.debug:
     msg: "[WARNING] Parameter 'unattend_install_conf' is not configured in vars/test.yml."
@@ -41,11 +26,6 @@
 
 - name: "Compose VM CDROMs with ISO file list"
   include_tasks: ../../common/compose_vm_cdroms.yml
-
-- name: "Set fact of adding USB controller to the new created VM on ARM ESXi host"
-  ansible.builtin.set_fact:
-    usb_controller: 'usb3'
-  when: esxi_cpu_vendor == 'arm'
 
 - name: "Create a new VM with boot disk of controller type {{ boot_disk_controller }}"
   include_tasks: ../../common/vm_create.yml
@@ -63,7 +43,7 @@
     - name: "Enable secure boot"
       include_tasks: ../../common/vm_set_boot_options.yml
       vars:
-        secure_boot_enabled_set: "{{ secureboot_enabled | default(false) }}"
+        secure_boot_enabled_set: "{{ secureboot_enabled }}"
         enter_bios_setup: true
     - name: "Enable VBS on VM"
       include_tasks: ../utils/win_enable_vbs_vm.yml
@@ -129,7 +109,7 @@
     vm_wait_log_hide_output: false
   when:
     - firmware == 'efi'
-    - secureboot_enabled is defined and secureboot_enabled
+    - secureboot_enabled
 
 - name: "Wait for VM network adapter is connected"
   include_tasks: ../../common/vm_wait_network_connected.yml

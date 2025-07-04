@@ -1,0 +1,199 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set fact of the default hardware version for new VM"
+  ansible.builtin.set_fact:
+    hardware_version: "{{ esxi_default_hardware_version }}"
+  when: >
+    hardware_version is undefined or
+    not hardware_version
+
+- name: "Set fact of the latest hardware version for new VM"
+  ansible.builtin.set_fact:
+    hardware_version: "{{ esxi_latest_hardware_version }}"
+  when: hardware_version | lower == 'latest'
+
+- name: "Check hardware version for new VM in ESXi supported hardware versions list"
+  ansible.builtin.assert:
+    that:
+      - hardware_version | int in esxi_hardware_versions
+      - hardware_version | int >= 13
+    fail_msg: >-
+      Configured VM hardware verion '{{ hardware_version }}' is not in the supported
+      hardware versions list '{{ esxi_hardware_versions }}' on ESXi '{{ esxi_version }}',
+      or it's less than 13, which is the lowest hardware version supported in this test suite.
+      Please check your configuration in vars/test.yml.
+
+- name: "Get '{{ guest_id }}' guest config options with VM hardware version '{{ hardware_version }}'"
+  include_tasks: ../common/esxi_get_guest_config_options.yml
+  vars:
+    esxi_hardware_version: "{{ hardware_version }}"
+
+- name: "Set fact of VM guest options retrieved"
+  ansible.builtin.set_fact:
+    guest_options_retrieved: true
+
+- name: "Set facts of the virtual hardware configurations for new VM"
+  ansible.builtin.set_fact:
+    boot_disk_controller: >-
+      {{
+          (boot_disk_controller is defined and boot_disk_controller)
+          | ternary(boot_disk_controller | lower, guest_config_options.default_disk_controller)
+      }}
+    network_adapter_type: >-
+      {{
+          (network_adapter_type is defined and network_adapter_type)
+          | ternary(network_adapter_type | lower, guest_config_options.default_ethernet)
+      }}
+    firmware: >-
+      {{
+          (firmware is defined and firmware)
+          | ternary(firmware | lower, guest_config_options.rec_firmware)
+      }}
+    memory_mb: >-
+      {{
+          (memory_mb is defined and memory_mb)
+          | ternary(memory_mb | int, guest_config_options.rec_memory_mb)
+      }}
+    boot_disk_size_gb: >-
+      {{
+          (boot_disk_size_gb is defined and boot_disk_size_gb)
+          | ternary(boot_disk_size_gb | int, (guest_config_options.rec_disk_mb | int // 1024))
+      }}
+
+- name: "Set fact of the EFI secure boot enable status for new VM"
+  ansible.builtin.set_fact:
+    secureboot_enabled: >-
+      {%- if firmware == 'efi' -%}
+      {{
+          (secureboot_enabled is defined and secureboot_enabled | type_debug == 'bool')
+          | ternary(secureboot_enabled, guest_config_options.default_secure_boot)
+      }}
+      {%- else -%}false
+      {%- endif -%}
+
+- name: "Check boot disk controller type for new VM"
+  ansible.builtin.assert:
+    that:
+      - boot_disk_controller in guest_config_options.support_disk_controller
+    fail_msg: >-
+      Boot disk controller '{{ boot_disk_controller }}' for new VM is not in the supported
+      disk controller list in guest config options '{{ guest_config_options.support_disk_controller }}'
+      for VM with guest ID '{{ guest_id }}' and hardware version '{{ hardware_version }}'.
+      Please check your configuration in vars/test.yml.
+
+- name: "Check boot disk controller type for new VM on ESXi on ARM"
+  ansible.builtin.assert:
+    that:
+      - boot_disk_controller != 'paravirtual'
+    fail_msg: >-
+      Boot disk controller '{{ boot_disk_controller }}' is not supported for VM on ESXi on ARM since
+      PVSCSI driver is not available in OS distributions except Photon OS currently.
+  when:
+    - esxi_cpu_vendor == 'arm'
+    - guest_id != 'vmwarePhoton64'
+
+# Installing FreeBSD 32bit on lsilogic/lsilogicsas/nvme disk will
+# fail when memory size >= 4 GB
+- name: "Set fact of the memory size in MB for new VM"
+  ansible.builtin.set_fact:
+    memory_mb: "{{ [3072, memory_mb | int] | min }}"
+  when:
+    - guest_id is match('freebsd\\d+Guest')
+    - boot_disk_controller in ['lsilogic', 'lsilogicsas', 'nvme']
+
+- name: "Check network adatper type for new VM"
+  ansible.builtin.assert:
+    that:
+      - network_adapter_type in guest_config_options.support_ethernet_card
+    fail_msg: >-
+      Network adatper '{{ network_adapter_type }}' for new VM is not in the supported
+      Ethernet list in guest config options '{{ guest_config_options.support_ethernet_card }}'
+      for VM with guest ID '{{ guest_id }}' and hardware version '{{ hardware_version }}'.
+      Please check your configuration in vars/test.yml.
+
+- name: "Check firmware for new VM"
+  ansible.builtin.assert:
+    that:
+      - firmware in ['bios', 'efi']
+    fail_msg: >-
+      Firmware '{{ firmware }}' for new VM is not in the valid firmware type list ['bios', 'efi'].
+      Please check your configuration in vars/test.yml.
+
+- name: "Check EFI secure boot for new VM"
+  ansible.builtin.assert:
+    that:
+      - secureboot_enabled == guest_config_options.support_secure_boot
+    fail_msg: >-
+      Enable EFI secure boot is set to '{{ secureboot_enabled }}' for new VM, but secure boot support
+      status in guest config options is '{{ guest_config_options.support_secure_boot }}'
+      for VM with guest ID '{{ guest_id }}' and hardware version '{{ hardware_version }}'.
+      Please check your configuration in vars/test.yml.
+  when:
+    - firmware == 'efi'
+    - secureboot_enabled
+
+- name: "Check CPU number and cores per socket values for new VM"
+  ansible.builtin.assert:
+    that:
+      - (cpu_number | int) % (cpu_cores_per_socket | int) == 0
+    fail_msg: >-
+      Configured CPU number '{{ cpu_number }}' is not divisible by the configured cores per socket value
+      '{{ cpu_cores_per_socket }}'.
+      Please check your configuration in vars/test.yml.
+  when:
+    - cpu_number is defined and cpu_number
+    - cpu_cores_per_socket is defined and cpu_cores_per_socket
+
+# CPU number is defined, but cores per socket is not defined
+- name: "Set fact of CPU cores per socket for new VM"
+  ansible.builtin.set_fact:
+    cpu_cores_per_socket: >-
+      {{
+          ((cpu_number | int) % (guest_config_options.rec_cpu_cores_per_socket | int) == 0)
+          | ternary(guest_config_options.rec_cpu_cores_per_socket, 1)
+      }}
+  when:
+    - cpu_number is defined and cpu_number
+    - cpu_cores_per_socket is undefined or not cpu_cores_per_socket
+
+# CPU number is not defined, then set the recommended ones
+- name: "Set fact of the default CPU number and cores per socket for new VM"
+  ansible.builtin.set_fact:
+    cpu_number: "{{ (guest_config_options.rec_cpu_cores_per_socket | int) * (guest_config_options.rec_cpu_socket | int) }}"
+    cpu_cores_per_socket: "{{ guest_config_options.rec_cpu_cores_per_socket }}"
+  when: cpu_number is undefined or not cpu_number
+
+- name: "Check Windows VM CPU socket number"
+  include_tasks: check_cpu_socket.yml
+  when: gosv_test_suite == "windows"
+
+- name: "Set USB controller to 'usb3' for new VM on ESXi on ARM"
+  ansible.builtin.set_fact:
+    usb_controller: 'usb3'
+  when: esxi_cpu_vendor == 'arm'
+
+- name: "Check USB controller for new VM"
+  ansible.builtin.assert:
+    that:
+      - usb_controller in guest_config_options.support_usb_controller
+    fail_msg: >-
+      USB controller '{{ usb_controller }}' for new VM is not in the supported
+      USB controller list in guest config options '{{ guest_config_options.support_usb_controller }}'
+      for VM with guest ID '{{ guest_id }}' and hardware version '{{ hardware_version }}'.
+      Please check your configuration in vars/test.yml.
+  when: usb_controller is defined
+
+- name: "Display the facts of the new VM configurations"
+  ansible.builtin.debug:
+    msg:
+      - "The new VM will be located in '{{ vm_datastore_path }}' with below configurations:"
+      - "Hardware version: {{ hardware_version }}"
+      - "Boot disk controller: {{ boot_disk_controller }}"
+      - "Network adapter: {{ network_adapter_type }}"
+      - "Firmware: {{ firmware }}"
+      - "Secure boot enabled: {{ (firmware == 'efi') | ternary(secureboot_enabled, '') }}"
+      - "CPU number: {{ cpu_number }}"
+      - "CPU cores per socket: {{ cpu_cores_per_socket }}"
+      - "Memory size in MB: {{ memory_mb }}"
+      - "Disk size in GB: {{ boot_disk_size_gb }}"

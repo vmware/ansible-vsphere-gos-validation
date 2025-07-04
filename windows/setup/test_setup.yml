@@ -18,6 +18,32 @@
   include_tasks: ../../common/check_vm_settings.yml
   when: vm_settings_checked is undefined
 
+- name: "Get VM info after reverting to base snapshot"
+  when:
+    - not new_vm
+    - base_snapshot_exists | bool
+    - vm_info_retrieved is undefined or not vm_info_retrieved
+  block:
+    - name: "Get VM info at base snapshot"
+      include_tasks: ../../common/vm_get_vm_info.yml
+
+    - name: "Set fact that VM info at base snapshot retrieved"
+      ansible.builtin.set_fact:
+        vm_info_retrieved: true
+
+- name: "Get '{{ vm_guest_id }}' guest config options with VM hardware version '{{ vm_hardware_version_num }}'"
+  when: guest_options_retrieved is undefined or not guest_options_retrieved
+  block:
+    - name: "Get VM guest options"
+      include_tasks: ../../common/esxi_get_guest_config_options.yml
+      vars:
+        guest_id: "{{ vm_guest_id }}"
+        esxi_hardware_version: "{{ vm_hardware_version_num }}"
+
+    - name: "Set fact of VM guest options retrieved"
+      ansible.builtin.set_fact:
+        guest_options_retrieved: true
+
 - name: "Get VM guest IP"
   include_tasks: ../../common/vm_get_ip.yml
   vars:
