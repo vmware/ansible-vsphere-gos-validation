@@ -50,6 +50,12 @@
       ansible.builtin.set_fact:
         win_enable_bitlocker_cmd: "Enable-BitLocker -MountPoint 'C:' -UsedSpaceOnly -TpmProtector -SkipHardwareTest"
 
+    - name: "Workaround for known issue"
+      include_tasks: handle_vm_known_issue.yml
+      when:
+        - guest_os_ansible_distribution is search('10|11|2019|2022|2025')
+        - win_boot_disk_ctrl_type in ['lsilogicsas', 'paravirtual']
+
     - name: "Retry to enable BitLocker on 'C:' drive"
       ansible.windows.win_shell: "{{ win_enable_bitlocker_cmd }}"
       register: win_enable_bl_cmd_result
@@ -60,14 +66,6 @@
         - not (win_enable_bl_cmd_result.stderr is defined and win_enable_bl_cmd_result.stderr is search('an I/O device error'))
       retries: 3
       delay: 120
-
-    - name: "Workaround for known issue"
-      include_tasks: handle_vm_known_issue.yml
-      when:
-        - guest_os_ansible_distribution is search('2019|2022')
-        - win_boot_disk_ctrl_type in ['lsilogicsas', 'paravirtual']
-        - win_enable_bl_cmd_result.stderr is defined
-        - win_enable_bl_cmd_result.stderr
 
     - name: "Check enable BitLocker command result"
       ansible.builtin.assert:
