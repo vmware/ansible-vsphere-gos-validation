@@ -1,15 +1,21 @@
 # Copyright 2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# For Windows Server 2019/2022 VMs with SCSI disk, enabling BitLocker in guest OS returns error:
+# There are 2 known issues:
+# 1.For Windows Server 2019/2022 VMs with SCSI disk, enabling BitLocker in guest OS returns error:
 # "Set-BitLockerVolumeInternal : A device attached to the system is not functioning.
 # (Exception from HRESULT: 0x8007001F)".
-# Here is the workaround for this known issue.
+# 2.For Windows 10/11, Windows Server 2025, Bitlocker operations are slow or even may fail in guest
+# OS when VM with snapshot.
+# Here is the workaround for such issues.
 #
-- name: "Known issue - enable BitLocker failed in Windows Server 2019/2022"
+- name: "Known issue - enable BitLocker timeout/failed in {{ guest_os_name }}"
   ansible.builtin.debug:
     msg:
-      - "Enable BitLocker failed in Windows Server 2019/2022 VM with SCSI disk controller when VM has snapshots particularly."
+      - "For VM with SCSI disk controller and snapshots particularly:"
+      - "In Windows Server 2019/2022 guest OS, enabling BitLocker failed with exception."
+      - "In Windows 11 guest OS, OS may stuck at shutdown and BSOD a few minutes later."
+      - "In Windows 10 or Windows Server 2025 guest OS, BitLocker performs more slowly than when using NVMe disk."
       - "Workaround is adding a VMX config option to disable presenting a virtual disk as thin-provisioned to the guest."
   tags:
     - known_issue
@@ -31,12 +37,3 @@
     fail_msg: >-
       The 'disk.disableThinProvisioning' is not 'TRUE' in VM's extra config after VM power-on. In VM's extra config,
       disk.disableThinProvisioning = {{ vm_extra_config['disk.disableThinProvisioning'] | default('') }}.
-
-- name: "Try to enable BitLocker on 'C:' drive again after workaround"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "{{ win_enable_bitlocker_cmd }}"
-
-- name: "Set fact of the result of enabling BitLocker after workaround"
-  ansible.builtin.set_fact:
-    win_enable_bl_cmd_result: "{{ win_powershell_cmd_output }}"
