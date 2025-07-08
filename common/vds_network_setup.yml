@@ -7,10 +7,12 @@
 #   - Add ESXi host to the vSphere Distributed Switch
 #   - Add a VMkernel network adapter on the ESXi host and assign with distributed port group
 #
-- name: "Set facts for setting vSphere Distributed Switch networking"
+- name: "Set facts for setting up vSphere Distributed Switch network"
   ansible.builtin.set_fact:
     vds_name: "DSwitch{{ testrun_timestamp }}"
     vds_portgroup_name: "DPortGroup{{ testrun_timestamp }}"
+    new_network_netmask: "255.255.255.0"
+    new_network_netmask_bits: 24
 
 - name: "Create a new vSphere Distributed Switch '{{ vds_name }}'"
   include_tasks: vcenter_manage_vds.yml
@@ -74,5 +76,3 @@
     new_network_gateway: "{{ vds_vmk_ip_addr }}"
     new_network_name: "{{ vds_portgroup_name }}"
     new_network_adapter_ip: "{{ vds_vmk_ip_addr | ansible.utils.ipmath(10) }}"
-    new_network_netmask: "255.255.255.0"
-    new_network_netmask_bits: 24
