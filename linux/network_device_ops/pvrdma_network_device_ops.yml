@@ -55,6 +55,7 @@
 
         - name: "Pepare vSphere Distributed Switch and Port Group for PVRDMA testing"
           include_tasks: ../../common/vds_network_setup.yml
+          when: vds_network_is_setup is undefined or not vds_network_is_setup
 
         - name: "Tag VMkernel adapter and enable firewall rule on ESXi host for PVRDMA communication"
           include_tasks: ../../common/esxi_enable_pvrdma_configs.yml
@@ -64,7 +65,7 @@
         - name: "Set facts for PVRDMA network config on server VM and client VM"
           ansible.builtin.set_fact:
             pvrdma_server_vm_ipv4: "{{ vds_vmk_ip_addr | ansible.utils.ipmath(1) }}"
-            pvrdma_server_vm_net_prefix: "{{ vds_vmk_net_prefix }}"
+            pvrdma_server_vm_net_prefix: "{{ new_network_netmask_bits }}"
             pvrdma_server_vm_gateway: "{{ vds_vmk_ip_addr }}"
             pvrdma_client_vm_ipv4: "{{ vds_vmk_ip_addr | ansible.utils.ipmath(2) }}"
             pvrdma_client_vm_primary_nic_mac: ""
