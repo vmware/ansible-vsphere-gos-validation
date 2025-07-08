@@ -7,13 +7,19 @@
 # From Windows 11 v24H2, hardware requirements for Automatic Device Encryption are:
 # TPM 2.0 and UEFI secure boot,
 # please refer to this doc: https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-bitlocker
+#
 - name: "Get VM firmware info for Windows client"
   include_tasks: ../../common/vm_get_boot_info.yml
   when: guest_os_product_type == 'client'
 
 - name: "Set fact of whether BitLocker Drive Encryption is enabled automatically"
   ansible.builtin.set_fact:
-    win_bde_auto_enable: "{{ guest_os_product_type == 'client' and guest_os_ansible_distribution_ver is version('10.0.26100.0', '>=') and vm_secureboot_enabled }}"
+    win_bde_auto_enable: >-
+      {{
+         guest_os_product_type == 'client' and
+         guest_os_ansible_distribution_ver is version('10.0.26100.0', '>=') and
+         vm_secureboot_enabled | default(false)
+      }}
 
 # BitLocker is not installed by default in Windows Server
 - name: "Check and install BitLocker feature in Windows Server"
@@ -43,18 +49,18 @@
           vars:
             set_win_power_state: "restart"
 
+- name: "Workaround for known issue"
+  include_tasks: handle_vm_known_issue.yml
+  when:
+    - esxi_version is version('7.0.3', '>=')
+    - win_boot_disk_ctrl_type in ['lsilogicsas', 'paravirtual']
+
 - name: "Handle BitLocker Device Encryption not enabled automatically situation"
   when: not win_bde_auto_enable
   block:
     - name: "Set fact of the command for enabling BitLocker in guest OS"
       ansible.builtin.set_fact:
         win_enable_bitlocker_cmd: "Enable-BitLocker -MountPoint 'C:' -UsedSpaceOnly -TpmProtector -SkipHardwareTest"
-
-    - name: "Workaround for known issue"
-      include_tasks: handle_vm_known_issue.yml
-      when:
-        - guest_os_ansible_distribution is search('10|11|2019|2022|2025')
-        - win_boot_disk_ctrl_type in ['lsilogicsas', 'paravirtual']
 
     - name: "Retry to enable BitLocker on 'C:' drive"
       ansible.windows.win_shell: "{{ win_enable_bitlocker_cmd }}"
