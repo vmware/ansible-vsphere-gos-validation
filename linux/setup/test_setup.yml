@@ -8,59 +8,34 @@
 - name: "Set current test case index, name and log folder"
   include_tasks: ../../common/set_current_testcase_facts.yml
 
-- name: "Check base snapshot existence and/or revert to it"
-  include_tasks: ../../common/base_snapshot_check_revert.yml
-
-- name: "Check VM settings"
-  include_tasks: ../../common/check_vm_settings.yml
-  when: vm_settings_checked is undefined
-
-- name: "Get VM info after reverting to base snapshot"
+- name: "Set VM in a clean mode"
   when:
-    - not new_vm
-    - base_snapshot_exists | bool
-    - vm_info_retrieved is undefined or not vm_info_retrieved
+    - vm_under_test is defined
+    - vm_under_test
   block:
-    - name: "Get VM info at base snapshot"
-      include_tasks: ../../common/vm_get_vm_info.yml
+    - name: "Check base snapshot existence and/or revert to it"
+      include_tasks: ../../common/base_snapshot_check_revert.yml
 
-    - name: "Set fact that VM info at base snapshot retrieved"
-      ansible.builtin.set_fact:
-        vm_info_retrieved: true
-
-# Sometimes after reverting snapshot on FreeBSD VM, its network is not reachable.
-# Here restarts it to work around the network issue
-- name: "Reset FreeBSD VM to update network after reverting to base snapshot"
-  include_tasks: ../../common/vm_set_power_state.yml
-  vars:
-    vm_power_state_set: "restarted"
-  when:
-    - base_snapshot_exists
-    - guest_os_ansible_distribution is defined
-    - guest_os_ansible_distribution == 'FreeBSD'
-
-- name: "Get '{{ vm_guest_id }}' guest config options with VM hardware version '{{ vm_hardware_version_num }}'"
-  when: guest_options_retrieved is undefined or not guest_options_retrieved
-  block:
-    - name: "Get VM guest options"
-      include_tasks: ../../common/esxi_get_guest_config_options.yml
+    # Sometimes after reverting snapshot on FreeBSD VM, its network is not reachable.
+    # Here restarts it to work around the network issue
+    - name: "Reset FreeBSD VM to update network after reverting to base snapshot"
+      include_tasks: ../../common/vm_set_power_state.yml
       vars:
-        guest_id: "{{ vm_guest_id }}"
-        esxi_hardware_version: "{{ vm_hardware_version_num }}"
+        vm_power_state_set: "restarted"
+      when:
+        - base_snapshot_exists
+        - (guest_os_ansible_distribution is defined and guest_os_ansible_distribution == 'FreeBSD') or
+          (vm_guest_id is search('freebsd'))
 
-    - name: "Set fact of VM guest options retrieved"
-      ansible.builtin.set_fact:
-        guest_options_retrieved: true
+- name: "Set fact that VM is under testing"
+  ansible.builtin.set_fact:
+    vm_under_test: true
 
 - name: "Get VM guest IP"
   include_tasks: ../../common/update_inventory.yml
 
 - name: "Print VM guest IP address"
   ansible.builtin.debug: var=vm_guest_ip
-
-- name: "Get guest OS system info"
-  include_tasks: ../utils/get_linux_system_info.yml
-  when: guest_os_system_info_retrieved is undefined or not guest_os_system_info_retrieved
 
 - name: "Get VMware Tools status"
   include_tasks: ../../common/vm_get_vmtools_status.yml
