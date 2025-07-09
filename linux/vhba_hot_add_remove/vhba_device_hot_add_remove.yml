@@ -3,6 +3,11 @@
 ---
 - name: "Test case block"
   block:
+    - name: "Test setup"
+      include_tasks: ../setup/test_setup.yml
+      vars:
+        create_test_log_folder: true
+
     - name: "Skip test case"
       include_tasks: ../../common/skip_test_case.yml
       vars:
@@ -14,11 +19,6 @@
           '{{ vm_hardware_version_num }}'.
         skip_reason: "Not Supported"
       when: new_disk_ctrl_type not in guest_config_options.support_disk_controller
-
-    - name: "Test setup"
-      include_tasks: ../setup/test_setup.yml
-      vars:
-        create_test_log_folder: true
 
     - name: "Check support status for {{ new_disk_ctrl_type }} controller"
       include_tasks: check_vhba_support_status.yml
@@ -161,7 +161,9 @@
 
     - name: "Collect FreeBSD GEOM config info"
       include_tasks: ../utils/freebsd_collect_geom_conf.yml
-      when: guest_os_family == 'FreeBSD'
+      when:
+        - guest_os_family is defined
+        - guest_os_family == 'FreeBSD'
 
     - name: "Test case failure"
       include_tasks: ../../common/test_rescue.yml
