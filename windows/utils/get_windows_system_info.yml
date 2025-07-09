@@ -7,6 +7,7 @@
     guest_os_with_inbox_drivers: false
     vm_guest_os_distribution: ''
     guest_os_edition: ''
+    guest_os_product_version: ''
 
 - name: "Get VM guest system info"
   include_tasks: ../../common/get_guest_system_info.yml
@@ -35,8 +36,16 @@
 - name: "Get Windows guest OS edition from distribution info"
   ansible.builtin.set_fact:
     guest_os_edition: >-
-      {{ (guest_os_ansible_distribution | regex_search('Microsoft Windows( Server)? ([0-9]+) (R2 )?(.*)', '\4') | first | regex_replace('insider|preview', '', ignorecase=True)).strip() }}
-  when: guest_os_ansible_distribution
+      {{ (guest_os_ansible_distribution | regex_search('Windows( Server)? ([0-9]+) (R2 )?(.*)', '\4') | first | regex_replace('insider|preview', '', ignorecase=True)).strip() }}
+  when:
+    - guest_os_ansible_distribution | regex_search('Windows( Server)? ([0-9]+) (R2 )?(.*)')
+
+- name: "Get Windows guest OS product version from distribution info"
+  ansible.builtin.set_fact:
+    guest_os_product_version: >-
+      {{ guest_os_ansible_distribution | regex_search('Windows( Server)? ([0-9]+)', '\2') | first }}
+  when:
+    - guest_os_ansible_distribution | regex_search('Windows( Server)? ([0-9]+)')
 
 - name: "Print Windows guest OS information"
   ansible.builtin.debug:
@@ -56,6 +65,7 @@
       - "Guest OS edition: {{ guest_os_edition }}"
       - "Guest OS hostname: {{ guest_os_hostname }}"
       - "Guest OS should contain inbox drivers: {{ guest_os_with_inbox_drivers }}"
+      - "Guest OS product version: {{ guest_os_product_version }}"
 
 - name: "Set fact of VM guest OS type"
   ansible.builtin.set_fact:
