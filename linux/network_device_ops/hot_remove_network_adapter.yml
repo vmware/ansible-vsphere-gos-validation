@@ -3,6 +3,12 @@
 ---
 # Hot remove the new network adapter
 #
+# Hot remove network adapter is not supported on ESXi on ARM now,
+# here shutdown the guest OS to cold remove the new network adapter
+- name: "Shutdown guest OS to cold remove disk from VM on ESXi on ARM"
+  include_tasks: ../utils/shutdown.yml
+  when: esxi_cpu_vendor == 'arm'
+
 - name: "Hot remove the new network adapter from VM"
   include_tasks: ../../common/vm_remove_network_adapter.yml
   vars:
@@ -41,6 +47,10 @@
     - name: "Failed to hot remove new {{ adapter_type }} network adapter {{ new_network_adapter }}"
       ansible.builtin.fail:
         msg: "{{ remove_adapter }}"
+
+- name: "Power on VM and refresh guest OS IP in the in-memory inventory hosts info"
+  include_tasks: ../../common/update_inventory.yml
+  when: esxi_cpu_vendor == 'arm'
 
 - name: "Check VM connection is not broken after hot-remove"
   include_tasks: ../../common/vm_wait_connection.yml

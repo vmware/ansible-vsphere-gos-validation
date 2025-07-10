@@ -27,8 +27,18 @@
     dmesg_output_file_name: 'dmesg_before_nic_hotadd.log'
     dmesg_no_log: true
 
+# Hot add network adapter is not supported on ESXi on ARM now,
+# here shutdown the guest OS to cold add a new network adapter
+- name: "Shutdown guest OS to cold remove disk from VM on ESXi on ARM"
+  include_tasks: ../utils/shutdown.yml
+  when: esxi_cpu_vendor == 'arm'
+
 - name: "Hot add a new {{ adapter_type }} network adapter to VM"
   include_tasks: ../../common/vm_add_network_adapter.yml
+
+- name: "Power on VM and refresh guest OS IP in the in-memory inventory hosts info"
+  include_tasks: ../../common/update_inventory.yml
+  when: esxi_cpu_vendor == 'arm'
 
 - name: "Check VM connection is not broken after hot-add"
   include_tasks: ../../common/vm_wait_connection.yml
