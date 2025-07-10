@@ -4,18 +4,15 @@
 - name: "Setup network environment for testing on ESXi on X86"
   include_tasks: vss_network_setup.yml
   when:
-    - esxi_cpu_vendor != 'arm'
     - vss_network_is_setup is undefined or not vss_network_is_setup
+    - esxi_cpu_vendor != 'arm'
+    - network_testbed_type is undefined or network_testbed_type == 'vss'
 
 - name: "Setup network environment for testing on ESXi on ARM"
-  when: esxi_cpu_vendor == 'arm'
+  when: >-
+    esxi_cpu_vendor == 'arm' or
+    (network_testbed_type is defined and network_testbed_type == 'vds')
   block:
-    - name: "Setup network environment with vSphere Distributed Switch"
-      include_tasks: vds_network_setup.yml
-      when:
-        - vcenter_is_defined
-        - vds_network_is_setup is undefined or not vds_network_is_setup
-
     - name: "vCenter server info is not set"
       ansible.builtin.fail:
         msg: >-
@@ -23,3 +20,9 @@
           info is not set, please conifgure parameters 'vcenter_hostname', 'vcenter_username'
           and 'vcenter_password' in vars/test.yml.
       when: not vcenter_is_defined
+
+    - name: "Setup network environment with vSphere Distributed Switch"
+      include_tasks: vds_network_setup.yml
+      when:
+        - vcenter_is_defined
+        - vds_network_is_setup is undefined or not vds_network_is_setup
