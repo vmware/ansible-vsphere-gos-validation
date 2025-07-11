@@ -53,9 +53,23 @@
               - service_facts_result.ansible_facts.services | length > 0
             fail_msg: "Failed to get guest OS services"
 
-        - name: "Get all cloud-init services on {{ vm_guest_os_distribution }}"
+        - name: "Get cloud-init services settings"
+          ansible.builtin.shell: "systemctl -p ExecStart,ExecStop show {{ service_name }}"
+          delegate_to: "{{ vm_guest_ip }}"
+          register: get_services_status
+          with_items: "{{ service_facts_result.ansible_facts.services.keys() | select('match', 'cloud-.*.service') }}"
+          loop_control:
+            loop_var: service_name
+
+        - name: "Set fact of cloud-init services with valid settings on {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
-            cloud_init_services: "{{ service_facts_result.ansible_facts.services.keys() | select('match', 'cloud-.*.service') }}"
+            cloud_init_services: >-
+              {{
+                get_services_status.results |
+                selectattr('stdout', 'defined') |
+                rejectattr('stdout', 'equalto', '') |
+                map(attribute='service_name')
+              }}
 
         - name: "Stop cloud-init services"
           ansible.builtin.shell: "systemctl stop {{ service_name }}"
