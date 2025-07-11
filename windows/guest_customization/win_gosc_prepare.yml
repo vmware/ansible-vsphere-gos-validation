@@ -5,11 +5,9 @@
 # Note: refer to this page to set time zone id and name:
 # https://msdn.microsoft.com/en-us/library/ms912391.aspx
 #
-- name: "Prepare router VM, vSwitch and portgroup"
+- name: "Prepare network environment for GOSC with static IP"
   include_tasks: ../../common/network_testbed_setup.yml
-  when:
-    - router_vm_deployed is undefined or not router_vm_deployed
-    - gosc_network_type == "static"
+  when: gosc_network_type == "static"
 
 - name: "Save the VM password before GOSC"
   ansible.builtin.set_fact:
@@ -40,12 +38,12 @@
     win_gosc_spec: >-
       {{ win_gosc_spec | combine({
       'gosc_dns_servers': ['192.168.0.1', '192.168.0.2'],
-      'gosc_ip': '192.168.192.10',
+      'gosc_ip': network_env_nic_ip,
       'gosc_domain': "gosc.test.com",
       'gosc_dns_suffix': ["test.com", "gosc.test.com"],
-      'gosc_gateway': vlan_gateway,
-      'gosc_netmask': '255.255.255.0',
-      'gosc_network': portgroup_name}) }}
+      'gosc_gateway': network_env_gateway,
+      'gosc_netmask': network_env_net_mask,
+      'gosc_network': network_env_net_name}) }}
   when: gosc_network_type == "static"
 
 - name: "Set fact of Windows GOSC spec with DHCP IP"

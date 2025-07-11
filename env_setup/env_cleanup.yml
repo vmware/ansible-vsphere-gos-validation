@@ -12,22 +12,17 @@
       when: cleanup_vm is undefined
 
     # Need to revert to base snapshot of target VM firstly, or removing portgroup would fail
-    - name: "Revert to base snapshot then cleanup network testbed configurations"
+    - name: "Revert to snapshot {{ base_snapshot_name }}"
+      include_tasks: ../common/vm_revert_snapshot.yml
+      vars:
+        snapshot_name: "{{ base_snapshot_name }}"
+        skip_if_not_exist: true
       when:
-        - router_vm_deployed is defined
-        - router_vm_deployed | bool
-      block:
-        - name: "Revert to snapshot {{ base_snapshot_name }}"
-          include_tasks: ../common/vm_revert_snapshot.yml
-          vars:
-            snapshot_name: "{{ base_snapshot_name }}"
-            skip_if_not_exist: true
-          when:
-            - base_snapshot_exists is defined
-            - base_snapshot_exists | bool
-        # Clean up router VM, vSwitch and portgroup
-        - name: "Cleanup router VM and vSwitch"
-          include_tasks: ../common/network_testbed_cleanup.yml
+        - base_snapshot_exists is defined
+        - base_snapshot_exists | bool
+
+    - name: "Cleanup network environment"
+      include_tasks: ../common/network_testbed_cleanup.yml
 
     - name: "Cleanup new deployed VM"
       when:
