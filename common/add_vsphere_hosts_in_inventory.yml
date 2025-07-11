@@ -38,26 +38,29 @@
     - name: "Check '{{ datastore }}' exists on ESXi server"
       ansible.builtin.assert:
         that:
-          - esxi_datastores | length > 0
           - esxi_datastores | selectattr('name', 'equalto', datastore) | length == 1
-        fail_msg: "Datastore '{{ datastore }}' doesn't exist on ESXi server"
-        success_msg: "Datastore '{{ datastore }}' exists on ESXi server"
+        fail_msg: "Datastore '{{ datastore }}' doesn't exist or is not accessible on ESXi server"
+        success_msg: "Datastore '{{ datastore }}' is accessible on ESXi server"
 
     - name: "Set fact of temporary directory on ESXi server datastore '{{ datastore }}'"
       ansible.builtin.set_fact:
         esxi_tmp_path: "/vmfs/volumes/{{ datastore }}"
 
-- name: "Set temporary directory a datastore with maximum free space on ESXi server"
+- name: "Set temporary directory on the VMFS datastore with maximum free space on ESXi server"
   when: datastore is undefined or not datastore
   block:
-    # If there is any VMFS datastore, use the VMFS datastore with maximum free space.
-    # Otherwise, use the NFS datastore with maximum free space.
-    - name: "Set fact of the datastore with maximum free space on ESXi server"
+    - name: "Check ESXi server has accessible VMFS datastores"
+      ansible.builtin.assert:
+        that:
+          - esxi_vmfs_datastores | length > 0
+        fail_msg: "There is no accessible VMFS datastore on ESXi server"
+
+    # Use the VMFS datastore with maximum free space.
+    - name: "Set fact of the VMFS datastore with maximum free space on ESXi server"
       ansible.builtin.set_fact:
         esxi_max_free_datastore: >-
           {{
-            (esxi_vmfs_datastores | length > 0) |
-            ternary(esxi_vmfs_datastores, esxi_nfs_datastores) |
+            esxi_vmfs_datastores |
             sort(attribute='freeSpace') |
             map(attribute='name') |
             last
