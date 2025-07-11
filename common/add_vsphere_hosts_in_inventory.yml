@@ -21,6 +21,55 @@
     - vcenter_ssh_password is defined
     - vcenter_ssh_password
 
+- name: "Get datastores on ESXi server"
+  include_tasks: esxi_get_datastores.yml
+
+- name: "Check ESXi server has accessible datastores"
+  ansible.builtin.assert:
+    that:
+      - esxi_datastores | length > 0
+    fail_msg: "There is no accessible datastore on ESXi server"
+
+- name: "Check datastore and set temporary directory on ESXi server"
+  when:
+    - datastore is defined
+    - datastore
+  block:
+    - name: "Check '{{ datastore }}' exists on ESXi server"
+      ansible.builtin.assert:
+        that:
+          - esxi_datastores | selectattr('name', 'equalto', datastore) | length == 1
+        fail_msg: "Datastore '{{ datastore }}' doesn't exist or is not accessible on ESXi server"
+        success_msg: "Datastore '{{ datastore }}' is accessible on ESXi server"
+
+    - name: "Set fact of temporary directory on ESXi server datastore '{{ datastore }}'"
+      ansible.builtin.set_fact:
+        esxi_tmp_path: "/vmfs/volumes/{{ datastore }}"
+
+- name: "Set temporary directory on the VMFS datastore with maximum free space on ESXi server"
+  when: datastore is undefined or not datastore
+  block:
+    - name: "Check ESXi server has accessible VMFS datastores"
+      ansible.builtin.assert:
+        that:
+          - esxi_vmfs_datastores | length > 0
+        fail_msg: "There is no accessible VMFS datastore on ESXi server"
+
+    # Use the VMFS datastore with maximum free space.
+    - name: "Set fact of the VMFS datastore with maximum free space on ESXi server"
+      ansible.builtin.set_fact:
+        esxi_max_free_datastore: >-
+          {{
+            esxi_vmfs_datastores |
+            sort(attribute='freeSpace') |
+            map(attribute='name') |
+            last
+          }}
+
+    - name: "Set fact of temporary directory on ESXi server datastore '{{ esxi_max_free_datastore }}'"
+      ansible.builtin.set_fact:
+        esxi_tmp_path: "/vmfs/volumes/{{ esxi_max_free_datastore }}"
+
 - name: "Add ESXi Server into memory inventory"
   include_tasks: ../common/add_host_in_memory_inventory.yml
   vars:
@@ -30,5 +79,5 @@
     add_host_in_memory_inventory_pwd: "{{ esxi_password }}"
     add_host_in_memory_inventory_python: "/bin/python"
     add_host_in_memory_inventory_ssh_pipeline: true
-    add_host_in_memory_inventory_remote_tmp: "{{ vm_datastore_path }}"
+    add_host_in_memory_inventory_remote_tmp: "{{ esxi_tmp_path }}"
     add_host_in_memory_inventory_shell: "{{ esxi_shell }}"

@@ -1,40 +1,43 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get ESXi datastores using vmware_datastore_info module
-- name: Get ESXi datastores info
+# Get accessible datastores information on ESXi server
+# Returns:
+#   esxi_datastores: A list of all datastores on ESXi server
+#   esxi_vmfs_datastores: A list of VMFS datastores on ESXi server
+#   esxi_nfs_datastores: A list of NFS datastores on ESXi server
+#
+- name: "Initialize the fact of ESXi server vmfs and nfs datastore list"
+  ansible.builtin.set_fact:
+    esxi_datastores: []
+    esxi_vmfs_datastores: []
+    esxi_nfs_datastores: []
+
+- name: "Get ESXi datastores info"
   community.vmware.vmware_datastore_info:
     validate_certs: "{{ validate_certs | default(false) }}"
     hostname: "{{ esxi_hostname }}"
     username: "{{ esxi_username }}"
     password: "{{ esxi_password }}"
     datacenter_name: "ha-datacenter"
-  register: server_get_datastores_result
+  register: get_datastores_result
 
-- name: Display the result of datastore info
-  ansible.builtin.debug: var=server_get_datastores_result
-  when: enable_debug is defined and enable_debug
+- name: "Display the result of datastores info on ESXi server"
+  ansible.builtin.debug: var=get_datastores_result
+  when: enable_debug
 
-- name: Initialize the fact of ESXi server vmfs and nfs datastore list
+- name: "Set facts of VMFS and NFS datastores on ESXi server"
   ansible.builtin.set_fact:
-    server_get_datastores_vmfs: []
-    server_get_datastores_nfs: []
-
-- name: Set fact of the ESXi server vmfs datastore list
-  ansible.builtin.set_fact:
-    server_get_datastores_vmfs: "{{ (server_get_datastores_vmfs + [ item.name ]) if item['type']|lower == 'vmfs' else server_get_datastores_vmfs }}"
-  no_log: true
-  with_items: "{{ server_get_datastores_result.datastores }}"
-
-- name: Set fact of the ESXi server nfs datastore list
-  ansible.builtin.set_fact:
-    server_get_datastores_nfs: "{{ server_get_datastores_nfs + [ item.name ] if item.type|lower == 'nfs' else server_get_datastores_nfs }}"
-  no_log: true
-  with_items: "{{ server_get_datastores_result.datastores }}"
-
-- name: Set fact of the ESXi server vmfs and nfs datatore dict
-  ansible.builtin.set_fact:
-    server_get_datastores_list: {'vmfs': "{{ server_get_datastores_vmfs }}", 'nfs': "{{ server_get_datastores_nfs }}"}
-
-- ansible.builtin.debug:
-    msg: "Get ESXi '{{ esxi_hostname }}' datastores list: {{ server_get_datastores_list }}"
+    esxi_datastores: "{{ _esxi_accessible_datastores }}"
+    esxi_vmfs_datastores: "{{ _esxi_accessible_datastores | selectattr('type', 'equalto', 'VMFS') }}"
+    esxi_nfs_datastores: "{{ _esxi_accessible_datastores | selectattr('type', 'equalto', 'NFS') }}"
+  vars:
+    _esxi_accessible_datastores: >-
+      {{
+        get_datastores_result.datastores |
+        selectattr('accessible', 'equalto', true) |
+        selectattr('maintenanceMode', 'equalto', None)
+      }}
+  when:
+    - get_datastores_result.datastores is defined
+    - get_datastores_result.datastores | length > 0
