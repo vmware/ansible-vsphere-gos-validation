@@ -65,9 +65,14 @@
 
         - name: "Set facts for PVRDMA network config on server VM and client VM"
           ansible.builtin.set_fact:
-            pvrdma_server_vm_ipv4: "{{ network_env_nic_ip | ansible.utils.ipmath(1) }}"
-            pvrdma_client_vm_ipv4: "{{ network_env_nic_ip | ansible.utils.ipmath(2) }}"
+            pvrdma_server_vm_ipv4: "{{ network_env_nic_ip }}"
+            pvrdma_client_vm_ipv4: "{{ network_env_nic_ip | ansible.utils.ipmath(1) }}"
             pvrdma_client_vm_primary_nic_mac: ""
+            new_nic_gateway: "{{ network_env_gateway }}"
+            new_nic_net_prefix: "{{ network_env_net_prefix }}"
+            new_nic_network: "{{ (network_env_nic_ip ~ '/' ~ network_env_net_prefix) | ansible.utils.ipaddr('network') }}"
+            new_nic_ipv4_method: 'static'
+            network_env_nic_ip: "{{ network_env_nic_ip | ansible.utils.ipmath(2) }}"
 
         # Clone a new VM as client VM from current VM, and current VM as server
         - name: "Clone a new VM as client VM from current VM"
@@ -80,11 +85,7 @@
         - name: "Hot add a new {{ adapter_type }} network adapter on server VM and apply network config"
           include_tasks: hot_add_network_adapter.yml
           vars:
-            new_nic_ipv4_method: "static"
-            new_nic_gateway: "{{ network_env_gateway }}"
-            new_nic_net_prefix: "{{ network_env_net_prefix }}"
             new_nic_ipv4: "{{ pvrdma_server_vm_ipv4 }}"
-            new_nic_network: "{{ (pvrdma_server_vm_ipv4 ~ '/' ~ network_env_net_prefix) | ansible.utils.ipaddr('network') }}"
 
         - name: "Update server VM guest IP when it changes"
           ansible.builtin.set_fact:

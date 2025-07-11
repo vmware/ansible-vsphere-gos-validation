@@ -14,17 +14,27 @@
     - name: "Prepare network environment for new network adapter"
       include_tasks: ../../common/network_testbed_setup.yml
 
-    - name: "Set fact of the static IP address info for new network adapter"
+    - name: "Set fact of IP assignment type for new network adapter"
       ansible.builtin.set_fact:
-        new_nic_ipv4: "{{ network_env_nic_ip }}"
-        new_nic_net_prefix: "{{ network_env_net_prefix }}"
-        new_nic_gateway: "{{ network_env_gateway }}"
-      when: vds_network_is_setup is defined and vds_network_is_setup
+        new_nic_ipv4_method: >-
+          {%- if vds_network_is_setup is defined and vds_network_is_setup -%}static
+          {%- elif vss_network_is_setup is defined and vss_network_is_setup -%}dhcp
+          {%- else -%}
+          {%- endif -%}
 
     - name: "Hot add a new {{ adapter_type }} network adapter on VM and apply network config"
       include_tasks: hot_add_network_adapter.yml
       vars:
-        new_nic_ipv4_method: "{{ (vds_network_is_setup is defined and vds_network_is_setup) | ternary('static', 'dhcp') }}"
+        new_nic_ipv4: "{{ network_env_nic_ip }}"
+        new_nic_gateway: "{{ network_env_gateway }}"
+        new_nic_net_prefix: "{{ network_env_net_prefix }}"
+        new_nic_network: "{{ (network_env_nic_ip ~ '/' ~ network_env_net_prefix) | ansible.utils.ipaddr('network') }}"
+        network_env_nic_ip: "{{ network_env_nic_ip | ansible.utils.ipmath(1) }}"
+      when: new_nic_ipv4_method == 'static'
+
+    - name: "Hot add a new {{ adapter_type }} network adapter on VM and apply network config"
+      include_tasks: hot_add_network_adapter.yml
+      when: new_nic_ipv4_method == 'dhcp'
 
     - name: "Validate network adapter status changes"
       include_tasks: network_status_validate.yml
