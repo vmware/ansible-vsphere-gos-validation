@@ -1,17 +1,17 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Setup network environment for testing on ESXi on X86"
+- name: "Prepare vSphere Standard Switch network environment"
   include_tasks: vss_network_setup.yml
   when:
     - vss_network_is_setup is undefined or not vss_network_is_setup
     - esxi_cpu_vendor != 'arm'
     - network_testbed_type is undefined or network_testbed_type == 'vss'
 
-- name: "Setup network environment for testing on ESXi on ARM"
-  when: >-
-    esxi_cpu_vendor == 'arm' or
-    (network_testbed_type is defined and network_testbed_type == 'vds')
+- name: "Prepare vSphere Distributed Switch network environment"
+  when:
+    - vds_network_is_setup is undefined or not vds_network_is_setup
+    - esxi_cpu_vendor == 'arm' or (network_testbed_type is defined and network_testbed_type == 'vds')
   block:
     - name: "vCenter server info is not set"
       ansible.builtin.fail:
@@ -21,8 +21,6 @@
           and 'vcenter_password' in vars/test.yml.
       when: not vcenter_is_defined
 
-    - name: "Setup network environment with vSphere Distributed Switch"
+    - name: "Setup vSphere Distributed Switch network"
       include_tasks: vds_network_setup.yml
-      when:
-        - vcenter_is_defined
-        - vds_network_is_setup is undefined or not vds_network_is_setup
+      when: vcenter_is_defined
