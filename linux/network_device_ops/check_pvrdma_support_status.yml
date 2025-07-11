@@ -7,10 +7,10 @@
   include_tasks: ../../common/skip_test_case.yml
   vars:
     skip_msg: >-
-      Test case '{{ ansible_play_name }}' is skipped because vCenter server is not configured,
-      which is required for setting up vSphere Distributed Switch networking and cloning PVRDMA client VM.
-    skip_reason: "Not Applicable"
-  when: not vcenter_is_defined
+      Test case '{{ ansible_play_name }}' is skipped because network adapter '{{ adapter_type }}'
+      is not supported by ESXi {{ esxi_version }} on ARM.
+    skip_reason: "Not Supported"
+  when: esxi_cpu_vendor == 'arm'
 
 - name: "Skip test case for unsupported guest OS"
   include_tasks: ../../common/skip_test_case.yml
@@ -26,9 +26,7 @@
       This guest ID '{{ vm_guest_id }}' with hardware version '{{ vm_hardware_version_num }}'
       does not support PVRDMA network adapter.
     skip_reason: "Not Supported"
-  when: >
-    (guest_config_options.support_ethernet_card is undefined) or
-    ('pvrdma' not in guest_config_options.support_ethernet_card)
+  when: "'pvrdma' not in guest_config_options.support_ethernet_card"
 
 - name: "Get module info about vmw_pvrdma"
   include_tasks: ../utils/get_module_info.yml
@@ -49,11 +47,12 @@
     skip_reason: "Not Supported"
   when: guest_pvrdma_module_info | length == 0
 
-- name: "Block test case due to no vCenter Server"
+- name: "Skip test case"
   include_tasks: ../../common/skip_test_case.yml
   vars:
     skip_msg: >-
-      Test case is blocked because test environment doesn't have vCenter Server,
-      which doesn't meet PVRDMA requirements.
-    skip_reason: "Blocked"
+      Test case '{{ ansible_play_name }}' is skipped because vCenter server is not configured,
+      which is required for setting up vSphere Distributed Switch networking and cloning PVRDMA
+      client VM.
+    skip_reason: "Not Applicable"
   when: not vcenter_is_defined

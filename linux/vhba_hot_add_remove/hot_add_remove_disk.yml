@@ -22,6 +22,13 @@
 - name: "Hot add a new {{ new_disk_ctrl_type }} controller and a new disk together"
   when: new_disk_ctrl_state == "new"
   block:
+    # Hot add disk controller is not supported on ESXi on ARM now,
+    # here shutdown the guest OS to cold add a new disk controller and disk
+    # together
+    - name: "Shutdown guest OS to cold add a disk controller and disk to VM on ESXi on ARM"
+      include_tasks: ../utils/shutdown.yml
+      when: esxi_cpu_vendor == 'arm'
+
     - name: "Hot add a new disk on a new {{ new_disk_ctrl_type }} controller"
       include_tasks: ../../common/vm_hot_add_ctrl_disk.yml
       vars:
@@ -30,10 +37,8 @@
         ctrl_number: "{{ new_ctrl_number }}"
         unit_number: "{{ new_unit_number }}"
 
-    # Hot add disk controller is not fully supported on ESXi on ARM now,
-    # here reboots the guest OS to recognized the new added disk controller and disk
-    - name: "Reboot guest OS after hot adding a new disk controller and a new disk together"
-      include_tasks: ../utils/reboot.yml
+    - name: "Power on VM and refresh guest OS IP in the in-memory inventory hosts info"
+      include_tasks: ../../common/update_inventory.yml
       when: esxi_cpu_vendor == 'arm'
 
 - name: "Hot add a new disk on an existing {{ new_disk_ctrl_type }} controller"
