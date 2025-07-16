@@ -40,7 +40,13 @@
 
 - name: "Meet the conditions of known issue on VM with NVMe boot disk controller"
   ansible.builtin.set_fact:
-    nvme_boot_known_issue: "{{ guest_os_ansible_distribution is search('2025') and test_disk_ctrl_type == 'nvme' and win_boot_disk_ctrl_type == 'nvme' and test_on_boot_ctrl }}"
+    nvme_boot_known_issue: >-
+      {{
+        guest_os_product_version | int == 2025 and
+        test_disk_ctrl_type == 'nvme' and
+        win_boot_disk_ctrl_type == 'nvme' and
+        test_on_boot_ctrl
+      }}
 
 - name: "Get disk number in guest OS after hot adding disk to existing controller"
   include_tasks: ../utils/win_get_disk_num.yml
