@@ -9,26 +9,24 @@
 #   guest_config_options: The guest id config options for a hardware version
 # Example output:
 #  "guest_config_options": {
-#      "default_cdrom_controller": "ide",
-#      "default_cpu_number": 1,
+#      "default_cdrom_controller": "sata",
 #      "default_disk_controller": "paravirtual",
 #      "default_ethernet": "vmxnet3",
-#      "default_secure_boot": false,
+#      "default_secure_boot": true,
 #      "default_usb_controller": "",
-#      "guest_fullname": "Other 5.x Linux (64-bit)",
-#      "guest_id": "other5xLinux64Guest",
-#      "hardware_version": "vmx-21",
+#      "guest_fullname": "Red Hat Enterprise Linux 9 (64-bit)",
+#      "guest_id": "rhel9_64Guest",
+#      "hardware_version": "vmx-19",
 #      "rec_cpu_cores_per_socket": 1,
 #      "rec_cpu_socket": 1,
 #      "rec_disk_mb": 16384,
 #      "rec_firmware": "efi",
-#      "rec_memory_mb": 1024,
+#      "rec_memory_mb": 2048,
 #      "rec_persistent_memory": 8192,
-#      "rec_vram_kb": 4096,
+#      "rec_vram_kb": 8192,
+#      "support_cpu_hotadd": true,
 #      "support_disk_controller": [
-#          "lsilogic",
 #          "paravirtual",
-#          "lsilogicsas",
 #          "sata",
 #          "nvme",
 #          "ide"
@@ -39,6 +37,8 @@
 #          "sriov",
 #          "pvrdma"
 #      ],
+#      "support_for_create": true,
+#      "support_memory_hotadd": true,
 #      "support_min_persistent_mem_mb": 4,
 #      "support_persistent_memory": true,
 #      "support_secure_boot": true,
@@ -48,6 +48,7 @@
 #          "usb3"
 #      ]
 #  }
+
 - name: "Check esxi_hardware_version is set with valid value"
   ansible.builtin.assert:
     that:
@@ -90,9 +91,8 @@
   block:
     - name: "Initialize variables for getting guest id default configs"
       ansible.builtin.set_fact:
-        vm_config_option_esx_hw: "/etc/vmware/hostd/env/vmconfigoption-esx-hw{{ esxi_hardware_version }}.xml"
+        esxi_vm_config_option_file: "/etc/vmware/hostd/env/vmconfigoption-esx-hw{{ esxi_hardware_version }}.xml"
         local_vm_config_option_file: "{{ local_cache }}/vmconfigoption-esx-hw{{ esxi_hardware_version }}.xml"
-        guest_config_options_xpath: "/ConfigRoot/ConfigurationOption/guestOSDescriptor/e[id='{{ guest_id }}']"
         vm_device_types:
           vim.vm.device.VirtualLsiLogicController: 'lsilogic'
           vim.vm.device.VirtualLsiLogicSASController: 'lsilogicsas'
@@ -139,14 +139,14 @@
       ansible.builtin.set_fact:
         guest_config_options: >-
           {{
-            vm_config_name.values() | zip_longest([]) |
+            vm_config_name.values() | zip_longest([], fillvalue='') |
             items2dict(key_name=0, value_name=1) |
             combine({'hardware_version': 'vmx-' ~  esxi_hardware_version})
           }}
 
     - name: "Fetch config option file from ESXi server"
       ansible.builtin.fetch:
-        src: "{{ vm_config_option_esx_hw }}"
+        src: "{{ esxi_vm_config_option_file }}"
         dest: "{{ local_vm_config_option_file }}"
         flat: true
       delegate_to: "{{ esxi_hostname }}"
@@ -177,13 +177,14 @@
         guest_config_options: >-
           {{
             guest_config_options |
-            combine({
-                     vm_config_name[item.key]:
-                     (item.value in vm_device_types) | ternary(vm_device_types[item.value],
-                                                               (item.value in ['true', 'false']) |
-                                                               ternary(item.value | bool, item.value)
-                    })
+            combine({vm_config_name[item.key]: (_value is match('\d+')) | ternary(_value | int, _value) })
           }}
+      vars:
+        _value: >-
+           {%- if item.value in ['true', 'false'] -%}{{ item.value | bool }}
+           {%- elif item.value in vm_device_types -%}{{ vm_device_types[item.value] }}
+           {%- else -%}{{ item.value }}
+           {%- endif -%}
       when:
         - item.key in vm_config_name
         - item.value | type_debug not in ["list", "dict"]
@@ -194,8 +195,11 @@
         guest_config_options: >-
           {{
             guest_config_options |
-            combine({'rec_vram_kb': guest_os_descriptor[0].vRAMSizeInKB.defaultValue | default('')})
+            combine({'rec_vram_kb': guest_os_descriptor[0].vRAMSizeInKB.defaultValue | int})
           }}
+      when:
+        - guest_os_descriptor[0].vRAMSizeInKB.defaultValue is defined
+        - guest_os_descriptor[0].vRAMSizeInKB.defaultValue is match('\d+')
 
     - name: "Set supported disk controllers, network devices and USB controllers for guest id {{ guest_id }}"
       ansible.builtin.set_fact:
