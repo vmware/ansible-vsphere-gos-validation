@@ -130,6 +130,7 @@
 * esxi_set_ntp.yml: Set NTP servers on ESXi server
 * esxi_get_service_info.yml: Get host service information on ESXi server
 * esxi_manage_service.yml: Manage host service on ESXi server
+* esxi_get_vds_info.yml: Get vSphere Distributed Switch info on ESXi server
 
 ### Tasks for ESXi datastores
 * esxi_add_datastore.yml: Add NFS or VMFS datastore to ESXi host
