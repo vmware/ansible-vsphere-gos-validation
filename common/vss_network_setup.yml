@@ -1,0 +1,56 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Setup vSphere Standard Switch (VSS) networking, include:
+#   - Create a new vSphere Standard Switch
+#   - Create a new port group
+#   - Deploy a new router VM
+#   - Add a new network adapter on router VM and set its network
+#     to the new created port group above
+#
+- name: "Set facts to prepare vSphere Standard Switch network"
+  ansible.builtin.set_fact:
+    vss_name: "vSwitch{{ testrun_timestamp }}"
+    vss_portgroup_name: "vSwitch{{ testrun_timestamp }}_PG"
+    network_env_net_mask: "255.255.255.0"
+    network_env_net_prefix: 24
+
+- name: "Add a new vSphere Standard Switch without assigning physical network adapter"
+  include_tasks: esxi_add_vswitch.yml
+  vars:
+    vswitch_name: "{{ vss_name }}"
+
+- name: "Add a new port group on the new created standard switch"
+  include_tasks: esxi_add_portgroup.yml
+  vars:
+    vswitch_name: "{{ vss_name }}"
+    portgroup_name: "{{ vss_portgroup_name }}"
+
+- name: "Deploy a router VM"
+  include_tasks: router_vm_deploy.yml
+
+- name: "Add a new e1000 network adapter to the router VM"
+  include_tasks: vm_add_network_adapter.yml
+  vars:
+    adapter_type: e1000
+    vm_name: "{{ router_vm_name }}"
+    vm_portgroup_name: "{{ vss_portgroup_name }}"
+
+- name: "Power on the router VM"
+  include_tasks: vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-on'
+    vm_name: "{{ router_vm_name }}"
+
+- name: "Wait 10 seconds for the router VM booting up"
+  ansible.builtin.pause:
+    seconds: 10
+
+# 192.168.192.1 is the IP address configured on the new added
+# network adapter on router VM and used as the IP address of gateway
+- name: "Set facts of vSphere Standard Switch network"
+  ansible.builtin.set_fact:
+    vss_network_is_setup: true
+    network_env_gateway: "192.168.192.1"
+    network_env_net_name: "{{ vss_portgroup_name }}"
+    network_env_nic_ip: "192.168.192.10"
