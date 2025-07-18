@@ -5,12 +5,13 @@
 # Return:
 #   vm_exists: true if the vm exists.
 #
-
 - name: "Initialize variable for VM existence"
   ansible.builtin.set_fact:
     existing_vm_info: ""
     vm_exists: false
 
+# If there is a VM deleted while executing this task, the task may fail.
+# Here addes retries to get all VMs info successfully
 - name: "Get all registerd VMs and templates on {{ vsphere_host_name }}"
   community.vmware.vmware_vm_info:
     hostname: "{{ vsphere_host_name }}"
@@ -20,8 +21,18 @@
     folder: "{{ vm_folder }}"
     vm_type: "all"
   register: all_vm_facts
+  retries: 10
+  delay: 5
+  until:
+    - all_vm_facts.failed is defined
+    - not all_vm_facts.failed
 
-- block:
+- name: "Check whether VM exists or not"
+  when:
+    - all_vm_facts is defined
+    - all_vm_facts.virtual_machines is defined
+    - all_vm_facts.virtual_machines
+  block:
     - name: "Set fact of existing VM basic information"
       ansible.builtin.set_fact:
         existing_vm_info: "{{ all_vm_facts.virtual_machines | selectattr('guest_name', 'equalto', vm_name) }}"
@@ -34,10 +45,6 @@
       ansible.builtin.set_fact:
         vm_exists: true
       when: existing_vm_info | length > 0
-  when:
-    - all_vm_facts is defined
-    - all_vm_facts.virtual_machines is defined
-    - all_vm_facts.virtual_machines
 
 - name: "Print the fact that VM exists or not"
   ansible.builtin.debug: var=vm_exists
