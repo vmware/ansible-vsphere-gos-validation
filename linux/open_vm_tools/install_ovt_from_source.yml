@@ -29,12 +29,17 @@
   vars:
     _ovt_build_config: "{{ lookup('file', ovt_build_config_file_path) | from_yaml }}"
 
-- name: "Add '--without-x' option to configure because {{ vm_guest_os_distribution }} doesn't have GTK3"
+- name: "Add '--without-x' configure option because {{ vm_guest_os_distribution }} doesn't have GTK3"
   ansible.builtin.set_fact:
     ovt_configure_options: "{{ ovt_configure_options | union(['--without-x']) }}"
   when:
     - guest_os_ansible_system == 'linux'
     - ovt_dependencies | select('search', 'gtk[^0-9]*3') | length < 2
+
+- name: "Add '--with-fuse=fuse' configure option on {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    ovt_configure_options: "{{ ovt_configure_options | union(['--with-fuse=fuse']) }}"
+  when: guest_os_ansible_system == 'freebsd'
 
 - name: "Check open-vm-tools dependencies are not empty"
   ansible.builtin.assert:
