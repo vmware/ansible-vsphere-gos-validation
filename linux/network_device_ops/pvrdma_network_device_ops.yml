@@ -20,6 +20,11 @@
         - name: "Check whether guest OS supports PVRDMA testing"
           include_tasks: check_pvrdma_support_status.yml
 
+        - name: "Pepare vSphere Distributed Switch and Port Group for PVRDMA testing"
+          include_tasks: ../../common/network_testbed_setup.yml
+          vars:
+            network_testbed_type: 'vds'
+
         - name: "Initialize facts for PVRDMA server VM and client VM"
           ansible.builtin.set_fact:
             pvrdma_server_vm_name: "{{ vm_name }}"
@@ -43,20 +48,12 @@
           ansible.builtin.set_fact:
             current_test_log_folder: "{{ pvrdma_server_test_log_folder }}"
 
-        - name: "Prepare for PVRDMA network adapter testing"
-          include_tasks: prepare_network_device_test.yml
-
         - name: "Get RDMA devices in guest OS before hot-add"
           include_tasks: ../utils/get_rdma_device_info.yml
 
         - name: "Set fact of RDMA device before hot-add"
           ansible.builtin.set_fact:
             rdma_devices_before_hotadd: "{{ guest_rdma_device_info }}"
-
-        - name: "Pepare vSphere Distributed Switch and Port Group for PVRDMA testing"
-          include_tasks: ../../common/network_testbed_setup.yml
-          vars:
-            network_testbed_type: 'vds'
 
         - name: "Tag VMkernel adapter and enable firewall rule on ESXi host for PVRDMA communication"
           include_tasks: ../../common/esxi_enable_pvrdma_configs.yml
