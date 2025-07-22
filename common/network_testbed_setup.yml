@@ -7,18 +7,20 @@
     - vss_network_is_setup is undefined or not vss_network_is_setup
     - esxi_cpu_vendor != 'arm'
     - network_testbed_type is undefined or network_testbed_type == 'vss'
+    - vds_network_is_setup is undefined or not vds_network_is_setup
 
 - name: "Prepare vSphere Distributed Switch network environment"
   when:
     - vds_network_is_setup is undefined or not vds_network_is_setup
     - esxi_cpu_vendor == 'arm' or (network_testbed_type is defined and network_testbed_type == 'vds')
   block:
-    - name: "vCenter server info is not set"
-      ansible.builtin.fail:
-        msg: >-
-          Can't setup network environment with vSphere Distributed Switch when vCenter server
-          info is not set, please conifgure parameters 'vcenter_hostname', 'vcenter_username'
-          and 'vcenter_password' in vars/test.yml.
+    - name: "Skip test case"
+      include_tasks: skip_test_case.yml
+      vars:
+        skip_msg: >-
+          Test case '{{ ansible_play_name }}' is skipped because vCenter server is not configured,
+          which is required for setting up vSphere Distributed Switch networking.
+        skip_reason: "Not Applicable"
       when: not vcenter_is_defined
 
     - name: "Setup vSphere Distributed Switch network"
