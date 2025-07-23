@@ -9,6 +9,8 @@
 
 - name: "Test setup"
   include_tasks: ../setup/test_setup.yml
+  vars:
+    create_test_log_folder: true
 
 - name: "Skip test case because VM has open-vm-tools installed and update_vmtools is false"
   include_tasks: ../../common/skip_test_case.yml
@@ -72,7 +74,7 @@
     - linux_ovt_install_type == 'source'
     - linux_ovt_tarball_url is undefined or not linux_ovt_tarball_url
 
-# Testing open-vm-tools source install is not supported on ProLinux,
+# Testing open-vm-tools source install is not supported on ProLinux, FusionOS 22,
 # and RHEL/CentOS/OracleLinux 7 or earlier releases.
 - name: "Skip test case for {{ guest_os_ansible_distribution }}"
   include_tasks: ../../common/skip_test_case.yml
@@ -84,6 +86,8 @@
   when:
     - linux_ovt_install_type == "source"
     - (guest_os_ansible_distribution == 'ProLinux' or
+       (guest_os_ansible_distribution == 'FusionOS' and
+        guest_os_ansible_distribution_major_ver | int == 22) or
        (guest_os_ansible_distribution in ['RedHat', 'CentOS', 'OracleLinux'] and
         guest_os_ansible_distribution_major_ver | int <= 7))
 
