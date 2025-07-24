@@ -13,50 +13,16 @@
 
 - name: "Check base snapshot existence and/or revert to it"
   include_tasks: ../../common/base_snapshot_check_revert.yml
-
-- name: "Check VM settings"
-  include_tasks: ../../common/check_vm_settings.yml
-  when: vm_settings_checked is undefined
-
-- name: "Get VM info after reverting to base snapshot"
   when:
-    - not new_vm
-    - base_snapshot_exists | bool
-    - vm_info_retrieved is undefined or not vm_info_retrieved
-  block:
-    - name: "Get VM info at base snapshot"
-      include_tasks: ../../common/vm_get_vm_info.yml
+    - vm_under_test is defined
+    - vm_under_test
 
-    - name: "Set fact that VM info at base snapshot retrieved"
-      ansible.builtin.set_fact:
-        vm_info_retrieved: true
+- name: "Set fact that VM is under testing"
+  ansible.builtin.set_fact:
+    vm_under_test: true
 
-- name: "Get '{{ vm_guest_id }}' guest config options with VM hardware version '{{ vm_hardware_version_num }}'"
-  when: guest_options_retrieved is undefined or not guest_options_retrieved
-  block:
-    - name: "Get VM guest options"
-      include_tasks: ../../common/esxi_get_guest_config_options.yml
-      vars:
-        guest_id: "{{ vm_guest_id }}"
-        esxi_hardware_version: "{{ vm_hardware_version_num }}"
-
-    - name: "Set fact of VM guest options retrieved"
-      ansible.builtin.set_fact:
-        guest_options_retrieved: true
-
-- name: "Get VM guest IP"
-  include_tasks: ../../common/vm_get_ip.yml
-  vars:
-    vm_get_ip_timeout: 600
-
-- name: "Check Windows winrm is connectable"
-  include_tasks: ../utils/win_check_winrm.yml
-
-- name: "Add Windows host to in-memory inventory"
-  include_tasks: ../utils/add_windows_host.yml
-
-- name: "Print VM guest IP address"
-  ansible.builtin.debug: var=vm_guest_ip
+- name: "Refresh VM guest IP in the in-memory inventory hosts info"
+  include_tasks: ../utils/win_update_inventory.yml
 
 # Windows Update will cause OS poweroff or restart taking a long time,
 # or GOSC test cases failure, here try to pause Windows Update 7 days
@@ -84,10 +50,6 @@
   when:
     - vmtools_is_installed
     - vmtools_info_retrieved is undefined or not vmtools_info_retrieved
-
-- name: "Get guest OS system info"
-  include_tasks: ../utils/get_windows_system_info.yml
-  when: guest_os_system_info_retrieved is undefined or not guest_os_system_info_retrieved
 
 - name: "Get VM guest info including guest id, full name, family and detailed data"
   include_tasks: ../../common/vm_get_guest_info.yml
