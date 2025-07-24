@@ -7,10 +7,25 @@
 #   - Add ESXi host to the vSphere Distributed Switch
 #   - Add a VMkernel network adapter on the ESXi host and assign with distributed port group
 #
-- name: "Set facts for setting vSphere Distributed Switch networking"
+- name: "Get the vSphere Distributed Switch info on ESXi host"
+  include_tasks: esxi_get_vds_info.yml
+
+- name: "Check the number of vSphere Distributed Switch on ESXi host"
+  ansible.builtin.assert:
+    that:
+      - get_host_vds_result.distributed_virtual_switches is defined
+      - get_host_vds_result.distributed_virtual_switches | length < 15
+    fail_msg: >-
+      There are already '{{ get_host_vds_result.distributed_virtual_switches | length }}' vSphere Distributed Switch
+      connected by ESXi host '{{ esxi_hostname }}', please remove any unused ones to adhere to the recommended maximum of 16.
+      Exceeding this value can lead to unexpected behavior and is generally not a supported configuration.
+
+- name: "Set facts to prepare vSphere Distributed Switch network"
   ansible.builtin.set_fact:
     vds_name: "DSwitch{{ testrun_timestamp }}"
     vds_portgroup_name: "DPortGroup{{ testrun_timestamp }}"
+    network_env_net_mask: "255.255.255.0"
+    network_env_net_prefix: 24
 
 - name: "Create a new vSphere Distributed Switch '{{ vds_name }}'"
   include_tasks: vcenter_manage_vds.yml
@@ -30,22 +45,18 @@
 - name: "Get new VMkernel network adapter device"
   include_tasks: esxi_get_new_vmkernel_adapter.yml
 
-- name: "Set fact of the new VMkernel network adapter device"
+- name: "Set facts of the new VMkernel network adapter index,  name and IP address"
   ansible.builtin.set_fact:
     vds_vmk_device_index: "{{ new_vmk_device_index }}"
     vds_vmk_device_name: "{{ new_vmk_device_name }}"
+    vds_vmk_ip_addr: "192.168.{{ new_vmk_device_index | int }}.1"
 
-- name: "Set fact of the new VMkernel network adapter's IP address"
-  ansible.builtin.set_fact:
-    vds_vmk_ip_addr: "192.172.{{ vds_vmk_device_index | int }}.1"
-    vds_vmk_net_prefix: 24
-
-- name: "Set fact of VMkernel network adapter network"
+- name: "Set fact of the network info for the new VMkernel network adapter"
   ansible.builtin.set_fact:
     vds_vmk_network:
       type: 'static'
       ip_address: "{{ vds_vmk_ip_addr }}"
-      subnet_mask: "255.255.255.0"
+      subnet_mask: "{{ network_env_net_mask }}"
       default_gateway: "{{ vds_vmk_ip_addr }}"
 
 - name: "Add a VMkernel network adapter assigned to the distributed port group for the ESXi host"
@@ -72,6 +83,9 @@
       "{{ manage_vmk_result.device | default('') }}".
     success_msg: "VMkernel network adapter '{{ vds_vmk_device_name }}' is added to ESXi host"
 
-- name: "Set fact that the vSphere Distributed Switch networking is setup"
+- name: "Set facts of vSphere Distributed Switch network"
   ansible.builtin.set_fact:
     vds_network_is_setup: true
+    network_env_gateway: "{{ vds_vmk_ip_addr }}"
+    network_env_net_name: "{{ vds_portgroup_name }}"
+    network_env_nic_ip: "{{ vds_vmk_ip_addr | ansible.utils.ipmath(10) }}"

@@ -21,6 +21,10 @@
     - name: "Check GOSC testing is supported or not"
       include_tasks: check_gosc_support_status.yml
 
+    - name: "Prepare network environment for GOSC with static IP"
+      include_tasks: ../../common/network_testbed_setup.yml
+      when: ip_assignment == "static"
+
     - name: "Prepare for GOSC testing on VMware Photon OS"
       when: guest_os_ansible_distribution == "VMware Photon OS"
       block:
@@ -134,12 +138,6 @@
     - name: "Update cloud-init config for {{ gosc_workflow }} GOSC"
       include_tasks: ../utils/enable_disable_cloudinit_cfg.yml
 
-    - name: "Prepare router VM, vSwitch and portgroup"
-      include_tasks: ../../common/network_testbed_setup.yml
-      when:
-        - router_vm_required | default(false)
-        - router_vm_deployed is undefined or not router_vm_deployed | bool
-
     # Initialize the GOSC spec
     - name: "Initialize the GOS customization spec"
       ansible.builtin.set_fact:
@@ -150,11 +148,11 @@
       ansible.builtin.set_fact:
         linux_gosc_spec: "{{ linux_gosc_spec | combine(item) }}"
       loop:
-        - {'network': "{{ portgroup_name }}"}
-        - {'ip': "192.168.192.101"}
-        - {'netmask': "255.255.255.0"}
-        - {'gateway': "192.168.192.1"}
-        - {'dns_servers': ["192.168.1.1", "192.168.1.2"]}
+        - {'network': "{{ network_env_net_name }}"}
+        - {'ip': "{{ network_env_nic_ip }}"}
+        - {'netmask': "{{ network_env_net_mask }}"}
+        - {'gateway': "{{ network_env_gateway }}"}
+        - {'dns_servers': ["192.168.0.1", "192.168.0.2"]}
         - {'hostname': "gosc-static-vm-01"}
         - {'hwclockUTC': false}
       when: ip_assignment == "static"

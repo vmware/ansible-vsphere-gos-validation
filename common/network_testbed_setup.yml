@@ -1,43 +1,35 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Add new vSwitch and portgroup to ESXi host and deploy a router VM
-# Parameters:
-#   vswitch_name: the name of vSwitch to be added for new network
-#     interface testing or GOSC testing.
-#   portgroup_name: the name of vSwitch portgroup to be added for
-#     new network interface testing or GOSC testing.
-#
-- name: "Set facts for setting testbed network"
-  ansible.builtin.set_fact:
-    vswitch_name: "vSwitch{{ testrun_timestamp }}"
-    portgroup_name: "vSwitch{{ testrun_timestamp }}_PG"
+- name: "Prepare vSphere Standard Switch network environment"
+  include_tasks: vss_network_setup.yml
+  when:
+    - vss_network_is_setup is undefined or not vss_network_is_setup
+    - esxi_cpu_vendor != 'arm'
+    - network_testbed_type is undefined or network_testbed_type == 'vss'
+    - vds_network_is_setup is undefined or not vds_network_is_setup
 
-# Add a new standard vSwitch without physical network adapters
-- include_tasks: esxi_add_vswitch.yml
+- name: "Prepare vSphere Distributed Switch network environment"
+  when:
+    - vds_network_is_setup is undefined or not vds_network_is_setup
+    - esxi_cpu_vendor == 'arm' or (network_testbed_type is defined and network_testbed_type == 'vds')
+  block:
+    - name: "Skip test case"
+      include_tasks: skip_test_case.yml
+      vars:
+        skip_msg: >-
+          Test case '{{ ansible_play_name }}' is skipped because vCenter server is not configured,
+          which is required for setting up vSphere Distributed Switch networking.
+        skip_reason: "Not Applicable"
+      when: not vcenter_is_defined
 
-# Create a new portgroup for VM network
-- include_tasks: esxi_add_portgroup.yml
+    - name: "Setup vSphere Distributed Switch network"
+      include_tasks: vds_network_setup.yml
+      when: vcenter_is_defined
 
-# Deploy a router VM
-- include_tasks: router_vm_deploy.yml
-
-# Hotadd a new e1000 network adapter to router VM
-- include_tasks: vm_add_network_adapter.yml
-  vars:
-    adapter_type: e1000
-    vm_name: "{{ router_vm_name }}"
-    vm_portgroup_name: "{{ portgroup_name }}"
-
-# Power on the router VM
-- include_tasks: vm_set_power_state.yml
-  vars:
-    vm_power_state_set: 'powered-on'
-    vm_name: "{{ router_vm_name }}"
-- name: "Wait 10 seconds to let router VM start up"
-  ansible.builtin.pause:
-    seconds: 10
-
-- name: "Set fact of router_vm_deployed to True"
-  ansible.builtin.set_fact:
-    router_vm_deployed: true
+- name: "Check network environment with either type is setup"
+  ansible.builtin.assert:
+    that:
+      - (vds_network_is_setup is defined and vds_network_is_setup) or (vss_network_is_setup is defined and vss_network_is_setup)
+    fail_msg: >-
+      Neither the vSphere Distributed Switch network environment nor the vSphere Standard Switch network environment is set up.
