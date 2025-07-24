@@ -16,11 +16,52 @@
   when: guest_os_ansible_distribution == "Ubuntu"
 
 - name: "Set fact of official APT sources on {{ vm_guest_os_distribution }}"
-  ansible.builtin.set_fact:
-    apt_sources:
-      - "deb http://deb.debian.org/debian/ {{ guest_os_ansible_distribution_release }} main"
-      - "deb http://deb.debian.org/debian/ {{ guest_os_ansible_distribution_release }} main contrib"
   when: guest_os_ansible_distribution == "Debian"
+  block:
+    - name: "Check APT sources for Debian {{ guest_os_ansible_distribution_release }}"
+      ansible.builtin.uri:
+        url: "{{ item }}/dists/{{ guest_os_ansible_distribution_release }}"
+        follow_redirects: "safe"
+        method: "HEAD"
+      ignore_errors: true
+      register: check_apt_sources
+      no_log: true
+      with_items:
+        - "http://deb.debian.org/debian"
+        - "https://archive.debian.org/debian-archive/debian"
+
+    - name: "Display the result of checking APT sources for Debian {{ guest_os_ansible_distribution_release }}"
+      ansible.builtin.debug: var=check_apt_sources
+      when: enable_debug
+
+    - name: "Set fact of available APT sources for Debian {{ guest_os_ansible_distribution_release }}"
+      ansible.builtin.set_fact:
+        debian_apt_sources: "{{ check_apt_sources.results | selectattr('status', 'equalto', 200) | map(attribute='item') }}"
+      when:
+        - check_apt_sources.results is defined
+        - check_apt_sources.results | length > 0
+
+    - name: "Check there is at least one accessible APT source for Debian {{ guest_os_ansible_distribution_release }}"
+      ansible.builtin.assert:
+        that:
+          - debian_apt_sources is defined
+          - debian_apt_sources | length > 0
+        fail_msg: >-
+          Not found any accessible APT source for Debian {{ guest_os_ansible_distribution_release }}
+
+    - name: "Set fact of official APT sources on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        apt_sources:
+          - "deb {{ debian_apt_sources[0] }} {{ guest_os_ansible_distribution_release }} main"
+          - "deb {{ debian_apt_sources[0] }} {{ guest_os_ansible_distribution_release }} main contrib"
+
+    # Comment out existing APT sources
+    - name: "Comment out existing APT sources"
+      ansible.builtin.replace:
+        path: "{{ apt_sources_list }}"
+        regexp: "^( *deb .*)"
+        replace: "#\\1"
+      delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Set fact of official APT sources on {{ vm_guest_os_distribution }}"
   when: guest_os_ansible_distribution == "Pardus GNU/Linux"
