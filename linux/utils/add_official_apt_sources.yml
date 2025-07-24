@@ -41,14 +41,19 @@
         - check_apt_sources.results is defined
         - check_apt_sources.results | length > 0
 
+    - name: "Check there is at least one accessible APT source for Debian {{ guest_os_ansible_distribution_release }}"
+      ansible.builtin.assert:
+        that:
+          - debian_apt_sources is defined
+          - debian_apt_sources | length > 0
+        fail_msg: >-
+          Not found any accessible APT source for Debian {{ guest_os_ansible_distribution_release }}
+
     - name: "Set fact of official APT sources on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
         apt_sources:
           - "deb {{ debian_apt_sources[0] }} {{ guest_os_ansible_distribution_release }} main"
           - "deb {{ debian_apt_sources[0] }} {{ guest_os_ansible_distribution_release }} main contrib"
-      when:
-        - debian_apt_sources is defined
-        - debian_apt_sources | length > 0
 
     # Comment out existing APT sources
     - name: "Comment out existing APT sources"
