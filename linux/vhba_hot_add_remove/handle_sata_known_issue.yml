@@ -3,14 +3,47 @@
 ---
 # Handle SATA known issues
 #
-# Pardus 21 XFCE can't detect SATA disk change after hot-remove
-# Work around it by updating the disk state
-- name: "Handle SATA known issue on {{ vm_guest_os_distribution }}"
+# Pardus 21 XFCE can't detect SATA disk change after hot remove
+- name: "Set fact of guest OS has SATA known issue on {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    sata_known_issue_exists: true
   when:
     - guest_os_ansible_distribution == 'Pardus GNU/Linux'
     - guest_os_ansible_distribution_major_ver | int == 21
     - guest_os_edition == 'XFCE'
+
+# RHEL family OS of version 9.6, 10.0 or later, CentOS Stream 9 and 10 can't detect SATA disk change
+# after hot remove when 'alpmalpm=medium_power' exists in tuned config
+- name: "Check whether SATA known issue exists on {{ vm_guest_os_distribution }}"
+  when:
+    - guest_os_family == 'RedHat'
+    - guest_os_ansible_distribution_major_ver | int >= 9
+  block:
+    - name: "Check 'alpm=medium_power' in tuned config"
+      ansible.builtin.shell: "grep '^ *alpm=medium_power' '{{ tuned_conf_path }}'"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: check_alpm_result
+      ignore_errors: true
+      vars:
+        tuned_conf_path: >-
+          {{
+            (guest_os_ansible_distribution_major_ver | int == 9) |
+            ternary('/usr/lib/tuned/balanced/tuned.conf',
+                    '/usr/lib/tuned/profiles/balanced/tuned.conf')
+          }}
+
+    - name: "Set fact of guest OS has SATA known issue on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        sata_known_issue_exists: true
+      when:
+        - check_alpm_result.stdout is defined
+        - check_alpm_result.stdout
+
+- name: "Handle SATA known issue on {{ vm_guest_os_distribution }}"
+  when:
     - wait_device_state | lower == 'absent'
+    - sata_known_issue_exists is defined
+    - sata_known_issue_exists
   block:
     - name: "Known issue - workaround of detecting SATA device changes on {{ vm_guest_os_distribution }}"
       ansible.builtin.debug:
