@@ -30,7 +30,7 @@
           ansible.builtin.set_fact:
             vmware_toolbox_cmd_path: "C:\\Program Files\\VMware\\VMware Tools\\VMwareToolboxCmd.exe"
 
-        - name: "Set fact of collecting VMware Tools files"
+        - name: "Set facts of VMware Tools log files"
           ansible.builtin.set_fact:
             collect_power_scripts_logs: true
 
@@ -56,23 +56,17 @@
         - name: "Collect config file and log files of VMware Tools"
           when: collect_power_scripts_logs is defined and collect_power_scripts_logs
           block:
-            - name: "Collect config file {{ vmtools_conf_path }}"
+            - name: "Collect config file {{ win_power_script_log_path }}"
               include_tasks: ../utils/win_get_file.yml
               vars:
-                win_get_file_src_path: "{{ vmtools_conf_path }}"
+                win_get_file_src_path: "{{ win_power_script_log_path }}"
                 win_get_file_dst_path: "{{ current_test_log_folder }}"
-
-            - name: "Collect log file {{ win_vmtoolsd_log_path }}"
-              include_tasks: ../utils/win_get_file.yml
-              vars:
-                win_get_file_src_path: "{{ win_vmtoolsd_log_path }}"
-                win_get_file_dst_path: "{{ current_test_log_folder }}"
-
-            - name: "Collect log file {{ win_vmsvc_log_path }}"
-              include_tasks: ../utils/win_get_file.yml
-              vars:
-                win_get_file_src_path: "{{ win_vmsvc_log_path }}"
-                win_get_file_dst_path: "{{ current_test_log_folder }}"
+              with_items:
+                - vmtools_conf_path
+                - win_vmtoolsd_log_path
+                - win_vmsvc_log_path
+              loop_control:
+                loop_var: win_power_script_log_path
 
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
