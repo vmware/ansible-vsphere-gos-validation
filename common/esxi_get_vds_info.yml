@@ -1,0 +1,19 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Gather information of the vSphere Distributed Switch on the ESXi host
+- name: "Get all registered vSphere Distributed Switch on host '{{ esxi_hostname }}'"
+  community.vmware.vmware_dvswitch_info:
+    hostname: "{{ esxi_hostname }}"
+    username: "{{ esxi_username }}"
+    password: "{{ esxi_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    schema: 'vsphere'
+    properties:
+      - summary.name
+      - summary.portgroupName
+      - overallStatus
+  register: get_host_vds_result
+
+- name: "Display the vSphere Distributed Switch info on host '{{ esxi_hostname }}'"
+  ansible.builtin.debug: var=get_host_vds_result

@@ -1,24 +1,10 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Remove the deployed router VM and created vSwitch and portgroup
-# Parameters:
-#   router_vm_name: the name of router VM added for assigning
-#     DHCP IP to new network interface
-#   vswitch_name: the name of vSwitch added for new network interface testing
-#   portgroup_name: the name of portgroup added for new network interface testing
-#
-- include_tasks: vm_set_power_state.yml
-  vars:
-    vm_power_state_set: 'powered-off'
-    vm_name: "{{ router_vm_name }}"
-# Remove deployed router VM
-- include_tasks: vm_remove.yml
-  vars:
-    vm_name: "{{ router_vm_name }}"
+- name: "Clean up vSphere Standard Switch network environment"
+  include_tasks: vss_network_cleanup.yml
+  when: vss_network_is_setup is defined and vss_network_is_setup
 
-# Remove the portgroup added for network testing
-- include_tasks: esxi_remove_portgroup.yml
-
-# Remove the vswitch added for network testing
-- include_tasks: esxi_remove_vswitch.yml
+- name: "Clean up vSphere Distributed Switch network environment"
+  include_tasks: vds_network_cleanup.yml
+  when: vds_network_is_setup is defined and vds_network_is_setup

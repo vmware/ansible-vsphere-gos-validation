@@ -1,0 +1,36 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Remove the deployed router VM, created port group and vSphere Standard Switch.
+# Parameters:
+#   router_vm_name: the name of router VM deployed for assigning
+#     DHCP IP to the new network interface of VM.
+#   vss_name: the name of vSphere Standard Switch added for new network
+#     interface testing.
+#   vss_portgroup_name: the name of port group added for new network interface testing.
+#
+- name: "Power off the deployed router VM"
+  include_tasks: vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-off'
+    vm_name: "{{ router_vm_name }}"
+
+- name: "Remove the deployed router VM"
+  include_tasks: vm_remove.yml
+  vars:
+    vm_name: "{{ router_vm_name }}"
+
+- name: "Remove the added port group on vSphere Standard Switch"
+  include_tasks: esxi_remove_portgroup.yml
+  vars:
+    vswitch_name: "{{ vss_name }}"
+    portgroup_name: "{{ vss_portgroup_name }}"
+
+- name: "Remove the created vSphere Standard Switch"
+  include_tasks: esxi_remove_vswitch.yml
+  vars:
+    vswitch_name: "{{ vss_name }}"
+
+- name: "Set fact that vSphere Standard Switch network environment has been removed"
+  ansible.builtin.set_fact:
+    vss_network_is_setup: false

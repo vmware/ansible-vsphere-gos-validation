@@ -20,6 +20,11 @@
         - name: "Check whether guest OS supports PVRDMA testing"
           include_tasks: check_pvrdma_support_status.yml
 
+        - name: "Pepare vSphere Distributed Switch and Port Group for PVRDMA testing"
+          include_tasks: ../../common/network_testbed_setup.yml
+          vars:
+            network_testbed_type: 'vds'
+
         - name: "Initialize facts for PVRDMA server VM and client VM"
           ansible.builtin.set_fact:
             pvrdma_server_vm_name: "{{ vm_name }}"
@@ -53,25 +58,21 @@
           ansible.builtin.set_fact:
             rdma_devices_before_hotadd: "{{ guest_rdma_device_info }}"
 
-        - name: "Pepare vSphere Distributed Switch and Port Group for PVRDMA testing"
-          include_tasks: ../../common/vds_network_setup.yml
-
         - name: "Tag VMkernel adapter and enable firewall rule on ESXi host for PVRDMA communication"
           include_tasks: ../../common/esxi_enable_pvrdma_configs.yml
           vars:
             pvrdma_vmk_nic: "{{ vds_vmk_device_name }}"
 
-        - name: "Set the port group name for new network adapter"
-          ansible.builtin.set_fact:
-            vm_portgroup_name: "{{ vds_portgroup_name }}"
-
         - name: "Set facts for PVRDMA network config on server VM and client VM"
           ansible.builtin.set_fact:
-            pvrdma_server_vm_ipv4: "{{ vds_vmk_ip_addr | ansible.utils.ipmath(1) }}"
-            pvrdma_server_vm_net_prefix: "{{ vds_vmk_net_prefix }}"
-            pvrdma_server_vm_gateway: "{{ vds_vmk_ip_addr }}"
-            pvrdma_client_vm_ipv4: "{{ vds_vmk_ip_addr | ansible.utils.ipmath(2) }}"
+            pvrdma_server_vm_ipv4: "{{ network_env_nic_ip }}"
+            pvrdma_client_vm_ipv4: "{{ network_env_nic_ip | ansible.utils.ipmath(1) }}"
             pvrdma_client_vm_primary_nic_mac: ""
+            new_nic_gateway: "{{ network_env_gateway }}"
+            new_nic_net_prefix: "{{ network_env_net_prefix }}"
+            new_nic_network: "{{ (network_env_nic_ip ~ '/' ~ network_env_net_prefix) | ansible.utils.ipaddr('network') }}"
+            new_nic_ipv4_method: 'static'
+            network_env_nic_ip: "{{ network_env_nic_ip | ansible.utils.ipmath(2) }}"
 
         # Clone a new VM as client VM from current VM, and current VM as server
         - name: "Clone a new VM as client VM from current VM"
@@ -81,15 +82,10 @@
             cloned_vm_name: "{{ pvrdma_client_vm_name }}"
 
         # On server VM
-        - name: "Set facts of new network adapter config for server VM"
-          ansible.builtin.set_fact:
-            new_nic_network: "{{ (pvrdma_server_vm_ipv4 ~ '/' ~ pvrdma_server_vm_net_prefix) | ansible.utils.ipaddr('network') }}"
-            new_nic_ipv4: "{{ pvrdma_server_vm_ipv4 }}"
-            new_nic_net_prefix: "{{ pvrdma_server_vm_net_prefix }}"
-            new_nic_gateway: "{{ pvrdma_server_vm_gateway }}"
-
         - name: "Hot add a new {{ adapter_type }} network adapter on server VM and apply network config"
           include_tasks: hot_add_network_adapter.yml
+          vars:
+            new_nic_ipv4: "{{ pvrdma_server_vm_ipv4 }}"
 
         - name: "Update server VM guest IP when it changes"
           ansible.builtin.set_fact:
@@ -125,9 +121,6 @@
 
         - name: "Remove VMkernel adapter tag and disable firewall rule for PVRDMA communication"
           include_tasks: ../../common/esxi_disable_pvrdma_configs.yml
-
-        - name: "Cleanup network"
-          include_tasks: ../../common/vds_network_cleanup.yml
       rescue:
         - name: "Switch to server VM"
           ansible.builtin.set_fact:

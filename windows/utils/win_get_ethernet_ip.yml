@@ -1,32 +1,31 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get Ethernet IP in Windows guest OS
+# Get specified Ethernet IP addresses in Windows guest OS.
 # Parameters:
-#   ethernet_name: Ethernet name in guest OS
-# Return:
-#   ethernet_dict
+#   ethernet_name: the specified Ethernet name.
 #
-- name: "Get '{{ ethernet_name }}' ip in guest OS"
+- name: "Initialize the Ethernet IP address list"
+  ansible.builtin.set_fact:
+    ethernet_ip: []
+
+- name: "Get '{{ ethernet_name }}' IP addresses in guest OS"
   include_tasks: win_execute_cmd.yml
   vars:
     win_powershell_cmd: "Get-NetIPAddress | where-object {$_.InterfaceAlias -match '{{ ethernet_name }}'} | foreach {$_.IPAddress}"
 
-- name: Initialize the Ethernet IP list
-  ansible.builtin.set_fact:
-    ethernet_ip: []
-    ethernet_ip_dict: {}
-
-- block:
-    - name: Set fact of the Ethernet IP list
+- name: "Set fact of '{{ ethernet_name }}' IP addresses"
+  when:
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length != 0
+  block:
+    - name: "Set fact of the IP addresses list"
       ansible.builtin.set_fact:
         ethernet_ip: "{{ ethernet_ip | union([item.split('%')[0]]) }}"
       loop: "{{ win_powershell_cmd_output.stdout_lines }}"
-    - name: Set fact of the Ethernet name and IP dict
+    - name: "Add the Ethernet name and IP addresses to dict"
       ansible.builtin.set_fact:
-        ethernet_ip_dict: "{{ ethernet_ip_dict | combine({ethernet_name: ethernet_ip}) }}"
-      when: ethernet_ip_dict is defined
-  when: win_powershell_cmd_output.stdout_lines | length != 0
+        ethernet_ip_dict: "{{ ethernet_ip_dict | default({}) | combine({ethernet_name: ethernet_ip}) }}"
 
-- ansible.builtin.debug:
-    msg: "Get Ethernet name and IP address dict: {{ ethernet_ip_dict }}"
+- name: "Print '{{ ethernet_name }}' IP addresses"
+  ansible.builtin.debug: var=ethernet_ip
