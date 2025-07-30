@@ -53,34 +53,26 @@
             - ['default', 'custom']
             - "{{ power_script_ops }}"
       rescue:
-        - name: "Get VMware Tools status"
-          include_tasks: ../utils/win_get_service_status.yml
-          vars:
-            win_service_name: "VMTools"
-
-        - name: "Set VMware Tools status"
-          ansible.builtin.set_fact:
-            vmtools_service_status: "{{ service_status }}"
-
-        # Stop VMware Tools service in case of log file in use error
-        - name: "Stop VMware Tools Service before getting its log file"
-          include_tasks: ../utils/win_execute_cmd.yml
-          vars:
-            win_powershell_cmd: "Stop-Service -Name VMTools"
-          when: vmtools_service_status == "Running"
-
-        - name: "Collect file {{ win_power_script_log_path }}"
-          include_tasks: ../utils/win_get_file.yml
-          vars:
-            win_get_file_src_path: "{{ win_power_script_log_path }}"
-            win_get_file_dst_path: "{{ current_test_log_folder }}"
-          with_items:
-            - "{{ vmtools_conf_path }}"
-            - "{{ win_vmsvc_log_path }}"
-            - "{{ win_vmtoolsd_log_path }}"
-          loop_control:
-            loop_var: win_power_script_log_path
+        - name: "Stop VMware Tools and collect log files"
           when: collect_power_scripts_logs is defined and collect_power_scripts_logs
+          block:
+            # Stop VMware Tools service in case of log file in use error
+            - name: "Stop VMware Tools Service before getting its log file"
+              include_tasks: ../utils/win_execute_cmd.yml
+              vars:
+                win_powershell_cmd: "Stop-Service -Name VMTools"
+
+            - name: "Collect file {{ win_power_script_log_path }}"
+              include_tasks: ../utils/win_get_file.yml
+              vars:
+                win_get_file_src_path: "{{ win_power_script_log_path }}"
+                win_get_file_dst_path: "{{ current_test_log_folder }}"
+              with_items:
+                - "{{ vmtools_conf_path }}"
+                - "{{ win_vmsvc_log_path }}"
+                - "{{ win_vmtoolsd_log_path }}"
+              loop_control:
+                loop_var: win_power_script_log_path
 
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
