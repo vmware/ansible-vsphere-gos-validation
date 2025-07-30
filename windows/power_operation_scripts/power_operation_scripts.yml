@@ -34,6 +34,10 @@
           ansible.builtin.set_fact:
             collect_power_scripts_logs: true
 
+        - name: "Test rescure 1"
+          ansible.builtin.fail:
+            msg: "Will go to rescure 1"
+
         - name: "Set fact of power operations"
           ansible.builtin.set_fact:
             power_script_ops: ['power', 'shutdown', 'suspend', 'resume']
@@ -52,11 +56,23 @@
           with_nested:
             - ['default', 'custom']
             - "{{ power_script_ops }}"
-
-        - name: "Test rescure 1"
-          ansible.builtin.fail:
-            msg: "Will go to rescure 1"
       rescue:
+        - name: "Get VMware Tools status"
+          include_tasks: win_get_service_status.yml
+          vars:
+            win_service_name: "VMTools"
+
+        - name: "Set VMware Tools status"
+          ansible.builtin.set_fact:
+            vmtools_service_status: "{{ service_status }}"
+
+        # Stop VMware Tools service in case of log file in use error
+        - name: "Stop VMware Tools Service before getting its log file"
+          include_tasks: win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "Stop-Service -Name VMTools"
+          when: vmtools_service_status == "Running"
+
         - name: "Collect file {{ win_power_script_log_path }}"
           include_tasks: ../utils/win_get_file.yml
           vars:
