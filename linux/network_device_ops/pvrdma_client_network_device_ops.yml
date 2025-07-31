@@ -10,7 +10,7 @@
         vm_name: "{{ pvrdma_client_vm_name }}"
         current_test_log_folder: "{{ pvrdma_client_test_log_folder }}"
         pvrdma_client_vm_ready: false
-        pvrdma_client_vm_exists: true
+        pvrdma_client_vm_success: false
         pvrdma_client_vm_under_test: true
 
     - name: "Get client VM log directory and path"
@@ -118,21 +118,9 @@
     - name: "Perform PVRDMA rping test from client VM to server VM"
       include_tasks: pvrdma_rping_test.yml
 
-    - name: "Power off the client VM"
-      include_tasks: ../../common/vm_set_power_state.yml
-      vars:
-        vm_power_state_set: 'powered-off'
-
-    - name: "Set fact of client VM ready to 'false'"
+    - name: "Set fact of client VM test succeeded"
       ansible.builtin.set_fact:
-        pvrdma_client_vm_ready: false
-
-    - name: "Remove the client VM"
-      include_tasks: ../../common/vm_remove.yml
-
-    - name: "Set fact of client VM exists to 'false'"
-      ansible.builtin.set_fact:
-        pvrdma_client_vm_exists: false
+        pvrdma_client_vm_success: true
 
     - name: "Test passed on client VM"
       ansible.builtin.debug:
@@ -158,7 +146,6 @@
         vm_dir_name: "{{ pvrdma_client_vm_dir_name }}"
         vm_vmx_path: "{{ pvrdma_client_vm_vmx_path }}"
       when:
-        - pvrdma_client_vm_exists
         - pvrdma_client_vm_dir_name | default('')
         - pvrdma_client_vm_vmx_path | default('')
 
