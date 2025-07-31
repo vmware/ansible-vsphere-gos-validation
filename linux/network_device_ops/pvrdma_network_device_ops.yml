@@ -34,7 +34,6 @@
             pvrdma_client_vm_guest_ip: ""
             pvrdma_client_test_log_folder: "{{ current_test_log_folder }}/{{ vm_name }}_client_{{ current_test_timestamp }}"
             pvrdma_client_vm_invalid_ips: ["{{ vm_guest_ip }}"]
-            pvrdma_client_vm_under_test: false
 
         - name: "Create test log folders for server VM and client VM"
           include_tasks: ../../common/create_directory.yml
@@ -82,6 +81,10 @@
           vars:
             parent_vm_name: "{{ pvrdma_server_vm_name }}"
             cloned_vm_name: "{{ pvrdma_client_vm_name }}"
+
+        - name: "Set fact of client VM exists"
+          ansible.builtin.set_fact:
+            pvrdma_client_vm_exists: true
 
         # On server VM
         - name: "Hot add a new {{ adapter_type }} network adapter on server VM and apply network config"
@@ -149,3 +152,19 @@
 
         - name: "Collect server VM information at test failure"
           include_tasks: ../../common/test_rescue.yml
+      always:
+        - name: "Clean up client VM"
+          when:
+            - pvrdma_client_vm_exists is defined
+            - pvrdma_client_vm_exists
+          block:
+            - name: "Power off client VM"
+              include_tasks: ../../common/vm_set_power_state.yml
+              vars:
+                vm_name: "{{ pvrdma_client_vm_name }}"
+                vm_power_state_set: 'powered-off'
+
+            - name: "Remove client VM"
+              include_tasks: ../../common/vm_remove.yml
+              vars:
+                vm_name: "{{ pvrdma_client_vm_name }}"
