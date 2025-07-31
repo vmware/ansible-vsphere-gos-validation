@@ -34,6 +34,7 @@
             pvrdma_client_vm_guest_ip: ""
             pvrdma_client_test_log_folder: "{{ current_test_log_folder }}/{{ vm_name }}_client_{{ current_test_timestamp }}"
             pvrdma_client_vm_invalid_ips: ["{{ vm_guest_ip }}"]
+            pvrdma_client_vm_under_test: false
 
         - name: "Create test log folders for server VM and client VM"
           include_tasks: ../../common/create_directory.yml
@@ -66,6 +67,7 @@
         - name: "Set facts for PVRDMA network config on server VM and client VM"
           ansible.builtin.set_fact:
             pvrdma_server_vm_ipv4: "{{ network_env_nic_ip }}"
+            pvrdma_server_vm_primary_nic_mac: "{{ vm_primary_nic_mac }}"
             pvrdma_client_vm_ipv4: "{{ network_env_nic_ip | ansible.utils.ipmath(1) }}"
             pvrdma_client_vm_primary_nic_mac: ""
             new_nic_gateway: "{{ network_env_gateway }}"
@@ -112,7 +114,9 @@
           ansible.builtin.set_fact:
             vm_name: "{{ pvrdma_server_vm_name }}"
             vm_guest_ip: "{{ pvrdma_server_vm_guest_ip }}"
+            vm_primary_nic_mac: "{{ pvrdma_server_vm_primary_nic_mac }}"
             current_test_log_folder: "{{ pvrdma_server_test_log_folder }}"
+            pvrdma_client_vm_under_test: false
 
         - name: "Hot remove the new {{ adapter_type }} network adapter from server VM"
           include_tasks: hot_remove_network_adapter.yml
@@ -126,11 +130,11 @@
           ansible.builtin.set_fact:
             vm_name: "{{ pvrdma_server_vm_name }}"
             vm_guest_ip: "{{ pvrdma_server_vm_guest_ip }}"
+            vm_primary_nic_mac: "{{ pvrdma_server_vm_primary_nic_mac }}"
             current_test_log_folder: "{{ pvrdma_server_test_log_folder }}"
           when:
-            - pvrdma_server_vm_name is defined
-            - pvrdma_server_vm_guest_ip is defined
-            - pvrdma_server_test_log_folder is defined
+            - pvrdma_client_vm_under_test is defined
+            - pvrdma_client_vm_under_test
 
         - name: "Collect server VM's guest OS information for triage"
           include_tasks: ../setup/linux_test_rescue.yml

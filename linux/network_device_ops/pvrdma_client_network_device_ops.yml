@@ -11,6 +11,7 @@
         current_test_log_folder: "{{ pvrdma_client_test_log_folder }}"
         pvrdma_client_vm_ready: false
         pvrdma_client_vm_exists: true
+        pvrdma_client_vm_under_test: true
 
     - name: "Get client VM log directory and path"
       include_tasks: ../../common/vm_get_config.yml
@@ -28,10 +29,23 @@
     - name: "Set fact of client VM '{{ pvrdma_client_vm_name }}' primary network adapter MAC address"
       ansible.builtin.set_fact:
         pvrdma_client_vm_primary_nic_mac: "{{ vm_network_adapters['0'].mac_addr }}"
+        vm_primary_nic_mac: "{{ vm_network_adapters['0'].mac_addr }}"
       when:
         - vm_network_adapters is defined
         - vm_network_adapters['0'] is defined
         - vm_network_adapters['0'].mac_addr is defined
+
+    - name: "Check the primary network adapter MAC address of client VM '{{ pvrdma_client_vm_name }}'"
+      ansible.builtin.assert:
+        that:
+          - pvrdma_client_vm_primary_nic_mac
+          - pvrdma_client_vm_primary_nic_mac != pvrdma_server_vm_primary_nic_mac
+        fail_msg: >-
+          The primary network adapter's MAC address of client VM '{{ pvrdma_client_vm_name }}'
+          is either empty or same as the primary network adapter's MAC address of server VM
+        success_msg: >-
+          The primary network adapter's MAC address of client VM '{{ pvrdma_client_vm_name }}'
+          is '{{ pvrdma_client_vm_primary_nic_mac }}'
 
     - name: "Reset client VM '{{ pvrdma_client_vm_name }}' for updating IP address"
       include_tasks: ../../common/vm_set_power_state.yml
