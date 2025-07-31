@@ -7,6 +7,11 @@
 - name: "Check and create VMware Tools config file"
   include_tasks: win_check_create_vmtools_conf.yml
 
+- name: "Set facts of VMware Tools log files"
+  ansible.builtin.set_fact:
+    win_vmtoolsd_log_path: "C:\\\\ProgramData\\\\VMware\\\\VMware Tools\\\\vmtoolsd.log"
+    win_vmsvc_log_path: "C:\\\\ProgramData\\\\VMware\\\\VMware Tools\\\\vmsvc.log"
+
 - name: "Enable VMware Tools log in VMware Tools config file"
   community.windows.win_lineinfile:
     path: "{{ vmtools_conf_path }}"
@@ -16,8 +21,8 @@
     - {key: '^#log\s*=\s*true\s*', value: 'log = true'}
     - {key: '^#vmtoolsd.level\s*', value: 'vmtoolsd.level = debug'}
     - {key: '^#vmtoolsd.handler\s*', value: 'vmtoolsd.handler = file'}
-    - {key: '^#vmtoolsd.data\s*', value: 'vmtoolsd.data = C:\\ProgramData\\VMware\\VMware Tools\\vmtoolsd.log'}
+    - {key: '^#vmtoolsd.data\s*', value: 'vmtoolsd.data = {{ win_vmtoolsd_log_path }}'}
     - {key: '^#vmsvc.level\s*', value: 'vmsvc.level = debug'}
     - {key: '^#vmsvc.handler\s*', value: 'vmsvc.handler = file'}
-    - {key: '^#vmsvc.data\s*', value: 'vmsvc.data = C:\\ProgramData\\VMware\\VMware Tools\\vmsvc.log'}
+    - {key: '^#vmsvc.data\s*', value: 'vmsvc.data = {{ win_vmsvc_log_path }}'}
   delegate_to: "{{ vm_guest_ip }}"
