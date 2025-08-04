@@ -39,6 +39,11 @@
   ansible.builtin.set_fact:
     eth0_name: "{{ network_adapters_before_hotadd[0] }}"
 
+- name: "Get network config file for '{{ eth0_name }}'"
+  include_tasks: ../utils/get_network_config_file.yml
+  vars:
+    network_adapter_name: "{{ eth0_name }}"
+
 - name: "Update systemd network config for the primary network adapter"
   include_tasks: update_systemd_network_config.yml
   vars:
@@ -61,11 +66,6 @@
         package_list: ["rdma-core", "librdmacm-utils"]
         package_state: "present"
       when: guest_os_family in ["Suse", "RedHat"]
-
-    - name: "Get network config file for '{{ eth0_name }}'"
-      include_tasks: ../utils/get_network_config_file.yml
-      vars:
-        network_adapter_name: "{{ eth0_name }}"
 
     - name: "Remove MAC address or UUID from network config file"
       when: network_config_path
