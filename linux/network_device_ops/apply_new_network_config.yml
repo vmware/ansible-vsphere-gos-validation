@@ -4,6 +4,11 @@
 # Parameters:
 #   new_network_adapter: The name of new network adapter interface
 #
+- name: "Get the network connection for new {{ adapter_type }} network adapter"
+  include_tasks: ../utils/get_network_config_file.yml
+  vars:
+    network_adapter_name: "{{ new_network_adapter }}"
+
 - name: "Add network connection for new {{ adapter_type }} network adapter on {{ vm_guest_os_distribution }}"
   when: guest_os_network_manager == "NetworkManager"
   block:
@@ -18,11 +23,6 @@
 
     # Some guest OS might automatically add a connection for the new network adapter with
     # DHCP IP address obtained. Here needs to deactivate it so that we can add a new connection.
-    - name: "Get the network connection for new {{ adapter_type }} network adapter"
-      include_tasks: ../utils/get_network_config_file.yml
-      vars:
-        network_adapter_name: "{{ new_network_adapter }}"
-
     - name: "Set fact of new network connection name and config file"
       ansible.builtin.set_fact:
         new_network_connection_name: "{{ network_connection_name }}"
@@ -65,19 +65,6 @@
     - guest_os_ansible_distribution != "FreeBSD"
     - guest_os_network_manager not in ["NetworkManager", "systemd-networkd"]
   block:
-    - name: "Get the network config file for new {{ adapter_type }} network adapter"
-      include_tasks: ../utils/get_network_config_file.yml
-      vars:
-        network_adapter_name: "{{ new_network_adapter }}"
-
-    - name: "Check network config file is set"
-      ansible.builtin.assert:
-        that:
-          - network_config_path
-        fail_msg: >-
-          Failed to get network config file for new {{ adapter_type }} network
-          adapter '{{ new_network_adapter }}' on {{ vm_guest_os_distribution }}
-
     - name: "Set fact of the network config template on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
         network_config_template: "{{ guest_os_family | lower }}_network_conf.j2"
@@ -88,15 +75,6 @@
         dest: "{{ network_config_path }}"
         mode: "0666"
       delegate_to: "{{ vm_guest_ip }}"
-
-    - name: "Get content of network config file '{{ network_config_path }}'"
-      ansible.builtin.command: "cat {{ network_config_path }}"
-      register: network_config
-      changed_when: false
-      delegate_to: "{{ vm_guest_ip }}"
-
-    - name: "Display content of network config file '{{ network_config_path }}'"
-      ansible.builtin.debug: var=network_config.stdout_lines
 
 - name: "Update systemd network config on {{ vm_guest_os_distribution }}"
   include_tasks: update_systemd_network_config.yml
@@ -122,6 +100,18 @@
         - name: "Get DHCP IPv4 address for new {{ adapter_type }} network adapter"
           ansible.builtin.shell: "dhclient {{ new_network_adapter }}"
           delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Display the content of new newtwork config file '{{ network_config_path }}'"
+  when: network_config_path
+  block:
+    - name: "Get content of network config file '{{ network_config_path }}'"
+      ansible.builtin.command: "cat {{ network_config_path }}"
+      register: network_config
+      changed_when: false
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Display content of network config file '{{ network_config_path }}'"
+      ansible.builtin.debug: var=network_config.stdout_lines
 
 - name: "Reload network configs on {{ vm_guest_os_distribution }}"
   include_tasks: reload_network_configs.yml
