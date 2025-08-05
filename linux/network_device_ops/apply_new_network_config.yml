@@ -21,23 +21,6 @@
             ternary('ipv6.method disabled', '')
           }}
 
-    # Some guest OS might automatically add a connection for the new network adapter with
-    # DHCP IP address obtained. Here needs to deactivate it so that we can add a new connection.
-    - name: "Set fact of new network connection name and config file"
-      ansible.builtin.set_fact:
-        new_network_connection_name: "{{ network_connection_name }}"
-        new_network_connection_file: "{{ network_config_path }}"
-
-    - name: "Deactivate the auto created network connection '{{ new_network_connection_name }}'"
-      ansible.builtin.shell: "nmcli connection down '{{ new_network_connection_name }}'"
-      delegate_to: "{{ vm_guest_ip }}"
-      when: new_network_connection_name
-
-    - name: "Remove the auto created network connection file '{{ new_network_connection_file }}'"
-      ansible.builtin.shell: "rm -f '{{ new_network_connection_file }}'"
-      delegate_to: "{{ vm_guest_ip }}"
-      when: new_network_connection_file
-
     - name: "Set fact of command for adding network connection with static IP addresss"
       ansible.builtin.set_fact:
         nmcli_connection_add_cmd: >-
@@ -58,6 +41,11 @@
       ansible.builtin.shell: "{{ nmcli_connection_add_cmd }}"
       delegate_to: "{{ vm_guest_ip }}"
       register: nmcli_connection_add_result
+
+    - name: "Update the network connection file for new {{ adapter_type }} network adapter"
+      include_tasks: ../utils/get_network_config_file.yml
+      vars:
+        network_adapter_name: "{{ new_network_adapter }}"
 
 # Set network config file in guest OS
 - name: "Set network config file for new {{ adapter_type }} network adapter on {{ vm_guest_os_distribution }}"
@@ -101,17 +89,21 @@
           ansible.builtin.shell: "dhclient {{ new_network_adapter }}"
           delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Display the content of new network config file '{{ network_config_path }}'"
+- name: "Collect the new network config file '{{ network_config_path }}'"
   when: network_config_path
   block:
+    - name: "Fetch the network config file of {{ adapter_type }} network adapter '{{ new_network_adapter }}'"
+      include_tasks: ../utils/fetch_file.yml
+      vars:
+        fetch_file_src_path: "{{ network_config_path }}"
+        fetch_file_dst_path: "{{ current_test_log_folder }}/"
+
     - name: "Get content of network config file '{{ network_config_path }}'"
-      ansible.builtin.command: "cat {{ network_config_path }}"
-      register: network_config
-      changed_when: false
-      delegate_to: "{{ vm_guest_ip }}"
+      ansible.builtin.set_fact:
+        new_network_config_content: "{{ lookup('file', fetch_file_local_path) }}"
 
     - name: "Display content of network config file '{{ network_config_path }}'"
-      ansible.builtin.debug: var=network_config.stdout_lines
+      ansible.builtin.debug: var=new_network_config_content
 
 - name: "Reload network configs on {{ vm_guest_os_distribution }}"
   include_tasks: reload_network_configs.yml
