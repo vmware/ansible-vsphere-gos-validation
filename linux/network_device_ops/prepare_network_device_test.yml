@@ -43,6 +43,7 @@
   include_tasks: ../utils/get_network_config_file.yml
   vars:
     network_adapter_name: "{{ eth0_name }}"
+    network_adapter_is_primary: true
 
 - name: "Update systemd network config for the primary network adapter '{{ eth0_name }}'"
   include_tasks: update_systemd_network_config.yml
@@ -56,32 +57,29 @@
     - name: "Install rdma packages in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       include_tasks: ../utils/install_uninstall_package.yml
       vars:
-        package_list: ["rdma-core", "rdmacm-utils"]
+        package_list: ["rdma-core", "rdmacm-utils", "ibverbs-utils"]
         package_state: "present"
       when: guest_os_family == "Debian"
 
     - name: "Install rdma packages in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       include_tasks: ../utils/install_uninstall_package.yml
       vars:
-        package_list: ["rdma-core", "librdmacm-utils"]
+        package_list: ["rdma-core", "librdmacm-utils", "libibverbs-utils"]
         package_state: "present"
       when: guest_os_family in ["Suse", "RedHat"]
 
-    - name: "Remove MAC address or UUID from network config file"
-      when: network_config_path
-      block:
-        - name: "Get network config file state"
-          include_tasks: ../utils/get_file_stat_info.yml
-          vars:
-            guest_file_path: "{{ network_config_path }}"
+    - name: "Get network config file state"
+      include_tasks: ../utils/get_file_stat_info.yml
+      vars:
+        guest_file_path: "{{ network_config_path }}"
 
-        - name: "Remove MAC address or UUID from network config file for '{{ eth0_name }}'"
-          ansible.builtin.lineinfile:
-            path: "{{ network_config_path }}"
-            regexp: "^uuid|^UUID|^MAC|^mac"
-            state: absent
-          delegate_to: "{{ vm_guest_ip }}"
-          when: guest_file_exists
+    - name: "Remove MAC address or UUID from network config file for '{{ eth0_name }}'"
+      ansible.builtin.lineinfile:
+        path: "{{ network_config_path }}"
+        regexp: "^uuid|^UUID|^MAC|^mac"
+        state: absent
+      delegate_to: "{{ vm_guest_ip }}"
+      when: guest_file_exists
 
     - name: "Get VM serial port devices"
       include_tasks: ../../common/vm_get_device_with_type.yml
@@ -109,3 +107,19 @@
 
 - name: "Disable firewall in guest OS"
   include_tasks: ../utils/disable_firewall.yml
+
+- name: "Update NetworkManager config on {{ vm_guest_os_distribution }}"
+  when: guest_os_network_manager == "NetworkManager"
+  block:
+    - name: "Do not create default network connection file on {{ vm_guest_os_distribution }}"
+      ansible.builtin.blockinfile:
+        path: "/etc/NetworkManager/conf.d/no-auto-default.conf"
+        block: |
+          [main]
+          no-auto-default=*,except:interface-name:{{ eth0_name }}
+        create: true
+        mode: "0644"
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Reload network configs on {{ vm_guest_os_distribution }}"
+      include_tasks: reload_network_configs.yml

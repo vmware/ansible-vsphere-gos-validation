@@ -22,7 +22,7 @@
       ansible.builtin.shell: "systemctl is-active {{ network_service_name }}"
       ignore_errors: true
       delegate_to: "{{ vm_guest_ip }}"
-      with_items: ["systemd-networkd", "NetworkManager"]
+      with_items: ["NetworkManager", "systemd-networkd"]
       loop_control:
         loop_var: network_service_name
       register: check_active_network_service
@@ -57,15 +57,6 @@
       when:
         - guest_os_network_manager == "systemd-networkd"
         - guest_os_ansible_distribution == "Ubuntu"
-
-    # FusionOS 22 has systemd-networkd and NetworkManager running together. But it uses NetworkManager.
-    - name: "Set fact of network device manager to 'NetworkManager' on {{ vm_guest_os_distribution }}"
-      ansible.builtin.set_fact:
-        guest_os_network_manager: "NetworkManager"
-      when:
-        - guest_os_ansible_distribution == "FusionOS"
-        - guest_os_ansible_distribution_major_ver | int == 22
-        - guest_active_network_service | select('equalto', 'NetworkManager') | length > 0
 
     # Use traditional ifdown/ifup commands to manage network devices for other Linux OS
     - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is traditional ifdown/ifup"
