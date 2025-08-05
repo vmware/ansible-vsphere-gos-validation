@@ -39,27 +39,30 @@
       or the files listed in 'D:\' drive '{{ win_files_vmtools_iso }}' do not contain all the
       files in this list '{{ win_vmtools_files_check }}'.
 
-- name: "Get VMware Tools version from manifest.txt file"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "Select-String -Path D:\\manifest.txt -Pattern 'monolithic.version'"
+- name: "Check VMware Tools version"
+  when: esxi_cpu_vendor != 'arm'
+  block:
+    - name: "Get VMware Tools version from manifest.txt file"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "Select-String -Path D:\\manifest.txt -Pattern 'monolithic.version'"
 
-- name: "Set fact of VMware Tools version from manifest.txt file"
-  ansible.builtin.set_fact:
-    vmtools_version_manifest: |-
-      {%- if win_powershell_cmd_output.stdout_lines | length != 0 -%}
-      {{ (win_powershell_cmd_output.stdout_lines | select)[0].split('"')[1] }}
-      {%- endif -%}
+    - name: "Set fact of VMware Tools version from manifest.txt file"
+      ansible.builtin.set_fact:
+        vmtools_version_manifest: |-
+          {%- if win_powershell_cmd_output.stdout_lines | length != 0 -%}
+          {{ (win_powershell_cmd_output.stdout_lines | select)[0].split('"')[1] }}
+          {%- endif -%}
 
-- name: "Not supported VMware Tools version"
-  include_tasks: ../../common/skip_test_case.yml
-  vars:
-     skip_msg: >
-       Skip test case '{{ ansible_play_name }}' because this VMware Tools version '{{ vmtools_version_manifest }}'
-       does not support Windows '{{ guest_os_ansible_architecture }}' OS.
-       Please refer to "VMware Tools 12.5.0 and later supports only Windows 64-bit guest operating systems." in
-       release notes https://techdocs.broadcom.com/us/en/vmware-cis/vsphere/tools/12-5-0/release-notes/vmware-tools-1250-release-notes.html.
-     skip_reason: "Not Supported"
-  when:
-    - guest_os_ansible_architecture == "32-bit"
-    - vmtools_version_manifest is version('12.5.0', '>=')
+    - name: "Not supported VMware Tools version"
+      include_tasks: ../../common/skip_test_case.yml
+      vars:
+        skip_msg: >
+          Skip test case '{{ ansible_play_name }}' because this VMware Tools version '{{ vmtools_version_manifest }}'
+          does not support Windows '{{ guest_os_ansible_architecture }}' OS.
+          Please refer to "VMware Tools 12.5.0 and later supports only Windows 64-bit guest operating systems." in
+          release notes https://techdocs.broadcom.com/us/en/vmware-cis/vsphere/tools/12-5-0/release-notes/vmware-tools-1250-release-notes.html.
+        skip_reason: "Not Supported"
+      when:
+        - guest_os_ansible_architecture == "32-bit"
+        - vmtools_version_manifest is version('12.5.0', '>=')
