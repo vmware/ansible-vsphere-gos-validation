@@ -19,6 +19,17 @@
           vars:
             skip_test_no_vmtools: true
 
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case '{{ ansible_play_name }}' because Applicaion '{{ vmtools_toolboxcmd_path }}'
+              does not exist in guest OS.
+            skip_reason: "Not Supported"
+          when:
+            - vmtools_toolboxcmd_exists is defined
+            - not vmtools_toolboxcmd_exists
+
         - name: "Initialize the facts of host time"
           ansible.builtin.set_fact:
             real_time: ""
@@ -30,7 +41,7 @@
             win_powershell_cmd: "Set-TimeZone -Id UTC"
 
         - name: "Get host time by VMware Tools in guest OS"
-          ansible.windows.win_shell: "& 'C:\\Program Files\\VMware\\VMware Tools\\VMwareToolboxCmd.exe' stat hosttime"
+          ansible.windows.win_shell: "& '{{ vmtools_toolboxcmd_path }}' stat hosttime"
           register: stat_time_output
           delegate_to: "{{ vm_guest_ip }}"
           ignore_unreachable: true
