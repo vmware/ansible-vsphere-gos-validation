@@ -66,6 +66,7 @@
         - name: "Set facts for PVRDMA network config on server VM and client VM"
           ansible.builtin.set_fact:
             pvrdma_server_vm_ipv4: "{{ network_env_nic_ip }}"
+            pvrdma_server_vm_primary_nic_mac: "{{ vm_primary_nic_mac }}"
             pvrdma_client_vm_ipv4: "{{ network_env_nic_ip | ansible.utils.ipmath(1) }}"
             pvrdma_client_vm_primary_nic_mac: ""
             new_nic_gateway: "{{ network_env_gateway }}"
@@ -80,6 +81,10 @@
           vars:
             parent_vm_name: "{{ pvrdma_server_vm_name }}"
             cloned_vm_name: "{{ pvrdma_client_vm_name }}"
+
+        - name: "Set fact of client VM exists"
+          ansible.builtin.set_fact:
+            pvrdma_client_vm_exists: true
 
         # On server VM
         - name: "Hot add a new {{ adapter_type }} network adapter on server VM and apply network config"
@@ -112,7 +117,9 @@
           ansible.builtin.set_fact:
             vm_name: "{{ pvrdma_server_vm_name }}"
             vm_guest_ip: "{{ pvrdma_server_vm_guest_ip }}"
+            vm_primary_nic_mac: "{{ pvrdma_server_vm_primary_nic_mac }}"
             current_test_log_folder: "{{ pvrdma_server_test_log_folder }}"
+            pvrdma_client_vm_under_test: false
 
         - name: "Hot remove the new {{ adapter_type }} network adapter from server VM"
           include_tasks: hot_remove_network_adapter.yml
@@ -126,11 +133,11 @@
           ansible.builtin.set_fact:
             vm_name: "{{ pvrdma_server_vm_name }}"
             vm_guest_ip: "{{ pvrdma_server_vm_guest_ip }}"
+            vm_primary_nic_mac: "{{ pvrdma_server_vm_primary_nic_mac }}"
             current_test_log_folder: "{{ pvrdma_server_test_log_folder }}"
           when:
-            - pvrdma_server_vm_name is defined
-            - pvrdma_server_vm_guest_ip is defined
-            - pvrdma_server_test_log_folder is defined
+            - pvrdma_client_vm_under_test is defined
+            - pvrdma_client_vm_under_test
 
         - name: "Collect server VM's guest OS information for triage"
           include_tasks: ../setup/linux_test_rescue.yml
@@ -145,3 +152,19 @@
 
         - name: "Collect server VM information at test failure"
           include_tasks: ../../common/test_rescue.yml
+      always:
+        - name: "Clean up client VM"
+          when:
+            - pvrdma_client_vm_exists is defined
+            - pvrdma_client_vm_exists
+          block:
+            - name: "Power off client VM"
+              include_tasks: ../../common/vm_set_power_state.yml
+              vars:
+                vm_name: "{{ pvrdma_client_vm_name }}"
+                vm_power_state_set: 'powered-off'
+
+            - name: "Remove client VM"
+              include_tasks: ../../common/vm_remove.yml
+              vars:
+                vm_name: "{{ pvrdma_client_vm_name }}"

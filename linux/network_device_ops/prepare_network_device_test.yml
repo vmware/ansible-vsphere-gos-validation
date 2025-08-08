@@ -3,6 +3,12 @@
 ---
 # Install required packages and kernel modules
 #
+- name: "Get guest network device manager"
+  include_tasks: ../utils/get_network_manager.yml
+  when: >-
+    guest_os_network_manager is undefined or
+    not guest_os_network_manager
+
 - name: "Install 'distrib-compat' for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
   include_tasks: ../utils/install_uninstall_package.yml
   vars:
@@ -29,9 +35,26 @@
 
 # Get eth0 device name in guest. Sometimes it is not 'eth0',
 # e.g., 'ens192', 'ens33', etc.
-- name: "Set fact of the first network adapter interface name in guest OS"
+- name: "Set fact of the primary network adapter interface name in guest OS"
   ansible.builtin.set_fact:
     eth0_name: "{{ network_adapters_before_hotadd[0] }}"
+
+- name: "Get network config file for the primary network adapter '{{ eth0_name }}'"
+  include_tasks: ../utils/get_network_config_file.yml
+  vars:
+    network_adapter_name: "{{ eth0_name }}"
+    network_adapter_is_primary: true
+
+- name: "Set fact of network config file for the primary network adapter '{{ eth0_name }}'"
+  ansible.builtin.set_fact:
+    eth0_network_config_path: "{{ network_config_path }}"
+
+- name: "Update systemd network config for the primary network adapter '{{ eth0_name }}'"
+  include_tasks: update_systemd_network_config.yml
+  vars:
+    network_adapter_name: "{{ eth0_name }}"
+    network_config_path: "{{ eth0_network_config_path }}"
+  when: guest_os_network_manager == "systemd-networkd"
 
 - name: "Prepare for PVRDMA testing"
   when: adapter_type == "pvrdma"
@@ -39,37 +62,29 @@
     - name: "Install rdma packages in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       include_tasks: ../utils/install_uninstall_package.yml
       vars:
-        package_list: ["rdma-core", "rdmacm-utils"]
+        package_list: ["rdma-core", "rdmacm-utils", "ibverbs-utils"]
         package_state: "present"
       when: guest_os_family == "Debian"
 
     - name: "Install rdma packages in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
       include_tasks: ../utils/install_uninstall_package.yml
       vars:
-        package_list: ["rdma-core", "librdmacm-utils"]
+        package_list: ["rdma-core", "librdmacm-utils", "libibverbs-utils"]
         package_state: "present"
       when: guest_os_family in ["Suse", "RedHat"]
 
-    - name: "Get network config file for '{{ eth0_name }}'"
-      include_tasks: ../utils/get_network_config_file.yml
+    - name: "Get network config file state"
+      include_tasks: ../utils/get_file_stat_info.yml
       vars:
-        network_adapter_name: "{{ eth0_name }}"
+        guest_file_path: "{{ eth0_network_config_path }}"
 
-    - name: "Remove MAC address or UUID from network config file"
-      when: network_config_path
-      block:
-        - name: "Get network config file state"
-          include_tasks: ../utils/get_file_stat_info.yml
-          vars:
-            guest_file_path: "{{ network_config_path }}"
-
-        - name: "Remove MAC address or UUID from network config file for '{{ eth0_name }}'"
-          ansible.builtin.lineinfile:
-            path: "{{ network_config_path }}"
-            regexp: "^uuid|^UUID|^MAC|^mac"
-            state: absent
-          delegate_to: "{{ vm_guest_ip }}"
-          when: guest_file_exists
+    - name: "Remove MAC address or UUID from network config file for '{{ eth0_name }}'"
+      ansible.builtin.lineinfile:
+        path: "{{ eth0_network_config_path }}"
+        regexp: "^uuid|^UUID|^MAC|^mac"
+        state: absent
+      delegate_to: "{{ vm_guest_ip }}"
+      when: guest_file_exists
 
     - name: "Get VM serial port devices"
       include_tasks: ../../common/vm_get_device_with_type.yml
@@ -97,3 +112,36 @@
 
 - name: "Disable firewall in guest OS"
   include_tasks: ../utils/disable_firewall.yml
+
+- name: "Update NetworkManager config on {{ vm_guest_os_distribution }}"
+  when: guest_os_network_manager == "NetworkManager"
+  block:
+    - name: "Set fact of NetworkManager config directory path"
+      ansible.builtin.set_fact:
+        network_manager_config_dir: "/etc/NetworkManager/conf.d"
+
+    - name: "Get stat info of NetworkManager config directory"
+      include_tasks: ../utils/get_file_stat_info.yml
+      vars:
+        guest_file_path: "{{ network_manager_config_dir }}"
+
+    - name: "Create NetworkManager config directory if it doesn't exist"
+      ansible.builtin.file:
+        path: "{{ network_manager_config_dir }}"
+        mode: "0755"
+        state: directory
+      delegate_to: "{{ vm_guest_ip }}"
+      when: not guest_file_exists
+
+    - name: "Do not create default network connection file on {{ vm_guest_os_distribution }}"
+      ansible.builtin.blockinfile:
+        path: "{{ network_manager_config_dir }}/00-no-auto-default.conf"
+        block: |
+          [main]
+          no-auto-default=*,except:interface-name:{{ eth0_name }}
+        create: true
+        mode: "0644"
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Reload network configs on {{ vm_guest_os_distribution }}"
+      include_tasks: reload_network_configs.yml
