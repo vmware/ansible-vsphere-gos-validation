@@ -12,6 +12,23 @@
 - name: "Add network connection for new {{ adapter_type }} network adapter on {{ vm_guest_os_distribution }}"
   when: guest_os_network_manager == "NetworkManager"
   block:
+    # Some guest OS might automatically add a connection for the new network adapter with
+    # DHCP IP address obtained. Here needs to deactivate it so that we can add a new connection.
+    - name: "Set fact of new network connection name and config file"
+      ansible.builtin.set_fact:
+        new_network_connection_name: "{{ network_connection_name }}"
+        new_network_connection_file: "{{ network_config_path }}"
+
+    - name: "Deactivate the auto created network connection '{{ new_network_connection_name }}'"
+      ansible.builtin.shell: "nmcli connection down '{{ new_network_connection_name }}'"
+      delegate_to: "{{ vm_guest_ip }}"
+      when: new_network_connection_name
+
+    - name: "Remove the auto created network connection file '{{ new_network_connection_file }}'"
+      ansible.builtin.shell: "rm -f '{{ new_network_connection_file }}'"
+      delegate_to: "{{ vm_guest_ip }}"
+      when: new_network_connection_file
+
     - name: "Set fact of IPv6 config in network connection for new {{ adapter_type }} network adapter"
       ansible.builtin.set_fact:
         nmcli_ipv6_method: >-
