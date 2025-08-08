@@ -45,10 +45,15 @@
     network_adapter_name: "{{ eth0_name }}"
     network_adapter_is_primary: true
 
+- name: "Set fact of network config file for the primary network adapter '{{ eth0_name }}'"
+  ansible.builtin.set_fact:
+    eth0_network_config_path: "{{ network_config_path }}"
+
 - name: "Update systemd network config for the primary network adapter '{{ eth0_name }}'"
   include_tasks: update_systemd_network_config.yml
   vars:
     network_adapter_name: "{{ eth0_name }}"
+    network_config_path: "{{ eth0_network_config_path }}"
   when: guest_os_network_manager == "systemd-networkd"
 
 - name: "Prepare for PVRDMA testing"
@@ -71,11 +76,11 @@
     - name: "Get network config file state"
       include_tasks: ../utils/get_file_stat_info.yml
       vars:
-        guest_file_path: "{{ network_config_path }}"
+        guest_file_path: "{{ eth0_network_config_path }}"
 
     - name: "Remove MAC address or UUID from network config file for '{{ eth0_name }}'"
       ansible.builtin.lineinfile:
-        path: "{{ network_config_path }}"
+        path: "{{ eth0_network_config_path }}"
         regexp: "^uuid|^UUID|^MAC|^mac"
         state: absent
       delegate_to: "{{ vm_guest_ip }}"
@@ -111,9 +116,26 @@
 - name: "Update NetworkManager config on {{ vm_guest_os_distribution }}"
   when: guest_os_network_manager == "NetworkManager"
   block:
+    - name: "Set fact of NetworkManager config directory path"
+      ansible.builtin.set_fact:
+        network_manager_config_dir: "/etc/NetworkManager/conf.d"
+
+    - name: "Get stat info of NetworkManager config directory"
+      include_tasks: ../utils/get_file_stat_info.yml
+      vars:
+        guest_file_path: "{{ network_manager_config_dir }}"
+
+    - name: "Create NetworkManager config directory if it doesn't exist"
+      ansible.builtin.file:
+        path: "{{ network_manager_config_dir }}"
+        mode: "0755"
+        state: directory
+      delegate_to: "{{ vm_guest_ip }}"
+      when: not guest_file_exists
+
     - name: "Do not create default network connection file on {{ vm_guest_os_distribution }}"
       ansible.builtin.blockinfile:
-        path: "/etc/NetworkManager/conf.d/no-auto-default.conf"
+        path: "{{ network_manager_config_dir }}/00-no-auto-default.conf"
         block: |
           [main]
           no-auto-default=*,except:interface-name:{{ eth0_name }}
