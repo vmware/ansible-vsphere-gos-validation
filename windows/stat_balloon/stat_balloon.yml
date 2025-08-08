@@ -11,20 +11,42 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: true
 
-        - include_tasks: ../utils/win_execute_cmd.yml
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
-            win_powershell_cmd: "& 'C:\\Program Files\\VMware\\VMware Tools\\VMwareToolboxCmd.exe' stat balloon"
-        - name: Check balloon status is 0 MB
+            skip_msg: >-
+              Skip test case '{{ ansible_play_name }}' because Applicaion '{{ vmtools_toolboxcmd_path }}'
+              does not exist in guest OS.
+            skip_reason: "Not Supported"
+          when:
+            - vmtools_toolboxcmd_exists is defined
+            - not vmtools_toolboxcmd_exists
+
+        - name: "Get balloon status in guest OS"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "& '{{ vmtools_toolboxcmd_path }}' stat balloon"
+
+        - name: "Check balloon status is 0 MB in this testing"
           ansible.builtin.assert:
             that:
               - not win_powershell_cmd_output.failed
+              - win_powershell_cmd_output.stdout_lines is defined
+              - win_powershell_cmd_output.stdout_lines | length == 1
               - win_powershell_cmd_output.stdout_lines[0] == '0 MB'
-            fail_msg: "stat_balloon test failed"
-            success_msg: "stat_balloon test passed"
+            fail_msg: >-
+              The amount of memory that is currently reclaimed from the VM through ballooning is
+              '{{ win_powershell_cmd_output.stdout_lines | default('') }}', expected result is '0 MB'.
+            success_msg: >-
+              The amount of memory that is currently reclaimed from the VM through ballooning is
+              '{{ win_powershell_cmd_output.stdout_lines[0] }}'.
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
