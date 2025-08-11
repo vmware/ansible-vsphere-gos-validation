@@ -1,21 +1,30 @@
 # Copyright 2023-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Hot add a new network adapter and apply network config
+# Add a new network adapter and apply network config
 #
 - name: "Initialize facts of the new {{ adapter_type }} network adapter"
   ansible.builtin.set_fact:
-    new_network_adapter: ""
+    new_network_adapter_name: ""
     new_network_adapter_status: ""
-    new_network_adapter_mac_addr: ""
+    new_network_adapter_mac: ""
     new_network_adapter_ip: ""
 
-- name: "Clear dmesg ring buffer"
+- name: "Update primary network config on {{ vm_guest_os_distribution }}"
+  include_tasks: apply_new_network_config.yml
+  vars:
+    new_network_adapter_name: "{{ guest_primary_nic_name }}"
+    new_network_adapter_mac: "{{ guest_primary_nic_mac }}"
+    new_nic_ipv4_method: "dhcp"
+  when: guest_os_ansible_system == "linux"
+    
+- name: "Clear dmesg ring buffer before hot adding a {{ adapter_type }} new network adapter"
   include_tasks: ../utils/collect_dmesg.yml
   vars:
     dmesg_options: '-c'
-    dmesg_output_file_name: 'dmesg_before_nic_hotadd.log'
+    dmesg_output_file_name: 'dmesg_before_nic_hot_add.log'
     dmesg_no_log: true
+  when: esxi_cpu_vendor != 'arm'
 
 # Hot add network adapter is not supported on ESXi on ARM now,
 # here shutdown the guest OS to cold add a new network adapter
@@ -23,118 +32,121 @@
   include_tasks: ../utils/shutdown.yml
   when: esxi_cpu_vendor == 'arm'
 
-- name: "Hot add a new {{ adapter_type }} network adapter to VM"
+- name: "Add a new {{ adapter_type }} network adapter to VM"
   include_tasks: ../../common/vm_add_network_adapter.yml
   vars:
     vm_portgroup_name: "{{ network_env_net_name }}"
 
-- name: "Sleep 10s for guest OS detecting new {{ adapter_type }} network adapter"
-  ansible.builtin.pause:
-    seconds: 10
-  when: esxi_cpu_vendor != 'arm'
-
-- name: "Power on VM and refresh guest OS IP in the in-memory inventory hosts info"
+- name: "Refresh guest OS IP in the in-memory inventory hosts info"
   include_tasks: ../../common/update_inventory.yml
+
+- name: "Get primary network adapter after power on"
+  include_tasks: ../utils/get_primary_network_adapter.yml
   when: esxi_cpu_vendor == 'arm'
 
-- name: "Check VM connection is not broken after hot-add"
-  include_tasks: ../../common/vm_wait_connection.yml
-  vars:
-    vm_wait_connection_timeout: 60
+- name: "Check dmesg after hot adding a new network adapter"
+  when: esxi_cpu_vendor != 'arm'
+  block:
+    - name: "Sleep 10s for guest OS detecting new {{ adapter_type }} network adapter"
+      ansible.builtin.pause:
+        seconds: 10
 
-- name: "Collect dmesg after hot adding a new network adapter"
-  include_tasks: ../utils/collect_dmesg.yml
-  vars:
-    dmesg_options: '-c'
-    dmesg_output_file_name: 'dmesg_after_nic_hot_add.log'
-    dmesg_check_call_trace: true
+    - name: "Collect dmesg after hot adding a new {{ adapter_type }} network adapter"
+      include_tasks: ../utils/collect_dmesg.yml
+      vars:
+        dmesg_options: '-c'
+        dmesg_output_file_name: 'dmesg_after_nic_hot_add.log'
+        dmesg_check_call_trace: true
 
-- name: "Set match string for newly added NIC in dmesg ring buffer"
-  ansible.builtin.set_fact:
-    nic_match_in_dmesg: |-
-      {%- if guest_os_family == "FreeBSD" -%}
-          {%- if adapter_type == 'vmxnet3' -%}VMware VMXNET3
-          {%- else  -%}Intel\(R\) Gigabit
+    - name: "Set match string for newly added NIC in dmesg ring buffer"
+      ansible.builtin.set_fact:
+        nic_match_in_dmesg: |-
+          {%- if guest_os_family == "FreeBSD" -%}
+              {%- if adapter_type == 'vmxnet3' -%}VMware VMXNET3
+              {%- else  -%}Intel\(R\) Gigabit
+              {%- endif -%}
+          {%-  else -%}{{ adapter_type }}
           {%- endif -%}
-      {%-  else -%}{{ adapter_type }}
-      {%- endif -%}
 
-- name: "Set fact of device messages in dmesg ring buffer"
-  ansible.builtin.set_fact:
-    new_network_adapter_dmesg: >-
-      {{
-        dmesg_cmd_result.stdout_lines | default([]) |
-        select('match', '.*' ~ nic_match_in_dmesg ~ '.*')
-      }}
+    - name: "Set fact of device messages in dmesg ring buffer"
+      ansible.builtin.set_fact:
+        new_network_adapter_dmesg: >-
+          {{
+            dmesg_cmd_result.stdout_lines | default([]) |
+            select('match', '.*' ~ nic_match_in_dmesg ~ '.*')
+          }}
 
-- name: "Assert messages about new network adapter is printed"
-  ansible.builtin.assert:
-    that:
-      - new_network_adapter_dmesg | length > 0
-    fail_msg: "There is no message about new {{ adapter_type }} network adapter in dmesg on VM {{ vm_name }}"
+    - name: "Check dmesg has new messages about new {{ adapter_type }} network adapter"
+      ansible.builtin.assert:
+        that:
+          - new_network_adapter_dmesg | length > 0
+        fail_msg: "There is no message about new {{ adapter_type }} network adapter in dmesg on VM {{ vm_name }}"
 
-- name: "Get network adapters status after hot-add"
+- name: "Get network adapters status after adding a new {{ adapter_type }} network adapter"
   include_tasks: ../utils/get_network_adapters_status.yml
 
-- name: "Set fact of network adapters after hot-add"
+- name: "Set fact of network adapters' MAC addresses after adding a new {{ adapter_type }} network adapter"
   ansible.builtin.set_fact:
-    network_adapters_after_hotadd: "{{ guest_network_adapters }}"
+    network_macs_after_add: "{{ guest_network_adapters_mac }}"
 
 - name: "Assert new {{ adapter_type }} adapter interface is detected"
   ansible.builtin.assert:
     that:
-      - network_adapters_after_hotadd | difference(network_adapters_before_hotadd) | length > 0
-    fail_msg: "Guest OS failed to detect new added {{ adapter_type }} network adapter on VM {{ vm_name }}"
+      - network_macs_after_add | difference(network_macs_before_add) | length > 0
+    fail_msg: >-
+      Guest OS failed to detect new added {{ adapter_type }} network adapter on {{ vm_guest_os_distribution }}.
+      The MAC addresses of guest OS network adapters before adding include {{ network_macs_before_add }}.
+      The MAC addresses of guest OS network adapters after adding include {{ network_macs_after_add }}.
 
-# Get new added network interface
-- name: "Set fact of new {{ adapter_type }} network adapter interface name"
-  ansible.builtin.set_fact:
-    new_network_adapter: "{{ network_adapters_after_hotadd | difference(network_adapters_before_hotadd) | first }}"
-
-- name: "Print the new {{ adapter_type }} adapter interface name"
-  ansible.builtin.debug: var=new_network_adapter
-
+# Get new added network adapter info
 - name: "Set fact of new {{ adapter_type }} network adapter status before applying network config"
   ansible.builtin.set_fact:
-    new_network_adapter_status: "{{ guest_network_adapters_status | selectattr('device', 'equalto', new_network_adapter) | first }}"
-
-- name: "Set the fact of new {{ adapter_type }} adapter interface mac address"
-  ansible.builtin.set_fact:
-    new_network_adapter_mac_addr: "{{ new_network_adapter_status.macaddress }}"
-
-- name: "Set fact of the new {{ adapter_type }} network adapter's IPv4 address before applying network config"
-  ansible.builtin.set_fact:
-    new_network_adapter_ip: >-
+    new_network_adapter_status: >-
       {{
-        (new_network_adapter_status.ipv4 | type_debug == "list") |
-        ternary(new_network_adapter_status.ipv4[0].address | default('') ,
-                new_network_adapter_status.ipv4.address | default(''))
+        guest_network_adapters_status |
+        rejectattr('macaddress', 'equalto', guest_primary_nic_mac) |
+        first
       }}
-  when:
-    - new_network_adapter_status.ipv4 is defined
-    - new_network_adapter_status.ipv4 | type_debug in ['list', 'dict']
 
-- name: "Apply new network config to get new {{ adapter_type }} network adapter's IPv4 address"
-  include_tasks: apply_new_network_config.yml
-  when: not new_network_adapter_ip or new_nic_ipv4_method == 'static'
+- name: "Print the new {{ adapter_type }} adapter information"
+  ansible.builtin.debug: var=new_network_adapter_status
 
-- name: "Check the new {{ adapter_type }} network adapter has IPv4 address"
+- name: "Check new {{ adapter_type }} adapter interface name and MAC address"
   ansible.builtin.assert:
     that:
-      - new_network_adapter_ip
+      - new_network_adapter_status.device is defined
+      - new_network_adapter_status.device
+      - new_network_adapter_status.macaddress is defined
+      - new_network_adapter_status.macaddress
     fail_msg: >-
-      Failed to get IPv4 address of the new {{ adapter_type }} network adapter '{{ new_network_adapter }}'
-      on {{ vm_guest_os_distribution }}. The network adapter status is {{ new_network_adapter_status }}.
-    success_msg: >-
-      The IPv4 address of the new {{ adapter_type }} network adapter '{{ new_network_adapter }}'
-      is {{ new_network_adapter_ip }} on {{ vm_guest_os_distribution }}.
+      Failed to get the new added {{ adapter_type }} adapter interface name or MAC address
+      on {{ vm_guest_os_distribution }}
 
-- name: "Ping VLAN gateway after hot adding new {{ adapter_type }} network adapter"
+- name: "Set facts of new {{ adapter_type }} network adapter interface name and MAC address"
+  ansible.builtin.set_fact:
+    new_network_adapter_name: "{{ new_network_adapter_status.device }}"
+    new_network_adapter_mac: "{{ new_network_adapter_status.macaddress }}"
+
+- name: "Apply new network config for the new {{ adapter_type }} network adapter"
+  include_tasks: apply_new_network_config.yml
+
+- name: "Get the IPv4 address of the new {{ adapter_type }} network adapter"
+  include_tasks: get_new_network_adapter_ip.yml
+
+- name: "Ping VLAN gateway from the new {{ adapter_type }} network adapter"
   include_tasks: ping_vlan_gateway.yml
   vars:
-    ping_src_interface: "{{ new_network_adapter }}"
+    ping_src_interface: "{{ new_network_adapter_name }}"
     ping_src_ip: "{{ new_network_adapter_ip }}"
 
-- name: "Set ping result after hot adding new {{ adapter_type }} network adapter"
+- name: "Set ping result after adding the new {{ adapter_type }} network adapter"
   ansible.builtin.set_fact:
-    ping_success_after_hotadd: "{{ ping_success }}"
+    ping_success_after_add: "{{ ping_success }}"
+
+- name: "Check ping result from the new {{ adapter_type }} network adapter"
+  ansible.builtin.assert:
+    that:
+      - ping_success_after_add
+    fail_msg: >-
+      Failed to ping VLAN gateway {{ new_nic_gateway }} from the new {{ adapter_type }}
+      network adapter with IPv4 address {{ new_network_adapter_ip }}

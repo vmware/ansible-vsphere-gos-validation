@@ -2,16 +2,21 @@ network:
   version: 2
   renderer: networkd
   ethernets:
-    {{ eth0_name }}:
+    {{ guest_primary_nic_name }}:
+      match:
+        macaddress: {{ guest_primary_nic_mac }}
       dhcp4: true
       dhcp4-overrides:
         route-metric: 100
-    {{ new_network_adapter }}:
-{% if new_nic_ipv4_method == 'dhcp' %}
+{% if new_network_adapter_name is defined and new_network_adapter_name and new_network_adapter_name != guest_primary_nic_name %}
+    {{ new_network_adapter_name }}:
+      match:
+        macaddress: {{ new_network_adapter_mac }}
+      {% if new_nic_ipv4_method == 'dhcp' -%}
       dhcp4: true
       dhcp4-overrides:
         route-metric: 200
-{% else %}
+      {% else -%}
       dhcp4: false
       addresses:
         - {{ new_nic_ipv4 }}/{{ new_nic_net_prefix }}
@@ -19,4 +24,5 @@ network:
         - to: {{ new_nic_network }}
           via: {{ new_nic_gateway }}
           metric: 200
+      {%- endif %}
 {% endif %}

@@ -1,0 +1,91 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Update network connection for the primary or secondary network adapter managed by NetworkManager
+#
+- name: "Update network connection for the primary network adapter '{{ new_network_adapter_name }}'"
+  when: new_network_adapter_mac == guest_primary_nic_mac
+  block:
+    - name: "Modify network connection with MAC address for the primary network adapter '{{ new_network_adapter_name }}'"
+      ansible.builtin.shell: |
+        nmcli connection modify '{{ network_connection_name }}' 802-3-ethernet.mac-address '{{ new_network_adapter_mac }}';
+        nmcli connection modify '{{ network_connection_name }}' connection.interface-name ''
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Set fact of NetworkManager config directory path"
+      ansible.builtin.set_fact:
+        network_manager_config_dir: "/etc/NetworkManager/conf.d"
+
+    - name: "Get stat info of NetworkManager config directory"
+      include_tasks: ../utils/get_file_stat_info.yml
+      vars:
+        guest_file_path: "{{ network_manager_config_dir }}"
+
+    - name: "Create NetworkManager config directory if it doesn't exist"
+      ansible.builtin.file:
+        path: "{{ network_manager_config_dir }}"
+        mode: "0755"
+        state: directory
+      delegate_to: "{{ vm_guest_ip }}"
+      when: not guest_file_exists
+
+    - name: "Do not create default network connection for new network adapter on {{ vm_guest_os_distribution }}"
+      ansible.builtin.blockinfile:
+        path: "{{ network_manager_config_dir }}/00-no-auto-default.conf"
+        block: |
+          [main]
+          no-auto-default=*,except:mac:{{ guest_primary_nic_mac }}
+        create: true
+        mode: "0644"
+      delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Add a new network connnection for the secondary network adapter '{{ new_network_adapter_name }}'"
+  when: new_network_adapter_mac != guest_primary_nic_mac
+  block:
+    # Some guest OS might automatically add a connection for the second network adapter with
+    # DHCP IP address obtained. Here needs to deactivate it so that we can add a new connection.
+    - name: "Deactivate the existing network connection '{{ network_connection_name }}'"
+      ansible.builtin.shell: "nmcli connection down '{{ network_connection_name }}'"
+      delegate_to: "{{ vm_guest_ip }}"
+      when: network_connection_name
+
+    - name: "Remove the existing created network connection file '{{ network_config_path }}'"
+      ansible.builtin.shell: "rm -f '{{ network_config_path }}'"
+      delegate_to: "{{ vm_guest_ip }}"
+      when: network_config_path
+
+    - name: "Set fact of IPv6 method in network connection for the secondary network adapter '{{ new_network_adapter_name }}'"
+      ansible.builtin.set_fact:
+        nmcli_ipv6_method: >-
+          {{
+            (guest_os_ansible_distribution == 'SLED' and
+             guest_os_ansible_distribution_ver == '15.7') |
+            ternary('ipv6.method disabled', '')
+          }}
+
+    - name: "Set fact of command for adding network connection with static IP addresss"
+      ansible.builtin.set_fact:
+        nmcli_connection_add_cmd: >-
+          nmcli connection add type ethernet ifname {{ new_network_adapter_name }}
+          con-name {{ new_network_adapter_name }} mac {{ new_network_adapter_mac }}
+          ipv4.method manual ipv4.addresses {{ new_nic_ipv4 }}/{{ new_nic_net_prefix }}
+          ipv4.gateway {{ new_nic_gateway }} {{ nmcli_ipv6_method }}
+      when: new_nic_ipv4_method == 'static'
+
+    - name: "Set fact of command for adding network connection with DHCP IP addresss"
+      ansible.builtin.set_fact:
+        nmcli_connection_add_cmd: >-
+          nmcli connection add type ethernet ifname {{ new_network_adapter_name }}
+          con-name {{ new_network_adapter_name }} mac {{ new_network_adapter_mac }}
+          {{ nmcli_ipv6_method }}
+      when: new_nic_ipv4_method == 'dhcp'
+
+    - name: "Add a new network connection for the secondary network adapter '{{ new_network_adapter_name }}'"
+      ansible.builtin.shell: "{{ nmcli_connection_add_cmd }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: nmcli_connection_add_result
+
+    - name: "Update the network connection file for the secondary network adapter '{{ new_network_adapter_name }}'"
+      include_tasks: ../utils/get_network_config_file.yml
+      vars:
+        network_adapter_name: "{{ new_network_adapter_name }}"

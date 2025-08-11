@@ -4,8 +4,6 @@
 # Get network network config file for an interface
 # Parameters:
 #   network_adapter_name: The network interface name
-#   network_adapter_is_primary(optional): The given network interface name is the primary network interface.
-#     Default is false.
 # Return:
 #   network_config_path: The network interface config file path
 #   network_connection_name: The network connection name managed by NetworkManager.
@@ -92,19 +90,3 @@
       ansible.builtin.set_fact:
         network_config_path: "/etc/rc.conf"
       when: guest_os_family == "FreeBSD"
-
-# The network config file must be set for the primary network interface or
-# the second primary network interface which is not managed by NetworkManager
-- name: "Check network config file is set"
-  ansible.builtin.assert:
-    that:
-      - network_config_path
-    fail_msg: >-
-      Failed to get network config file of network adapter '{{ network_adapter_name }}'
-      on {{ vm_guest_os_distribution }}
-    success_msg: >-
-      The network config file of network adapter '{{ network_adapter_name }}'
-      is '{{ network_config_path }}' on {{ vm_guest_os_distribution }}
-  when:
-    network_adapter_is_primary | default(false) or
-    guest_os_network_manager != "NetworkManager"
