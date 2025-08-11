@@ -4,16 +4,18 @@
 auto lo
 iface lo inet loopback
 
-auto {{ eth0_name }}
-iface {{ eth0_name }} inet dhcp
+auto {{ guest_primary_nic_name }}
+iface {{ guest_primary_nic_name }} inet dhcp
   metric 100
 
-auto {{ new_network_adapter }}
-allow-hotplug {{ new_network_adapter }}
-iface {{ new_network_adapter }} inet {{ new_nic_ipv4_method }}
+{% if new_network_adapter_name is defined and new_network_adapter_name and new_network_adapter_name != guest_primary_nic_name %}
+auto {{ new_network_adapter_name }}
+allow-hotplug {{ new_network_adapter_name }}
+iface {{ new_network_adapter_name }} inet {{ new_nic_ipv4_method }}
   metric 200
   {% if new_nic_ipv4_method == 'static' -%}
   address {{ new_nic_ipv4 }}/{{ new_nic_net_prefix }}
   gateway {{ new_nic_gateway }}
   {%- endif %}
+{% endif %}
 {% endif %}

@@ -25,6 +25,11 @@
           vars:
             network_testbed_type: 'vds'
 
+        - name: "Tag VMkernel adapter and enable firewall rule on ESXi host for PVRDMA communication"
+          include_tasks: ../../common/esxi_enable_pvrdma_configs.yml
+          vars:
+            pvrdma_vmk_nic: "{{ vds_vmk_device_name }}"
+
         - name: "Initialize facts for PVRDMA server VM and client VM"
           ansible.builtin.set_fact:
             pvrdma_server_vm_name: "{{ vm_name }}"
@@ -58,11 +63,6 @@
           ansible.builtin.set_fact:
             rdma_devices_before_hotadd: "{{ guest_rdma_device_info }}"
 
-        - name: "Tag VMkernel adapter and enable firewall rule on ESXi host for PVRDMA communication"
-          include_tasks: ../../common/esxi_enable_pvrdma_configs.yml
-          vars:
-            pvrdma_vmk_nic: "{{ vds_vmk_device_name }}"
-
         - name: "Set facts for PVRDMA network config on server VM and client VM"
           ansible.builtin.set_fact:
             pvrdma_server_vm_ipv4: "{{ network_env_nic_ip }}"
@@ -74,17 +74,6 @@
             new_nic_network: "{{ (network_env_nic_ip ~ '/' ~ network_env_net_prefix) | ansible.utils.ipaddr('network') }}"
             new_nic_ipv4_method: 'static'
             network_env_nic_ip: "{{ network_env_nic_ip | ansible.utils.ipmath(2) }}"
-
-        # Clone a new VM as client VM from current VM, and current VM as server
-        - name: "Clone a new VM as client VM from current VM"
-          include_tasks: ../../common/vm_instant_clone.yml
-          vars:
-            parent_vm_name: "{{ pvrdma_server_vm_name }}"
-            cloned_vm_name: "{{ pvrdma_client_vm_name }}"
-
-        - name: "Set fact of client VM exists"
-          ansible.builtin.set_fact:
-            pvrdma_client_vm_exists: true
 
         # On server VM
         - name: "Hot add a new {{ adapter_type }} network adapter on server VM and apply network config"
@@ -100,7 +89,7 @@
 
         - name: "Set fact of the PVRDMA network adapter mac address for server VM"
           ansible.builtin.set_fact:
-            new_nic_mac_addr: "{{ new_network_adapter_mac_addr }}"
+            new_nic_mac_addr: "{{ new_network_adapter_mac }}"
 
         - name: "Validate network adapter status changes on server VM"
           include_tasks: network_status_validate.yml
@@ -124,7 +113,7 @@
         - name: "Hot remove the new {{ adapter_type }} network adapter from server VM"
           include_tasks: hot_remove_network_adapter.yml
           vars:
-            new_network_adapter_mac_addr: "{{ new_nic_mac_addr }}"
+            new_network_adapter_mac: "{{ new_nic_mac_addr }}"
 
         - name: "Remove VMkernel adapter tag and disable firewall rule for PVRDMA communication"
           include_tasks: ../../common/esxi_disable_pvrdma_configs.yml

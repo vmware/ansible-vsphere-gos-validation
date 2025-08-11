@@ -96,16 +96,13 @@
       ansible.builtin.set_fact:
         pvrdma_client_vm_ready: true
 
+    - name: "Get primary network adapter information before network device testing on client VM"
+      include_tasks: ../utils/get_primary_network_adapter.yml
+
     - name: "Hot add a new {{ adapter_type }} network adapter on client VM and apply network config"
       include_tasks: hot_add_network_adapter.yml
       vars:
         new_nic_ipv4: "{{ pvrdma_client_vm_ipv4 }}"
-
-    - name: "Check the result of pinging gateway from client VM"
-      ansible.builtin.assert:
-        that:
-          - ping_success_after_hotadd | bool
-        fail_msg: "Failed to ping gateway from PVRDMA device on client VM {{ vm_name }}"
 
     - name: "Update client VM guest IP when it changes"
       ansible.builtin.set_fact:
