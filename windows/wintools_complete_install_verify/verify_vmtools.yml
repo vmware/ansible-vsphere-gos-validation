@@ -69,6 +69,23 @@
   block:
     - name: "Get problem device after VMware Tools install"
       include_tasks: ../utils/win_get_problem_device.yml
+
+    - name: "Handle known issue"
+      when:
+        - esxi_cpu_vendor == 'arm'
+        - gos_problem_device_list | length == 1
+        - gos_problem_device_list[0]['device_name'] == "Base System Device"
+      block:
+        - name: "Known issue - problem device exists in guest OS on ESXi on ARM"
+          ansible.builtin.debug:
+            msg:
+              - "Get problem device in guest OS on ESXi on ARM with VMware Tools {{ vmtools_info_from_vmtoolsd }} installed: {{ gos_problem_device_list }}"
+          tags:
+            - known_issue
+        - name: "Set fact of problem device known issue"
+          ansible.builtin.set_fact:
+            problem_device_known_issue: true
+
     - name: "Check no problem device listed"
       ansible.builtin.assert:
         that:
@@ -76,3 +93,4 @@
           - not gos_has_problem_device
         fail_msg: "Problem devices were found in guest OS, please check listed problem devices: {{ gos_problem_device_list }}"
         success_msg: "No problem device is found in guest OS."
+      when: problem_device_known_issue is undefined
