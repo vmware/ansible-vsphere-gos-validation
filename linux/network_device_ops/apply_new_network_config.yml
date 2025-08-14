@@ -3,7 +3,7 @@
 ---
 # Apply network config for the primary and secondary network adapter
 #
-- name: "Get the network connection for network adapter '{{ new_network_adapter_name }}'"
+- name: "Get the network config file for network adapter '{{ new_network_adapter_name }}'"
   include_tasks: ../utils/get_network_config_file.yml
   vars:
     network_adapter_name: "{{ new_network_adapter_name }}"
@@ -51,6 +51,17 @@
           ansible.builtin.shell: "dhclient {{ new_network_adapter_name }}"
           delegate_to: "{{ vm_guest_ip }}"
 
+- name: "Reload network configs on {{ vm_guest_os_distribution }}"
+  include_tasks: reload_network_configs.yml
+  when: not (guest_os_ansible_distribution == "FreeBSD" and new_nic_ipv4_method == "dhcp")
+
+# After NetworkManager reloading network configs, the primary network connection file might change
+- name: "Update the network connection file for network adapter '{{ new_network_adapter_name }}'"
+  include_tasks: ../utils/get_network_config_file.yml
+  vars:
+    network_adapter_name: "{{ new_network_adapter_name }}"
+  when: guest_os_network_manager == "NetworkManager"
+
 - name: "Collect the network config file for network adapter '{{ new_network_adapter_name }}'"
   when: network_config_path
   block:
@@ -63,7 +74,3 @@
     - name: "Display content of network config file '{{ network_config_path }}'"
       ansible.builtin.debug:
         msg: "{{ lookup('file', fetch_file_local_path) | split('\n') }}"
-
-- name: "Reload network configs on {{ vm_guest_os_distribution }}"
-  include_tasks: reload_network_configs.yml
-  when: not (guest_os_ansible_distribution == "FreeBSD" and new_nic_ipv4_method == "dhcp")
