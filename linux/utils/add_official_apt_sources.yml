@@ -9,11 +9,21 @@
     apt_sources: []
 
 - name: "Set fact of official APT sources on {{ vm_guest_os_distribution }}"
-  ansible.builtin.set_fact:
-    apt_sources:
-      - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }} main restricted universe"
-      - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }}-updates main restricted"
   when: guest_os_ansible_distribution == "Ubuntu"
+  block:
+    - name: "Set fact of official APT sources on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        apt_sources:
+          - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }} main restricted universe"
+          - "deb http://archive.ubuntu.com/ubuntu {{ guest_os_ansible_distribution_release }}-updates main restricted"
+      when: esxi_cpu_vendor != 'arm'
+
+    - name: "Set fact of official APT sources on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        apt_sources:
+          - "deb http://ports.ubuntu.com/ubuntu-ports {{ guest_os_ansible_distribution_release }} main restricted universe"
+          - "deb http://ports.ubuntu.com/ubuntu-ports {{ guest_os_ansible_distribution_release }}-updates main restricted"
+      when: esxi_cpu_vendor == 'arm'
 
 - name: "Set fact of official APT sources on {{ vm_guest_os_distribution }}"
   when: guest_os_ansible_distribution == "Debian"
