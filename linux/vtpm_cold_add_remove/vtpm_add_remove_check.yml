@@ -1,0 +1,45 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Get VM cryptographic key info"
+  include_tasks: ../../common/vm_get_cryptokey_id.yml
+
+# Check VM is encrypted after adding vTPM device
+- name: "Make sure 'keyId' property is set in VM config"
+  ansible.builtin.assert:
+    that:
+      - vm_key_id_info
+      - vm_key_id_info.keyId is defined
+      - vm_key_id_info.keyId
+      - vm_key_id_info.providerId is defined
+      - vm_key_id_info.providerId.id is defined
+      - vm_key_id_info.providerId.id
+    fail_msg: "'keyId' property is not set in VM config: {{ vm_key_id_info }}, which should be set after adding vTPM device."
+  when: vtpm_test_operation == 'add'
+
+# Check VM is not encrypted after removing vTPM device
+# when VM home files are not encrypted at the beginning
+- name: "Check 'keyId' property is unset in VM config"
+  ansible.builtin.assert:
+    that:
+      - not vm_key_id_info
+    fail_msg: "'keyId' property is set in VM config: {{ vm_key_id_info }}, which should be unset after removing vTPM device."
+  when:
+    - vtpm_test_operation == 'remove'
+    - not vm_home_encrypted
+
+- name: "Get TPM device info in guest OS"
+  include_tasks: ../utils/get_tpm_status.yml
+
+- name: "Check TPM device status in guest OS after cold add"
+  include_tasks: check_vtpm_status.yml
+  when: vtpm_test_operation == 'add'
+
+- name: "Check TPM device is not present after cold remove"
+  ansible.builtin.assert:
+    that:
+      - tmp_present is defined
+      - not tmp_present | bool
+    fail_msg: "TPM device status is present in guest OS after device removing: {{ tpm_info }}."
+  when:
+    - vtpm_test_operation == 'remove'

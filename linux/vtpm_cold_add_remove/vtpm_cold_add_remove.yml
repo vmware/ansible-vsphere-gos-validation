@@ -1,0 +1,73 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for checking VM is encrypted when adding
+# vTPM device to VM, VM is not encrypted after removing vTPM device.
+#
+- name: vtpm_cold_add_remove
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Test case '{{ ansible_play_name }}' is skipped because vCenter server is not configured,
+              while vTPM device configuration requires to connect to it in this test case.
+            skip_reason: "Not Applicable"
+          when: not vcenter_is_defined
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case due to VM hardware version is: {{ vm_hardware_version_num }}, not >= 14."
+            skip_reason: "Not Supported"
+          when: vm_hardware_version_num | int < 14
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case {{ ansible_play_name }} because vTPM is not supported
+              for {{ vm_guest_os_distribution }} guest OS on ESXi on ARM.
+            skip_reason: "Not Supported"
+          when:
+            - esxi_cpu_vendor == 'arm'
+            - (guest_os_ansible_distribution == "VMware Photon OS" and guest_os_ansible_distribution_ver is version('5.0', '<=')) or
+              (guest_os_ansible_distribution == "RedHat" and (guest_os_ansible_distribution_ver is version('9.6', '<=') or
+              guest_os_ansible_distribution_ver == "10.0"))
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case due to VM firmware is: {{ vm_firmware }}, not EFI."
+            skip_reason: "Not Applicable"
+          when: vm_firmware != 'efi'
+
+        - name: "Install 'tpm2-tools' for {{ guest_os_ansible_distribution }}"
+          include_tasks: ../utils/install_uninstall_package.yml
+          vars:
+            package_list: ["tpm2-tools"]
+            package_state: "present"
+
+        - name: "Cold add and remove VM vTPM device test"
+          include_tasks: vtpm_add_remove_test.yml
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+      always:
+        - name: "Revert back VM name and VM primary MAC address"
+          ansible.builtin.set_fact:
+            vm_name: "{{ vm_name_clone_from }}"
+            vm_primary_nic_mac: "{{ vm_nic_mac_clone_from }}"
+            vm_dir_name: "{{ vm_dir_name_clone_from }}"
+          when:
+            - vm_name_clone_from is defined
+            - vm_nic_mac_clone_from is defined
+            - vm_dir_name_clone_from is defined
