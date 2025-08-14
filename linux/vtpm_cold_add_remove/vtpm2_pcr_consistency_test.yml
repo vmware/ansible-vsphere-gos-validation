@@ -1,0 +1,34 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# xxx 
+# xxx
+# xxx
+- name: "Record current PCR value"
+  ansible.builtin.shell: tpm2_pcrread sha256:0,1,2
+  delegate_to: "{{ vm_guest_ip }}"
+  register: pcr_result
+
+- name: "Display current PCR value"
+  ansible.builtin.debug: var=pcr_result
+
+- name: "Modify VM settting to add vCPU"
+
+
+- name: "Re-read PCR values"
+  ansible.builtin.shell: tpm2_pcrread sha256:0,1,2
+  delegate_to: "{{ vm_guest_ip }}"
+  register: new_pcr_result
+
+- name: "Display the new PCR value"
+  ansible.builtin.debug: var=new_pcr_result
+  
+- name: "Compare PCR value"
+  ansible.builtin.assert:
+    that:
+      - pcr_result.stdout is defined
+      - pcr_result.stdout
+      - new_pcr_result.stdout is defined
+      - new_pcr_result.stdout
+      - pcr_result.stdout != new_pcr_result.stdout
+    fail_msg: "The PCR value is not changed after change VM settings"

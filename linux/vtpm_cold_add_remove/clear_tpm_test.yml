@@ -1,0 +1,19 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check OS still work well after clear TPM
+#
+- name: "Clear vTPM in guest OS"
+  ansible.builtin.shell: tpm2_clear
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Restart guest OS after reset TPM"
+  include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "restarted"
+
+- name: "Get TPM info after reset"
+  include_tasks: ../utils/get_tpm_status.yml
+
+- name: "Check TPM device status in guest OS after reset"
+  include_tasks: check_vtpm_status.yml

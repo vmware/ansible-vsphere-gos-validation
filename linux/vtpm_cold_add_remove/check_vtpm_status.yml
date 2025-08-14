@@ -1,0 +1,39 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check vTPM device status in guest OS
+- name: "Make sure TPM device is present"
+  ansible.builtin.assert:
+    that:
+      - tpm_present | bool
+    fail_msg: "TPM device status is not present in guest OS {{ guest_os_ansible_distribution }}."
+
+- name: "Get random numbers form TPM"
+  ansible.builtin.shell: tpm2_getrandom 4 | hexdump -C
+  delegate_to: "{{ vm_guest_ip }}"
+  register: tpm_get_random_numbers_result
+  ignore_errors: true
+
+- name: "Display the result to get random number from TPM"
+  ansible.builtin.debug: var=tpm_get_random_numbers_result
+
+- name: "Make sure TPM device is ready"
+  ansible.builtin.assert:
+    that:
+      - tpm_get_random_numbers_result.rc is defined
+      - tpm_get_random_numbers_result.rc == 0
+    fail_msg: "TPM device is not ready in guest OS {{ guest_os_ansible_distribution }}. Possibly it's not enabled or not activated"
+
+- name: "Make sure TPM device manufacturer ID is 'VMW'"
+  ansible.builtin.assert:
+    that:
+      - tpm_info['TPM2_PT_MANUFACTURER'] | trim == 'VMW'
+    fail_msg: "TPM device manufacturer ID is not 'VMW' in guest OS {{ guest_os_ansible_distribution }}."
+  when: "'TPM2_PT_MANUFACTURER' in tpm_info"
+
+- name: "Make sure TPM family indicator is '2.0'"
+  ansible.builtin.assert:
+    that:
+      - tpm_info['TPM2_PT_FAMILY_INDICATOR'] | trim == '2.0'
+    fail_msg: "TPM device family indicator is not '2.0' in guest OS {{ guest_os_ansible_distribution }}."
+  when: "'TPM2_PT_FAMILY_INDICATOR' in tpm_info"

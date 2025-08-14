@@ -1,0 +1,39 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# There are 2 known issues:
+# 1.For Windows Server 2019/2022 VMs with SCSI disk, enabling BitLocker in guest OS returns error:
+# "Set-BitLockerVolumeInternal : A device attached to the system is not functioning.
+# (Exception from HRESULT: 0x8007001F)".
+# 2.For Windows 10/11, Windows Server 2025, Bitlocker operations are slow or even may fail in guest
+# OS when VM with snapshot.
+# Here is the workaround for such issues.
+#
+- name: "Known issue - BitLocker operations take long time or fail in {{ vm_guest_os_distribution }}"
+  ansible.builtin.debug:
+    msg:
+      - "For VM with SCSI disk controller and snapshots particularly:"
+      - "In Windows Server 2019/2022 guest OS, enabling BitLocker failed with exception."
+      - "In Windows 11 guest OS, OS may stuck at shutdown and BSOD a few minutes later."
+      - "In Windows 10 or Windows Server 2025 guest OS, BitLocker performs more slowly than when using NVMe disk."
+      - "Workaround is adding a VMX config option to disable presenting a virtual disk as thin-provisioned to the guest."
+  tags:
+    - known_issue
+
+- name: "Set fact of VM advanced setting for disabling thin provisioning"
+  ansible.builtin.set_fact:
+    vm_advanced_settings:
+      - key: "disk.disableThinProvisioning"
+        value: "TRUE"
+
+- name: "Add 'disk.disableThinProvisioning' in VM's extra config"
+  include_tasks: ../utils/win_set_vm_extra_config.yml
+
+- name: "Check 'disk.disableThinProvisioning' is 'TRUE' in VM's extra config after VM power-on"
+  ansible.builtin.assert:
+    that:
+      - vm_extra_config['disk.disableThinProvisioning'] is defined
+      - vm_extra_config['disk.disableThinProvisioning'] == 'TRUE'
+    fail_msg: >-
+      The 'disk.disableThinProvisioning' is not 'TRUE' in VM's extra config after VM power-on. In VM's extra config,
+      disk.disableThinProvisioning = {{ vm_extra_config['disk.disableThinProvisioning'] | default('') }}.

@@ -1,0 +1,130 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Handle VM without vTPM device situation"
+  when: not vm_with_vtpm
+  block:
+    - name: "Power off instant cloned VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-off'
+    - name: "Add key provider on vCenter server"
+      include_tasks: ../../common/vcenter_add_key_provider.yml
+      vars:
+        vc_cert_path: "{{ current_test_log_folder }}"
+      when:
+        - key_provider_type is defined and key_provider_type
+        - not (key_provider_added is defined and key_provider_added)
+    - name: "Add vTPM device to cloned VM"
+      include_tasks: ../../common/vm_add_remove_vtpm.yml
+      vars:
+        vtpm_operation: 'present'
+    - name: "Pause 10 seconds after adding vTPM device"
+      ansible.builtin.pause:
+        seconds: 10
+
+- name: "Power on cloned VM"
+  include_tasks: ../../common/vm_set_power_state.yml
+  vars:
+    vm_power_state_set: 'powered-on'
+
+- name: "Get cloned VM primary MAC address"
+  include_tasks: ../../common/vm_wait_primary_nic_mac.yml
+
+- name: "Check cloned VM MAC is not the same as parent VM MAC address"
+  ansible.builtin.assert:
+    that:
+      - vm_primary_nic_mac != vm_nic_mac_clone_from
+    fail_msg: >-
+      Cloned VM '{{ vm_name_clone_to }}' MAC address is '{{ vm_primary_nic_mac }}',
+      which is the same as parent VM '{{ vm_name_clone_from }}' MAC address.
+    success_msg:
+      - "Parent VM '{{ vm_name_clone_from }}' MAC address is: {{ vm_nic_mac_clone_from }}."
+      - "Cloned VM '{{ vm_name_clone_to }}' MAC address is: {{ vm_primary_nic_mac }}."
+
+- name: "Initialize cloned VM IP address"
+  ansible.builtin.set_fact:
+    retry_vm_guest_ip: ""
+
+- name: "Retry to get cloned VM IP address"
+  include_tasks:
+    file: retry_vm_get_ip.yml
+    apply:
+      when: >
+        (not retry_vm_guest_ip) or 
+        (retry_vm_guest_ip == vm_ip_clone_from)
+  with_list: "{{ range(1, 11) | list }}"
+  loop_control:
+    loop_var: retry_count
+
+- name: "Check cloned VM IP is not the same as parent VM IP address"
+  ansible.builtin.assert:
+    that:
+      - retry_vm_guest_ip != vm_ip_clone_from
+    fail_msg: >-
+      Cloned VM '{{ vm_name_clone_to }}' IP address is '{{ retry_vm_guest_ip }}',
+      which is the same as parent VM '{{ vm_name_clone_from }}' IP address after refreshing 100 seconds.
+    success_msg:
+      - "Parent VM '{{ vm_name_clone_from }}' IP address is: {{ vm_ip_clone_from }}."
+      - "Cloned VM '{{ vm_name_clone_to }}' IP address is: {{ retry_vm_guest_ip }}."
+
+- name: "Check the cloned VM is connectable"
+  include_tasks: ../../common/vm_wait_connection.yml
+  vars:
+    vm_wait_connection_timeout: 60
+
+- name: "Add cloned VM to in-memory inventory"
+  include_tasks: ../../common/add_host_in_memory_inventory.yml
+  vars:
+    add_host_in_memory_inventory_ip: "{{ vm_guest_ip }}"
+    add_host_in_memory_inventory_gp: "target_vm"
+    add_host_in_memory_inventory_user: "{{ vm_username }}"
+    add_host_in_memory_inventory_pwd: "{{ vm_password }}"
+    add_host_in_memory_inventory_python: "{{ vm_python | default('auto') }}"
+    add_host_in_memory_inventory_ssh_pipeline: "{{ vm_ssh_pipeline_enable | default(false) }}"
+
+- name: "Display inventory hosts in group 'target_vm'"
+  ansible.builtin.debug: var=groups['target_vm']
+
+- name: "Check vTPM device added"
+  include_tasks: vtpm_add_remove_check.yml
+  vars:
+    vtpm_test_operation: "add"
+
+# check the basic functionalities of TMP 2.0
+
+# vTPM.enable.tpm2_readpublic: Read public key
+- name: "Create public"
+  ansible.builtin.shell: tpm2_createprimary -c primary.ctx
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Read public key"
+  ansible.builtin.shell: tpm2_readpublic -c primary.ctx
+  delegate_to: "{{ vm_guest_ip }}"
+
+# vTPM.enable.tpm2_rsadecrypt: Verify whether the virtual vTPM’s RSA decryption function is enabled and operating properly.
+- name: "Check vTPM's RSA decryption function"
+  include_tasks: vtpm2_rsadecrypt_test.yml
+
+# vTPM.enable.tpm2_verifysignature: Verify the validity of the digital signature
+- name: "Verify the validity of the digital signature"
+  include_tasks: vtpm2_signature_test.yml
+
+# vTPM.enable.tpm2_hash: Verify the validity of hash
+- name: "Verify the validity of hash"
+  include_tasks: vtpm2_hash_test.yml
+
+# vTPM.enable.tpm2_activatecredential: Verify whether the vTPM can perform Credential Activation operations
+- name: "Verify whether the vTPM can perform Credential Activation operations"
+  include_tasks: vtpm2_activatecredential_test.yml
+
+# vTPM.enable.pcr_consistency.ChangeHardware: Verify the impact of hardware changes on PCR values
+- name: "Verify the impact of hardware changes on PCR values"
+  include_tasks: vtpm2_pcr_consistency_test.yml
+
+- name: "Check Clear TPM command in guest OS"
+  include_tasks: clear_tpm_test.yml
+  when:
+    - tpm_info['TPM2_PT_PERMANENT'] is defined
+    - tpm_info['TPM2_PT_PERMANENT']['disableClear'] is defined
+    - not (tpm_info['TPM2_PT_PERMANENT']['disableClear'] | bool)
