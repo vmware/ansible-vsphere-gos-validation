@@ -4,46 +4,55 @@
 # Rescue tasks to be executed before common/test_rescue.yml
 # for collecting information from Linux guest OS 
 #
-- name: "Collect dmesg at test case failure"
-  include_tasks: ../utils/collect_dmesg.yml
+
+- name: "Check SSH connection to guest OS"
+  include_tasks: ../../common/test_ssh_connection.yml
   vars:
-    dmesg_ignore_errors: true
-    dmesg_output_file_name: "dmesg_at_{{ ansible_play_name }}_failure.log"
-    dmesg_check_call_trace: true
+    ssh_server_ip: "{{ vm_guest_ip }}"
 
-- name: "No output file for dmesg"
-  ansible.builtin.debug:
-    msg: "There is no new messages in dmesg ring buffer or failed to get dmesg output"
-  when: not dmesg_output_file_path
-
-- name: "Display call trace stack detected in dmesg output"
-  ansible.builtin.debug:
-    msg: "{{ dmesg_call_trace_stack }}"
-  tags:
-    - fail_message
-  when:
-    - dmesg_call_trace_stack is defined
-    - dmesg_call_trace_stack | length > 0
-
-- name: "Collect /var/log/messages at test case failure"
-  include_tasks: ../utils/fetch_file.yml
-  vars:
-    fetch_file_src_path: "/var/log/messages"
-    fetch_file_dst_path: "{{ current_test_log_folder }}/"
-    fetch_file_ignore_errors: true
-
-- name: "Generate system log from the current boot"
-  ansible.builtin.shell: "journalctl -b >/tmp/journalctl_b.log"
-  ignore_errors: true
-  delegate_to: "{{ vm_guest_ip }}"
-  register: journalctl_result
-
-- name: "Collect system log from the current boot"
-  include_tasks: ../utils/fetch_file.yml
-  vars:
-    fetch_file_src_path: "/tmp/journalctl_b.log"
-    fetch_file_dst_path: "{{ current_test_log_folder }}/"
-    fetch_file_ignore_errors: true
-  when:
-    - journalctl_result.failed is defined
-    - not journalctl_result.failed
+- name: "Collect Linux logs at test failure"
+  when: ssh_connect_success
+  block:
+    - name: "Collect dmesg at test case failure"
+      include_tasks: ../utils/collect_dmesg.yml
+      vars:
+        dmesg_ignore_errors: true
+        dmesg_output_file_name: "dmesg_at_{{ ansible_play_name }}_failure.log"
+        dmesg_check_call_trace: true
+    
+    - name: "No output file for dmesg"
+      ansible.builtin.debug:
+        msg: "There is no new messages in dmesg ring buffer or failed to get dmesg output"
+      when: not dmesg_output_file_path
+    
+    - name: "Display call trace stack detected in dmesg output"
+      ansible.builtin.debug:
+        msg: "{{ dmesg_call_trace_stack }}"
+      tags:
+        - fail_message
+      when:
+        - dmesg_call_trace_stack is defined
+        - dmesg_call_trace_stack | length > 0
+    
+    - name: "Collect /var/log/messages at test case failure"
+      include_tasks: ../utils/fetch_file.yml
+      vars:
+        fetch_file_src_path: "/var/log/messages"
+        fetch_file_dst_path: "{{ current_test_log_folder }}/"
+        fetch_file_ignore_errors: true
+    
+    - name: "Generate system log from the current boot"
+      ansible.builtin.shell: "journalctl -b >/tmp/journalctl_b.log"
+      ignore_errors: true
+      delegate_to: "{{ vm_guest_ip }}"
+      register: journalctl_result
+    
+    - name: "Collect system log from the current boot"
+      include_tasks: ../utils/fetch_file.yml
+      vars:
+        fetch_file_src_path: "/tmp/journalctl_b.log"
+        fetch_file_dst_path: "{{ current_test_log_folder }}/"
+        fetch_file_ignore_errors: true
+      when:
+        - journalctl_result.failed is defined
+        - not journalctl_result.failed
