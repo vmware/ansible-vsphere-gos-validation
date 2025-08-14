@@ -1,8 +1,14 @@
 # Copyright 2023-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Install required packages and kernel modules
+# Prepare for network device testing
 #
+- name: "Get guest network device manager"
+  include_tasks: ../utils/get_network_manager.yml
+  when: >-
+    guest_os_network_manager is undefined or
+    not guest_os_network_manager
+
 - name: "Install 'distrib-compat' for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
   include_tasks: ../utils/install_uninstall_package.yml
   vars:
@@ -20,56 +26,45 @@
     - guest_os_ansible_distribution in ["SLES", "SLED"]
     - guest_os_ansible_distribution_major_ver | int == 12
 
-- name: "Get existing network interface before hotadd testing"
-  include_tasks: ../utils/get_network_adapters_status.yml
+- name: "Disable firewall in guest OS"
+  include_tasks: ../utils/disable_firewall.yml
 
-- name: "Set fact of network adapter info before hotadd"
-  ansible.builtin.set_fact:
-    network_adapters_before_hotadd: "{{ guest_network_adapters }}"
+- name: "Get primary network adapter information before network device testing"
+  include_tasks: ../utils/get_primary_network_adapter.yml
 
-# Get eth0 device name in guest. Sometimes it is not 'eth0',
-# e.g., 'ens192', 'ens33', etc.
-- name: "Set fact of the first network adapter interface name in guest OS"
+- name: "Set fact of network adapters before network device testing"
   ansible.builtin.set_fact:
-    eth0_name: "{{ network_adapters_before_hotadd[0] }}"
+    network_macs_before_add: "{{ guest_network_adapters_mac | unique }}"
 
 - name: "Prepare for PVRDMA testing"
   when: adapter_type == "pvrdma"
   block:
-    - name: "Install rdma packages in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+    - name: "Install rdma packages on {{ vm_guest_os_distribution }}"
       include_tasks: ../utils/install_uninstall_package.yml
       vars:
-        package_list: ["rdma-core", "rdmacm-utils"]
+        package_list: ["rdma-core", "rdmacm-utils", "ibverbs-utils"]
         package_state: "present"
       when: guest_os_family == "Debian"
 
-    - name: "Install rdma packages in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+    - name: "Install rdma packages in {{ vm_guest_os_distribution }}"
       include_tasks: ../utils/install_uninstall_package.yml
       vars:
-        package_list: ["rdma-core", "librdmacm-utils"]
+        package_list: ["rdma-core", "librdmacm-utils", "libibverbs-utils"]
         package_state: "present"
       when: guest_os_family in ["Suse", "RedHat"]
 
-    - name: "Get network config file for '{{ eth0_name }}'"
-      include_tasks: ../utils/get_network_config_file.yml
+    - name: "Get network config file state"
+      include_tasks: ../utils/get_file_stat_info.yml
       vars:
-        network_adapter_name: "{{ eth0_name }}"
+        guest_file_path: "{{ guest_primary_nic_config_path }}"
 
-    - name: "Remove MAC address or UUID from network config file"
-      when: network_config_path
-      block:
-        - name: "Get network config file state"
-          include_tasks: ../utils/get_file_stat_info.yml
-          vars:
-            guest_file_path: "{{ network_config_path }}"
-
-        - name: "Remove MAC address or UUID from network config file for '{{ eth0_name }}'"
-          ansible.builtin.lineinfile:
-            path: "{{ network_config_path }}"
-            regexp: "^uuid|^UUID|^MAC|^mac"
-            state: absent
-          delegate_to: "{{ vm_guest_ip }}"
-          when: guest_file_exists
+    - name: "Remove MAC address or UUID from network config file for '{{ guest_primary_nic_name }}'"
+      ansible.builtin.lineinfile:
+        path: "{{ guest_primary_nic_config_path }}"
+        regexp: "^uuid|^UUID|^MAC|^mac|^HWADDR"
+        state: absent
+      delegate_to: "{{ vm_guest_ip }}"
+      when: guest_file_exists
 
     - name: "Get VM serial port devices"
       include_tasks: ../../common/vm_get_device_with_type.yml
@@ -95,5 +90,13 @@
           vars:
             vm_power_state_set: 'powered-on'
 
-- name: "Disable firewall in guest OS"
-  include_tasks: ../utils/disable_firewall.yml
+    # Clone a new VM as PVRDMA client VM from current VM, and current VM as server
+    - name: "Clone a new VM as client VM from current VM"
+      include_tasks: ../../common/vm_instant_clone.yml
+      vars:
+        parent_vm_name: "{{ pvrdma_server_vm_name }}"
+        cloned_vm_name: "{{ pvrdma_client_vm_name }}"
+
+    - name: "Set fact of client VM exists"
+      ansible.builtin.set_fact:
+        pvrdma_client_vm_exists: true

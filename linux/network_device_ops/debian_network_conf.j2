@@ -2,16 +2,20 @@
     {%- include 'ubuntu_netplan_conf.j2' -%}
 {% else %}
 auto lo
-  iface lo inet loopback
-{% for dev in network_adapters_after_hotadd %}
+iface lo inet loopback
 
-auto {{ dev }}
-  iface {{ dev }} inet dhcp
-  {%- if dev != eth0_name %}
-  metric 200
-  allow-hotplug {{ dev }}
-  {%- else %}
+auto {{ guest_primary_nic_name }}
+iface {{ guest_primary_nic_name }} inet dhcp
   metric 100
+
+{% if new_network_adapter_name is defined and new_network_adapter_name and new_network_adapter_name != guest_primary_nic_name %}
+auto {{ new_network_adapter_name }}
+allow-hotplug {{ new_network_adapter_name }}
+iface {{ new_network_adapter_name }} inet {{ new_nic_ipv4_method }}
+  metric 200
+  {% if new_nic_ipv4_method == 'static' -%}
+  address {{ new_nic_ipv4 }}/{{ new_nic_net_prefix }}
+  gateway {{ new_nic_gateway }}
   {%- endif %}
-{% endfor %}
+{% endif %}
 {% endif %}
