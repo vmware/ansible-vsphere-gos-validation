@@ -4,11 +4,18 @@
 - name: "Set fact of expected Windows online updates categories"
   ansible.builtin.set_fact:
     win_updates_categories_expect:
-      - 'Feature Packs'
-      - 'Update Rollups'
-      - 'Updates'
-      - 'Upgrades'
+      - "Feature Packs"
+      - "Update Rollups"
+      - "Updates"
       - 'Windows Insider Pre-Release'
+      - "CriticalUpdates"
+      - "SecurityUpdates"
+      - "Drivers"
+
+- name: "Set fact of expected Windows online updates categories"
+  ansible.builtin.set_fact:
+    win_updates_categories_expect: >-
+      {{ win_updates_categories_expect + ["Upgrades"] }}
   when: win_check_is_updated
 
 - name: "Resume Windows Update in guest OS"
@@ -32,6 +39,8 @@
 
 - name: "Try to install Windows online updates"
   include_tasks: ../utils/win_install_online_updates.yml
+  vars:
+    win_updates_categories: "{{ win_updates_categories_expect }}"
 
 # Skip test case when no update installed and not expect guest OS to be updated
 - name: "Skip test case"
