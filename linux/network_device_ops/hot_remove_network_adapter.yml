@@ -3,6 +3,30 @@
 ---
 # Remove the new network adapter
 #
+# On ESXi on ARM, change back primary network adapter name to eth0 on SLES 15.
+- name: "Revert primary network config to eth0 on {{ vm_guest_os_distribution }}"
+  when:
+    - primary_nic_known_issue is defined
+    - primary_nic_known_issue
+  block:
+    - name: "Remove current primary network adapter config file"
+      ansible.builtin.file:
+        path: "{{ guest_primary_nic_config_path }}"
+        state: absent
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Reset primary network adapter name and config file on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_primary_nic_name: "eth0"
+        guest_primary_nic_config_path: "{{ guest_primary_nic_config_path | replace('eth1', 'eth0') }}"
+
+    - name: "Update primary network config for 'eth0' on {{ vm_guest_os_distribution }}"
+      include_tasks: apply_new_network_config.yml
+      vars:
+        new_network_adapter_name: "{{ guest_primary_nic_name }}"
+        new_network_adapter_mac: "{{ guest_primary_nic_mac }}"
+        new_nic_ipv4_method: "dhcp"
+
 # Hot remove network adapter is not supported on ESXi on ARM now,
 # here shutdown the guest OS to cold remove the new network adapter
 - name: "Shutdown guest OS to cold remove the network adapter from VM on ESXi on ARM"

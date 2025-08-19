@@ -9,6 +9,23 @@
     new_network_adapter_status: ""
     new_network_adapter_mac: ""
     new_network_adapter_ip: ""
+    primary_nic_known_issue: false
+
+# For SLES 15 on ESXi on ARM, if the primary network adapter type is e1000e, and the second one
+# is vmxnet3, their interface name will be swapped after power on. So here changes
+# the primary network adapter's name to "eth1", so that it can take effect after cold
+# add a new vmxnet3 adapter and VM power on.
+- name: "Update facts of primary network adapter known issue and name on {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    primary_nic_known_issue: true
+    guest_primary_nic_name: "eth1"
+  when:
+    - esxi_cpu_vendor == 'arm'
+    - guest_os_ansible_distribution == "SLES"
+    - guest_os_ansible_distribution_major_ver | int == 15
+    - guest_primary_nic_type == "e1000e"
+    - guest_primary_nic_name == "eth0"
+    - adapter_type == "vmxnet3"
 
 - name: "Update primary network config on {{ vm_guest_os_distribution }}"
   include_tasks: apply_new_network_config.yml

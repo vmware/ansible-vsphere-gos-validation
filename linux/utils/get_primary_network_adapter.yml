@@ -2,9 +2,15 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Get the primary network adapter information
+# Returns:
+#   guest_primary_nic_type: The network adapter's type
+#   guest_primary_nic_name: The network adapter's interface name
+#   guest_primary_nic_mac: The network adapter's MAC address
+#   guest_primary_nic_config_path: The network adapter's config file path
 #
 - name: "Initialize facts of the primary network adapter in guest OS"
   ansible.builtin.set_fact:
+    guest_primary_nic_type: ""
     guest_primary_nic_name: ""
     guest_primary_nic_mac: ""
     guest_primary_nic_config_path: ""
@@ -14,12 +20,11 @@
 
 - name: "Set facts of the primary network adapter name and MAC address in guest OS"
   ansible.builtin.set_fact:
-    guest_primary_nic_name: "{{ guest_primary_nic_adapters[0].device }}"
-    guest_primary_nic_mac: "{{ guest_primary_nic_adapters[0].macaddress }}"
+    guest_primary_nic_type: "{{ guest_primary_nic_adapters[0].module | default('') }}"
+    guest_primary_nic_name: "{{ guest_primary_nic_adapters[0].device | default('') }}"
+    guest_primary_nic_mac: "{{ guest_primary_nic_adapters[0].macaddress | default('') }}"
   when:
     - guest_primary_nic_adapters | length > 0
-    - guest_primary_nic_adapters[0].device is defined
-    - guest_primary_nic_adapters[0].macaddress is defined
   vars:
     guest_primary_nic_adapters: >-
       {{
@@ -60,6 +65,7 @@
 - name: "Display the primary network adapter information in guest OS"
   ansible.builtin.debug:
     msg:
+      - "The primary network adatper's type is {{ guest_primary_nic_type }}"
       - "The primary network adatper's interface name is {{ guest_primary_nic_name }}"
       - "The primary network adatper's MAC address is {{ guest_primary_nic_mac }}"
       - "The primary network adatper's config file path is {{ guest_primary_nic_config_path }}"

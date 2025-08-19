@@ -14,6 +14,9 @@
           nmcli connection reload && systemctl restart NetworkManager
       {%- elif guest_os_ansible_distribution == 'FreeBSD' -%}
           service netif restart && service routing restart && dhclient {{ guest_primary_nic_name }}
+      {%- elif (guest_os_network_manager == 'wicked' and primary_nic_known_issue and
+                new_network_adapter_name != guest_primary_nic_name) -%}
+          systemctl restart wicked
       {%- endif -%}
 
 - name: "Reload network configs on {{ vm_guest_os_distribution }}"
@@ -25,10 +28,10 @@
       async: 20
       poll: 0
       ignore_errors: true
-    
+
     - name: "Sleep 30s for network reloading"
       ansible.builtin.pause:
         seconds: 30
-    
+
     - name: "Update VM's guest IP in case it's changed"
       include_tasks: ../../common/update_inventory.yml
