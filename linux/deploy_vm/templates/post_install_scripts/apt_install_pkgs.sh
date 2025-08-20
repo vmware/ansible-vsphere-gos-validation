@@ -31,11 +31,6 @@ if [ "X$cdrom_missing_pkgs" != "X" ]; then
     echo "Updating list of available packages"
     apt update -y 2>&1
 
-    # It gets stuck at searching / installing packages from online repo during autoinstall for Debian 13
-    # Skipping the installation of these packages during autoinstall will not affect the subsequent test cases.
-    if [[ "X$OS_NAME" == "XDebian GNU/Linux" ]] && [[ "X$VERSION_ID" == "X13" ]]; then
-        cdrom_missing_pkgs=""
-    fi
     for pkg in $cdrom_missing_pkgs; do
         echo "Searching package $pkg in online repo"
         apt list $pkg 2>/dev/null | cut -d '/' -f 1 | grep $pkg
