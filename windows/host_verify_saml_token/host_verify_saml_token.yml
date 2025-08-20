@@ -25,6 +25,18 @@
             skip_reason: "Not Supported"
           when: esxi_version is version('8.0.2', '<') or vmtools_version is version('12.3.0', '<')
 
+        - name: "Get VMware Tools services list"
+          include_tasks: ../utils/win_get_vmtools_service_list.yml
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case '{{ ansible_play_name }}' because 'VGAuthService' is not available in the guest OS,
+              the installed services and their status are '{{ vmtools_service_dict }}'.
+            skip_reason: "Not Supported"
+          when: 'VGAuthService' not in vmtools_service_dict.keys()
+
         - name: "Skip test case due to missing vCenter Server variables"
           include_tasks: ../../common/skip_test_case.yml
           vars:
