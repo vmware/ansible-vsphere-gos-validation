@@ -2,34 +2,51 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Get network adapter status
-- name: "Initialize the fact of network adapters status in guest"
+- name: "Initialize facts of network adapters and status in guest OS"
   ansible.builtin.set_fact:
-    guest_network_adapters: []
+    guest_network_adapters_name: []
     guest_network_adapters_status: []
+    guest_network_adapters_mac: []
 
-- include_tasks: ../../common/get_system_info.yml
+- name: "Get guest OS system info"
+  include_tasks: ../../common/get_system_info.yml
   vars:
     gos_info_filter: ["ansible_*"]
 
-- block:
-    - name: "Set the fact of network adapters in guest"
-      ansible.builtin.set_fact:
-        guest_network_adapters: "{{ guest_system_info.ansible_interfaces | reject('match', '^(lo|docker|virbr)') }}"
-
-    - name: "Get network adapters status"
-      ansible.builtin.set_fact:
-        guest_network_adapters_status: "{{ guest_network_adapters_status | union([guest_system_info['ansible_%s'|format(item.replace('-', '_'))] | dict2items | rejectattr('key', 'equalto', 'features') | items2dict ])  }}"
-      when: guest_system_info['ansible_%s'|format(item.replace('-', '_'))].type == "ether"
-      with_items: "{{ guest_network_adapters }}"
-
-    - name: "Update the fact of network adapters in guest"
-      ansible.builtin.set_fact:
-        guest_network_adapters: "{{ guest_network_adapters_status | map(attribute='device') | list }}"
-
+- name: "Get network adapters details"
   when:
     - guest_system_info is defined
-    - guest_system_info.ansible_interfaces is defined
-    - guest_system_info.ansible_interfaces | length >= 1
+    - guest_system_info
+  block:
+    - name: "Set fact of network adapters details in guest OS"
+      ansible.builtin.set_fact:
+        guest_network_adapters_status: >-
+          {{
+            guest_network_adapters_status |
+            union([item.value | dict2items | rejectattr('key', 'equalto', 'features') | items2dict])
+          }}
+      when:
+        - item.value | type_debug == "dict"
+        - item.value['type'] is defined
+        - item.value['type'] == "ether"
+        - item.value['device'] is defined
+        - not (item.value['device'] is match('^(lo|docker|virbr)'))
+      with_dict: "{{ guest_system_info }}"
+
+    - name: "Set fact of network adapter interfaces in guest OS"
+      ansible.builtin.set_fact:
+        guest_network_adapters_name: >-
+          {{
+            guest_network_adapters_status |
+            selectattr('device', 'defined') |
+            map(attribute='device')
+          }}
+        guest_network_adapters_mac: >-
+         {{
+           guest_network_adapters_status |
+           selectattr('macaddress', 'defined') |
+           map(attribute='macaddress')
+         }}
 
 - name: "Print guest OS network adapters status"
   ansible.builtin.debug: var=guest_network_adapters_status

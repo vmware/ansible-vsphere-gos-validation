@@ -3,13 +3,15 @@
 ---
 # Get network network config file for an interface
 # Parameters:
-#   network_adapter_name: The network interface name
+#   network_adapter_name: The network interface name.
 # Return:
-#   network_config_path: The network interface config file path
+#   network_config_path: The network interface config file path.
+#   network_connection_name: The network connection name managed by NetworkManager.
 #
-- name: "Initialize network config file for {{ network_adapter_name }}"
+- name: "Initialize facts of network config file and connection name for {{ network_adapter_name }}"
   ansible.builtin.set_fact:
     network_config_path: ""
+    network_connection_name: ""
 
 - name: "Get network device manager in guest OS"
   include_tasks: get_network_manager.yml
@@ -20,27 +22,39 @@
 - name: "Get network config file from NetworkManager"
   when: guest_os_network_manager == "NetworkManager"
   block:
-    - name: "Get network connections"
-      ansible.builtin.shell: "nmcli -t -f DEVICE,FILENAME connection show --active | grep '{{ network_adapter_name }}:'"
+    - name: "Get all active network connections on {{ vm_guest_os_distribution }}"
+      ansible.builtin.shell: "nmcli -t -f DEVICE,FILENAME,NAME connection show --active"
       delegate_to: "{{ vm_guest_ip }}"
       register: "network_conn_result"
       ignore_errors: true
 
-    - name: "Set fact of network config file for '{{ network_adapter_name }}' on {{ guest_os_ansible_distribution }}"
+    - name: "Get active network connections for '{{ network_adapter_name }}'"
       ansible.builtin.set_fact:
-        network_config_path: "{{ network_conn_result.stdout_lines[0].split(':')[1] }}"
+        active_network_connections: "{{ network_conn_result.stdout_lines | select('match', network_adapter_name ~ ':.*') }}"
       when:
         - network_conn_result.rc is defined
         - network_conn_result.rc == 0
-        - network_conn_result.stdout_lines | length == 1
+        - network_conn_result.stdout_lines is defined
+        - network_conn_result.stdout_lines | length > 0
+
+    - name: "Set fact of network config file for '{{ network_adapter_name }}' on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        network_config_path: "{{ network_conn_properties[1] }}"
+        network_connection_name: "{{ network_conn_properties[2] }}"
+      vars:
+        network_conn_properties: "{{ active_network_connections[0].split(':') }}"
+      when: active_network_connections | length == 1
+
+- name: "Set fact of network config file for '{{ network_adapter_name }}' on {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    network_config_path: "/etc/systemd/network/{{ network_adapter_name }}.network"
+  when: guest_os_network_manager == "systemd-networkd"
 
 # Set fact of network config file in guest OS except VMware Photon OS
 - name: "Set fact of network config file"
-  when:
-    - guest_os_network_manager != "NetworkManager"
-    - guest_os_ansible_distribution not in ["VMware Photon OS", "Astra Linux (Orel)"]
+  when: guest_os_network_manager not in ["NetworkManager", "systemd-networkd"]
   block:
-    - name: "Set fact of network config file for '{{ network_adapter_name }}' on {{ guest_os_ansible_distribution }}"
+    - name: "Set fact of network config file for '{{ network_adapter_name }}' on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
         network_config_path: "/etc/sysconfig/network-scripts/ifcfg-{{ network_adapter_name }}"
       when: guest_os_family == "RedHat"
@@ -72,14 +86,7 @@
         network_config_path: "/etc/sysconfig/network/ifcfg-{{ network_adapter_name }}"
       when: guest_os_family == "Suse"
 
-    - name: "Set fact of network config file for '{{ network_adapter_name }}' on Flatcar"
-      ansible.builtin.set_fact:
-        network_config_path: "/etc/systemd/network/{{ network_adapter_name }}"
-      when: guest_os_ansible_distribution == 'Flatcar'
-
-    # It won't work if the file is {{ network_adapter_name }} / netif / netstart
     - name: "Set fact of network config file for '{{ network_adapter_name }}' on FreeBSD"
       ansible.builtin.set_fact:
-        network_config_path: "/etc/rc.conf.d/network"
+        network_config_path: "/etc/rc.conf"
       when: guest_os_family == "FreeBSD"
-

@@ -1,0 +1,75 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the primary network adapter information
+# Returns:
+#   guest_primary_nic_type: The network adapter's type, which is used on Linux.
+#   guest_primary_nic_name: The network adapter's interface name.
+#   guest_primary_nic_mac: The network adapter's MAC address.
+#   guest_primary_nic_config_path: The network adapter's config file path.
+#
+- name: "Initialize facts of the primary network adapter in guest OS"
+  ansible.builtin.set_fact:
+    guest_primary_nic_type: ""
+    guest_primary_nic_name: ""
+    guest_primary_nic_mac: "{{ vm_primary_nic_mac }}"
+    guest_primary_nic_config_path: ""
+
+- name: "Get all network adapters in guest OS"
+  include_tasks: get_network_adapters_status.yml
+
+# On FreeBSD, guest_network_adapters_status has 2 items for the primary network
+# adapter. So here only picks up the first one. Besides there is no 'module'
+# property for the network adapter on FreeBSD. So guest_primary_nic_type is empty.
+# guest_primary_nic_type is only used on Linux.
+- name: "Set facts of the primary network adapter name and MAC address in guest OS"
+  ansible.builtin.set_fact:
+    guest_primary_nic_type: "{{ guest_primary_nic_adapters[0].module | default('') }}"
+    guest_primary_nic_name: "{{ guest_primary_nic_adapters[0].device }}"
+  when:
+    - guest_primary_nic_adapters | length > 0
+  vars:
+    guest_primary_nic_adapters: >-
+      {{
+        guest_network_adapters_status |
+        selectattr('macaddress', 'defined') |
+        selectattr('macaddress', 'equalto', guest_primary_nic_mac) |
+        selectattr('device', 'defined')
+      }}
+
+- name: "Check the primary network adapter name and MAC address in guest OS"
+  ansible.builtin.assert:
+    that:
+      - guest_primary_nic_name
+    fail_msg: >-
+      Failed to get the primary network adapter interface name with MAC address
+      {{ guest_primary_nic_mac }} on {{ vm_guest_os_distribution }}
+
+- name: "Get network config file for the primary network adapter '{{ guest_primary_nic_name }}'"
+  include_tasks: get_network_config_file.yml
+  vars:
+    network_adapter_name: "{{ guest_primary_nic_name }}"
+
+- name: "Check the network config file is set for the primary network adapter '{{ guest_primary_nic_name }}'"
+  ansible.builtin.assert:
+    that:
+      - network_config_path
+    fail_msg: >-
+      Failed to get network config file of network adapter '{{ guest_primary_nic_name }}'
+      on {{ vm_guest_os_distribution }}
+    success_msg: >-
+      The network config file of network adapter '{{ guest_primary_nic_name }}'
+      is '{{ network_config_path }}' on {{ vm_guest_os_distribution }}
+  when: guest_os_network_manager != "NetworkManager"
+
+- name: "Set fact of network config file for the primary network adapter '{{ guest_primary_nic_name }}'"
+  ansible.builtin.set_fact:
+    guest_primary_nic_config_path: "{{ network_config_path }}"
+
+- name: "Display the primary network adapter information in guest OS"
+  ansible.builtin.debug:
+    msg:
+      - "The primary network adatper's type is {{ guest_primary_nic_type }}"
+      - "The primary network adatper's interface name is {{ guest_primary_nic_name }}"
+      - "The primary network adatper's MAC address is {{ guest_primary_nic_mac }}"
+      - "The primary network adatper's config file path is {{ guest_primary_nic_config_path }}"

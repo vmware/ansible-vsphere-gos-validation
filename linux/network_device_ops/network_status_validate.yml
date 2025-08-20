@@ -4,13 +4,13 @@
 - name: "Bring down the new network adapter interface"
   include_tasks: ../utils/set_network_adapter_status.yml
   vars:
-    network_adapter_name: "{{ new_network_adapter }}"
+    network_adapter_name: "{{ new_network_adapter_name }}"
     network_adapter_status: "down"
 
-- name: "Ping VLAN gateway after {{ new_network_adapter }} is down"
+- name: "Ping VLAN gateway after '{{ new_network_adapter_name }}' is down"
   include_tasks: ping_vlan_gateway.yml
   vars:
-    ping_src_interface: "{{ new_network_adapter }}"
+    ping_src_interface: "{{ new_network_adapter_name }}"
     ping_src_ip: "{{ new_network_adapter_ip }}"
 
 - name: "Set ping result after bringing down the new network adapter"
@@ -20,13 +20,13 @@
 - name: "Bring up the new network adapter interface"
   include_tasks: ../utils/set_network_adapter_status.yml
   vars:
-    network_adapter_name: "{{ new_network_adapter }}"
+    network_adapter_name: "{{ new_network_adapter_name }}"
     network_adapter_status: "up"
 
-- name: "Ping VLAN gateway after {{ new_network_adapter }} is up"
+- name: "Ping VLAN gateway after '{{ new_network_adapter_name }}' is up"
   include_tasks: ping_vlan_gateway.yml
   vars:
-    ping_src_interface: "{{ new_network_adapter }}"
+    ping_src_interface: "{{ new_network_adapter_name }}"
     ping_src_ip: "{{ new_network_adapter_ip }}"
 
 - name: "Set ping result after bringing up the new network adapter"
@@ -36,13 +36,13 @@
 - name: "Disconnect the new network adapter from VM"
   include_tasks: ../../common/vm_configure_network_adapter.yml
   vars:
-    netadapter_mac_addr: "{{ new_network_adapter_mac_addr }}"
+    netadapter_mac_addr: "{{ new_network_adapter_mac }}"
     netadapter_connect: false
 
-- name: "Ping VLAN gateway after {{ new_network_adapter }} is disconnected"
+- name: "Ping VLAN gateway after '{{ new_network_adapter_name }}' is disconnected"
   include_tasks: ping_vlan_gateway.yml
   vars:
-    ping_src_interface: "{{ new_network_adapter }}"
+    ping_src_interface: "{{ new_network_adapter_name }}"
     ping_src_ip: "{{ new_network_adapter_ip }}"
 
 - name: "Set ping result after disconnecting the new network adapter"
@@ -52,13 +52,13 @@
 - name: "Reconnect the new network adapter to VM"
   include_tasks: ../../common/vm_configure_network_adapter.yml
   vars:
-    netadapter_mac_addr: "{{ new_network_adapter_mac_addr }}"
+    netadapter_mac_addr: "{{ new_network_adapter_mac }}"
     netadapter_connect: true
 
-- name: "Ping VLAN gateway after {{ new_network_adapter }} is reconnected"
+- name: "Ping VLAN gateway after '{{ new_network_adapter_name }}' is reconnected"
   include_tasks: ping_vlan_gateway.yml
   vars:
-    ping_src_interface: "{{ new_network_adapter }}"
+    ping_src_interface: "{{ new_network_adapter_name }}"
     ping_src_ip: "{{ new_network_adapter_ip }}"
 
 - name: "Set ping result after reconnecting the new network adapter"
@@ -68,16 +68,14 @@
 - name: "Print network adapter test results"
   ansible.builtin.debug:
     msg:
-      - "Ping succeeded after {{ new_network_adapter }} hot-add: {{ ping_success_after_hotadd }}"
-      - "Ping succeeded after {{ new_network_adapter }} down: {{ ping_success_after_ifdown }}"
-      - "Ping succeeded after {{ new_network_adapter }} up: {{ ping_success_after_ifup }}"
-      - "Ping succeeded after {{ new_network_adapter }} disconnect: {{ ping_success_after_disconnect }}"
-      - "Ping succeeded after {{ new_network_adapter }} reconnect: {{ ping_success_after_reconnect }}"
+      - "Ping succeeded after '{{ new_network_adapter_name }}' down: {{ ping_success_after_ifdown }}"
+      - "Ping succeeded after '{{ new_network_adapter_name }}' up: {{ ping_success_after_ifup }}"
+      - "Ping succeeded after '{{ new_network_adapter_name }}' disconnect: {{ ping_success_after_disconnect }}"
+      - "Ping succeeded after '{{ new_network_adapter_name }}' reconnect: {{ ping_success_after_reconnect }}"
 
 - name: "Assert network adapter ping results are as expected"
   ansible.builtin.assert:
     that:
-      - ping_success_after_hotadd
       - not ping_success_after_ifdown
       - ping_success_after_ifup
       - not ping_success_after_disconnect

@@ -1,0 +1,55 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Update systemd network config file for primary or secondary network adapter
+#
+- name: "Set fact of systemd network config template and directory on {{ vm_guest_os_distribution }}"
+  ansible.builtin.set_fact:
+    systemd_network_config_template: "systemd_network_conf.j2"
+    systemd_network_config_dir: "{{ network_config_path | dirname }}"
+
+- name: "Get stat info of systemd network config directory"
+  include_tasks: ../utils/get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ systemd_network_config_dir }}"
+
+- name: "Check systemd network config directory exists"
+  ansible.builtin.assert:
+    that:
+      - guest_file_exists
+    fail_msg: "Systemd network config directory '{{ systemd_network_config_dir }}' doesn't exist"
+    success_msg: "Systemd network config directory '{{ systemd_network_config_dir }}' exists"
+
+- name: "Update systemd network config for the primary network adapter '{{ new_network_adapter_name }}'"
+  when: new_network_adapter_mac == guest_primary_nic_mac
+  block:
+    - name: "Find existing systemd network config files"
+      ansible.builtin.shell: "find {{ systemd_network_config_dir }} -name '*.network'"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: find_network_config_result
+
+    - name: "Remove systemd existing network config files"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: "absent"
+      with_items: "{{ find_network_config_result.stdout_lines }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      when:
+        - find_network_config_result.stdout_lines is defined
+        - find_network_config_result.stdout_lines | length > 0
+
+    - name: "Update fact of systemd network config file for network adapter '{{ new_network_adapter_name }}'"
+      ansible.builtin.set_fact:
+        network_config_path: "{{ systemd_network_config_dir }}/10-primary-nic.network"
+
+- name: "Update fact of systemd network config file for network adapter '{{ new_network_adapter_name }}'"
+  ansible.builtin.set_fact:
+    network_config_path: "{{ systemd_network_config_dir }}/99-secondary-nic.network"
+  when: new_network_adapter_mac != guest_primary_nic_mac
+
+- name: "Create a new systemd network config file '{{ network_config_path }}'"
+  ansible.builtin.template:
+    src: "{{ systemd_network_config_template }}"
+    dest: "{{ network_config_path }}"
+    mode: "0666"
+  delegate_to: "{{ vm_guest_ip }}"

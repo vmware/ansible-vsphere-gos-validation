@@ -1,29 +1,47 @@
 # Copyright 2023-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Hot remove the new network adapter
+# Remove the new network adapter
 #
+# On ESXi on ARM, change back primary network adapter name to eth0 on SLES 15.
+- name: "Revert primary network config to eth0 on {{ vm_guest_os_distribution }}"
+  when:
+    - primary_nic_known_issue is defined
+    - primary_nic_known_issue
+  block:
+    - name: "Remove current primary network adapter config file"
+      ansible.builtin.file:
+        path: "{{ guest_primary_nic_config_path }}"
+        state: absent
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Reset primary network adapter name and config file on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_primary_nic_name: "eth0"
+        guest_primary_nic_config_path: "{{ guest_primary_nic_config_path | replace('eth1', 'eth0') }}"
+
+    - name: "Update primary network config for 'eth0' on {{ vm_guest_os_distribution }}"
+      include_tasks: apply_new_network_config.yml
+      vars:
+        new_network_adapter_name: "{{ guest_primary_nic_name }}"
+        new_network_adapter_mac: "{{ guest_primary_nic_mac }}"
+        new_nic_ipv4_method: "dhcp"
+
 # Hot remove network adapter is not supported on ESXi on ARM now,
 # here shutdown the guest OS to cold remove the new network adapter
 - name: "Shutdown guest OS to cold remove the network adapter from VM on ESXi on ARM"
   include_tasks: ../utils/shutdown.yml
   when: esxi_cpu_vendor == 'arm'
 
-- name: "Hot remove the new network adapter from VM"
+- name: "Remove the new network adapter from VM"
   include_tasks: ../../common/vm_remove_network_adapter.yml
   vars:
-    netadapter_mac_addr: "{{ new_network_adapter_mac_addr }}"
+    netadapter_mac_addr: "{{ new_network_adapter_mac }}"
     vm_remove_adapter_ignore_errors: true
 
-- name: "Network adapter hot-remove succeeded"
-  ansible.builtin.debug:
-    msg: "Successfully hot removed new {{ adapter_type }} network adapter {{ new_network_adapter }}"
-  when:
-    - remove_adapter.changed is defined
-    - remove_adapter.changed
-
-- name: "Network adapter hot-remove failed"
+- name: "Network adapter hot-remove failed due to known issue"
   when: >-
+    esxi_cpu_vendor != 'arm' and
     (remove_adapter.changed is undefined or
      not remove_adapter.changed)
   block:
@@ -44,18 +62,20 @@
         - guest_os_ansible_distribution == "OracleLinux"
         - guest_os_ansible_distribution_ver == '8.8'
 
-    - name: "Failed to hot remove new {{ adapter_type }} network adapter {{ new_network_adapter }}"
+    - name: "Failed to hot remove new {{ adapter_type }} network adapter '{{ new_network_adapter_mac }}'"
       ansible.builtin.fail:
         msg: "{{ remove_adapter }}"
 
-- name: "Power on VM and refresh guest OS IP in the in-memory inventory hosts info"
-  include_tasks: ../../common/update_inventory.yml
-  when: esxi_cpu_vendor == 'arm'
+- name: "Check network adapter remove result"
+  ansible.builtin.assert:
+    that:
+      - remove_adapter.changed is defined
+      - remove_adapter.changed
+    fail_msg: "Failed to removed new {{ adapter_type }} network adapter '{{ new_network_adapter_mac }}'"
+    success_msg: "Successfully removed new {{ adapter_type }} network adapter '{{ new_network_adapter_mac }}'"
 
-- name: "Check VM connection is not broken after hot-remove"
-  include_tasks: ../../common/vm_wait_connection.yml
-  vars:
-    vm_wait_connection_timeout: 60
+- name: "Refresh guest OS IP in the in-memory inventory hosts info"
+  include_tasks: ../../common/update_inventory.yml
 
 - name: "Collect dmesg after hot removing the new network adapter"
   include_tasks: ../utils/collect_dmesg.yml
@@ -63,17 +83,18 @@
     dmesg_options: '-c'
     dmesg_output_file_name: 'dmesg_after_nic_hot_remove.log'
     dmesg_check_call_trace: true
+  when: esxi_cpu_vendor != 'arm'
 
-- name: "Get network adapter status after hot-remove"
+- name: "Get network adapter status in guest OS after remove"
   include_tasks: ../utils/get_network_adapters_status.yml
 
-- name: "Set fact of network adapter info after hot-remove"
+- name: "Set fact of network adapter info after remove"
   ansible.builtin.set_fact:
-    network_adapters_after_hotremove: "{{ guest_network_adapters }}"
+    network_macs_after_remove: "{{ guest_network_adapters_mac | unique }}"
 
 - name: "Assert new {{ adapter_type }} adapter interface is removed"
   ansible.builtin.assert:
     that:
-      - network_adapters_after_hotremove | difference(network_adapters_before_hotadd) | length == 0
-    fail_msg: "After hot removing the new network adapter from VM {{ vm_name }}, guest OS still can detect it"
-    success_msg: "The new {{ adapter_type }} adapter interface is removed in guest OS on VM {{ vm_name }}"
+      - network_macs_after_remove | difference(network_macs_before_add) | length == 0
+    fail_msg: "After removing the new network adapter from VM, guest OS still can detect it"
+    success_msg: "The new {{ adapter_type }} adapter interface is removed in guest OS"

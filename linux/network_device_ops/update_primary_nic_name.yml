@@ -1,0 +1,21 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Update the primary network adapter's name on SLES 15
+#
+- name: "Set fact of GRUB config file path"
+  ansible.builtin.set_fact:
+    grub_opts_path: "/etc/default/grub"
+    grub_cfg_path: "/boot/grub2/grub.cfg"
+
+- name: "Enable policy-based network naming and rebuild GRUB"
+  ansible.builtin.shell: |-
+    sed -i 's/GRUB_CMDLINE_LINUX=\"/GRUB_CMDLINE_LINUX=\"net.ifnames=0 /' {{ grub_opts_path }};
+    grub2-mkconfig -o {{ grub_cfg_path }}
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Reboot guest OS to make GRUB take effect"
+  include_tasks: ../utils/reboot.yml
+
+- name: "Update VM's guest IP after reboot"
+  include_tasks: ../../common/update_inventory.yml
