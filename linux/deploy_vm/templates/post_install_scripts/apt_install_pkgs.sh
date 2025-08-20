@@ -1,24 +1,24 @@
 #Install open-vm-toools from CDROM if it exists
 cdrom_missing_pkgs=""
 for pkg in $required_pkgs; do
-    echo "Searching package $pkg in CDROM"
+    echo "Searching package $pkg in CDROM" >/dev/ttyS0
     apt list $pkg 2>/dev/null | cut -d '/' -f 1 | grep $pkg
     pkg_in_cdrom=$?
     if [ $pkg_in_cdrom -eq 0 ]; then
         echo "Installing pacakge $pkg from CDROM"
         apt install -y $pkg 2>&1
         if [ $? -ne 0 ]; then
-            echo "ERROR: Failed to install package $pkg from CDROM"
+            echo "ERROR: Failed to install package $pkg from CDROM" >/dev/ttyS0
             cdrom_missing_pkgs="$cdrom_missing_pkgs $pkg"
         fi
     else
-        echo "Package $pkg doesn't exist in CDROM"
+        echo "Package $pkg doesn't exist in CDROM" >/dev/ttyS0
         cdrom_missing_pkgs="$cdrom_missing_pkgs $pkg"
     fi
 done
 
 if [ "X$cdrom_missing_pkgs" != "X" ]; then
-    echo "Adding $OS_NAME $VERSION_ID ($VERSION_CODENAME) offical online repo"
+    echo "Adding $OS_NAME $VERSION_ID ($VERSION_CODENAME) offical online repo" >/dev/ttyS0
 {% if unattend_installer == 'Debian' %}
     echo "deb http://deb.debian.org/debian/ $VERSION_CODENAME main contrib" >> /etc/apt/sources.list
 {% elif unattend_installer == 'Pardus' %}
@@ -36,13 +36,13 @@ if [ "X$cdrom_missing_pkgs" != "X" ]; then
         apt list $pkg 2>/dev/null | cut -d '/' -f 1 | grep $pkg
         pkg_in_online_repo=$?
         if [ $pkg_in_online_repo -eq 0 ]; then
-            echo "Installing package $pkg from online repo"
+            echo "Installing package $pkg from online repo" >/dev/ttyS0
             apt install -y $pkg 2>&1
             if [ $? -ne 0 ]; then
-                echo "ERROR: Failed to install package $pkg from online repo"
+                echo "ERROR: Failed to install package $pkg from online repo" >/dev/ttyS0
             fi
         else
-            echo "ERROR: Failed to find package $pkg from CDROM and online repo"
+            echo "ERROR: Failed to find package $pkg from CDROM and online repo" >/dev/ttyS0
         fi
     done
 fi
