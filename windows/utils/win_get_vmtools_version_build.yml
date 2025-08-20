@@ -3,8 +3,9 @@
 ---
 # Get installed VMware Tools version and build number in Windows guest OS
 # Return:
-#   vmtools_version: VMware Tools version
-#   vmtools_build_number: VMware Tools build number
+#   vmtools_version: VMware Tools version.
+#   vmtools_build_number: VMware Tools build number.
+#   vmtools_toolboxcmd_exists: Whether 'VMwareToolboxCmd.exe' exists in guest OS.
 #
 - name: "Initialize the facts of VMware Tools version and build info"
   ansible.builtin.set_fact:
@@ -12,11 +13,38 @@
     vmtools_version: ''
     vmtools_major_version: ''
     vmtools_build_number: ''
+    vmtools_toolboxcmd_exists: false
+    vmtools_install_path: "C:\\Program Files\\VMware\\VMware Tools"
 
-- name: "Execute 'VMwareToolboxCmd.exe' to get VMware Tools info in guest OS"
+- name: "Set facts of the paths for 'VMwareToolboxCmd.exe' and 'vmtoolsd.exe'"
+  ansible.builtin.set_fact:
+    vmtools_toolboxcmd_path: "{{ vmtools_install_path }}\\VMwareToolboxCmd.exe"
+    vmtoolsd_path: "{{ vmtools_install_path }}\\vmtoolsd.exe"
+
+- name: "Check whether 'VMwareToolboxCmd.exe' exists"
+  include_tasks: win_check_file_exist.yml
+  vars:
+    win_check_file_exist_file: "{{ vmtools_toolboxcmd_path }}"
+
+- name: "Set fact of 'VMwareToolboxCmd.exe' existence status"
+  ansible.builtin.set_fact:
+    vmtools_toolboxcmd_exists: "{{ win_check_file_exist_result }}"
+
+- name: "Check whether 'vmtoolsd.exe' exists"
+  include_tasks: win_check_file_exist.yml
+  vars:
+    win_check_file_exist_file: "{{ vmtoolsd_path }}"
+
+- name: "'vmtoolsd.exe' does not exist"
+  ansible.builtin.assert:
+    that:
+      - win_check_file_exist_result
+    fail_msg: "File '{{ vmtoolsd_path }}' does not exist in guest OS."
+
+- name: "Get VMware Tools info in guest OS"
   include_tasks: win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "& 'C:\\Program Files\\VMware\\VMware Tools\\VMwareToolboxCmd.exe' -v"
+    win_powershell_cmd: "& '{{ vmtoolsd_path }}' -v"
 
 - name: "Set fact of VMware Tools info got in guest OS"
   ansible.builtin.set_fact:
@@ -27,7 +55,7 @@
 
 - name: "Set fact of VMware Tools major version and build number"
   ansible.builtin.set_fact:
-    vmtools_major_version: "{{ vmtools_info_from_vmtoolsd.split('.')[0] }}"
+    vmtools_major_version: "{{ vmtools_info_from_vmtoolsd | regex_findall('\\d+') | first }}"
     vmtools_build_number: "{{ vmtools_info_from_vmtoolsd | regex_findall('\\d+') | last }}"
   when: vmtools_info_from_vmtoolsd
 
@@ -40,7 +68,7 @@
 
 - name: "Set fact of VMware Tools version"
   ansible.builtin.set_fact:
-    vmtools_version: "{{ vmtools_info_from_vmtoolsd | regex_search('^(\\d+\\.){3}\\d+') }}"
+    vmtools_version: "{{ vmtools_info_from_vmtoolsd | regex_search('(\\d+\\.){3}\\d+') }}"
   when:
     - vmtools_major_version
     - vmtools_major_version | int > 12

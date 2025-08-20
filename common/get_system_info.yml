@@ -3,30 +3,21 @@
 ---
 # Collect guest system info using Ansible setup module
 # Parameters:
-#   filter (optional): if the filter is set, getting the filtered
-#     guest system info, if not set, will get the whole ansible facts.
+#   gos_info_filter (optional): if supplied, return the facts that match
+#     one of the specified pattern in the list. Default value is [], which means
+#     returning all the gathered facts.
+#   get_gos_info_timeout (optional): the timeout in seconds for individual
+#     fact gathering, default value is 30.
 # Return:
-#   guest_system_info: the filtered guest system info
+#   guest_system_info: the gathered guest system info.
 #
-- name: "Filter is not specified"
-  block:
-    - name: "Collect guest information for '{{ vm_guest_ip }}'"
-      ansible.builtin.setup:
-      register: get_system_info_result
-      delegate_to: "{{ vm_guest_ip }}"
-    - name: "Set guest system info to ansible_facts when filter is not given"
-      ansible.builtin.set_fact:
-        guest_system_info: "{{ get_system_info_result.ansible_facts }}"
-  when: filter is undefined or not filter
+- name: "Collect guest system information for VM '{{ vm_guest_ip }}'"
+  ansible.builtin.setup:
+    filter: "{{ gos_info_filter | default([]) }}"
+    gather_timeout: "{{ get_gos_info_timeout | default(30) }}"
+  register: get_gos_info_result
+  delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Filter is specified"
-  block:
-    - name: "Collect filtered guest information for '{{ vm_guest_ip }}'"
-      ansible.builtin.setup:
-        filter: "{{ filter }}"
-      register: get_system_info_result
-      delegate_to: "{{ vm_guest_ip }}"
-    - name: "Set guest system info when filter is given"
-      ansible.builtin.set_fact:
-        guest_system_info: "{{ get_system_info_result.ansible_facts }}"
-  when: filter is defined and filter
+- name: "Set gathered guest system information"
+  ansible.builtin.set_fact:
+    guest_system_info: "{{ get_gos_info_result.ansible_facts }}"
