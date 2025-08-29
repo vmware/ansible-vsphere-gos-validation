@@ -17,8 +17,14 @@
           vars:
             skip_test_no_vmtools: true
 
-        - name: "Get VMware Tools services list"
+        - name: "Get VMware Tools services info"
           include_tasks: ../utils/win_get_vmtools_service_list.yml
+
+        - name: "Check VMware Tools services info"
+          ansible.builtin.assert:
+            that:
+              - vmtools_service_dict.keys() | length != 0
+            fail_msg: "Failed to get VMware Tools services dict in guest OS: {{ vmtools_service_dict }}"
 
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
@@ -27,9 +33,7 @@
               Skip test case '{{ ansible_play_name }}' because 'VGAuthService' is not available in the guest OS,
               the installed services and their status are '{{ vmtools_service_dict }}'.
             skip_reason: "Not Supported"
-          when: >
-            (vmtools_service_dict.keys() | length == 0) or
-            ("'VGAuthService' not in vmtools_service_dict.keys()")
+          when: "'VGAuthService' not in vmtools_service_dict.keys()"
 
         - name: "Verify 'VGAuthService' is running"
           ansible.builtin.assert:
