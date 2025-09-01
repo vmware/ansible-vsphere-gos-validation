@@ -17,6 +17,27 @@
           vars:
             skip_test_no_vmtools: true
 
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case '{{ ansible_play_name }}' because 'vmvss' service is not available in the guest OS
+              on ESXi on ARM, the installed services and their status are '{{ vmtools_service_dict }}'.
+            skip_reason: "Not Supported"
+          when:
+            - esxi_cpu_vendor == 'arm'
+            - "'vmvss' not in vmtools_service_dict.keys()"
+
+        - name: "Check 'vmvss' service"
+          ansible.builtin.assert:
+            that:
+              - vmtools_service_dict.keys() | length != 0
+              - 'vmvss' in vmtools_service_dict.keys()
+            fail_msg: >-
+              'vmvss' service is required but not found in the VMware Tools services dict got in
+              guest OS '{{ vmtools_service_dict }}'.
+          when: esxi_cpu_vendor != 'arm'
+
         - name: "Check disk.EnableUUID in VMX file for Windows Server"
           include_tasks: check_vmx_disk_enable_uuid.yml
           when: guest_os_product_type == "server"
