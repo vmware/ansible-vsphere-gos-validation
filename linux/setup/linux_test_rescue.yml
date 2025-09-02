@@ -11,7 +11,9 @@
   when: vm_guest_ip
 
 - name: "Collect Linux logs at test failure"
-  when: vm_guest_ip and ssh_connect_success
+  when:
+    - vm_guest_ip
+    - ssh_connect_success is defined and ssh_connect_success
   block:
     - name: "Collect dmesg at test case failure"
       include_tasks: ../utils/collect_dmesg.yml
@@ -41,10 +43,12 @@
         fetch_file_dst_path: "{{ current_test_log_folder }}/"
         fetch_file_ignore_errors: true
     
+    # Adding 'omit' in 'delegate_to' is a workaround of issue of this task is still executed
+    # when variable 'vm_guest_ip' is empty
     - name: "Generate system log from the current boot"
       ansible.builtin.shell: "journalctl -b >/tmp/journalctl_b.log"
       ignore_errors: true
-      delegate_to: "{{ vm_guest_ip }}"
+      delegate_to: "{{ vm_guest_ip | ternary(vm_guest_ip, omit) }}"
       register: journalctl_result
     
     - name: "Collect system log from the current boot"
