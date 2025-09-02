@@ -1,34 +1,70 @@
 # Copyright 2025 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# xxx 
-# xxx
-# xxx
-- name: "Record current PCR value"
-  ansible.builtin.shell: tpm2_pcrread sha256:0,1,2
-  delegate_to: "{{ vm_guest_ip }}"
-  register: pcr_result
+- name: "Get ESXi host logical processor number"
+  include_tasks: ../../common/esxi_get_cpu_mem_info.yml
 
-- name: "Display current PCR value"
-  ansible.builtin.debug: var=pcr_result
+- name: "Set fact of the maximum vCPU number of hot add test"
+  ansible.builtin.set_fact:
+    max_num_cpus: "{{ [esxi_logical_cpu_num | int, vm_cpu_hotadd_max | default(16) | int] | min }}"
 
-- name: "Modify VM settting to add vCPU"
+- name: "Maximum VM vCPU number of CPU hot add test"
+  ansible.builtin.debug: var=max_num_cpus
 
+- name: "Get CPU info"
+  include_tasks: ../../common/vm_get_cpu_info.yml
 
-- name: "Re-read PCR values"
-  ansible.builtin.shell: tpm2_pcrread sha256:0,1,2
-  delegate_to: "{{ vm_guest_ip }}"
-  register: new_pcr_result
+- name: Set fact of the test cores per socket value
+  ansible.builtin.set_fact:
+    new_cores_per_socket: "{{ vm_cpu_cores_per_socket | int + 2 }}"
 
-- name: "Display the new PCR value"
-  ansible.builtin.debug: var=new_pcr_result
-  
-- name: "Compare PCR value"
-  ansible.builtin.assert:
-    that:
-      - pcr_result.stdout is defined
-      - pcr_result.stdout
-      - new_pcr_result.stdout is defined
-      - new_pcr_result.stdout
-      - pcr_result.stdout != new_pcr_result.stdout
-    fail_msg: "The PCR value is not changed after change VM settings"
+- ansible.builtin.debug:
+    msg: "New cores per socket value '{{ new_cores_per_socket }}' is larger than '{{ max_num_cpus }}', skip test"
+  when: new_cores_per_socket | int > max_num_cpus | int
+
+- name: "Change vCPU and test vTPM.enable.pcr_consistency.ChangeHardware"
+  when: new_cores_per_socket | int <= max_num_cpus | int
+  block:
+    - name: "Record current PCR value"
+      ansible.builtin.shell: tpm2_pcrread sha256:0
+      delegate_to: "{{ vm_guest_ip }}"
+      register: pcr_before_result
+
+    - name: "Display current PCR value"
+      ansible.builtin.debug: var=pcr_before_result
+
+    - name: "Shutdown VM"
+      include_tasks: ../utils/shutdown.yml
+
+    - name: "Modify VM settting to add vCPU"
+      include_tasks: ../../common/vm_set_cpu_number.yml
+      vars:
+        num_cores_per_socket: "{{ new_cores_per_socket }}"
+        num_cpus: "{{ new_cores_per_socket }}"
+
+    - name: "Poweron VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-on'
+        
+    - name: "Update inventory"  
+      include_tasks: ../../common/update_inventory.yml
+
+    - name: "Re-read PCR values"
+      ansible.builtin.shell: tpm2_pcrread sha256:0
+      delegate_to: "{{ vm_guest_ip }}"
+      register: pcr_after_result
+
+    - name: "Display the new PCR value"
+      ansible.builtin.debug: var=pcr_after_result
+
+    - name: "Compare PCR value"
+      ansible.builtin.assert:
+        that:
+          - pcr_before_result.stdout is defined
+          - pcr_before_result.stdout
+          - pcr_after_result.stdout is defined
+          - pcr_after_result.stdout
+          - pcr_before_result.stdout == pcr_after_result.stdout
+        success_msg: "PCR value unchanged. vTPM ChangeHardware may have taken effect or did not trigger any change"
+        fail_msg: "PCR value changed. vTPM ChangeHardware did not fully restrict PCR updates"

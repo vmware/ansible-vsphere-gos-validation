@@ -2,5 +2,14 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # 
-#
-#
+- name: "Prepare test data"
+  ansible.builtin.shell: echo "Hello_vTPM_Hash" > test_hash_data.txt
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "hash the data using TPM"
+  ansible.builtin.shell: tpm2_hash -C o -g sha256 -o hash.out test_hash_data.txt
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Check the Hash"
+  ansible.builtin.shell: xxd hash.out
+  delegate_to: "{{ vm_guest_ip }}"
