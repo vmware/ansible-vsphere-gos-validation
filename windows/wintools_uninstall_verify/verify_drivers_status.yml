@@ -2,20 +2,17 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Handle inbox drivers contained in guest OS situation
-- name: "Check PVSCSI driver status"
-  when: esxi_cpu_vendor != 'arm'
-  block:
-    - name: "Check PVSCSI driver not uninstalled"
-      include_tasks: check_pvscsi_not_uninstalled.yml
-      when: >
-        (win_pvscsi_installer[0] == 'Windows') or
-        (win_pvscsi_installer[0] == 'MSI' and vm_has_pvscsi_boot_disk)
+- name: "Check PVSCSI driver not uninstalled"
+  include_tasks: check_pvscsi_not_uninstalled.yml
+  when: >
+    (win_pvscsi_installer[0] == 'Windows') or
+    (win_pvscsi_installer[0] == 'MSI' and vm_has_pvscsi_boot_disk)
 
-    - name: "Check inboxed PVSCSI driver loaded"
-      include_tasks: check_pvscsi_inbox_loaded.yml
-      when:
-        - win_pvscsi_installer[0] == 'MSI'
-        - not vm_has_pvscsi_boot_disk
+- name: "Check inboxed PVSCSI driver loaded"
+  include_tasks: check_pvscsi_inbox_loaded.yml
+  when:
+    - win_pvscsi_installer[0] == 'MSI'
+    - not vm_has_pvscsi_boot_disk
 
 - name: "Check VMXNET3 driver not uninstalled"
   include_tasks: check_vmxnet3_not_uninstalled.yml

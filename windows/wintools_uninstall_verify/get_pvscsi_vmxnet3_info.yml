@@ -6,24 +6,21 @@
     win_pvscsi_before: ""
     win_vmxnet3_before: ""
 
-- name: "Get PVSCSI driver info"
-  when: esxi_cpu_vendor != 'arm'
-  block:
-    - name: "Get loaded PVSCSI driver version"
-      include_tasks: ../utils/win_get_device_driver.yml
-      vars:
-        win_device_desc_keyword: 'pvscsi'
-    - name: "Set fact of the loaded PVSCSI driver info"
-      ansible.builtin.set_fact:
-        win_pvscsi_before: "{{ win_guest_device_driver }}"
+- name: "Get loaded PVSCSI driver version"
+  include_tasks: ../utils/win_get_device_driver.yml
+  vars:
+    win_device_desc_keyword: 'pvscsi'
+- name: "Set fact of the loaded PVSCSI driver info"
+  ansible.builtin.set_fact:
+    win_pvscsi_before: "{{ win_guest_device_driver }}"
 
-    - name: "Get PVSCSI driver installer info"
-      include_tasks: ../utils/win_get_driver_installer.yml
-      vars:
-        win_get_driver_installer_name: 'pvscsi'
-    - name: "Set fact of the PVSCSI driver installer info"
-      ansible.builtin.set_fact:
-        win_pvscsi_installer: "{{ win_driver_installer_list }}"
+- name: "Get PVSCSI driver installer info"
+  include_tasks: ../utils/win_get_driver_installer.yml
+  vars:
+    win_get_driver_installer_name: 'pvscsi'
+- name: "Set fact of the PVSCSI driver installer info"
+  ansible.builtin.set_fact:
+    win_pvscsi_installer: "{{ win_driver_installer_list }}"
 
 - name: "Get loaded VMXNET3 driver version"
   include_tasks: ../utils/win_get_device_driver.yml
@@ -47,7 +44,6 @@
       - win_pvscsi_before | length > 0
       - win_pvscsi_installer | length > 0
     fail_msg: "Not get loaded PVSCSI driver info '{{ win_pvscsi_before }}', or not get PVSCSI installer info '{{ win_pvscsi_installer }}' before uninstalling VMware Tools."
-  when: esxi_cpu_vendor != 'arm'
 
 - name: "Check VMXNET3 driver info retrieved"
   ansible.builtin.assert:

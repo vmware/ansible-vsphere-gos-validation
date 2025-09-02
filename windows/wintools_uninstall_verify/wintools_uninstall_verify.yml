@@ -37,7 +37,9 @@
 
         - name: "Make sure PVSCSI controller and VMXNET3 network adatper exist"
           include_tasks: prepare_pvscsi_vmxnet3_device.yml
-          when: guest_os_with_inbox_drivers
+          when:
+            - esxi_cpu_vendor != 'arm'
+            - guest_os_with_inbox_drivers
 
         - name: "Get problem device list"
           include_tasks: ../utils/win_get_problem_device.yml
@@ -49,12 +51,16 @@
 
         - name: "Uninstall VMware Tools"
           include_tasks: uninstall_vmtools.yml
+
         - name: "Verify PVSCSI and VMXNET3 drivers"
           include_tasks: verify_drivers_status.yml
-          when: guest_os_with_inbox_drivers
+          when:
+            - esxi_cpu_vendor != 'arm'
+            - guest_os_with_inbox_drivers
 
         - name: "Cleanup network configurations for added network adapter"
           when:
+            - esxi_cpu_vendor != 'arm'
             - guest_os_with_inbox_drivers
             - new_network_adapter_mac is defined
             - new_network_adapter_mac
