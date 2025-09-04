@@ -13,6 +13,14 @@
     nic_mac_addr_list_before_hotadd: "{{ vm_nic_mac_addr_list_get }}"
     nic_num_before_hotadd_guest: "{{ guest_nic_num_get }}"
 
+# Hot add network adapter on VM is not supported on ESXi on ARM currently,
+# so here shutdown guest OS before adding a new network adapter
+- name: "Shutdown VM on ESXi on ARM"
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "shutdown"
+  when: esxi_cpu_vendor == 'arm'
+
 - name: "Hot add a new network adapter to VM"
   include_tasks: ../../common/vm_add_network_adapter.yml
   vars:
@@ -28,6 +36,16 @@
 - name: "Wait 10 seconds after network adapter hot added"
   ansible.builtin.pause:
     seconds: 10
+
+- name: "Power on VM on ESXi on ARM"
+  when: esxi_cpu_vendor == 'arm'
+  block:
+    - name: "Power on VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: "powered-on"
+    - name: "Update in-memory inventory after VM power on"
+      include_tasks: ../utils/win_update_inventory.yml
 
 - name: "Get network adapter number after hot add"
   include_tasks: network_adapter_number_check.yml
@@ -48,6 +66,12 @@
 - name: "Disconnection and reconnection test"
   include_tasks: network_adapter_status_check.yml
 
+- name: "Shutdown VM on ESXi on ARM"
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "shutdown"
+  when: esxi_cpu_vendor == 'arm'
+
 - name: "Remove new added network adapter"
   include_tasks: ../../common/vm_remove_network_adapter.yml
   vars:
@@ -62,6 +86,16 @@
 - name: "Wait 10 seconds after network adapter hot remove"
   ansible.builtin.pause:
     seconds: 10
+
+- name: "Power on VM on ESXi on ARM"
+  when: esxi_cpu_vendor == 'arm'
+  block:
+    - name: "Power on VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: "powered-on"
+    - name: "Update in-memory inventory after VM power on"
+      include_tasks: ../utils/win_update_inventory.yml
 
 - name: "Get the number of VM network adapter after hot remove"
   include_tasks: network_adapter_number_check.yml

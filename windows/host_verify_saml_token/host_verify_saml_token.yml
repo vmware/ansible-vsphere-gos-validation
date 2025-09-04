@@ -25,6 +25,17 @@
             skip_reason: "Not Supported"
           when: esxi_version is version('8.0.2', '<') or vmtools_version is version('12.3.0', '<')
 
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case '{{ ansible_play_name }}' because 'VGAuthService' is not available in the guest OS
+              on ESXi on ARM, the installed services and their status are '{{ vmtools_service_dict }}'.
+            skip_reason: "Not Supported"
+          when:
+            - esxi_cpu_vendor == 'arm'
+            - "'VGAuthService' not in vmtools_service_dict.keys()"
+
         - name: "Skip test case due to missing vCenter Server variables"
           include_tasks: ../../common/skip_test_case.yml
           vars:
@@ -34,6 +45,16 @@
             (not vcenter_is_defined) or
             (vcenter_ssh_username is undefined or not vcenter_ssh_username) or
             (vcenter_ssh_password is undefined or not vcenter_ssh_password)
+
+        - name: "Verify 'VGAuthService' is running"
+          ansible.builtin.assert:
+            that:
+              - "'VGAuthService' in vmtools_service_dict.keys()"
+              - vmtools_service_dict['VGAuthService'] == "Running"
+            fail_msg: >-
+              Service 'VGAuthService' is required but not found or not running in guest OS,
+              got VMware Tools services status '{{ vmtools_service_dict }}'.
+            success_msg: "Service 'VGAuthService' is running in guest OS."
 
         - name: "Check VMware Tools capability exists for host verified SAML token"
           include_tasks: ../../common/vm_check_vmtools_capability.yml

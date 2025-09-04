@@ -10,20 +10,33 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: true
 
-        - name: Get VGAuthService status in Windows guest OS
-          include_tasks: ../utils/win_get_service_status.yml
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
           vars:
-            win_service_name: "VGAuthService"
-        - name: Verify VGAuthService is running
+            skip_msg: >-
+              Skip test case '{{ ansible_play_name }}' because 'VGAuthService' is not available in the guest OS
+              on ESXi on ARM, the installed services and their status are '{{ vmtools_service_dict }}'.
+            skip_reason: "Not Supported"
+          when:
+            - esxi_cpu_vendor == 'arm'
+            - "'VGAuthService' not in vmtools_service_dict.keys()"
+
+        - name: "Verify 'VGAuthService' is running"
           ansible.builtin.assert:
             that:
-              - service_status == "Running"
-            fail_msg: "VGAuth Service is not running in guest OS."
-            success_msg: "VGAuth service is running in guest OS."
+              - "'VGAuthService' in vmtools_service_dict.keys()"
+              - vmtools_service_dict['VGAuthService'] == "Running"
+            fail_msg: >-
+              Service 'VGAuthService' is required but not found or not running in guest OS,
+              got VMware Tools services status '{{ vmtools_service_dict }}'.
+            success_msg: "Service 'VGAuthService' is running in guest OS."
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml

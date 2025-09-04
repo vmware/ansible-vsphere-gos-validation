@@ -37,24 +37,28 @@
 
         - name: "Make sure PVSCSI controller and VMXNET3 network adatper exist"
           include_tasks: prepare_pvscsi_vmxnet3_device.yml
-          when: guest_os_with_inbox_drivers
+          when:
+            - esxi_cpu_vendor != 'arm'
+            - guest_os_with_inbox_drivers
 
-        - name: "Get problem device list"
-          include_tasks: ../utils/win_get_problem_device.yml
-        - name: "Check no problem device listed"
-          ansible.builtin.assert:
-            that:
-              - not gos_has_problem_device
-            fail_msg: "Problem devices were found in guest before VMware Tools uninstall, please check listed problem devices: {{ gos_problem_device_list }}"
+        # In Windows Server 2012 R2 or older OS there is no cmdlet 'Get-PnpDevice',
+        # so here only check in newer OS
+        - name: "Check if there is problem device in Device Manager"
+          include_tasks: ../wintools_complete_install_verify/check_problem_device.yml
+          when: guest_os_ansible_distribution_ver is version('6.3.9600.0', '>')
 
         - name: "Uninstall VMware Tools"
           include_tasks: uninstall_vmtools.yml
+
         - name: "Verify PVSCSI and VMXNET3 drivers"
           include_tasks: verify_drivers_status.yml
-          when: guest_os_with_inbox_drivers
+          when:
+            - esxi_cpu_vendor != 'arm'
+            - guest_os_with_inbox_drivers
 
         - name: "Cleanup network configurations for added network adapter"
           when:
+            - esxi_cpu_vendor != 'arm'
             - guest_os_with_inbox_drivers
             - new_network_adapter_mac is defined
             - new_network_adapter_mac

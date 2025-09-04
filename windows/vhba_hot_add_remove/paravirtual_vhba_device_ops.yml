@@ -17,15 +17,44 @@
           vars:
             create_current_test_folder: true
 
-        # Skip test case if no pvscsi driver in guest OS, no matter it's from inbox or VMware Tools
+        # Check if there is inbox PVSCSI driver
+        - name: "Get inbox PVSCSI driver info in guest OS"
+          include_tasks: ../utils/win_get_image_driver.yml
+          vars:
+            win_driver_inf: "pvscsii.inf"
+
+        # Check if there is installed PVSCSI driver when there is no inbox driver
+        - name: "Check 'pvscsi.sys' file in guest OS"
+          include_tasks: ../utils/win_check_file_exist.yml
+          vars:
+            win_check_file_exist_file: "C:\\Windows\\System32\\drivers\\pvscsi.sys"
+          when:
+            - vmtools_is_running
+            - not win_driver_info
+
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Test case '{{ current_testcase_name }}' is blocked because guest OS has no inbox PVSCSI driver or VMware Tools is not installed"
+            skip_msg: >-
+              Skip test case '{{ current_testcase_name }}' because PVSCSI driver is not available in the guest OS
+              on ESXi on ARM.
+            skip_reason: "Not Supported"
+          when:
+            - esxi_cpu_vendor == 'arm'
+            - not win_driver_info
+            - not win_check_file_exist_result
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Test case '{{ current_testcase_name }}' is blocked because PVSCSI driver is not available in the guest OS
+              on ESXi on '{{ esxi_cpu_vendor }}', please check issues with inboxed driver or installed VMware Tools.
             skip_reason: "Blocked"
           when:
-            - not vmtools_is_running
-            - not guest_os_with_inbox_drivers
+            - esxi_cpu_vendor != 'arm'
+            - not win_driver_info
+            - not win_check_file_exist_result
 
         - name: "Test run"
           include_tasks: vhba_test.yml
