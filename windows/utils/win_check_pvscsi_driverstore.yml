@@ -1,0 +1,30 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Check whether PVSCSI driver in Driver Store in guest OS.
+# Return:
+#   win_pvscsi_driver_store_exists: true or false.
+#
+- name: "Initialize the fact of whether PVSCSI driver files folder exists"
+  ansible.builtin.set_fact:
+    win_pvscsi_driver_store_exists: false
+
+- name: "Check whether PVSCSI driver files folder exists in Driver Store"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Test-Path -Path C:\\Windows\\System32\\DriverStore\\FileRepository\\pvscsi.inf*"
+    win_execute_cmd_ignore_error: true
+
+- name: "Set fact of whether PVSCSI driver files folder exists"
+  ansible.builtin.set_fact:
+    win_pvscsi_driver_store_exists: true
+  when:
+    - win_powershell_cmd_output.rc is defined
+    - win_powershell_cmd_output.rc == 0
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length == 1
+    - win_powershell_cmd_output.stdout_lines[0] == 'True'
+
+- name: "Print whether PVSCSI driver files folder exists in Driver Store"
+  ansible.builtin.debug: var=win_pvscsi_driver_store_exists
