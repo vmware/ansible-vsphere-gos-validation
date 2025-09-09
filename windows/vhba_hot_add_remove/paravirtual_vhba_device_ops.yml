@@ -18,19 +18,15 @@
             create_current_test_folder: true
 
         # Check if there is inbox PVSCSI driver
-        - name: "Get inbox PVSCSI driver info in guest OS"
+        - name: "Check if inboxed PVSCSI driver exists in guest OS"
           include_tasks: ../utils/win_get_image_driver.yml
           vars:
             win_driver_inf: "pvscsii.inf"
 
         # Check if there is installed PVSCSI driver when there is no inbox driver
-        - name: "Check 'pvscsi.sys' file in guest OS"
-          include_tasks: ../utils/win_check_file_exist.yml
-          vars:
-            win_check_file_exist_file: "C:\\Windows\\System32\\drivers\\pvscsi.sys"
-          when:
-            - vmtools_is_running
-            - not win_driver_info
+        - name: "Check if PVSCSI driver exists in Driver Store in guest OS"
+          include_tasks: ../utils/win_check_pvscsi_driverstore.yml
+          when: not win_driver_info
 
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
@@ -42,7 +38,7 @@
           when:
             - esxi_cpu_vendor == 'arm'
             - not win_driver_info
-            - not win_check_file_exist_result
+            - not win_pvscsi_driver_store_exists | default(false)
 
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
@@ -54,7 +50,7 @@
           when:
             - esxi_cpu_vendor != 'arm'
             - not win_driver_info
-            - not win_check_file_exist_result
+            - not win_pvscsi_driver_store_exists | default(false)
 
         - name: "Test run"
           include_tasks: vhba_test.yml
