@@ -3,6 +3,19 @@
 ---
 # Wait for autoinstall is completed successfully
 #
+- name: "Wait and select OS install option for SLE 16"
+  when: unattend_installer == 'Agama'
+  block:
+    - name: "Sleep 30 seconds to wait boot options display"
+      ansible.builtin.pause:
+        seconds: 30
+    - name: "Select install SUSE SLE 16"
+      include_tasks: ../../common/vm_guest_send_key.yml
+      vars:
+        keys_send:
+          - DOWNARROW
+          - ENTER
+
 # Check Secure Boot is successful
 - name: "Check 'Image APPROVED' in vmware.log when VM secure boot is enabled"
   include_tasks: ../../common/vm_wait_log_msg.yml
@@ -88,9 +101,9 @@
     keys_send:
       - DOWNARROW
       - ENTER
-  when: >
-    unattend_installer == 'Agama' or
-    (unattend_installer in ['SLE', 'openSUSE'] and firmware == "bios")
+  when:
+    - unattend_installer in ['SLE', 'openSUSE']
+    - firmware == "bios"
 
 # For RHEL, Fedora or RHEL-like OS, send key to boot screen to skip
 # disk check and start installation directly.
