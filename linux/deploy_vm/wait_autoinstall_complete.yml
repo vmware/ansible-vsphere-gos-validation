@@ -3,17 +3,13 @@
 ---
 # Wait for autoinstall is completed successfully
 #
-# For SLES/SLED/openSUSE, OS installation with BIOS firmware, send key to boot
-# screen to start new installation instead of booting from local
-- name: "Select boot menu for SUSE"
+- name: "Select boot menu for SUSE 16"
   include_tasks: ../../common/vm_guest_send_key.yml
   vars:
     keys_send:
       - DOWNARROW
       - ENTER
-  when:
-    - unattend_installer in ['SLE', 'openSUSE']
-    - firmware == "bios"
+  when: unattend_installer == 'Agama'
 
 # Check Secure Boot is successful
 - name: "Check 'Image APPROVED' in vmware.log when VM secure boot is enabled"
@@ -91,6 +87,18 @@
           - autoinstall_ipv4_addr[0] is ansible.utils.ipv4
         fail_msg: "Autoinstall failed due to no IPv4 address obtained."
         success_msg: "VM obtained IPv4 address during autoinstall: {{ autoinstall_ipv4_addr | first | default('') }}"
+
+# For SLES/SLED/openSUSE, OS installation with BIOS firmware, send key to boot
+# screen to start new installation instead of booting from local
+- name: "Select boot menu for SUSE"
+  include_tasks: ../../common/vm_guest_send_key.yml
+  vars:
+    keys_send:
+      - DOWNARROW
+      - ENTER
+  when:
+    - unattend_installer in ['SLE', 'openSUSE']
+    - firmware == "bios"
 
 # For RHEL, Fedora or RHEL-like OS, send key to boot screen to skip
 # disk check and start installation directly.
