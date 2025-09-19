@@ -80,6 +80,12 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
       }
     ]
   },
+  security: {
+    selinux: {
+      status: "enabled",
+      mode: "enforcing",
+    },
+  },
   scripts: {
     pre: [
       {
