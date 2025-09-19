@@ -48,6 +48,21 @@
       register: delete_file_result
       ignore_errors: true
 
+- name: "Clean up the cached/temp Windows Updates packages"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      Stop-Service -Name wuauserv,bits,cryptsvc,msiserver -Force;
+      Remove-Item -Path "$env:windir\\SoftwareDistribution\\Download\\*" -Recurse -Force -ErrorAction SilentlyContinue;
+      Remove-Item -Path "$env:windir\\Temp\\*" -Recurse -Force -ErrorAction SilentlyContinue;
+      Remove-Item -Path "$env:TEMP\\*" -Recurse -Force -ErrorAction SilentlyContinue;
+    win_execute_cmd_ignore_error: true
+
+- name: "Restart the guest OS after cleanup of the cached/tmp Windows Updates packages"
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+
 # For internal existing VM test scenario.
 # If guest OS has been updated, take a new base snapshot and remove the old one.
 - name: "Reset base snapshot if Windows online updates installed"
