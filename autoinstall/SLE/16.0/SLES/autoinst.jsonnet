@@ -32,7 +32,11 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
     ],
     packages: [
       "openssh-server-config-rootlogin",
-      "cloud-init"
+      "cloud-init",
+      "policycoreutils",
+      "selinux-policy",
+      "selinux-policy-targeted",
+      "selinux-tools"
     ]
   },
 {% if new_user is defined and new_user %}
@@ -79,6 +83,12 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
         autoconnect: true
       }
     ]
+  },
+  security: {
+    selinux: {
+      status: "enabled",
+      mode: "enforcing",
+    },
   },
   scripts: {
     pre: [
