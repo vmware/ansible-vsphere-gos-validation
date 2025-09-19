@@ -1,0 +1,77 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Initialize the facts of expected configured guest ID and guest fullname"
+  ansible.builtin.set_fact:
+    current_guest_id_expected: false
+    current_os_recognized: false
+
+- name: "Get supported guest IDs on ESXi {{ esxi_version }} with hardware version {{ vm_hardware_version_num }}"
+  include_tasks: ../../common/esxi_get_guest_ids.yml
+  vars:
+    esxi_hardware_version: "{{ vm_hardware_version_num }}"
+
+# Set expected guest ID corresponding to current OS
+- name: "Set fact of expected guest ID of current {{ guest_os_ansible_architecture }} OS"
+  ansible.builtin.set_fact:
+    current_os_guest_id: >-
+      {%- if guest_os_ansible_architecture == '32-bit' -%}{{ (current_gos_info.win_guest_id | reject('match', '.*64Guest'))[0] }}
+      {%- elif guest_os_ansible_cpu_arch == 'x86' -%}
+      {%- elif guest_os_ansible_cpu_arch == 'arm' -%}
+      {%- endif -%}
+
+- name: "Get the previous OS info in the pre-defined guest OS info list"
+  include_tasks: get_previous_gos_info.yml
+
+# Set expected guest ID corresponding to previous OS version
+- name: "Set fact of expected guest ID of previous {{ guest_os_ansible_architecture }} OS"
+  ansible.builtin.set_fact:
+    previous_os_guest_id: "{{ (guest_os_ansible_architecture == '64-bit' | ternary(previous_gos_info.win_guest_id | select('match', '.*64Guest'), previous_gos_info.win_guest_id' | reject('match', '.*64Guest')))[0] }}"
+
+# VM configured guest ID should be the current OS guest ID when it's defined
+# and supported for create on ESXi
+- name: "Set fact of the current guest ID is the expected configured VM guest ID"
+  ansible.builtin.set_fact:
+    current_guest_id_expected: true
+  when:
+    - esxi_version is version(current_gos_info.win_guest_creation_esxi, '>=')
+    - vm_hardware_version_num | int >= current_gos_info.win_guest_creation_hwv | int
+
+# Guest OS can be recognized
+- name: "Set fact of the current OS fullname is the expected guest OS fullname"
+  ansible.builtin.set_fact:
+    current_os_recognized: true
+  when: >
+    (esxi_version is version(current_gos_info.win_guest_creation_esxi, '>=')) or
+    (current_gos_info.win_guest_add_esxi is defined and 
+    esxi_version is version(current_gos_info.win_guest_add_esxi, '>=') and 
+    esxi_version is version(current_gos_info.win_guest_creation_esxi, '<') 
+    vmtools_version is version(current_gos_info.win_guest_vmtools, '>='))
+
+# Guest ID of previous OS version is configured
+- name: "Check guest ID and fullname in VM guest info"
+  ansible.builtin.assert:
+    that:
+      - vm_guest_id == previous_os_guest_id
+      - guestinfo_guest_id == (current_os_recognized | ternary(current_os_guest_id, vm_guest_id))
+      - guestinfo_guest_full_name in (current_os_recognized | ternary(current_gos_info.win_guest_fullname, previous_gos_info.win_guest_fullname))
+    fail_msg:
+      - "VM guest ID configured '{{ vm_guest_id }}' should be the guest ID corresponding to previous OS version '{{ previous_os_guest_id }}',"
+      - "Guest ID in VM guest info '{{ guestinfo_guest_id }}' should be equal to '{{ current_os_recognized | ternary(current_os_guest_id, vm_guest_id) }}',"
+      - "Guest fullname in VM guest info '{{ guestinfo_guest_full_name }}' should be in '{{ current_os_recognized | ternary(current_gos_info.win_guest_fullname, previous_gos_info.win_guest_fullname) }}'."
+  when:
+    - not current_guest_id_expected
+
+# Guest ID of current OS version is configured
+- name: "Check guest ID and fullname in VM guest info"
+  ansible.builtin.assert:
+    that:
+      - vm_guest_id == current_os_guest_id
+      - guestinfo_guest_id == vm_guest_id
+      - guestinfo_guest_full_name in current_gos_info['win_guest_fullname']
+    fail_msg:
+      - "VM guest ID configured '{{ vm_guest_id }}' should be the guest ID corresponding to current OS version '{{ current_os_guest_id }}',"
+      - "Guest ID in VM guest info '{{ guestinfo_guest_id }}' should be equal to the configured guest ID '{{ vm_guest_id }}',"
+      - "Guest fullname in VM guest info '{{ guestinfo_guest_full_name }}' should be in the expected list '{{ current_gos_info['win_guest_fullname'] }}'."
+  when:
+    - current_guest_id_expected
