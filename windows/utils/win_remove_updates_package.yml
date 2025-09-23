@@ -1,0 +1,23 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Remove the cached or temp Windows Updates packages which may occupy a significant amount of disk space.
+# Parameters:
+#   restart_os_after_cleanup: if true, will restart OS after the cleanup. Default is false
+#
+- name: "Clean up the cached/temp Windows Updates packages"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      Stop-Service -Name wuauserv,bits,cryptsvc,msiserver -Force;
+      Remove-Item -Path "$env:windir\\SoftwareDistribution\\Download\\*" -Recurse -Force -ErrorAction SilentlyContinue;
+      Remove-Item -Path "$env:windir\\Temp\\*" -Recurse -Force -ErrorAction SilentlyContinue;
+      Remove-Item -Path "$env:TEMP\\*" -Recurse -Force -ErrorAction SilentlyContinue;
+    win_execute_cmd_ignore_error: true
+
+- name: "Restart the guest OS after cleanup of the cached/tmp Windows Updates packages"
+  include_tasks: win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+  when: restart_os_after_cleanup | default(false)
