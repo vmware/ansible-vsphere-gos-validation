@@ -27,9 +27,9 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
     id: "SLES"
   },
   software: {
-    patterns: [
+    patterns: {
       add: ["gnome"]
-    ],
+    },
     packages: [
       "openssh-server-config-rootlogin",
       "cloud-init"
