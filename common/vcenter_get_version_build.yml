@@ -2,12 +2,14 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Get vCenter version, build number info by vmware_about_info module
-- name: "Initialize vCenter server info to N/A"
+- name: "Initialize vCenter server version and build"
   ansible.builtin.set_fact:
     vcenter_version: 'N/A'
     vcenter_build: 'N/A'
 
-- block:
+- name: "Get vCenter server version and build info when vCenter server is specified"
+  when: vcenter_is_defined is defined and vcenter_is_defined
+  block:
     - name: "Get vCenter server about info"
       community.vmware.vmware_about_info:
         hostname: '{{ vcenter_hostname }}'
@@ -15,16 +17,21 @@
         password: '{{ vcenter_password }}'
         validate_certs: "{{ validate_certs | default(false) }}"
       register: vcenter_about_info
-      ignore_errors: true
     - name: "Set fact of vCenter version and build number"
       ansible.builtin.set_fact:
         vcenter_version: "{{ vcenter_about_info.about_info.version }}"
         vcenter_build: "{{ vcenter_about_info.about_info.build }}"
-      when: not vcenter_about_info.failed
-    - ansible.builtin.debug:
-        msg: "Get vCenter server '{{ vcenter_hostname }}' about info failed"
-      when: vcenter_about_info.failed
-  when: vcenter_is_defined is defined and vcenter_is_defined
+      when:
+        - vcenter_about_info.about_info is defined
+        - vcenter_about_info.about_info.version is defined
+        - vcenter_about_info.about_info.build is defined
+
+    - name: "Check vCenter version and build number"
+      ansible.builtin.assert:
+        that:
+          - vcenter_version and vcenter_version != 'N/A'
+          - vcenter_build and vcenter_build != 'N/A'
+        fail_msg: "Failed to get vCenter version and build from VMware about info: {{ vcenter_about_info.about_info | default('') }}."
 
 # This debug info is for log plugin to get vCenter info
 - name: "Print vCenter Server hostname"
