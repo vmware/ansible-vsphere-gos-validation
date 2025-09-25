@@ -27,16 +27,12 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
     id: "SLES"
   },
   software: {
-    patterns: [
-      "gnome"
-    ],
+    patterns: {
+      add: ["gnome"]
+    },
     packages: [
       "openssh-server-config-rootlogin",
-      "cloud-init",
-      "policycoreutils",
-      "selinux-policy",
-      "selinux-policy-targeted",
-      "selinux-tools"
+      "cloud-init"
     ]
   },
 {% if new_user is defined and new_user %}
@@ -83,12 +79,6 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
         autoconnect: true
       }
     ]
-  },
-  security: {
-    selinux: {
-      status: "enabled",
-      mode: "enforcing",
-    },
   },
   scripts: {
     pre: [
