@@ -1,0 +1,21 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check if there is black screen issue occurs in Windows guest OS
+#
+- name: "Initialize the status of process 'explorer.exe'"
+  ansible.builtin.set_fact:
+    win_explorer_running: false
+
+- name: "Get the status of process 'explorer.exe'"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-Process -Name explorer"
+    win_execute_cmd_ignore_error: true
+
+- name: "Set fact of the status of process 'explorer.exe'"
+  ansible.builtin.set_fact:
+    win_explorer_running: true
+  when:
+    - win_powershell_cmd_output.rc is defined
+    - win_powershell_cmd_output.rc == 0 
