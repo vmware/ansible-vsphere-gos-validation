@@ -28,9 +28,9 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
     version: "16.0"
   },
   software: {
-    patterns: [
-      'gnome'
-    ]
+    patterns: {
+      add: ["gnome"]
+    }
   },
 {% if new_user is defined and new_user %}
   user: {
