@@ -24,7 +24,8 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
 
 {
   product: {
-    id: "Leap_16.0"
+    name: "openSUSE-Leap",
+    version: "16.0"
   },
   software: {
     patterns: [
