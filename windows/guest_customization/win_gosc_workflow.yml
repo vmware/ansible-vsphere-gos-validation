@@ -15,6 +15,17 @@
     - name: "Skip test case"
       include_tasks: ../../common/skip_test_case.yml
       vars:
+        skip_msg: >-
+          Skip test case '{{ ansible_play_name }}' because Windows guest customization is not supported
+          on ESXi on ARM with VMware Tools '{{ vmtools_version }}' installed.
+        skip_reason: "Not Supported"
+      when:
+        - esxi_cpu_vendor == 'arm'
+        - vmtools_version is version('13.1.0.0', '<=')
+
+    - name: "Skip test case"
+      include_tasks: ../../common/skip_test_case.yml
+      vars:
         skip_msg: "Test case '{{ ansible_play_name }}' is skipped because vCenter server is not configured"
         skip_reason: "Not Applicable"
       when: not vcenter_is_defined
