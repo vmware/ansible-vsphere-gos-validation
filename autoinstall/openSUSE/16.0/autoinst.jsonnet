@@ -24,12 +24,12 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
 
 {
   product: {
-    id: "Leap_16.0"
+    id: "openSUSE_Leap"
   },
   software: {
-    patterns: [
-      'gnome'
-    ]
+    patterns: {
+      add: ["gnome"]
+    }
   },
 {% if new_user is defined and new_user %}
   user: {
