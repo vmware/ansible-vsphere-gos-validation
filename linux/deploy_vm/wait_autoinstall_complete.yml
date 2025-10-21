@@ -6,23 +6,24 @@
 - name: "Wait and select OS install option for SLE 16"
   when: unattend_installer == 'Agama'
   block:
-    - name: "Sleep 30 seconds to wait boot options display"
-      ansible.builtin.pause:
-        seconds: 30
-
-    - name: "Select 'install SUSE SLE 16' option"
-      include_tasks: ../../common/vm_guest_send_key.yml
-      vars:
-        keys_send:
-          - DOWNARROW
-          - DOWNARROW
-          - ENTER
+    - name: "VM firmware is BIOS"
       when: firmware == "bios"
+        - name: "Sleep 30 seconds to wait boot options display"
+          ansible.builtin.pause:
+            seconds: 30
 
-    - name: "Reset VM in boot manager"
+        - name: "Select 'install SUSE SLE 16' option"
+          include_tasks: ../../common/vm_guest_send_key.yml
+          vars:
+            keys_send:
+              - DOWNARROW
+              - DOWNARROW
+              - ENTER
+
+    - name: "VM firmware is EFI"
       when: firmware == "efi"
       block:
-        - name: "Select rebooting from CDROM in boot manager"
+        - name: "Select boot from CDROM in boot manager"
           include_tasks: ../../common/vm_guest_send_key.yml
           vars:
             keys_send:
