@@ -2,97 +2,64 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is used for check VM guest OS fullname is reported correctly
-# in guest info through VMware Tools. When VMware Tools is not installed or not
-# running in VM, this test case result is 'No Run'.
+#   This test case is used for checking VM guest OS fullname
+# and guest OS ID are reported correctly in the VM guest info
+# by VMware Tools. When VMware Tools is not installed or not
+# running in the guest OS, this test case result is 'Blocked'.
 #
 - name: check_os_fullname
   hosts: localhost
   gather_facts: false
   tasks:
-    - block:
-        - include_tasks: ../setup/test_setup.yml
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: true
 
-        # Get OS info inside guest OS
-        - include_tasks: ../utils/win_get_fullname.yml
-        - ansible.builtin.debug:
-            msg:
-              - "Get guest fullname in guest OS: {{ os_fullname_guest }}"
-              - "Get OS architecture in guest OS: {{ guest_os_ansible_architecture }}"
-              - "VM guest ID is: {{ vm_guest_id }}"
+        - name: "Get VM guest info"
+          include_tasks: ../../common/vm_get_guest_info.yml
 
-        # Get ESXi version info if not defined
-        - include_tasks: ../../common/esxi_get_version_build.yml
-          when: >
-            (esxi_version is undefined) or
-            (esxi_version == 'N/A')
+        - name: "Set fact of the pre-defined guest OS info list"
+          include_tasks: win_guest_os_info.yml
 
-        # Get guest fullname from VM guest info
-        - include_tasks: ../../common/vm_get_guest_info.yml
-
-        - name: "Known issue - ignore incorrect guestID of Windows 11"
+        - name: "Print the guest OS info before checking"
           ansible.builtin.debug:
             msg:
-              - "The guestID of Windows 11 guest in guestinfo is empty on ESXi 7.0U3c. Ignore this known issue."
-              - "Please refer to https://knowledge.broadcom.com/external/article?articleId=313437."
-          tags:
-            - known_issue
-          when:
-            - not guestinfo_guest_id
-            - esxi_version is defined and esxi_version
-            - esxi_version is version('7.0.3', '=')
-            - esxi_build is defined and esxi_build
-            - esxi_build == "19193900"
-            - "'Windows 11' in os_fullname_guest"
-            - vmtools_version is defined and vmtools_version
-            - vmtools_version is version('12.0.0', '>=')
-        - name: "Check guest ID got from guest info is not empty"
-          ansible.builtin.assert:
-            that:
-              - guestinfo_guest_id
-            fail_msg: "Guest ID in guest info is '{{ guestinfo_guest_id }}', which should be a valid value firstly."
-          when: >
-            (not "'Windows 11' in os_fullname_guest") or
-            (esxi_version is undefined) or
-            (not esxi_version is version('7.0.3', '=')) or
-            (esxi_version is version('7.0.3', '=') and (esxi_build is undefined or esxi_build != "19193900")) or
-            (vmtools_version is undefined or vmtools_version is version('12.0.0', '<'))
-
-        - name: Initialize the expected guest fullname
+              - "OS architecture got in guest OS: {{ guest_os_ansible_architecture }}"
+              - "OS fullname got in guest OS: {{ guest_os_ansible_distribution }}"
+              - "OS fullname got in VM guest info: {{ guestinfo_guest_full_name }}"
+              - "VM guest ID configured: {{ vm_guest_id }}"
+              - "VM guest ID got in VM guest info: {{ guestinfo_guest_id }}"
+              - "VM hardware version: {{ vm_hardware_version }}"
+ 
+        - name: "Set fact of current OS name"
           ansible.builtin.set_fact:
-            expected_guest_fullname: ""
-        # Set expected guest fullname for Windows client
-        - block:
-            - include_tasks: win10_fullname.yml
-              when: "'Windows 10' in os_fullname_guest"
-            - include_tasks: win11_fullname.yml
-              when: "'Windows 11' in os_fullname_guest"
-          when: guest_os_product_type == "client"
+            current_gos: "{{ guest_os_ansible_distribution.strip('Microsoft ') }}"
 
-        # Set expected guest fullname for Windows Server
-        - block:
-            - block:
-                - include_tasks: winsrv2016orlater_fullname.yml
-                - include_tasks: winsrv2019_fullname.yml
-              when: not "'Windows Server 2022' in os_fullname_guest"
-            - include_tasks: winsrv2022_fullname.yml
-              when:
-                - "'Windows Server 2022' in os_fullname_guest"
-                - guest_os_build_num | int == 20348
-            - include_tasks: winsrvnext_fullname.yml
-              when:
-                - guest_os_build_num | int >= 22424
-          when: guest_os_product_type != "client"
+        - name: "Get OS info in the pre-defined guest OS info list matched current OS"
+          ansible.builtin.set_fact:
+            current_gos_info: "{{ win_gos_info | selectattr('win_guest', 'equalto', current_gos) }}"
 
-        - ansible.builtin.debug:
-            msg: "Expected guest fullname on ESXi '{{ esxi_version }}': {{ expected_guest_fullname }}"
-        - name: "Verify guest fullname in guest info is expected"
+        - name: "Check current OS in the pre-defined guest OS info list"
           ansible.builtin.assert:
             that:
-              - expected_guest_fullname != ""
-              - (guestinfo_guest_full_name == expected_guest_fullname) or (expected_guest_fullname is string and expected_guest_fullname in guestinfo_guest_full_name) or (expected_guest_fullname | type_debug == 'list' and guestinfo_guest_full_name in expected_guest_fullname)
-            fail_msg: "Guest fullname in guest info: {{ guestinfo_guest_full_name }}, is not the same as expected one: {{ expected_guest_fullname }}."
+              - current_gos_info | length == 1
+            fail_msg: >
+              "The pre-defined guest OS info list does not contain this OS version: {{ current_gos }},
+              please check whether this guest OS is supported and add it to the list accordingly."
+
+        - name: "Set fact of the matched current OS info"
+          ansible.builtin.set_fact:
+            current_gos_info: "{{ current_gos_info[0] }}"
+
+        - name: "Handle Windows 11 known issue"
+          include_tasks: win11_guest_info_exception.yml
+
+        - name: "Check guest fullname in VM guest info"
+          include_tasks: check_vm_guest_info.yml
+          when: win11_70u3c_exception is undefined
       rescue:
-        - include_tasks: ../../common/test_rescue.yml
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
