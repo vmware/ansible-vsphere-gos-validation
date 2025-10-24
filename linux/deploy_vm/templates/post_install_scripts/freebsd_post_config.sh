@@ -65,21 +65,22 @@ echo "DONE" >/dev/ttyu0
 echo "Installing packages ..." > /dev/ttyu0
 env ASSUME_ALWAYS_YES=YES pkg bootstrap -y
 
-# Hit issue: reset by peer during install packages
-# The open-vm-tools is not installed by default
-mkdir -p /usr/local/etc/pkg/repos
-mount > /dev/ttyu0
-cp -rf /dist/packages/repos/FreeBSD_install_cdrom.conf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
-env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
-
-# We install packages from ISO image
 # Different packages between the 32bit image and 64bit image
+# The open-vm-tools is not installed by default
 packages_to_install="bash sudo wget curl e2fsprogs iozone lsblk"
 if [ "$machtype" == "amd64" ] || [ "$machtype" == "x86_64" ]; then
     packages_to_install="$packages_to_install xorg gnome gnome-desktop gnome-shell gnome-session gdm slim xf86-video-vmware open-vm-tools xf86-input-vmmouse"
 else
     packages_to_install="$packages_to_install open-vm-tools-nox11"
 fi
+
+# From FreeBSD 15, we will install packages only from online repo
+{% set freebsd_version = (guest_id | regex_search('[0-9]+')) | int %}
+{% if freebsd_version < 15 %}
+mkdir -p /usr/local/etc/pkg/repos
+mount > /dev/ttyu0
+cp -rf /dist/packages/repos/FreeBSD_install_cdrom.conf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
+env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
 
 failed_packages=""
 for package_to_install in $packages_to_install
@@ -97,8 +98,15 @@ done
 
 # Disable ISO repo and enable default repo
 rm -rf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
+{% endif %}
+
 env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
 
+{% if freebsd_version >= 15 %}
+failed_packages = $packages_to_install
+{% endif %}
+
+# Hit issue: reset by peer during install packages
 if [ "$failed_packages" != "" ]; then
     echo "To install the following packages from offical repo: $failed_packages" > /dev/ttyu0
     for package_to_install in $failed_packages
