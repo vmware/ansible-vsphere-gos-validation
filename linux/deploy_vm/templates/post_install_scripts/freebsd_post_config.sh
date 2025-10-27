@@ -103,7 +103,7 @@ rm -rf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
 env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
 
 {% if freebsd_version >= 15 %}
-failed_packages = "$packages_to_install"
+failed_packages="$packages_to_install"
 {% endif %}
 
 # Hit issue: reset by peer during install packages
