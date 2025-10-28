@@ -75,37 +75,33 @@ else
 fi
 
 # From FreeBSD 15, we will install packages only from online repo
-{% set freebsd_version = (guest_id | regex_search('[0-9]+')) | int %}
-{% if freebsd_version < 15 %}
-mkdir -p /usr/local/etc/pkg/repos
-mount > /dev/ttyu0
-cp -rf /dist/packages/repos/FreeBSD_install_cdrom.conf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
+if [ -f "/dist/packages/repos/FreeBSD_install_cdrom.conf" ]; then
+    mkdir -p /usr/local/etc/pkg/repos
+    mount > /dev/ttyu0
+    cp -rf /dist/packages/repos/FreeBSD_install_cdrom.conf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
+    env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
+
+    failed_packages=""
+    for package_to_install in $packages_to_install
+    do
+        echo "Install package $package_to_install ..." > /dev/ttyu0
+        env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install
+        ret=$?
+        if [ $ret == 0 ]
+        then 
+            echo "Successfully installed the package $package_to_install from ISO repo" > /dev/ttyu0
+        else
+            failed_packages="$failed_packages $package_to_install"
+        fi
+    done
+
+    # Disable ISO repo and enable default repo
+    rm -rf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
+else 
+    failed_packages="$packages_to_install"
+fi
+
 env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
-
-failed_packages=""
-for package_to_install in $packages_to_install
-do
-    echo "Install package $package_to_install ..." > /dev/ttyu0
-    env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install
-    ret=$?
-    if [ $ret == 0 ]
-    then 
-        echo "Successfully installed the package $package_to_install from ISO repo" > /dev/ttyu0
-    else
-        failed_packages="$failed_packages $package_to_install"
-    fi
-done
-
-# Disable ISO repo and enable default repo
-rm -rf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
-{% endif %}
-
-env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
-
-{% if freebsd_version >= 15 %}
-failed_packages="$packages_to_install"
-{% endif %}
-
 # Hit issue: reset by peer during install packages
 if [ "$failed_packages" != "" ]; then
     echo "To install the following packages from offical repo: $failed_packages" > /dev/ttyu0
