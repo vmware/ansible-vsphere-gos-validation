@@ -102,7 +102,7 @@ else
 fi
 
 env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
-# Hit issue: reset by peer during install packages
+# Hit issue: reset by peer during install packages. So try multiple times to install packages
 if [ "$failed_packages" != "" ]; then
     echo "To install the following packages from offical repo: $failed_packages" > /dev/ttyu0
     for package_to_install in $failed_packages
