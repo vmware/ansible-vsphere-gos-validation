@@ -111,8 +111,8 @@ if [ "$failed_packages" != "" ]; then
         try_count=1
         until [ $ret -eq 0 ] || [ $try_count -ge 10 ]
         do
-            echo "Install package $package_to_install (try $try_count time) ..." > /dev/ttyu0 2>&1
-            env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install > /dev/ttyu0
+            echo "Install package $package_to_install (try $try_count time) ..." > /dev/ttyu0
+            env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install > /dev/ttyu0 2>&1
             ret=$?
             try_count=$((try_count+1))
             if [ $ret -eq 0 ]; then
