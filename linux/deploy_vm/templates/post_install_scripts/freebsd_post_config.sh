@@ -74,7 +74,7 @@ else
     packages_to_install="$packages_to_install open-vm-tools-nox11"
 fi
 
-# We will install packages only from online repo on FreeBSD 15 or above
+# Try to install package from CDROM repo. There is no default CDROM repo file FreeBSD_install_cdrom.conf on FreeBSD 15 or obove.
 failed_packages="$packages_to_install"
 if [ -f "/dist/packages/repos/FreeBSD_install_cdrom.conf" ]; then
     mkdir -p /usr/local/etc/pkg/repos
