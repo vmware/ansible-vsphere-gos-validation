@@ -75,6 +75,7 @@ else
 fi
 
 # We will install packages only from online repo on FreeBSD 15 or above
+failed_packages="$packages_to_install"
 if [ -f "/dist/packages/repos/FreeBSD_install_cdrom.conf" ]; then
     mkdir -p /usr/local/etc/pkg/repos
     mount > /dev/ttyu0
@@ -95,10 +96,8 @@ if [ -f "/dist/packages/repos/FreeBSD_install_cdrom.conf" ]; then
         fi
     done
 
-    # Disable ISO repo and enable default repo
+    # Remove ISO repo
     rm -rf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
-else 
-    failed_packages="$packages_to_install"
 fi
 
 env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
