@@ -65,15 +65,8 @@ echo "DONE" >/dev/ttyu0
 echo "Installing packages ..." > /dev/ttyu0
 env ASSUME_ALWAYS_YES=YES pkg bootstrap -y
 
-# Hit issue: reset by peer during install packages
-# The open-vm-tools is not installed by default
-mkdir -p /usr/local/etc/pkg/repos
-mount > /dev/ttyu0
-cp -rf /dist/packages/repos/FreeBSD_install_cdrom.conf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
-env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
-
-# We install packages from ISO image
 # Different packages between the 32bit image and 64bit image
+# The open-vm-tools is not installed by default
 packages_to_install="bash sudo wget curl e2fsprogs iozone lsblk"
 if [ "$machtype" == "amd64" ] || [ "$machtype" == "x86_64" ]; then
     packages_to_install="$packages_to_install xorg gnome gnome-desktop gnome-shell gnome-session gdm slim xf86-video-vmware open-vm-tools xf86-input-vmmouse"
@@ -81,24 +74,34 @@ else
     packages_to_install="$packages_to_install open-vm-tools-nox11"
 fi
 
-failed_packages=""
-for package_to_install in $packages_to_install
-do
-    echo "Install package $package_to_install ..." > /dev/ttyu0
-    env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install
-    ret=$?
-    if [ $ret == 0 ]
-    then 
-        echo "Successfully installed the package $package_to_install from ISO repo" > /dev/ttyu0
-    else
-        failed_packages="$failed_packages $package_to_install"
-    fi
-done
+# Try to install package from CDROM repo. There is no default CDROM repo file FreeBSD_install_cdrom.conf on FreeBSD 15 or obove.
+failed_packages="$packages_to_install"
+if [ -f "/dist/packages/repos/FreeBSD_install_cdrom.conf" ]; then
+    mkdir -p /usr/local/etc/pkg/repos
+    mount > /dev/ttyu0
+    cp -rf /dist/packages/repos/FreeBSD_install_cdrom.conf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
+    env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
 
-# Disable ISO repo and enable default repo
-rm -rf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
+    failed_packages=""
+    for package_to_install in $packages_to_install
+    do
+        echo "Install package $package_to_install ..." > /dev/ttyu0
+        env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install > /dev/ttyu0 2>&1
+        ret=$?
+        if [ $ret == 0 ]
+        then 
+            echo "Successfully installed the package $package_to_install from ISO repo" > /dev/ttyu0
+        else
+            failed_packages="$failed_packages $package_to_install"
+        fi
+    done
+
+    # Remove ISO repo
+    rm -rf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
+fi
+
 env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
-
+# Hit issue: reset by peer during install packages. So try multiple times to install packages
 if [ "$failed_packages" != "" ]; then
     echo "To install the following packages from offical repo: $failed_packages" > /dev/ttyu0
     for package_to_install in $failed_packages
@@ -108,7 +111,7 @@ if [ "$failed_packages" != "" ]; then
         until [ $ret -eq 0 ] || [ $try_count -ge 10 ]
         do
             echo "Install package $package_to_install (try $try_count time) ..." > /dev/ttyu0
-            env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install
+            env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install > /dev/ttyu0 2>&1
             ret=$?
             try_count=$((try_count+1))
             if [ $ret -eq 0 ]; then
