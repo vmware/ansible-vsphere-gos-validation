@@ -74,7 +74,7 @@ else
     packages_to_install="$packages_to_install open-vm-tools-nox11"
 fi
 
-# From FreeBSD 15, we will install packages only from online repo
+# We will install packages only from online repo on FreeBSD 15 or above
 if [ -f "/dist/packages/repos/FreeBSD_install_cdrom.conf" ]; then
     mkdir -p /usr/local/etc/pkg/repos
     mount > /dev/ttyu0
@@ -85,7 +85,7 @@ if [ -f "/dist/packages/repos/FreeBSD_install_cdrom.conf" ]; then
     for package_to_install in $packages_to_install
     do
         echo "Install package $package_to_install ..." > /dev/ttyu0
-        env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install
+        env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install > /dev/ttyu0
         ret=$?
         if [ $ret == 0 ]
         then 
@@ -112,7 +112,7 @@ if [ "$failed_packages" != "" ]; then
         until [ $ret -eq 0 ] || [ $try_count -ge 10 ]
         do
             echo "Install package $package_to_install (try $try_count time) ..." > /dev/ttyu0
-            env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install
+            env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install > /dev/ttyu0
             ret=$?
             try_count=$((try_count+1))
             if [ $ret -eq 0 ]; then
