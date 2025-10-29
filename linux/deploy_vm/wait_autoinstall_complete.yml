@@ -6,6 +6,11 @@
 - name: "Wait and select OS install option for SLE 16"
   when: unattend_installer == 'Agama'
   block:
+    - name: "Sleep 30 seconds to wait boot options display"
+      ansible.builtin.pause:
+        seconds: 30
+      when: esxi_cpu_vendor == 'arm'
+
     - name: "VM firmware is BIOS"
       when: firmware == "bios"
       block:
@@ -38,13 +43,6 @@
               - DOWNARROW
               - ENTER
 
-        - name: "Send one more ENTER to select boot from CDROM in boot manager"
-          include_tasks: ../../common/vm_guest_send_key.yml
-          vars:
-            keys_send:
-              - ENTER
-          when: esxi_cpu_vendor == 'arm'
-
         - name: "Take a screenshot before selecting install sles"
           include_tasks: ../../common/vm_take_screenshot.yml
           vars:
@@ -57,13 +55,6 @@
             keys_send:
               - DOWNARROW
               - ENTER
-
-        - name: "Send one more ENTER to select 'install SUSE SLE 16' option"
-          include_tasks: ../../common/vm_guest_send_key.yml
-          vars:
-            keys_send:
-              - ENTER
-          when: esxi_cpu_vendor == 'arm'
 
     - name: "Take a screenshot after selecting 'install SUSE SLE 16' option"
       include_tasks: ../../common/vm_take_screenshot.yml
