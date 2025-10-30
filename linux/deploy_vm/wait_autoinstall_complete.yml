@@ -6,11 +6,6 @@
 - name: "Wait and select OS install option for SLE 16"
   when: unattend_installer == 'Agama'
   block:
-    - name: "Sleep 30 seconds to wait boot options display"
-      ansible.builtin.pause:
-        seconds: 30
-      when: esxi_cpu_vendor == 'arm'
-
     - name: "VM firmware is BIOS"
       when: firmware == "bios"
       block:
@@ -48,6 +43,7 @@
           vars:
             vm_screenshot_local_dir: "{{ current_test_log_folder }}"
             vm_screenshot_local_name: "screenshot_before_select_sles.png"
+          when: esxi_cpu_vendor != 'arm'
 
         - name: "Select 'install SUSE SLE 16' option"
           include_tasks: ../../common/vm_guest_send_key.yml
