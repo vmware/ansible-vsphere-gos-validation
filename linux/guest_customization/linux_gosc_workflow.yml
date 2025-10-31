@@ -79,6 +79,16 @@
                 package_list: ["{{ guest_perl_package_name }}"]
                 package_state: "latest"
 
+    - name: "Prepare for perl GOSC testing on {{ guest_os_ansible_distribution }}"
+      include_tasks: ../utils/install_uninstall_package.yml
+      vars:
+        package_list: ["perl-modules"]
+        package_state: "present"
+      when:
+        - not enable_cloudinit_gosc
+        - guest_os_ansible_distribution == "Ubuntu"
+        - guest_os_edition not in ["Desktop", "Server"]
+
     - name: "Get guest OS network manager"
       include_tasks: ../utils/get_network_manager.yml
       when: >-

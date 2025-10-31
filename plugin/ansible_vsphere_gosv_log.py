@@ -272,6 +272,7 @@ class VmDetailInfo(VmGuestInfo):
                         self.GUI_Installed += f" {session_type}"
                     self.GUI_Installed += ")"
             self.CloudInit_Version = ansible_gosv_facts.get('cloudinit_version', '')
+            self.Firmware = ansible_gosv_facts.get('vm_firmware', '').upper()
             super().__init__(ansible_gosv_facts)
 
     def __str__(self):
