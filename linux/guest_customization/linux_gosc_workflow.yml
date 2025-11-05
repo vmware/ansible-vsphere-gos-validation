@@ -53,7 +53,7 @@
             - vmtools_version is version('11.3.5', '>=')
 
     # Install perl if guest OS doesn't have it
-    - name: "Prepare for perl GOSC testing on {{ guest_os_ansible_distribution }}"
+    - name: "Prepare for perl GOSC testing on {{ vm_guest_os_distribution }}"
       when:
         - not enable_cloudinit_gosc
         - guest_os_family == "RedHat"
@@ -67,7 +67,7 @@
         - name: "Install perl"
           when: which_perl_result.rc is undefined or which_perl_result.rc != 0
           block:
-            - name: "Set perl package name on {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+            - name: "Set perl package name on {{ vm_guest_os_distribution }}"
               ansible.builtin.set_fact:
                 guest_perl_package_name: |-
                   {%- if guest_os_ansible_kernel is version('4.0', '<') -%}perl
@@ -79,7 +79,7 @@
                 package_list: ["{{ guest_perl_package_name }}"]
                 package_state: "latest"
 
-    - name: "Prepare for perl GOSC testing on {{ guest_os_ansible_distribution }}"
+    - name: "Prepare for perl GOSC testing on {{ vm_guest_os_distribution }}"
       include_tasks: ../utils/install_uninstall_package.yml
       vars:
         package_list: ["perl-modules"]
@@ -101,7 +101,7 @@
     - name: "Prepare for cloud-init GOSC"
       when: enable_cloudinit_gosc
       block:
-        - name: "Install 'cloud-init' for cloud-init GOSC on {{ guest_os_ansible_distribution }}"
+        - name: "Install 'cloud-init' for cloud-init GOSC on {{ vm_guest_os_distribution }}"
           include_tasks: ../utils/install_uninstall_package.yml
           vars:
             package_list: ["cloud-init"]
