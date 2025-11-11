@@ -19,9 +19,10 @@
     - name: "Set fact of Ubuntu edition"
       ansible.builtin.set_fact:
         guest_os_edition: |-
-          {%- if 'linux-image-virtual' in guest_installed_packages -%}CloudImage
+          {%- if guest_installed_packages | select('search', 'linux-image-virtual|ubuntu-cloud-minimal') | length > 0 -%}CloudImage
           {%- elif guest_installed_packages | select('search', 'ubuntu-server') | length > 0 -%}Server
           {%- elif guest_installed_packages | select('search', 'ubuntu-desktop') | length > 0 -%}Desktop
+          {%- else -%}CloudImage
           {%- endif -%}
       when: guest_installed_packages | length > 0
 

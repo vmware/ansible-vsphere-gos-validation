@@ -1,0 +1,37 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get all of VM serial port backings info
+# Return:
+#   vm_serial_backings: A list of VM serial port backings info
+#
+- name: "Initialize fact of VM serial port backings"
+  ansible.builtin.set_fact:
+    vm_serial_backings: []
+
+- name: "Get VM serial port devices"
+  include_tasks: vm_get_device_with_type.yml
+  vars:
+    device_vim_type: "vim.vm.device.VirtualSerialPort"
+
+- name: "Set fact of VM serial port backings"
+  ansible.builtin.set_fact:
+    vm_serial_backings: >-
+      {{
+        vm_serial_backings |
+        union([item | combine({'type': _backing_type})])
+      }}
+  vars:
+    _backing_type: >-
+      {{
+        item._vimtype |
+        regex_replace('(vim.vm.device.VirtualSerialPort.)(.*)(BackingInfo)', '\2') |
+        lower | replace('uri', 'network')
+      }}
+  with_items: "{{ device_info_with_type | map(attribute='backing') }}"
+  when:
+    - device_info_with_type is defined
+    - device_info_with_type | length > 0
+
+- name: "Display VM serial port backings"
+  ansible.builtin.debug: var=vm_serial_backings

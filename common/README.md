@@ -15,6 +15,7 @@
 * vm_get_vbs_status.yml: Get Windows VM VBS enablement status
 * collect_ovf_vm_config.yml: Collect VM hardware configurations and save to a json file
 * vm_get_cryptokey_id.yml: Get cryptographic key ID info in VM config
+* vm_get_serial_ports.yml: Get all of VM serial port backings info
 
 ### Tasks for VM deploy or remove
 * vm_create.yml: Create a new VM on ESXi host

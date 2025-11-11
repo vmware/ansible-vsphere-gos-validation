@@ -1,19 +1,31 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Remove a serial port using output file from VM
+# Remove a serial port from VM
 # Parameter:
-#   vm_serial_file_ds_path: The serial port output file's datastore path.
+#   vm_serial_backing: The backing info of a serial port
 #
-- name: "Remove the serial port output file before removing serial port"
+- name: "Check parameter 'vm_serial_backing'"
+  ansible.builtin.assert:
+    that:
+      - vm_serial_backing is defined
+      - vm_serial_backing.type is defined
+      - vm_serial_backing.type in ['device', 'file', 'pipe', 'network']
+      - ((vm_serial_backing.type == 'device' and vm_serial_backing.deviceName | default('')) or
+        (vm_serial_backing.type == 'file' and vm_serial_backing.fileName | default('')) or
+        (vm_serial_backing.type == 'pipe' and vm_serial_backing.pipeName | default('')))
+    fail_msg: "Parameter 'vm_serial_backing' must be set with the backing info of a serial port."
+
+- name: "Remove the serial port backing file before removing serial port"
   include_tasks: esxi_check_delete_datastore_file.yml
   vars:
     file_in_datastore: "{{ datastore }}"
-    file_in_datastore_path: "{{ vm_serial_file_ds_path.split(']')[-1].strip(' ') }}"
+    file_in_datastore_path: "{{ vm_serial_backing.fileName.split(']')[-1].strip(' ') }}"
     file_in_datastore_ops: "absent"
     file_in_datastore_failed_ignore: true
+  when: vm_serial_backing.type == 'file'
 
-- name: "Remove a serial port using output file"
+- name: "Remove a serial port from VM"
   community.vmware.vmware_guest_serial_port:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -21,8 +33,10 @@
     validate_certs: "{{ validate_certs | default(false) }}"
     name: "{{ vm_name }}"
     backings:
-      - type: "file"
-        file_path: "{{ vm_serial_file_ds_path }}"
+      - backing_type: "{{ vm_serial_backing.type }}"
+        device_name: "{{ vm_serial_backing.deviceName | default(omit) }}"
+        file_path: "{{ vm_serial_backing.fileName | default(omit) }}"
+        pipe_name: "{{ vm_serial_backing.pipeName | default(omit) }}"
         state: absent
   register: remove_serial_port
 
@@ -34,10 +48,6 @@
     that:
       - remove_serial_port.changed is defined
       - remove_serial_port.changed
-    fail_msg: "Failed to remove serial port from VM"
-
-- name: "Clean facts of VM serial port output file"
-  ansible.builtin.set_fact:
-    vm_serial_file_ds_path: ""
-    vm_serial_file_abs_path: ""
-    vm_serial_file_name: ""
+    fail_msg: >-
+      Failed to remove serial port {{ vm_serial_backing }} from VM because the result of reconfiguring
+      VM task for removing serial port is not changed.

@@ -1,18 +1,18 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Add a serial port to VM by using output file
-# Parameter:
-#   vm_serial_file_ds_path: The VM's serial port output file on datastore.
+# Add a serial port to VM with backing file
 # Return:
-#   vm_serial_file_abs_path: The absolute path of VM serial port output file
+#   vm_serial_file_backing: The file backing info of VM serial port
+#   vm_serial_file_name: The file name of VM serial port backing file
 #
-- name: "Set default serial port output file for VM"
+- name: "Initialize facts of VM serial port file path, name and backing info"
   ansible.builtin.set_fact:
     vm_serial_file_ds_path: "{{ vm_files_path_ds.strip('\\/') }}/serial-{{ current_test_timestamp }}.log"
-  when: vm_serial_file_ds_path is undefined or not vm_serial_file_ds_path
+    vm_serial_file_name: ""
+    vm_serial_file_backing: {}
 
-- name: "Add a serial port using output file to VM"
+- name: "Add a serial port with backing file to VM"
   community.vmware.vmware_guest_serial_port:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -23,15 +23,21 @@
       - type: "file"
         file_path: "{{ vm_serial_file_ds_path }}"
         yield_on_poll: true
+  register: add_serial_port_result
 
-- name: "Set facts of VM serial port output file's name and absolute path"
+- name: "Check the serial port is added successfully"
+  ansible.builtin.assert:
+    that:
+      - add_serial_port_result.serial_port_info is defined
+      - (add_serial_port_result.serial_port_info |
+         selectattr('file_path', 'defined') |
+         selectattr('file_path', 'equalto', vm_serial_file_ds_path) | length > 0)
+    fail_msg: "Failed to add a serial port with backing file {{ vm_serial_file_ds_path }}"
+
+- name: "Set fact of VM serial port file name and backing info"
   ansible.builtin.set_fact:
     vm_serial_file_name: "{{ vm_serial_file_ds_path | basename }}"
-    vm_serial_file_abs_path: "{{ vm_serial_file_ds_path | replace('[', '/vmfs/volumes/') | replace('] ', '/') }}"
+    vm_serial_file_backing: {'type': 'file', 'fileName': '{{ vm_serial_file_ds_path }}'}
 
-- name: "Display the VM serial port output file info"
-  ansible.builtin.debug:
-    msg:
-      - "The VM serial port output file's name: {{ vm_serial_file_name }}"
-      - "The VM serial port output file's absolute path: {{ vm_serial_file_abs_path }}"
-      - "The VM serial port output file's datastore path: {{ vm_serial_file_ds_path }}"
+- name: "Display the VM serial port file backing info"
+  ansible.builtin.debug: var=vm_serial_file_backing

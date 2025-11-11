@@ -9,7 +9,7 @@
     guest_os_network_manager is undefined or
     not guest_os_network_manager
 
-- name: "Install 'distrib-compat' for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+- name: "Install 'distrib-compat' for {{ vm_guest_os_distribution }}"
   include_tasks: ../utils/install_uninstall_package.yml
   vars:
     package_list: ["distrib-compat"]
@@ -18,7 +18,16 @@
     - guest_os_ansible_distribution == "VMware Photon OS"
     - guest_os_ansible_distribution_major_ver | int < 4
 
-- name: "Reload '8021q' module in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+- name: "Install 'iputils-ping' for {{ vm_guest_os_distribution }}"
+  include_tasks: ../utils/install_uninstall_package.yml
+  vars:
+    package_list: ["iputils-ping"]
+    package_state: "present"
+  when:
+    - guest_os_ansible_distribution == "Ubuntu"
+    - guest_os_edition not in ["Desktop", "Server"]
+
+- name: "Reload '8021q' module in {{ vm_guest_os_distribution }}"
   include_tasks: ../utils/reload_module.yml
   vars:
     module_name: "8021q"
@@ -58,23 +67,35 @@
       vars:
         guest_file_path: "{{ guest_primary_nic_config_path }}"
 
-    - name: "Remove MAC address or UUID from network config file for '{{ guest_primary_nic_name }}'"
-      ansible.builtin.lineinfile:
-        path: "{{ guest_primary_nic_config_path }}"
-        regexp: "^uuid|^UUID|^MAC|^mac|^HWADDR"
-        state: absent
-      delegate_to: "{{ vm_guest_ip }}"
+    - name: "Update network config file to remove MAC address for '{{ guest_primary_nic_name }}'"
       when: guest_file_exists
+      block:
+        - name: "Remove MAC address or UUID from network config file for '{{ guest_primary_nic_name }}'"
+          ansible.builtin.lineinfile:
+            path: "{{ guest_primary_nic_config_path }}"
+            regexp: "^uuid|^UUID|^MAC|^mac|^HWADDR"
+            state: absent
+          delegate_to: "{{ vm_guest_ip }}"
+          when: guest_os_network_manager != "netplan"
 
-    - name: "Get VM serial port devices"
-      include_tasks: ../../common/vm_get_device_with_type.yml
-      vars:
-        device_vim_type: "vim.vm.device.VirtualSerialPort"
+        - name: "Update netplan config for '{{ guest_primary_nic_name }}'"
+          when: guest_os_network_manager == "netplan"
+          block:
+            - name: "Remove MAC address from netplan config file for '{{ guest_primary_nic_name }}'"
+              ansible.builtin.lineinfile:
+                path: "{{ guest_primary_nic_config_path }}"
+                regexp: "^ *(match|macaddress|set-name)"
+                state: absent
+              delegate_to: "{{ vm_guest_ip }}"
+
+            - name: "Apply new netplan config"
+              include_tasks: reload_network_configs.yml
+
+    - name: "Get all VM serial ports"
+      include_tasks: ../../common/vm_get_serial_ports.yml
 
     - name: "Remove VM serial port devices"
-      when:
-        - device_info_with_type is defined
-        - device_info_with_type | length > 0
+      when: vm_serial_backings | length > 0
       block:
         - name: "Shutdown guest OS for removing serial port"
           include_tasks: ../utils/shutdown.yml
@@ -82,13 +103,16 @@
         - name: "Remove VM serial port"
           include_tasks: ../../common/vm_remove_serial_port.yml
           vars:
-            vm_serial_file_ds_path: "{{ item.backing.fileName }}"
-          with_items: "{{ device_info_with_type }}"
+            vm_serial_backing: "{{ item }}"
+          with_items: "{{ vm_serial_backings }}"
 
         - name: "Power on VM"
           include_tasks: ../../common/vm_set_power_state.yml
           vars:
             vm_power_state_set: 'powered-on'
+
+        - name: "Update VM guest IP in inventory"
+          include_tasks: ../../common/update_inventory.yml
 
     # Clone a new VM as PVRDMA client VM from current VM, and current VM as server
     - name: "Clone a new VM as client VM from current VM"
@@ -100,3 +124,11 @@
     - name: "Set fact of client VM exists"
       ansible.builtin.set_fact:
         pvrdma_client_vm_exists: true
+
+    # The instant cloned VM has same IP address with parent VM.
+    # Resetting it to get a new DHCP IP address
+    - name: "Reset client VM '{{ pvrdma_client_vm_name }}' for getting DHCP IP address"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'restarted'
+        vm_name: "{{ pvrdma_client_vm_name }}"

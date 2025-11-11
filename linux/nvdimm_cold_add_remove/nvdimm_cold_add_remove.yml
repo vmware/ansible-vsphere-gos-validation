@@ -34,11 +34,8 @@
               Skip test case {{ ansible_play_name }} because {{ vm_guest_os_distribution }}
               doesn't support NVDIMM.
             skip_reason: "Not Supported"
-          when: >
-             (guest_os_ansible_distribution in ['Flatcar', 'UnionTech', 'Uos', 'Amazon',
-                                                'openSUSE Leap', 'FreeBSD', 'RHCOS'] or
-             (guest_os_ansible_distribution == 'Ubuntu' and
-              guest_os_edition == 'CloudImage'))
+          when: guest_os_ansible_distribution in ['Flatcar', 'UnionTech', 'Uos', 'Amazon',
+                                                  'openSUSE Leap', 'FreeBSD', 'RHCOS']
 
         - name: "Skip test case for 32-bit guest OS"
           include_tasks: ../../common/skip_test_case.yml
@@ -72,23 +69,33 @@
             (guest_config_options.support_persistent_memory is undefined) or
             (not guest_config_options.support_persistent_memory | bool)
 
-        - name: "Get the module information about libnvdimm"
+        - name: "Get the module information about 'libnvdimm'"
           include_tasks: ../utils/get_module_info.yml
           vars:
             module_name: "libnvdimm"
 
-        - name: "Set the fact of libnvdimm module information"
-          ansible.builtin.set_fact:
-            guest_libnvdimm_module_info: "{{ guest_module_info }}"
-
         # If libnvdimm module exists, the module info should have name or filename
-        - name: "Skip test case because of no libnvdimm module in guest OS"
+        - name: "Skip test case because of no 'libnvdimm' module in guest OS"
           include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: >-
-              Skip test case {{ ansible_play_name }} because guest OS doesn't have libnvdimm module.
+              Skip test case {{ ansible_play_name }} because guest OS doesn't have 'libnvdimm' module.
             skip_reason: "Not Supported"
-          when: guest_libnvdimm_module_info | length == 0
+          when: guest_module_info | length == 0
+
+        - name: "Get the module information about 'nd_pmem'"
+          include_tasks: ../utils/get_module_info.yml
+          vars:
+            module_name: "nd_pmem"
+
+        # If nd_pmem module exists, the module info should have name or filename
+        - name: "Skip test case because of no 'nd_pmem' module in guest OS"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case {{ ansible_play_name }} because guest OS doesn't have 'nd_pmem' module.
+            skip_reason: "Not Supported"
+          when: guest_module_info | length == 0
 
         - name: "Get ESXi host persistent memory info"
           include_tasks: ../../common/esxi_get_pmem_info.yml

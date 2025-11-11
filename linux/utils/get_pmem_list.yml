@@ -10,55 +10,78 @@
   ansible.builtin.set_fact:
     guest_pmem_list: []
 
-- name: "Install ndctl for managing PMem devices"
+- name: "Check command 'ndctl' exists"
+  ansible.builtin.shell: "which ndctl"
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  register: check_ndctl_result
+
+- name: "Install 'ndctl' for managing PMem devices"
   include_tasks: install_uninstall_package.yml
   vars:
     package_list: ["ndctl"]
     package_state: "present"
+  when: >-
+    check_ndctl_result is undefined or
+    check_ndctl_result.rc is undefined or
+    check_ndctl_result.rc != 0
 
-- name: "Get PMem devices in guest OS"
-  ansible.builtin.shell: "ndctl list -DHN"
+- name: "Get PMem DIMMs and regions in guest OS"
+  ansible.builtin.shell: "ndctl list -DHR"
   delegate_to: "{{ vm_guest_ip }}"
   changed_when: false
   ignore_errors: true
   register: ndctl_list_result
 
 - name: "Set the fact of PMem devices info"
-  block:
-    - name: "Set the fact of PMem dimms and namespaces info"
-      ansible.builtin.set_fact:
-        guest_pmem_dimms_ns_info: "{{ ndctl_list_result.stdout | from_json }}"
-
-    # Combine guest_pmem_dimms_ns_info.dimms and guest_pmem_dimms_ns_info.namespaces to one list
-    - name: "Update PMem devices size"
-      ansible.builtin.set_fact:
-        guest_pmem_list: >-
-          {{
-            guest_pmem_list +
-            [
-             item |
-             combine({'blockdev': item.dev | replace('nmem', 'pmem'),
-                      'size': 0}) |
-             combine((guest_pmem_dimms_ns_info.namespaces |
-                      selectattr('blockdev', 'equalto',
-                                 item.dev | replace('nmem', 'pmem')
-                                 ))[0] |
-                     default({}) |
-                     dict2items |
-                     selectattr('key', 'equalto', 'size') |
-                     items2dict)
-            ]
-          }}
-      with_items: "{{ guest_pmem_dimms_ns_info.dimms }}"
-      when:
-        - guest_pmem_dimms_ns_info.dimms is defined
-        - guest_pmem_dimms_ns_info.namespaces is defined
-        - guest_pmem_dimms_ns_info.dimms | length > 0
   when:
     - ndctl_list_result is defined
     - ndctl_list_result.stdout is defined
     - ndctl_list_result.stdout
     - ndctl_list_result.stdout | from_json | length == 2
+  block:
+    - name: "Set the fact of PMem DIMMs and regions info"
+      ansible.builtin.set_fact:
+        guest_dimms_and_regions: "{{ ndctl_list_result.stdout | from_json }}"
+        guest_dimms_list: []
+        guest_regions_mappings: []
 
-- name: "Print guest PMem device list"
+    - name: "Get PMem devices list"
+      when:
+        - guest_dimms_and_regions.dimms is defined
+        - guest_dimms_and_regions.dimms | length > 0
+      block:
+        - name: "Set fact of PMem DIMMs list"
+          ansible.builtin.set_fact:
+            guest_dimms_list: "{{ guest_dimms_and_regions.dimms }}"
+
+        - name: "Set fact of PMem regions mappings"
+          ansible.builtin.set_fact:
+            guest_regions_mappings: "{{ guest_dimms_and_regions.regions | map(attribute='mappings') | flatten }}"
+          when:
+            - guest_dimms_and_regions.regions is defined
+            - guest_dimms_and_regions.regions | length > 0
+
+        - name: "Check all PMem DIMMs are mapped to regions"
+          ansible.builtin.assert:
+            that:
+              - guest_regions_mappings | length == guest_dimms_list | length
+            fail_msg: >-
+              Not all DIMMs are mapped to a region. Current DIMMs list is {{ guest_dimms_list }}, regions mappings
+              are {{ guest_regions_mappings }}.
+
+        - name: "Update fact of PMem devices list"
+          ansible.builtin.set_fact:
+            guest_pmem_list: >-
+              {{
+                guest_pmem_list +
+                [
+                 item |
+                 combine({'blockdev': item.dev | replace('nmem', 'pmem'), 'length': 0}) |
+                 combine(guest_regions_mappings | selectattr('dimm', 'equalto', item.dev) | first)
+                ]
+              }}
+          with_items: "{{ guest_dimms_list }}"
+
+- name: "Print guest PMem devices list"
   ansible.builtin.debug: var=guest_pmem_list
