@@ -4,10 +4,14 @@
 - name: "Initialize the variables"
   ansible.builtin.set_fact:
     vm_nested_virt_status: false
-    vm_has_restarted: false
+    vm_need_restart: false
 
 - name: "Disable UAC"
   include_tasks: ../utils/win_disable_uac.yml
+
+- name: "Set the restart status"
+  ansible.builtin.set_fact:
+    vm_need_restart: "{{ win_uac_disable_set }}"
 
 # Get CPU Hardware virtualization status
 - name: "Get VM Hardware virtualization status"
@@ -46,13 +50,13 @@
 
     - name: "Set the fact of OS restart status"
       ansible.builtin.set_fact:
-        vm_has_restarted: true
+        vm_need_restart: false
 
 - name: "Restart the guest OS"
   include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"
-  when: not vm_has_restarted
+  when: vm_need_restart
 
 - name: "Enable and start Microsoft Store Install Service"
   include_tasks: ../utils/win_execute_cmd.yml
