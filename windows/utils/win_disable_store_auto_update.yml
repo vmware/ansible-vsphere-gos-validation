@@ -5,15 +5,29 @@
 # Reference:
 # https://docs.microsoft.com/en-us/answers/questions/333299/windows-10-sysprep.html
 #
-- name: Set fact of the registry path of Microsoft Store
-  ansible.builtin.set_fact:
-    win_store_reg: "HKLM\\SOFTWARE\\Policies\\Microsoft\\WindowsStore"
-# Set Auto download registry key
-- include_tasks: win_execute_cmd.yml
+- name: "Get the status of Microsoft Store install service"
+  include_tasks: win_get_service_status.yml
   vars:
-    win_powershell_cmd: "reg add '{{ win_store_reg }}' /v AutoDownload /t REG_DWORD /d 2 /f"
+    win_service_name: 'InstallService'
 
-# Stop and diable Microsoft Store install service
-- include_tasks: win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "Stop-Service InstallService; Set-Service -Name InstallService -StartupType Disabled"
+- name: "Not get the status of Microsoft Store install service"
+  ansible.builtin.debug:
+    msg: "Skip to disable 'Microsoft Store install service' since did not get its status '{{ service_status }}'."
+  when: service_status | length == 0
+
+- name: "Disable Microsoft Store install service"
+  when: service_status | length != 0
+  block:
+    - name: "Set fact of the registry path of Microsoft Store"
+      ansible.builtin.set_fact:
+        win_store_reg: "HKLM\\SOFTWARE\\Policies\\Microsoft\\WindowsStore"
+
+    - name: "Set Microsoft Store 'AutoDownload' registry value"
+      include_tasks: win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "reg add '{{ win_store_reg }}' /v AutoDownload /t REG_DWORD /d 2 /f"
+
+    - name: "Stop and diable Microsoft Store install service"
+      include_tasks: win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "Stop-Service InstallService; Set-Service -Name InstallService -StartupType Disabled"
