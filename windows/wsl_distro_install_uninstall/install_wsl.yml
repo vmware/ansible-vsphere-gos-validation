@@ -18,14 +18,14 @@
   block:
     - name: "Set installation command for inbox version of WSL"
       ansible.builtin.set_fact:
-        wsl_install_cmd: "wsl --install --inbox -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_install.txt"
+        wsl_install_cmd: "wsl --install --inbox -d {{ wsl_distribution_name }} *> '{{ wsl_file_path_win }}\\wsl_install.txt'"
       when:
         - guest_os_build_num | int < 25267
         - guest_os_build_num | int >= 22000
 
     - name: "Set installation command for store version of WSL"
       ansible.builtin.set_fact:
-        wsl_install_cmd: "wsl --install -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_install.txt"
+        wsl_install_cmd: "wsl --install -d {{ wsl_distribution_name }} *> '{{ wsl_file_path_win }}\\wsl_install.txt'"
       when: > 
         (guest_os_build_num | int >= 25267) or
         (guest_os_build_num | int < 22000)
@@ -40,7 +40,7 @@
   when: guest_os_product_type == 'server'
   block:
     - name: "Install WSL and distribution"
-      ansible.windows.win_shell: "wsl --install -d {{ wsl_distribution_name }} | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_install.txt"
+      ansible.windows.win_shell: "wsl --install -d {{ wsl_distribution_name }} *> '{{ wsl_file_path_win }}\\wsl_install.txt'"
       register: win_powershell_cmd_output
       ignore_errors: true
       delegate_to: "{{ vm_guest_ip }}"
@@ -92,7 +92,7 @@
     - name: "Set WSL default version to 2"
       include_tasks: ../utils/win_execute_cmd.yml
       vars:
-        win_powershell_cmd: "wsl --set-default-version 2 | Out-File -FilePath {{ wsl_file_path_win }}\\wsl_set_default_version_to_2.txt"
+        win_powershell_cmd: "wsl --set-default-version 2 *> '{{ wsl_file_path_win }}\\wsl_set_default_version_to_2.txt'"
         win_execute_cmd_ignore_error: true
 
     - name: "Process the WSL output message"
