@@ -50,19 +50,8 @@
             skip_reason: "Not Applicable"
           when: vm_firmware != 'efi'
 
-        - name: "Install 'tpm2-tools' for {{ guest_os_ansible_distribution }}"
-          include_tasks: ../utils/install_uninstall_package.yml
-          vars:
-            package_list: ["tpm2-tools"]
-            package_state: "present"
-
-        - name: "Get tpm2-tools version"
-          ansible.builtin.shell: tpm2_getcap --version
-          delegate_to: "{{ vm_guest_ip }}"
-          register: tpm_tools_version_result
-
-        - name: "Print tpm2-tools version"
-          ansible.builtin.debug: var=tpm_tools_version_result
+        - name: "Install vTPM related packges"
+          include_tasks: vtpm_install_packages.yml
 
         - name: "Cold add and remove VM vTPM device test"
           include_tasks: vtpm_add_remove_test.yml

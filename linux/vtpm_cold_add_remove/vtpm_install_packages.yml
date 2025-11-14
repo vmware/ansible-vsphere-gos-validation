@@ -1,0 +1,32 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+#
+- name: "Install 'tpm2-tools' for {{ guest_os_ansible_distribution }}"
+  include_tasks: ../utils/install_uninstall_package.yml
+  vars:
+    package_list: ["tpm2-tools"]
+    package_state: "present"
+  when: guest_os_ansible_distribution != "SLES"
+
+- name: "Install  for {{ guest_os_ansible_distribution }}"
+  include_tasks: ../utils/install_uninstall_package.yml
+  vars:
+    package_list: ["swtpm", "tpm2.0-tools"]
+    package_state: "present"
+  when: guest_os_ansible_distribution == "SLES"
+
+- name: "Get tpm2-tools version"
+  ansible.builtin.shell: tpm2_getcap --version
+  delegate_to: "{{ vm_guest_ip }}"
+  register: tpm_tools_version_result
+
+- name: "Print tpm2-tools version"
+  ansible.builtin.debug: var=tpm_tools_version_result
+
+- name: "Install package openssl for {{ guest_os_ansible_distribution }}"
+  include_tasks: ../utils/install_uninstall_package.yml
+  vars:
+    package_list: ["openssl"]
+    package_state: "present"
+  when: guest_os_ansible_distribution == "Fedora"
