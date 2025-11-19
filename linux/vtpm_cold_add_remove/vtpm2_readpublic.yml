@@ -5,9 +5,7 @@
 - name: "Create public in guest OS {{ guest_os_ansible_distribution }}"
   ansible.builtin.shell: tpm2_createprimary -c primary.ctx
   delegate_to: "{{ vm_guest_ip }}"
-  when: >
-     not (guest_os_ansible_distribution == "Debian" and guest_os_ansible_distribution_major_ver | int  == 10 and
-      guest_os_bit == "64-bit")
+  when: not (guest_os_ansible_distribution == "Debian" and guest_os_ansible_distribution_major_ver | int  == 10)
 
 - name: "Create public in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_major_ver }} {{ guest_os_bit }}"
   ansible.builtin.shell: tpm2_createprimary -H o -g sha256 -G ecc -C primary.ctx
@@ -15,7 +13,6 @@
   when:
     - guest_os_ansible_distribution == "Debian"
     - guest_os_ansible_distribution_major_ver | int  == 10
-    - guest_os_bit == "64-bit"
 
 - name: "Read public key"
   ansible.builtin.shell: tpm2_readpublic -c primary.ctx
