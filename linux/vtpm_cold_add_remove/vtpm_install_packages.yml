@@ -9,12 +9,21 @@
     package_state: "present"
   when: guest_os_ansible_distribution not in ['SLES', 'openSUSE Leap']
 
-- name: "Install for {{ guest_os_ansible_distribution }}"
-  include_tasks: ../utils/install_uninstall_package.yml
-  vars:
-    package_list: ["tpm2-tss-engine-devel", "tpm2.0-tools"]
-    package_state: "present"
+# Configure local DVD repositories to install packages for openSUSE, SLES.
+- name: "Add ISO repo and install packages from ISO"
   when: guest_os_ansible_distribution in ['SLES', 'openSUSE Leap']
+  block:
+    - name: "Connect CDROM and add local repositories on {{ vm_guest_os_distribution }}"
+      include_tasks: ../utils/add_local_dvd_repo.yml
+      when:
+        - os_installation_iso_list is defined
+        - os_installation_iso_list | length > 0
+
+    - name: "Install for {{ guest_os_ansible_distribution }}"
+      include_tasks: ../utils/install_uninstall_package.yml
+      vars:
+        package_list: ["tpm2-tss-engine-devel", "tpm2.0-tools"]
+        package_state: "present"
 
 - name: "Get tpm2-tools version"
   ansible.builtin.shell: tpm2_getcap --version
