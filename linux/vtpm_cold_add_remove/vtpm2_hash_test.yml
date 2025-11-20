@@ -6,9 +6,15 @@
   ansible.builtin.shell: echo "Hello_vTPM_Hash" > test_hash_data.txt
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: "hash the data using TPM"
+- name: "hash the data using vTPM in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+  ansible.builtin.shell: tpm2_hash -H o -g sha256 -o hash.out test_hash_data.txt
+  delegate_to: "{{ vm_guest_ip }}"
+  when: (guest_os_ansible_distribution == "Debian" and guest_os_ansible_distribution_major_ver | int  == 10)
+
+- name: "hash the data using vTPM in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
   ansible.builtin.shell: tpm2_hash -C o -g sha256 -o hash.out test_hash_data.txt
   delegate_to: "{{ vm_guest_ip }}"
+  when: not (guest_os_ansible_distribution == "Debian" and guest_os_ansible_distribution_major_ver | int  == 10)
 
 - name: "Check the Hash"
   ansible.builtin.shell: hexdump -C hash.out

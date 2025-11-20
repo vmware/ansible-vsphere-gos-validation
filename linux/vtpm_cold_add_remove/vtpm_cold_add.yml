@@ -94,29 +94,41 @@
   vars:
     vtpm_test_operation: "add"
 
-# vTPM.enable.tpm2_readpublic: Read public key
-- name: "Check vTPM's Read public key function"
-  include_tasks: vtpm2_readpublic.yml
+# In Debian 10, the tpm2-tools version is 3.1.3, which is very old. 
+# Since the testing functionality is limited or incomplete, we will only perform a simple test. 
+- name: "Check vTPM for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+  when: guest_os_ansible_distribution == "Debian" and guest_os_ansible_distribution_major_ver | int  == 10
+  block:
+    # vTPM.enable.tpm2_hash: Verify the validity of hash
+    - name: "Verify the validity of hash"
+      include_tasks: vtpm2_hash_test.yml
 
-# vTPM.enable.tpm2_rsadecrypt: Verify whether the virtual vTPM’s RSA decryption function is enabled and operating properly.
-- name: "Check vTPM's RSA decryption function"
-  include_tasks: vtpm2_rsadecrypt_test.yml
+- name: "Test vTPM for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+  when: not (guest_os_ansible_distribution == "Debian" and guest_os_ansible_distribution_major_ver | int  == 10)
+  block:
+    # vTPM.enable.tpm2_readpublic: Read public key
+    - name: "Check vTPM's Read public key function"
+      include_tasks: vtpm2_readpublic.yml
 
-# vTPM.enable.tpm2_verifysignature: Verify the validity of the digital signature
-- name: "Verify the validity of the digital signature"
-  include_tasks: vtpm2_signature_test.yml
+    # vTPM.enable.tpm2_rsadecrypt: Verify whether the virtual vTPM’s RSA decryption function is enabled and operating properly.
+    - name: "Check vTPM's RSA decryption function"
+      include_tasks: vtpm2_rsadecrypt_test.yml
 
-# vTPM.enable.tpm2_hash: Verify the validity of hash
-- name: "Verify the validity of hash"
-  include_tasks: vtpm2_hash_test.yml
+    # vTPM.enable.tpm2_verifysignature: Verify the validity of the digital signature
+    - name: "Verify the validity of the digital signature"
+      include_tasks: vtpm2_signature_test.yml
 
-# vTPM.enable.tpm2_activatecredential: Verify whether the vTPM can perform Credential Activation operations
-#- name: "Verify whether the vTPM can perform Credential Activation operations"
-#  include_tasks: vtpm2_activatecredential_test.yml
+    # vTPM.enable.tpm2_hash: Verify the validity of hash
+    - name: "Verify the validity of hash"
+      include_tasks: vtpm2_hash_test.yml
 
-# vTPM.enable.pcr_consistency.ChangeHardware: Verify the impact of hardware changes on PCR values
-- name: "Verify the impact of hardware changes on PCR values"
-  include_tasks: vtpm2_pcr_consistency_test.yml
+    # vTPM.enable.tpm2_activatecredential: Verify whether the vTPM can perform Credential Activation operations
+    #- name: "Verify whether the vTPM can perform Credential Activation operations"
+    #  include_tasks: vtpm2_activatecredential_test.yml
+
+    # vTPM.enable.pcr_consistency.ChangeHardware: Verify the impact of hardware changes on PCR values
+    - name: "Verify the impact of hardware changes on PCR values"
+      include_tasks: vtpm2_pcr_consistency_test.yml
 
 - name: "Check Clear TPM command in guest OS"
   include_tasks: clear_tpm_test.yml
