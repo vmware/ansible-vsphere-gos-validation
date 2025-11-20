@@ -112,19 +112,49 @@
     new_nvdimm_device_guest: "{{ (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add))[0] }}"
   when: (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add)) | length == 1
 
-- name: "Check persistent memory disk status in guest OS"
-  ansible.builtin.assert:
-    that:
-      - new_nvdimm_device_guest.Size is defined
-      - new_nvdimm_device_guest.Size | int / 1024 / 1024 == new_nvdimm_device_size | int
-      - new_nvdimm_device_guest.HealthStatus is defined
-      - new_nvdimm_device_guest.HealthStatus == "Healthy"
-    fail_msg: "Persistent memory disk status got in guest OS '{{ new_nvdimm_device_guest }}', which status is not 'Healthy', or the size got is not '{{ new_nvdimm_device_size }}' MB."
+- name: "Check NVDIMM device known issue on Windows 11 v24H2 or Windows Server 2025"
+  when:
+    - guest_os_product_version | int in [11, 2025]
+    - new_nvdimm_device_guest | length == 0
+  block:
+    - name: "Get Windows build number"
+      include_tasks: ../utils/win_get_os_version.yml
 
-- name: "Initialize and create partition on the pmem disk"
-  include_tasks: ../vhba_hot_add_remove/create_partition_raw_disk.yml
+    - name: "Set fact of the known issue of NVDIMM device"
+      ansible.builtin.set_fact:
+        nvdimm_known_issue: true
+      when:
+        - win_os_version_build is version('10.0.26100.0', '>=')
+        - win_os_version_build is version('10.0.26100.4652', '<')
 
-- name: "Create new file and write content to it on new disk"
-  include_tasks: ../vhba_hot_add_remove/create_new_file_read_write.yml
-  vars:
-    test_disk_ctrl_type: "nvdimm"
+- name: "Known issue - NVDIMM device is not recognized in guest OS"
+  ansible.builtin.debug:
+    msg:
+      - "No NVDIMM disk found in guest OS after cold adding to the Windows 11 v24H2 and Windows Server 2025 VMs."
+      - "This is a known issue, please refer to the KB article: https://knowledge.broadcom.com/external/article?articleNumber=381483"
+      - "Microsoft has fixed this issue in the updates of Windows 11 v24H2 and Windows Server 2025."
+  tags:
+    - known_issue
+  when: nvdimm_known_issue
+
+- name: "Check and test on the new persistent memory disk"
+  when: not nvdimm_known_issue
+  block:
+    - name: "Check persistent memory disk status in guest OS"
+      ansible.builtin.assert:
+        that:
+          - new_nvdimm_device_guest.Size is defined
+          - new_nvdimm_device_guest.Size | int / 1024 / 1024 == new_nvdimm_device_size | int
+          - new_nvdimm_device_guest.HealthStatus is defined
+          - new_nvdimm_device_guest.HealthStatus == "Healthy"
+        fail_msg: >-
+          Persistent memory disk status got in guest OS '{{ new_nvdimm_device_guest }}',
+          which is empty, or in not 'Healthy' status, or size is not '{{ new_nvdimm_device_size }}' MB.
+
+    - name: "Initialize and create partition on the pmem disk"
+      include_tasks: ../vhba_hot_add_remove/create_partition_raw_disk.yml
+
+    - name: "Create new file and write content to it on new disk"
+      include_tasks: ../vhba_hot_add_remove/create_new_file_read_write.yml
+      vars:
+        test_disk_ctrl_type: "nvdimm"

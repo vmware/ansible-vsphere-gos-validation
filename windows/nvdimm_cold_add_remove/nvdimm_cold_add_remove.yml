@@ -61,11 +61,16 @@
             (esxi_pmem_total_mb | int == 0) or
             (esxi_pmem_available_mb | int < 16)
 
+        - name: "Initialize the status of the known issue of NVDIMM device"
+          ansible.builtin.set_fact:
+            nvdimm_known_issue: false
+
         - name: "Do cold add testing"
           include_tasks: cold_add_nvdimm_test.yml
 
         - name: "Do cold remove testing"
           include_tasks: cold_remove_nvdimm_test.yml
+          when: not nvdimm_known_issue
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
