@@ -51,12 +51,26 @@
   when:
     - guest_os_ansible_distribution | regex_search('Windows( Server)? ([0-9]+)')
 
+- name: "Set Windows guest OS distribution variable only contain OS name"
+  ansible.builtin.set_fact:
+    guest_os_ansible_distribution: >-
+      {{ (guest_os_ansible_distribution | regex_search('Microsoft Windows( Server)? ([0-9]+) (R2 )?')).strip() }}
+
+- name: "Set Windows guest OS CPU architecture"
+  ansible.builtin.set_fact:
+    guest_os_ansible_cpu_arch: >-
+      {%- if guest_os_ansible_architecture2 in ['x86_64', 'amd64', 'i386'] -%}x86
+      {%- elif guest_os_ansible_architecture2 == 'aarch64'-%}arm
+      {%- endif -%}
+
 - name: "Print Windows guest OS information"
   ansible.builtin.debug:
     msg:
       - "Guest OS: {{ guest_os_ansible_distribution }}"
       - "Guest OS type: {{ guest_os_ansible_system }}"
       - "Guest OS arch: {{ guest_os_ansible_architecture }}"
+      - "Guest OS arch2: {{ guest_os_ansible_architecture2 }}"
+      - "Guest OS CPU arch: {{ guest_os_ansible_cpu_arch }}"
       - "Guest OS major version: {{ guest_os_ansible_distribution_major_ver }}"
       - "Guest OS minor version: {{ guest_os_ansible_distribution_minor_ver }}"
       - "Guest OS version: {{ guest_os_ansible_distribution_ver }}"
