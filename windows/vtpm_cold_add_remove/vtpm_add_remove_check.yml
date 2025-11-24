@@ -35,7 +35,7 @@
   include_tasks: check_vtpm_status.yml
   when: vtpm_test_operation == 'add'
 
-# Error returned from 'Get-Tpm' in Windows Server 2016 when no TPM device
+# Error returned from 'Get-Tpm' in Windows Server 2016 and Windows 10 LTSB 2016 when no TPM device
 - name: "Check TPM device is not present and ready in guest OS after cold remove"
   ansible.builtin.assert:
     that:
@@ -43,7 +43,7 @@
       - win_tpm_info['TpmReady'] is defined
       - not win_tpm_info['TpmPresent'] | bool
       - not win_tpm_info['TpmReady'] | bool
-    fail_msg: "TPM device status is ready or present in guest OS after device removing: {{ win_tpm_info }}."
+    fail_msg: "Not get TPM device info in guest OS, or its status is ready or present even after vTPM device removed: {{ win_tpm_info }}."
   when:
     - vtpm_test_operation == 'remove'
-    - guest_os_product_version | int != 2016
+    - guest_os_ansible_kernel is version('10.0.17763.0', '>=')
