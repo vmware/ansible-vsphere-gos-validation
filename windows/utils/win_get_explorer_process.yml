@@ -4,6 +4,9 @@
 # Description:
 #   Get process 'explorer.exe' in Windows guest OS to check
 # if there is black screen issue occurs.
+# Parameters:
+#   win_get_explorer_timeout: the retry time in seconds to get
+#     the status of process 'explorer.exe'.
 # Return:
 #   win_explorer_running: true or false. Whether the process
 #     'explorer.exe' is running in guest OS.
@@ -12,11 +15,17 @@
   ansible.builtin.set_fact:
     win_explorer_running: false
 
-- name: "Get the status of process 'explorer.exe'"
-  include_tasks: win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "Get-Process -Name explorer"
-    win_execute_cmd_ignore_error: true
+- name: "Wait for 'explorer.exe' process starting"
+  ansible.windows.win_shell: 'Get-Process -Name explorer'
+  delegate_to: "{{ vm_guest_ip }}"
+  register: get_service_status
+  delay: 5
+  retries: "{{ (win_get_explorer_timeout | default(300) / 5) | round | int }}"
+  until:
+    - get_service_status.rc is defined
+    - get_service_status.rc == 0
+  ignore_errors: true
+  ignore_unreachable: true
 
 - name: "Set fact of the status of process 'explorer.exe'"
   ansible.builtin.set_fact:

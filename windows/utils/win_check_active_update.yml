@@ -1,0 +1,48 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get these 2 processes' info to check if the Windows is actively installing or
+# configuring something.
+# "TiWorker.exe (Windows Modules Installer Worker)" is the primary process
+# responsible for installing updates and modifying system files.
+# "msiexec.exe" is the Windows Installer engine, if running as SYSTEM user (Session 0),
+# it means a background installation (like a driver or managed app) is happening.
+#
+- name: "Set facts of the commands for checking Windows status"
+  ansible.builtin.set_fact:
+    check_tiworker: "Get-Process TiWorker -ErrorAction SilentlyContinue | Format-List -Property *"
+    check_msiexec: "Get-Process msiexec -IncludeUserName -ErrorAction SilentlyContinue | Where-Object {$_.UserName -match 'SYSTEM'} | Format-List -Property *"
+
+- name: "Get 'TiWorker.exe' process info"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ check_tiworker }}"
+    win_execute_cmd_ignore_error: true
+
+- name: "Save the result of getting 'TiWorker.exe' process info"
+  ansible.builtin.set_fact:
+    check_tiworker_result: "{{ win_powershell_cmd_output }}"
+
+- name: "Get 'msiexec.exe' process info"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ check_msiexec }}"
+    win_execute_cmd_ignore_error: true
+
+- name: "Save the result of getting 'msiexec.exe' process info"
+  ansible.builtin.set_fact:
+    check_msiexec_result: "{{ win_powershell_cmd_output }}"
+
+- name: "Set fact of Windows is actively installing updates"
+  ansible.builtin.set_fact:
+    os_in_active_updates: true
+  when: >
+    (check_tiworker_result.rc is defined and check_tiworker_result.rc == 0) or
+    (check_msiexec_result.stdout is defined and check_msiexec_result.stdout | length != 0)
+
+- name: "Set fact of Windows is not actively installing updates"
+  ansible.builtin.set_fact:
+    os_in_active_updates: false
+  when:
+    - check_tiworker_result.rc is defined and check_tiworker_result.rc != 0
+    - check_msiexec_result.stdout is defined and check_msiexec_result.stdout | length == 0
