@@ -218,3 +218,18 @@
   vars:
     gosc_check_item: "dns_suffix_success"
     gosc_check_error_msg: "VM DNS domain search domains are {{ guest_dns_search }}, not expected search domains {{ linux_gosc_spec['dns_suffix'] }}"
+
+# Perl GOSC fails on Debian 11/12/13 due to DNS settings can be overwritten by NetworkManager mistakenly
+- name: "Known issue - Perl GOSC of {{ vm_guest_os_distribution }} {{ guest_os_ansible_distribution_ver }} on vCenter Server {{ vcenter_version }}"
+  ansible.builtin.debug:
+    msg:
+      - "Perl guest customization would fail due to DNS settings can be overwritten by NetworkManager mistakenly"
+      - "Please refer to https://knowledge.broadcom.com/external/article?articleId=419770"
+  tags:
+    - known_issue
+  when:
+    - (not dns_suffix_success | bool) or (not dns_servers_success | bool)
+    - guest_os_ansible_distribution == "Debian"
+    - guest_os_ansible_distribution_major_ver is version('13', '<=')
+    - vcenter_version is version('9.0.1', '<=')
+
