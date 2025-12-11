@@ -112,20 +112,14 @@
     new_nvdimm_device_guest: "{{ (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add))[0] }}"
   when: (guest_nvdimm_list_after_add | difference(guest_nvdimm_list_before_add)) | length == 1
 
-- name: "Check NVDIMM device known issue on Windows 11 v24H2 or Windows Server 2025"
+- name: "Set NVDIMM device known issue on Windows 11 v24H2 or Windows Server 2025"
+  ansible.builtin.set_fact:
+    nvdimm_known_issue: true
   when:
     - guest_os_product_version | int in [11, 2025]
     - new_nvdimm_device_guest | length == 0
-  block:
-    - name: "Get Windows build number"
-      include_tasks: ../utils/win_get_os_version.yml
-
-    - name: "Set fact of the known issue of NVDIMM device"
-      ansible.builtin.set_fact:
-        nvdimm_known_issue: true
-      when:
-        - win_os_version_build is version('10.0.26100.0', '>=')
-        - win_os_version_build is version('10.0.26100.4652', '<')
+    - win_os_version_build is version('10.0.26100.0', '>=')
+    - win_os_version_build is version('10.0.26100.4652', '<')
 
 - name: "Known issue - NVDIMM device is not recognized in guest OS"
   ansible.builtin.debug:
