@@ -1,0 +1,40 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Retry to get the usernames of VMware Tools processes in guest OS.
+# Parameters:
+#   win_vmtoolsd_username_list: the expected usernames list of process to get.
+#   get_vmtoolsd_user_timeout (optional): the timeout value in seconds to get
+#     the expected usernames of process. Default value is 180s.
+#
+- name: "Check parameter"
+  ansible.builtin.assert:
+    that:
+      - win_vmtoolsd_username_list is defined
+      - win_vmtoolsd_username_list | type_debug == 'list'
+    fail_msg: "Parameter 'win_vmtoolsd_username_list' is required to be defined as a list."
+
+- name: "Get usernames of VMware Tools processes in guest OS"
+  ansible.windows.win_shell: "(Get-Process vmtoolsd -IncludeUserName).UserName"
+  register: get_vmtoolsd_user
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_unreachable: true
+  retries: "{{ (get_vmtoolsd_user_timeout | default(180) | int / 5) | int }}"
+  delay: 5
+  until:
+    - get_vmtoolsd_user.stdout_lines is defined
+    - get_vmtoolsd_user.stdout_lines | sort == win_vmtoolsd_username_list | sort
+
+- name: "Check usernames of VMware Tools processes"
+  ansible.builtin.assert:
+    that:
+      - get_vmtoolsd_user.stdout_lines is defined
+      - get_vmtoolsd_user.stdout_lines | sort == win_vmtoolsd_username_list | sort
+    fail_msg: >-
+      Retry to get usernames of 'vmtoolsd' processes in {{ get_vmtoolsd_user_timeout | default(180) }}s:
+      {{ get_vmtoolsd_user.stdout_lines | default('') }}, still not get all expected ones:
+      {{ win_vmtoolsd_username_list }}.
+    success_msg: >-
+      Get expected usernames of 'vmtoolsd' processes:
+      {{ get_vmtoolsd_user.stdout_lines }}.

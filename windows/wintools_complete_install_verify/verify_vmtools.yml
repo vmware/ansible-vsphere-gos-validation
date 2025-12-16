@@ -43,24 +43,8 @@
       - vmtools_driver_list | length != 0
     fail_msg: "Not get installed drivers with VMware or Broadcom manufacturer after VMware Tools install."
 
-- name: "Get usernames of VMware Tools processes in guest OS"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "(Get-Process vmtoolsd -IncludeUserName).UserName"
-
-- name: "Check usernames of VMware Tools processes"
-  ansible.builtin.assert:
-    that:
-      - win_powershell_cmd_output.stdout_lines is defined
-      - win_powershell_cmd_output.stdout_lines | length == 2
-      - win_powershell_cmd_output.stdout_lines | sort == win_vmtoolsd_username_list | sort
-    fail_msg: >-
-      Get usernames of 'vmtoolsd' processes:
-      {{ win_powershell_cmd_output.stdout_lines | default('') }},
-      expected ones are {{ win_vmtoolsd_username_list }}.
-    success_msg: >-
-      Get usernames of 'vmtoolsd' processes:
-      {{ win_powershell_cmd_output.stdout_lines }}.
+- name: "Check usernames of VMware Tools processes in guest OS"
+  include_tasks: ../utils/win_check_vmtoolsd_user.yml
 
 # In Windows Server 2012 R2 or older OS there is no cmdlet 'Get-PnpDevice',
 # so here only check in newer OS
