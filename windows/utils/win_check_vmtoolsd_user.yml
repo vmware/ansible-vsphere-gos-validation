@@ -3,16 +3,12 @@
 ---
 # Retry to get the usernames of VMware Tools processes in guest OS.
 # Parameters:
-#   win_vmtoolsd_username_list: the expected usernames list of process to get.
 #   get_vmtoolsd_user_timeout (optional): the timeout value in seconds to get
-#     the expected usernames of process. Default value is 180s.
+#     the expected usernames of the vmtoolsd processes. Default value is 180s.
 #
-- name: "Check parameter"
-  ansible.builtin.assert:
-    that:
-      - win_vmtoolsd_username_list is defined
-      - win_vmtoolsd_username_list | type_debug == 'list'
-    fail_msg: "Parameter 'win_vmtoolsd_username_list' is required to be defined as a list."
+- name: "Set fact of the expected usernames list of VMware Tools processes"
+  ansible.builtin.set_fact:
+    win_vmtoolsd_username_list: ["NT AUTHORITY\\SYSTEM", "{{ guest_os_hostname }}\\{{ vm_username }}"]
 
 - name: "Get usernames of VMware Tools processes in guest OS"
   ansible.windows.win_shell: "(Get-Process vmtoolsd -IncludeUserName).UserName"
