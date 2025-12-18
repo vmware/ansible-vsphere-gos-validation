@@ -5,6 +5,7 @@
 #   service_name: The service name to be configured
 #   service_enabled: true or false to enable or disable service
 #   service_state: The service state: reloaded, restarted, started, or stopped
+#   service_change_waiting_time: (optional) wait time in seconds when service state changed. Default value is 5
 #
 - name: "Validate service state"
   ansible.builtin.fail:
@@ -21,9 +22,9 @@
     state: "{{ service_state }}"
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Sleep 25 seconds to wait {{ service_name }} {{ service_state }}"
+- name: "Sleep {{ service_change_waiting_time | default(5) }} seconds to wait {{ service_name }} {{ service_state }}"
   ansible.builtin.pause:
-    seconds: 25
+    seconds: "{{ service_change_waiting_time | default(5) }}"
 
 - include_tasks: check_service_status.yml
   vars:
