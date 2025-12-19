@@ -29,14 +29,18 @@
     (expected_service_status is undefined or
      expected_service_status not in ['enabled', 'disabled', ''])
 
+- name: "Initialize variables for service information"
+  ansible.builtin.set_fact:
+    service_info: ""
+
 - name: "Retry to get service information"
   loop: "{{ range(1, 5) | list }}"
   loop_control:
     loop_var: retry_count
   when: >
-    (service_info is not defined) or
+    (retry_count == 1) or
     (service_info.status is not defined) or
-    (service_info.status != expected_service_status)
+    (expected_service_status | length > 0 and service_info.status != expected_service_status)
   block:
     - name: "Get service information for {{ retry_count }} attempt"
       include_tasks: get_service_info.yml
@@ -48,7 +52,6 @@
 - name: "Check service '{{ service_name }}' is {{ expected_service_state }}"
   ansible.builtin.assert:
     that:
-      - service_info is defined
       - service_info.state is defined
       - service_info.state in ['active', 'running', 'stopped']
     fail_msg: "Serivce '{{ service_name }}' status is inactive"
@@ -58,7 +61,6 @@
 - name: "Check service '{{ service_name }}' is {{ expected_service_state }}"
   ansible.builtin.assert:
     that:
-      - service_info is defined
       - service_info.state is defined
       - service_info.state == expected_service_state
     fail_msg: "Serivce '{{ service_name }}' is not {{ expected_service_state }}"
@@ -68,7 +70,6 @@
 - name: "Check service '{{ service_name }}' is {{ expected_service_status }}"
   ansible.builtin.assert:
     that:
-      - service_info is defined
       - service_info.status is defined
       - service_info.status == expected_service_status
     fail_msg: "Serivce '{{ service_name }}' is not {{ expected_service_status }}"
@@ -78,7 +79,6 @@
 - name: "Check service '{{ service_name }}' is {{ expected_service_state }}"
   ansible.builtin.assert:
     that:
-      - service_info is defined
       - not service_info
     fail_msg: "Serivce '{{ service_name }}' exists"
     success_msg: "Service '{{ service_name }}' doesn't exist"
