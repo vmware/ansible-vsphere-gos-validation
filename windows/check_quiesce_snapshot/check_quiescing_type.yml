@@ -62,39 +62,30 @@
     list_files: true
   register: vm_vss_manifests_files
 
-# Windows Server VM with NVMe boot disk controller does not suppport application
-# consistent quiesce snapshot due to the known Windows issues.
-# Except below 2 situations:
-# Windows Server 2022 with build number newer than 20348.2582,
-# Windows Server 2025 with build number newer than 26100.7171.
-- name: "Handle Windows Server VM with NVMe disk controller situation"
-  when:
-    - guest_os_product_type == 'server'
-    - win_boot_disk_ctrl_type == 'nvme'
+# Windows Server VM with NVMe boot disk controller (except Windows Server 2022
+# with latest Windows updates installed) does not suppport application consistent
+# quiesce snapshot due to the known Windows issues.
+# Please keep track of the 3rd party issue status and vSphere support status.
+- name: "Handle Windows Server guest OS situation"
+  when: guest_os_product_type == 'server'
   block:
-    - name: "For Windows Server 2022"
-      ansible.builtin.set_fact:
-        app_quiesce_supported: true
-      when:
-        - guest_os_product_version | int == 2022
-        - win_os_version_build is version('10.0.20348.2582', '>=')
+    - name: "Handle Windows Server 2022 situation"
+      when: guest_os_product_version | int == 2022
+      block:
+        - name: "Get Windows Server 2022 build number"
+          include_tasks: ../utils/win_get_os_version.yml
+        - name: "Set Windows Server 2022 exception"
+          ansible.builtin.set_fact:
+            winsrv_2022_app_quiesce: true
+          when: win_os_version_build is version('10.0.20348.2582', '>=')
 
-    - name: "For Windows Server 2025"
+    - name: "Set fact of support application consistent quiescing situation"
       ansible.builtin.set_fact:
-        app_quiesce_supported: true
+        winsrv_app_quiesce_support: true
       when:
-        - esxi_version is version('9.0.0', '>')
-        - vm_hardware_version_num | int >= 21
-        - guest_os_product_version | int == 2025
-        - win_os_version_build is version('10.0.26100.7171', '>=')
-
-- name: "Set fact of support application consistent quiescing situation"
-  ansible.builtin.set_fact:
-    winsrv_app_quiesce_support: true
-  when:
-    - guestinfo_guest_full_name | regex_search('Windows Server ([0-9]{4})')
-    - guestinfo_guest_full_name | regex_search('Windows Server ([0-9]{4})') == guest_os_ansible_distribution | regex_search('Windows Server ([0-9]{4})')
-    - win_boot_disk_ctrl_type in ['lsilogicsas', 'paravirtual'] or (win_boot_disk_ctrl_type == 'nvme' and app_quiesce_supported | default(false))
+        - guestinfo_guest_full_name | regex_search('Windows Server ([0-9]{4})')
+        - guestinfo_guest_full_name | regex_search('Windows Server ([0-9]{4})') == guest_os_ansible_distribution | regex_search('Windows Server ([0-9]{4})')
+        - win_boot_disk_ctrl_type in ['lsilogicsas', 'paravirtual'] or (win_boot_disk_ctrl_type == 'nvme' and winsrv_2022_app_quiesce is defined and winsrv_2022_app_quiesce)
 
 - name: "Check filesystem consistent quiescing taken"
   ansible.builtin.assert:
