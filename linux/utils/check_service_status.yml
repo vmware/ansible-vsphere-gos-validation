@@ -30,9 +30,6 @@
      expected_service_status not in ['enabled', 'disabled', ''])
 
 - name: "Retry to get service information"
-  loop: "{{ range(1, 5) | list }}"
-  loop_control:
-    loop_var: retry_count
   when: >
     (retry_count == 1) or
     (service_info.status is not defined) or
@@ -44,6 +41,9 @@
     - name: "Sleep 5 seconds"
       ansible.builtin.pause:
         seconds: 5
+  loop: "{{ range(1, 5) | list }}"
+  loop_control:
+    loop_var: retry_count
 
 - name: "Check service '{{ service_name }}' is {{ expected_service_state }}"
   ansible.builtin.assert:
