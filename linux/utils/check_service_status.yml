@@ -29,21 +29,12 @@
     (expected_service_status is undefined or
      expected_service_status not in ['enabled', 'disabled', ''])
 
-- name: "Retry to get service information"
-  when: >
-    (retry_count == 1) or
-    (service_info.status is not defined) or
-    (expected_service_status | length > 0 and service_info.status != expected_service_status)
-  block:
-    - name: "Get service information for {{ retry_count }} attempt"
-      include_tasks: get_service_info.yml
-
-    - name: "Sleep 5 seconds"
-      ansible.builtin.pause:
-        seconds: 5
-  loop: "{{ range(1, 5) | list }}"
-  loop_control:
-    loop_var: retry_count
+- name: "Get service information"
+  include_tasks: get_service_info.yml
+  until: service_info.status is defined and 
+          (expected_service_status | length == 0 or service_info.status == expected_service_status)
+  retries: 5
+  delay: 5
 
 - name: "Check service '{{ service_name }}' is {{ expected_service_state }}"
   ansible.builtin.assert:
