@@ -12,30 +12,32 @@
 #
 - name: "Initialize VMware Tools services status result and expected services list"
   ansible.builtin.set_fact:
+    get_vmtools_service_result: ""
     vmtools_service_dict: {}
     win_get_vmtools_service_expect: "{{ win_get_vmtools_service_expect | default([]) }}"
 
 # Retry specified times to get services and status
 - name: "Retry to get VMware Tools services and status"
   ansible.windows.win_shell: "Get-Service | Where-Object {$_.displayname -match 'VMware'} | select Name, Status | ft -hide"
-  register: get_vmtools_ser_result
+  register: get_vmtools_service_result
   ignore_errors: true
   delegate_to: "{{ vm_guest_ip }}"
   ignore_unreachable: true
-  retries: "{{ win_get_vmtools_service_retries | default(1) }}"
-  delay: 5
-  until:
-    - get_vmtools_ser_result.stdout is defined
-    - get_vmtools_ser_result.stdout
-    - (win_get_vmtools_service_expect | reject('in', get_vmtools_ser_result.stdout)) | length == 0
+  loop: "{{ range(1, (win_get_vmtools_service_retries | default(1) | int + 1) }}"
+  loop_control:
+    pause: 5
+  when: >
+    (get_vmtools_service_result.stdout | default('') | length == 0) or
+    (win_get_vmtools_service_expect | length != 0 and
+    ((win_get_vmtools_service_expect | reject('in', get_vmtools_service_result.stdout)) | length != 0))
 
 - name: "Set fact of VMware Tools services and status dict"
   ansible.builtin.set_fact:
     vmtools_service_dict: "{{ vmtools_service_dict | combine({item.split()[0]: item.split()[1]}) }}"
-  with_items: "{{ get_vmtools_ser_result.stdout_lines | select }}"
+  with_items: "{{ get_vmtools_service_result.stdout_lines | select }}"
   when:
-    - get_vmtools_ser_result.stdout_lines is defined
-    - get_vmtools_ser_result.stdout_lines | length != 0
+    - get_vmtools_service_result.stdout_lines is defined
+    - get_vmtools_service_result.stdout_lines | length != 0
 
 - name: "Display VMware Tools services and status"
   ansible.builtin.debug: var=vmtools_service_dict
@@ -44,7 +46,9 @@
   ansible.builtin.assert:
     that:
       - services_missing == []
-    fail_msg: "Services '{{ services_missing }}' are not found in guest OS, please check manually."
+    fail_msg: >-
+      Get VMware services failed in guest OS with error '{{ get_vmtools_ser_result.msg | default('') }}',
+      or services '{{ services_missing }}' are not listed in the results.
   vars:
     services_missing: "{{ win_get_vmtools_service_expect | difference(vmtools_service_dict.keys()) }}"
   when: win_get_vmtools_service_expect | length != 0
