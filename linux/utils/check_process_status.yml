@@ -16,7 +16,18 @@
       - expected_process_state in ['present', 'absent']
     fail_msg: "Invalid parameter: expected_process_state={{ expected_process_state | default('undefined') }}"
 
-- include_tasks: get_process_info.yml
+- name: "Retry 4 times to get process information"
+  include_tasks: 
+    file: get_process_info.yml
+    apply:
+      when: >
+        (retry_count == 1) or
+        (process_list is not defined) or
+        (process_list | length == 0)
+  loop: "{{ range(1, 5) | list }}"
+  loop_control:
+    loop_var: retry_count
+    pause: 5
 
 - name: "Set default process uid to root"
   ansible.builtin.set_fact:
