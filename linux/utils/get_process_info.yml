@@ -17,14 +17,11 @@
   failed_when: false
   delegate_to: "{{ vm_guest_ip }}"
 
-- block:
-    - name: "Set the fact for process list"
-      ansible.builtin.set_fact:
-        process_list: "{{ process_list | union([{'uid':item.split()[0],'pid':item.split()[1], 'cmd':' '.join(item.split()[10:])}]) }}"
-      with_items: "{{ ps_result.stdout_lines }}"
+- name: "Set the fact for process list"
+  ansible.builtin.set_fact:
+    process_list: "{{ process_list | union([{'uid':item.split()[0],'pid':item.split()[1], 'cmd':' '.join(item.split()[10:])}]) }}"
+  with_items: "{{ ps_result.stdout_lines }}"
+  when: (ps_result.stdout_lines is defined) and (ps_result.stdout_lines | length >= 1)
 
-    - name: "Get the running process list"
-      ansible.builtin.debug: var=process_list
-  when:
-    - ps_result.stdout_lines is defined
-    - ps_result.stdout_lines | length >= 1
+- name: "Get the running process list"
+  ansible.builtin.debug: var=process_list
