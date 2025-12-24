@@ -1,7 +1,7 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: Set VM boot options
+- name: "Set VM boot options"
   community.vmware.vmware_guest_boot_manager:
     validate_certs: "{{ validate_certs | default(false) }}"
     hostname: "{{ vsphere_host_name }}"
@@ -11,17 +11,19 @@
     enter_bios_setup: "{{ enter_bios_setup | default(omit) }}"
     boot_order: "{{ boot_order_list | default(omit) }}"
     boot_hdd_name: "{{ boot_hdd_name | default(omit) }}"
-    boot_delay: "{{ boot_delay_milliseconds | default(omit) }}"
-    boot_retry_enabled: "{{ boot_retry_enabled | default(omit) }}"
-    boot_retry_delay: "{{ boot_retry_delay_milliseconds | default(omit) }}"
     boot_firmware: "{{ boot_firmware_set | default(omit) }}"
     secure_boot_enabled: "{{ secure_boot_enabled_set | default(omit) }}"
   register: set_boot_opts
-- name: Display set boot options result
-  ansible.builtin.debug: var=set_boot_opts
-  when: enable_debug is defined and enable_debug
 
-- name: Get VM boot facts after boot option changing
+- name: "Display the result of setting VM boot options"
+  ansible.builtin.debug: var=set_boot_opts
+  when: enable_debug
+
+- name: "Pause 5 seconds before getting VM boot info"
+  ansible.builtin.pause:
+    seconds: 5
+
+- name: "Get VM boot info after setting VM boot options"
   community.vmware.vmware_guest_boot_info:
     validate_certs: "{{ validate_certs | default(false) }}"
     hostname: "{{ vsphere_host_name }}"
@@ -29,6 +31,17 @@
     password: "{{ vsphere_host_user_password }}"
     name: "{{ vm_name }}"
   register: boot_facts
-- name: Display the VM boot options
+
+- name: "Display the VM boot info"
   ansible.builtin.debug: var=boot_facts
-  when: enable_debug is defined and enable_debug
+  when: enable_debug
+
+- name: "Check VM boot options after setting"
+  ansible.builtin.assert:
+    that:
+      - boot_facts.vm_boot_info.current_enter_bios_setup is defined
+      - boot_facts.vm_boot_info.current_enter_bios_setup == enter_bios_setup
+    fail_msg: >-
+      The value of 'current_enter_bios_setup' is '{{ boot_facts.vm_boot_info.current_enter_bios_setup | default('') }}',
+      which is not set to the expected value '{{ enter_bios_setup }}'.
+  when: enter_bios_setup is defined
