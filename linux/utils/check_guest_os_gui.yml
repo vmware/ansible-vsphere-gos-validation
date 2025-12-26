@@ -66,29 +66,6 @@
             guest_os_session_desktop: "{{ guest_login_sessions[0].Desktop | default('') }}"
           when: guest_login_sessions | length > 0
 
-- name: "Get login session type and desktop on FreeBSD"
-  when:
-    - guest_os_ansible_system == "freebsd"
-    - guest_os_with_gui
-  block:
-    - name: "Check Xorg or Xwayland is running or not"
-      ansible.builtin.shell: "pgrep -l 'Xorg|Xwayland'"
-      ignore_errors: true
-      delegate_to: "{{ vm_guest_ip }}"
-      register: pgrep_result
-
-    - name: "Set fact of login session type in guest OS"
-      ansible.builtin.set_fact:
-        guest_os_session_type: |-
-          {%- if 'Xorg' in pgrep_result.stdout -%}x11
-          {%- elif 'Xwayland' in pgrep_result.stdout -%}wayland
-          {%- endif -%}
-      when:
-        - pgrep_result.rc is defined
-        - pgrep_result.rc == 0
-        - pgrep_result.stdout is defined
-        - pgrep_result.stdout
-
 - name: "Display guest OS desktop facts"
   ansible.builtin.debug:
     msg:
