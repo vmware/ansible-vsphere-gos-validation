@@ -67,13 +67,7 @@ env ASSUME_ALWAYS_YES=YES pkg bootstrap -y
 
 # Different packages between the 32bit image and 64bit image
 # The open-vm-tools is not installed by default
-packages_to_install="bash sudo wget curl e2fsprogs iozone lsblk"
-if [ "$machtype" == "amd64" ] || [ "$machtype" == "x86_64" ]; then
-    packages_to_install="$packages_to_install xorg gnome gnome-desktop gnome-shell gnome-session gdm slim xf86-video-vmware open-vm-tools xf86-input-vmmouse"
-else
-    packages_to_install="$packages_to_install open-vm-tools-nox11"
-fi
-
+packages_to_install="bash sudo wget curl e2fsprogs iozone lsblk open-vm-tools-nox11"
 # Try to install package from CDROM repo. There is no default CDROM repo file FreeBSD_install_cdrom.conf on FreeBSD 15 or obove.
 failed_packages="$packages_to_install"
 if [ -f "/dist/packages/repos/FreeBSD_install_cdrom.conf" ]; then
@@ -159,33 +153,6 @@ echo "DONE" >/dev/ttyu0
 printf "Enable ZFS ..." > /dev/ttyu0
 sysrc zfs_enable="YES"
 echo "DONE" >/dev/ttyu0
-
-# Configure GNOME desktop
-if [ "$machtype" == "amd64" ] || [ "$machtype" == "x86_64" ]; then
-    printf "Configuring GNOME desktop ... " >/dev/ttyu0
-    echo "proc      /proc       procfs  rw  0   0" >> /etc/fstab
-    sysrc hald_enable="YES"
-    sysrc dbus_enable="YES"
-    sysrc gnome_enable="YES"
-    sysrc moused_enable="YES"
-    sysrc slim_enable="YES"
-    echo "DONE" >/dev/ttyu0
-
-    # Use SLIM auto login
-    printf "Enabling auto login ... " >/dev/ttyu0
-    sed -i '' -e "s/#auto_login .*/auto_login yes/" /usr/local/etc/slim.conf
-    {% if new_user is defined and new_user != 'root' -%}
-    sed -i '' -e "s/#default_user .*/default_user {{ new_user }}/" /usr/local/etc/slim.conf
-    echo "exec gnome-session" > /home/{{ new_user }}/.xinitrc
-    chmod a+x /home/{{ new_user }}/.xinitrc
-    chown {{ new_user }} /home/{{ new_user }}/.xinitrc 
-    {% else -%}
-    sed -i '' -e "s/#default_user .*/default_user root/" /usr/local/etc/slim.conf
-    echo "exec gnome-session" > /root/.xinitrc
-    chmod a+x /root/.xinitrc
-    {% endif -%}
-    echo "DONE" >/dev/ttyu0
-fi
 
 if [ "$BSDINSTALL_LOG" != "" ] && [ -f $BSDINSTALL_LOG ]; then
     echo "Dump BSD installer log" >/dev/ttyu0
