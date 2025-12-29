@@ -1,10 +1,25 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Disable power save in Windows guest OS"
+# Disable display timeout, sleep timeout, turn off disk timeout, hibernate timeout
+- name: "Change power settings in the current power plan in guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "powercfg /change monitor-timeout-ac 0; powercfg /change disk-timeout-ac 0; powercfg /change standby-timeout-ac 0; powercfg /change hibernate-timeout-ac 0;"
+    win_powershell_cmd: >-
+      powercfg /change monitor-timeout-ac 0;
+      powercfg /change monitor-timeout-dc 0;
+      powercfg /change standby-timeout-ac 0;
+      powercfg /change standby-timeout-dc 0;
+      powercfg /change disk-timeout-ac 0;
+      powercfg /change disk-timeout-dc 0;
+      powercfg /change hibernate-timeout-ac 0;
+      powercfg /change hibernate-timeout-dc 0
+
+- name: "Disable inactivity sign-out in guest OS"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      REG ADD "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System" /v "InactivityTimeoutSecs" /t REG_DWORD /d 0 /f
 
 - name: "Disable firewall in Windows guest OS"
   include_tasks: ../utils/win_execute_cmd.yml
@@ -29,7 +44,7 @@
   vars:
     win_powershell_cmd: >-
       REG ADD "HKLM\Software\Policies\Microsoft\Windows NT\Reliability" /v "ShutdownReasonUI" /t REG_DWORD /d 0 /f;
-      REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Reliability" /v "ShutdownReasonOn" /t REG_DWORD /d 0 /f
+      REG ADD "HKLM\Software\Policies\Microsoft\Windows NT\Reliability" /v "ShutdownReasonOn" /t REG_DWORD /d 0 /f
   when: guest_os_product_type == "server"
 
 - name: "Disable UAC"
