@@ -14,7 +14,7 @@
 - name: "Can not enable auto login for unknown display manager"
   ansible.builtin.fail:
     msg: "Can not enable auto login when guest_os_display_manager is {{ guest_os_display_manager | default('') }}."
-  when: guest_os_display_manager not in ["gdm", "xdm", "lightdm", "lxdm"]
+  when: guest_os_display_manager not in ["gdm", "xdm", "lightdm", "lxdm", "slim"]
 
 - name: "Set facts for enabling GDM auto login"
   when: guest_os_display_manager == "gdm"
@@ -33,6 +33,11 @@
       ansible.builtin.set_fact:
         dm_conf_path: "/etc/gdm3/daemon.conf"
       when: guest_os_ansible_distribution == "Debian"
+
+    - name: "Set GDM config file path for FreeBSD"
+      ansible.builtin.set_fact:
+        dm_conf_path: "/usr/local/etc/gdm/custom.conf"
+      when: guest_os_ansible_distribution == "FreeBSD"
 
     - name: "Set facts of autologin section and options"
       ansible.builtin.set_fact:
@@ -67,6 +72,14 @@
     dm_conf_section: "base"
     dm_autologin_options: {"autologin": "{{ autologin_user }}"}
   when: guest_os_display_manager == "lxdm"
+
+- name: "Set facts for enabling SLIM auto login"
+  ansible.builtin.set_fact:
+    dm_conf_path: "/usr/local/etc/slim.conf"
+    dm_autologin_options: {"default_user": "{{ autologin_user }}", "auto_login": "yes"}
+  when:
+    - guest_os_display_manager == "slim"
+    - guest_os_ansible_distribution == "FreeBSD"
 
 - name: "Can not enable auto login when dm_conf_path is not set"
   ansible.builtin.fail:
@@ -105,3 +118,24 @@
   when:
     - guest_os_display_manager == "xdm"
     - guest_os_family == "Suse"
+
+- name: "Enable auto login on FreeBSD"
+  when:
+    - guest_os_display_manager == "slim"
+    - guest_os_ansible_distribution == "FreeBSD"
+  block:
+    - name: "Enable auto login for user {{ autologin_user }} in {{ vm_guest_os_distribution }}"
+      include_tasks: replace_or_add_line_in_file.yml
+      vars:
+        file: "{{ dm_conf_path }}"
+        reg_exp: "^#*{{ item.key }}    .*"
+        line_content: "{{ item.key }}    {{ item.value }}"
+      with_list: "{{ dm_autologin_options | dict2items }}"
+
+    - name: "Set default display session"
+      ansible.builtin.shell: |
+        user_home=$(getent passwd vmware | awk -F: '{ print $6 }')
+        echo 'exec gnome-session' > $user_home/.xinitrc
+        chmod a+x $user_home/.xinitrc
+        chown {{ autologin_user }} $user_home/.xinitrc
+      delegate_to: "{{ vm_guest_ip }}"
