@@ -39,8 +39,13 @@
             that:
               - vm_wait_log_msg_success
               - guest_firmware_is_efi
-            fail_msg: "Failed to find EFI ROM info in vmware.log or guest OS firmware is not EFI."
-            success_msg: "Found EFI ROM info in vmware.log, and guest OS firmware is EFI."
+            success_msg: "Found EFI ROM info in vmware.log, and EFI firmware info in guest OS."
+            fail_msg: >-
+              {%- if not vm_wait_log_msg_success -%}
+              Checking 'EFI ROM' info in vmware.log file failed.
+              {%- if not guest_firmware_is_efi -%}
+              Checking whether the firmware is EFI in guest OS failed.
+              {%- endif -%}
       rescue:
         - name: "Collect Linux guest OS information for triage"
           include_tasks: ../setup/linux_test_rescue.yml
