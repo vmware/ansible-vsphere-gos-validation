@@ -16,15 +16,16 @@
     win_get_vmtools_service_expect: "{{ win_get_vmtools_service_expect | default([]) }}"
 
 - name: "Retry to get VMware Tools services and status"
-  include_tasks: win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "Get-Service | Where-Object {$_.displayname -match 'VMware'} | select Name, Status | ft -hide"
-    win_execute_cmd_ignore_error: true
-  apply:
-    when: >
-      (retry_time == 1) or
-      (win_get_vmtools_service_expect | length != 0 and
-      (win_powershell_cmd_output.stdout_lines | select | length != win_get_vmtools_service_expect | length))
+  include_tasks:
+    file: win_execute_cmd.yml
+    apply:
+      vars:
+        win_powershell_cmd: "Get-Service | Where-Object {$_.displayname -match 'VMware'} | select Name, Status | ft -hide"
+        win_execute_cmd_ignore_error: true
+      when: >
+        (retry_time == 1) or
+        (win_get_vmtools_service_expect | length != 0 and
+        (win_powershell_cmd_output.stdout_lines | select | length != win_get_vmtools_service_expect | length))
   loop: "{{ range(1, (win_get_vmtools_service_retries | default(1) | int + 1)) }}"
   loop_control:
     loop_var: retry_time
