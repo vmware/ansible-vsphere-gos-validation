@@ -28,8 +28,10 @@
     pause: 5
   when: >
     (get_vmtools_service_result.stdout | default('') | length == 0) or
-    (win_get_vmtools_service_expect | length != 0 and
-    ((win_get_vmtools_service_expect | reject('in', get_vmtools_service_result.stdout)) | length != 0))
+    (win_get_vmtools_service_expect | length != 0 and not get_vmtools_service_result.changed)
+
+- name: "Print the loop result"
+  debug: var=get_vmtools_service_result
 
 - name: "Set fact of VMware Tools services and status dict"
   ansible.builtin.set_fact:
