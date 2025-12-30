@@ -1,0 +1,45 @@
+# Copyright 2025 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check Windows system readiness after booting up 
+#
+- name: "Initialize the readiness of Windows"
+  ansible.builtin.set_fact:
+    os_in_active_updates: false
+
+- name: "Retry to check if Windows is actively installing updates"
+  include_tasks: win_check_active_update.yml
+  loop: "{{ range(1, 11) | list }}"
+  loop_control:
+    pause: 3
+    break_when:
+      - os_in_active_updates
+
+- name: "Debug message"
+  ansible.builtin.debug:
+    msg: "Not get the processes that can indicating the Windows is actively installing updates in 30s."
+  when: not os_in_active_updates
+
+- name: "Debug message"
+  ansible.builtin.debug:
+    msg: "Windows guest OS is actively installing updates or configuring something."
+  when: os_in_active_updates
+
+- name: "Wait for Windows updates installation completes"
+  when: os_in_active_updates
+  block:
+    - name: "Retry to check if Windows completes installing updates"
+      include_tasks: win_check_active_update.yml
+      loop: "{{ range(1, 201) | list }}"
+      loop_control:
+        pause: 3
+        break_when:
+          - not os_in_active_updates
+    - name: "Debug message"
+      ansible.builtin.debug:
+        msg: "Still can get the processes that indicating the Windows is actively installing updates in 600s."
+      when: os_in_active_updates
+    - name: "Debug message"
+      ansible.builtin.debug:
+        msg: "Windows guest OS completes the updates install."
+      when: not os_in_active_updates
