@@ -1,57 +1,25 @@
 # Copyright 2021-2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Get VMware Tools installed services in Windows guest OS
-# Parameters:
-#   win_get_vmtools_service_retries (optional): the retry time to get services list,
-#     default value is 1.
-#   win_get_vmtools_service_expect (optional): the expected services list to get,
-#     default value is [].
+# Get VMware Tools installed services in Windows guest OS.
 # Return:
-#   vmtools_service_dict: VMware Tools services and service status dict.
+#   vmtools_service_dict: VMware Tools services and their status dict.
 #
-- name: "Initialize VMware Tools services status result and expected services list"
+- name: "Initialize VMware Tools services dict"
   ansible.builtin.set_fact:
     vmtools_service_dict: {}
-    win_get_vmtools_service_expect: "{{ win_get_vmtools_service_expect | default([]) }}"
 
-- name: "Retry to get VMware Tools services and status"
-  include_tasks:
-    file: win_execute_cmd.yml
-    apply:
-      vars:
-        win_powershell_cmd: "Get-Service | Where-Object {$_.displayname -match 'VMware'} | select Name, Status | ft -hide"
-        win_execute_cmd_ignore_error: true
-      when: >
-        (retry_time == 1) or
-        (win_get_vmtools_service_expect | length != 0 and
-        (win_powershell_cmd_output.stdout_lines | default([]) | select | length < win_get_vmtools_service_expect | length))
-  loop: "{{ range(1, (win_get_vmtools_service_retries | default(1) | int + 1)) }}"
-  loop_control:
-    loop_var: retry_time
-    pause: 5
+- name: "Get VMware Tools services in guest OS"
+  ansible.windows.win_shell: "Get-Service | Where-Object {$_.displayname -match 'VMware'} | select Name, Status | ft -hide"
+  register: get_vmtools_service_result
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_unreachable: true
 
-- name: "Set fact of VMware Tools services and status dict"
+- name: "Set fact of VMware Tools services dict"
   ansible.builtin.set_fact:
     vmtools_service_dict: "{{ vmtools_service_dict | combine({item.split()[0]: item.split()[1]}) }}"
-  with_items: "{{ win_powershell_cmd_output.stdout_lines | select }}"
-  when:
-    - win_powershell_cmd_output.stdout_lines is defined
-    - win_powershell_cmd_output.stdout_lines | length != 0
+  with_items: "{{ get_vmtools_service_result.stdout_lines | default([]) | select }}"
 
-- name: "Display VMware Tools services and status"
+- name: "Display VMware Tools services dict"
   ansible.builtin.debug: var=vmtools_service_dict
-
-- name: "Check get all the services expected"
-  ansible.builtin.assert:
-    that:
-      - services_missing == []
-    fail_msg: >-
-      {%- if win_powershell_cmd_output.msg is defined -%}
-      Get VMware services failed in guest OS with error '{{ win_powershell_cmd_output.msg }}'.
-      {%- else -%}
-      Not get all expected services '{{ win_get_vmtools_service_expect }}' in guest OS, missing ones are '{{ services_missing }}'.
-      {%- endif -%}
-  vars:
-    services_missing: "{{ win_get_vmtools_service_expect | difference(vmtools_service_dict.keys()) }}"
-  when: win_get_vmtools_service_expect | length != 0
