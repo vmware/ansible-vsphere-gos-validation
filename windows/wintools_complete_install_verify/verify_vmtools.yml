@@ -18,11 +18,17 @@
       ['VMTools']
       {% endif %}
 
-- name: "Get VMware Tools services list"
-  include_tasks: ../utils/win_get_vmtools_service_list.yml
-  vars:
-    win_get_vmtools_service_retries: 6
-    win_get_vmtools_service_expect: "{{ win_tools_services }}"
+- name: "Retry to get VMware Tools services list"
+  include_tasks:
+    file: ../utils/win_get_vmtools_service_list.yml
+    apply:
+      when: >
+        (retry_time == 1) or
+        (vmtools_service_dict | default({}) | length < win_tools_services | length)
+  loop: "{{ range(1, 7) }}"
+  loop_control:
+    loop_var: retry_time
+    pause: 5
 
 - name: "Check VMware Tools service is running"
   ansible.builtin.assert:
