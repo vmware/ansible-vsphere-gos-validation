@@ -1,29 +1,22 @@
 # Copyright 2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Get ESXi host logical processor number"
-  include_tasks: ../../common/esxi_get_cpu_mem_info.yml
-
 - name: "Set fact of the maximum vCPU number of hot add test"
   ansible.builtin.set_fact:
-    max_num_cpus: "{{ [esxi_logical_cpu_num | int, vm_cpu_hotadd_max | default(16) | int] | min }}"
-
-- name: "Maximum VM vCPU number of CPU hot add test"
-  ansible.builtin.debug: var=max_num_cpus
+    vtpm_cpus: "{{ cpu_number | default(2) }}"
+    vtpm_cpu_cores_per_socket: "{{ cpu_cores_per_socket | default(1) }}"
 
 - name: "Get CPU info"
   include_tasks: ../../common/vm_get_cpu_info.yml
 
 - name: Set fact of the test cores per socket value
   ansible.builtin.set_fact:
-    new_cores_per_socket: "{{ vm_cpu_cores_per_socket | int + 2 }}"
-
-- ansible.builtin.debug:
-    msg: "New cores per socket value '{{ new_cores_per_socket }}' is larger than '{{ max_num_cpus }}', skip test"
-  when: new_cores_per_socket | int > max_num_cpus | int
+    vtpm_num_cpus: "{{ vtpm_cpus + vtpm_cpu_cores_per_socket }}"
+  when:
+    - vm_cpu_num == vtpm_cpus
+    - vm_cpu_cores_per_socket == vtpm_cpu_cores_per_socket
 
 - name: "Change vCPU and test vTPM.enable.pcr_consistency.ChangeHardware"
-  when: new_cores_per_socket | int <= max_num_cpus | int
   block:
     - name: "Record current PCR value"
       ansible.builtin.shell: tpm2_pcrread sha256:0
@@ -39,8 +32,8 @@
     - name: "Modify VM settting to add vCPU"
       include_tasks: ../../common/vm_set_cpu_number.yml
       vars:
-        num_cores_per_socket: "{{ new_cores_per_socket }}"
-        num_cpus: "{{ new_cores_per_socket }}"
+        num_cores_per_socket: "{{ vtpm_cpu_cores_per_socket }}"
+        num_cpus: "{{ vtpm_cpus }}"
 
     - name: "Poweron VM"
       include_tasks: ../../common/vm_set_power_state.yml
