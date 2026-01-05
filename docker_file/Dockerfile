@@ -1,6 +1,6 @@
 # ansible-vsphere-gos-validation
 # For users launch guest OS validation test on vSphere
-# version: 3.2
+# version: 3.3
 
 # Use latest Photon OS docker image as parent image
 FROM photon:latest

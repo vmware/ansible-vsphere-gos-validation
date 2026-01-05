@@ -68,33 +68,27 @@ This project supports below scenarios for end-to-end guest operating system vali
 
 | Guest Operating Systems                                | Automatic Install from ISO Image | Deploy from OVA Template | Existing VM with Guest Operating System Installed |
 |:-------------------------------------------------------| :------------------------------: | :----------------------: | :--------------------------------: |
-| Red Hat Enterprise Linux 7.x, 8.x, 9.x                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| CentOS 7.x, 8.x                                        | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| CentOS Stream 8, 9, 10                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Oracle Linux 7.x, 8.x, 9.x                             | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Rocky Linux 8.x, 9.x                                   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| AlmaLinux 8.x, 9.x                                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Red Hat Enterprise Linux 7.x, 8.x, 9.x, 10.x           | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| CentOS Stream 9, 10                                    | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Oracle Linux 7.x, 8.x, 9.x, 10.x                       | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Rocky Linux 8.x, 9.x, 10.x                             | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| AlmaLinux 8.x, 9.x, 10.x                               | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise Desktop 15 SP3 and later         | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise Server 15 SP3 and later          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise Server 16.0                      | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| VMware Photon OS 3.0, 4.0, 5.0                         | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
+| VMware Photon OS 4.0, 5.0                              | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Ubuntu 20.04 and later                                 | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Flatcar 2592.0.0 and later                             |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
-| Debian 10.10 and later, 11.x, 12.x                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Debian 10.10 and later, 11.x, 12.x, 13.x               | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Windows 10, 11                                         | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Windows Server 2019, 2022, 2025                        | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| UnionTech OS Server 20 1050a                           | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Fedora 36 Server, Workstation and later                | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Windows Server 2016, 2019, 2022, 2025                  | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Fedora 36 and later Server                             | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | ProLinux Server 7.9, 8.5                               | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | FreeBSD 13 and later                                   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Pardus 21.2 Server,XFCE Desktop and later              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| Pardus 23.x Server,XFCE Desktop                        | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| openSUSE Leap 15.3 and later                           | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| openSUSE Leap 16.0                                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| BCLinux 8.x                                            | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| BCLinux-for-Euler 21.10                                | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| Pardus 21.2 and later, 23.x, 25.0 Server/XFCE          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| openSUSE Leap 15.3 and later, 16.0                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Red Hat Enterprise Linux CoreOS (RHCOS) 4.13 and later |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
-| FusionOS 22 and 23                                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| FusionOS 22, 23                                        | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Miracle Linux 8.x, 9.x                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Kylin Linux Advanced Server V10 and later              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 
@@ -102,10 +96,10 @@ This project supports below scenarios for end-to-end guest operating system vali
 This compatible guest operating systems list is used for this project only. For guest operating system support status on ESXi, please refer to [Broadcom Compatibility Guide](https://compatibilityguide.broadcom.com/search?program=software&persona=live&column=osVendors&order=asc).
 
 ### Docker images
-* Latest (Release v3.2):
+* Latest (Release v3.3):
   * projects.packages.broadcom.com/gos_cert/ansible-vsphere-gos-validation:latest
-* Release v3.2:
-  * projects.packages.broadcom.com/gos_cert/ansible-vsphere-gos-validation:v3.2
+* Release v3.3:
+  * projects.packages.broadcom.com/gos_cert/ansible-vsphere-gos-validation:v3.3
 
 Launch testing using Docker image
 1. Execute below commands in your machine
