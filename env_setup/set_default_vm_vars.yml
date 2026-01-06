@@ -38,27 +38,27 @@
     boot_disk_controller: >-
       {{
           (boot_disk_controller is defined and boot_disk_controller)
-          | ternary(boot_disk_controller | lower, guest_config_options.default_disk_controller)
+          | ternary(boot_disk_controller, guest_config_options.default_disk_controller) | lower
       }}
     network_adapter_type: >-
       {{
           (network_adapter_type is defined and network_adapter_type)
-          | ternary(network_adapter_type | lower, guest_config_options.default_ethernet)
+          | ternary(network_adapter_type, guest_config_options.default_ethernet) | lower
       }}
     firmware: >-
       {{
           (firmware is defined and firmware)
-          | ternary(firmware | lower, guest_config_options.rec_firmware)
+          | ternary(firmware, guest_config_options.rec_firmware) | lower
       }}
     memory_mb: >-
       {{
           (memory_mb is defined and memory_mb)
-          | ternary(memory_mb | int, guest_config_options.rec_memory_mb)
+          | ternary(memory_mb, guest_config_options.rec_memory_mb) | int
       }}
     boot_disk_size_gb: >-
       {{
           (boot_disk_size_gb is defined and boot_disk_size_gb)
-          | ternary(boot_disk_size_gb | int, (guest_config_options.rec_disk_mb | int // 1024))
+          | ternary(boot_disk_size_gb, (guest_config_options.rec_disk_mb | int // 1024)) | int
       }}
 
 - name: "Set fact of the EFI secure boot enable status for new VM"
@@ -67,7 +67,7 @@
       {%- if firmware == 'efi' -%}
       {{
           (secureboot_enabled is defined and secureboot_enabled | type_debug == 'bool')
-          | ternary(secureboot_enabled, guest_config_options.default_secure_boot | bool)
+          | ternary(secureboot_enabled, guest_config_options.default_secure_boot) | bool
       }}
       {%- else -%}false
       {%- endif -%}
