@@ -49,6 +49,7 @@
   ansible.builtin.shell: tpm2_getcap properties-fixed | awk '/TPM2_PT_MANUFACTURER:/ {getline;getline; gsub(/"/, "", $2); print $2}'
   delegate_to: "{{ vm_guest_ip }}"
   register: tpm_manufacturer_results
+  ignore_errors: true
 
 - name: "Add manafacturer info to dict tpm_info"
   ansible.builtin.set_fact:
@@ -59,12 +60,13 @@
     - tpm_manufacturer_results.stdout is defined
     - tpm_manufacturer_results.stdout | length != 0
 
-- name: "Get vTPM family"
+- name: "Get TPM family"
   ansible.builtin.shell: tpm2_getcap properties-fixed | awk '/TPM2_PT_FAMILY_INDICATOR:/ {getline;getline; gsub(/"/, "", $2); print $2}'
   delegate_to: "{{ vm_guest_ip }}"
   register: tpm_family_results
+  ignore_errors: true
 
-- name: "Add vTPM family info to dict tpm_info"
+- name: "Add TPM family info to dict tpm_info"
   ansible.builtin.set_fact:
     tpm_info: "{{ tpm_info | combine({'TPM2_PT_FAMILY_INDICATOR': tpm_family_results.stdout}) }}"
   when:
