@@ -93,18 +93,5 @@ This project supports below scenarios for end-to-end guest operating system vali
 | Kylin Linux Advanced Server V10 and later              | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 
 **Notes**
-This compatible guest operating systems list is used for this project only. For guest operating system support status on ESXi, please refer to [Broadcom Compatibility Guide](https://compatibilityguide.broadcom.com/search?program=software&persona=live&column=osVendors&order=asc).
-
-### Docker images
-* Latest (Release v3.3):
-  * projects.packages.broadcom.com/gos_cert/ansible-vsphere-gos-validation:latest
-* Release v3.3:
-  * projects.packages.broadcom.com/gos_cert/ansible-vsphere-gos-validation:v3.3
-
-Launch testing using Docker image
-1. Execute below commands in your machine
-```
-$ docker pull projects.packages.broadcom.com/gos_cert/ansible-vsphere-gos-validation:latest
-$ docker run -it --privileged projects.packages.broadcom.com/gos_cert/ansible-vsphere-gos-validation:latest
-```
-2. Launch testing in the started container following the steps in this section [Steps to Launch Testing](#steps-to-launch-testing)
+This compatible guest operating systems list is used for this project only.
+For guest operating system support status on ESXi, please refer to [Broadcom Compatibility Guide](https://compatibilityguide.broadcom.com/search?program=software&persona=live&column=osVendors&order=asc).
