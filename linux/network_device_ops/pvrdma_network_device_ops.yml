@@ -141,3 +141,19 @@
 
         - name: "Collect server VM information at test failure"
           include_tasks: ../../common/test_rescue.yml
+      always:
+        - name: "Clean up client VM"
+          when:
+            - pvrdma_client_vm_exists is defined
+            - pvrdma_client_vm_exists
+          block:
+            - name: "Power off client VM"
+              include_tasks: ../../common/vm_set_power_state.yml
+              vars:
+                vm_name: "{{ pvrdma_client_vm_name }}"
+                vm_power_state_set: 'powered-off'
+
+            - name: "Remove client VM"
+              include_tasks: ../../common/vm_remove.yml
+              vars:
+                vm_name: "{{ pvrdma_client_vm_name }}"
