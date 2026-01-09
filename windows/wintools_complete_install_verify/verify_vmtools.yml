@@ -24,17 +24,30 @@
     apply:
       when: >
         (retry_time == 1) or
-        (vmtools_service_dict | default({}) | length < win_tools_services | length)
+        (vmtools_service_dict | default({}) | length < win_tools_services | length) or
+        ("'VGAuthService' in vmtools_service_dict" and vmtools_service_dict['VGAuthService'] != "Running") or
+        ("'VMTools' in vmtools_service_dict" and vmtools_service_dict['VMTools'] != "Running")
   loop: "{{ range(1, 7) }}"
   loop_control:
     loop_var: retry_time
     pause: 5
 
-- name: "Check VMware Tools service is running"
+- name: "Check service 'VGAuthService' is running"
   ansible.builtin.assert:
     that:
+      - vmtools_service_dict.VGAuthService is defined
+      - vmtools_service_dict['VGAuthService'] == "Running"
+    fail_msg: >-
+      Not get 'Running' status of service 'VGAuthService' in guest OS after 6 retries. Got services status dict: {{ vmtools_service_dict }}.
+  when: "'VGAuthService' in win_tools_services"
+
+- name: "Check service 'VMTools' is running"
+  ansible.builtin.assert:
+    that:
+      - vmtools_service_dict.VMTools is defined
       - vmtools_service_dict['VMTools'] == "Running"
-    fail_msg: "'VMTools' service is not 'Running' after VMware Tools install: {{ vmtools_service_dict['VMTools'] }}"
+    fail_msg: >-
+      Not get 'Running' status of service 'VMTools' in guest OS after 6 retries. Got services status dict: {{ vmtools_service_dict }}.
 
 - name: "Get drivers with VMware or Broadcom manufacturer"
   include_tasks: ../utils/win_get_vmtools_driver_list.yml
