@@ -23,6 +23,10 @@
         package_list: ["tpm2-tss-engine-devel", "tpm2.0-tools", "tpm2.0-abrmd"]
         package_state: "present"
 
+- name: "Initialize fact of tpm2-tools major version"
+  ansible.builtin.set_fact:
+    tpm2_major_version: "0"
+
 - name: "Get tpm2-tools version"
   ansible.builtin.shell: tpm2_getcap --version
   delegate_to: "{{ vm_guest_ip }}"
@@ -31,9 +35,25 @@
 - name: "Print tpm2-tools version"
   ansible.builtin.debug: var=tpm_tools_version_result
 
-- name: "Set fact of tpm2-tools major version"
+- name: "Set fact of tpm2-tools major version for {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
-    tpm2_major_version: "{{ (tpm_tools_version_result | regex_search('version=\"([0-9]+)', '\\1')) | default('4') }}"
+    tpm2_major_version: "{{ (tpm_tools_version_result | regex_search('version=\"([0-9]+)', '\\1'))[0] }}"
+  when: guest_os_ansible_distribution != "Kylin Linux Advanced Server"
+
+- name: "Get TPM version for {{ guest_os_ansible_distribution }}"
+  when: guest_os_ansible_distribution == "Kylin Linux Advanced Server"
+  block:
+    - name: "Get TPM version from tpm2-tools package"
+      ansible.builtin.shell: "rpm -qa | grep '^tpm2-tools-[0-9]'"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: tpm_tools_version_result
+
+    - name: "Set fact of tpm2-tools major version"
+      ansible.builtin.set_fact:
+        tpm2_major_version: "{{ (tpm_tools_version_result | regex_search('tpm2-tools-\"([0-9]+)', '\\1'))[0] }}"
+
+- name: "Print tpm2-tools major version"
+  ansible.builtin.debug: var=tpm2_major_version
 
 - name: "Install package openssl for {{ guest_os_ansible_distribution }}"
   include_tasks: ../utils/install_uninstall_package.yml
