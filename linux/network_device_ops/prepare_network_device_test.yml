@@ -70,6 +70,11 @@
     - name: "Update network config file to remove MAC address for '{{ guest_primary_nic_name }}'"
       when: guest_file_exists
       block:
+        - name: "Print the content of the network config file before changing"
+          ansible.builtin.shell: "cat {{ guest_primary_nic_config_path }}"
+          delegate_to: "{{ vm_guest_ip }}"
+          ignore_errors: true
+
         - name: "Remove MAC address or UUID from network config file for '{{ guest_primary_nic_name }}'"
           ansible.builtin.lineinfile:
             path: "{{ guest_primary_nic_config_path }}"
@@ -90,6 +95,11 @@
 
             - name: "Apply new netplan config"
               include_tasks: reload_network_configs.yml
+
+    - name: "Print the content of the network config file after changing"
+      ansible.builtin.shell: "cat {{ guest_primary_nic_config_path }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
 
     - name: "Get all VM serial ports"
       include_tasks: ../../common/vm_get_serial_ports.yml
@@ -120,6 +130,10 @@
       vars:
         parent_vm_name: "{{ pvrdma_server_vm_name }}"
         cloned_vm_name: "{{ pvrdma_client_vm_name }}"
+
+    - name: "Pause 30 seconds after VM instant clone"
+      ansible.builtin.pause:
+        seconds: 30
 
     - name: "Set fact of client VM exists"
       ansible.builtin.set_fact:

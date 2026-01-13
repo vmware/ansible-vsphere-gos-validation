@@ -47,6 +47,18 @@
           The primary network adapter's MAC address of client VM '{{ pvrdma_client_vm_name }}'
           is '{{ pvrdma_client_vm_primary_nic_mac }}'
 
+    - name: "Get VMware Tools status on client VM"
+      include_tasks: ../../common/vm_get_vmtools_status.yml
+
+    - name: "Fetch network config file from client VM for debugging"
+      include_tasks: ../../common/vm_guest_file_operation.yml
+      vars:
+        operation: "fetch_file"
+        src_path: "{{ guest_primary_nic_config_path }}"
+        dest_path: "{{ current_test_log_folder }}/{{ guest_primary_nic_config_path | ansible.builtin.basename }}_after_clone"
+        guest_file_ops_ignore_error: true
+      when: vmtools_is_running is defined and vmtools_is_running | bool
+
     - name: "Refresh client VM's guest IP till it has different IP with server VM"
       include_tasks:
         file: refresh_pvrdma_client_vm_ip.yml
