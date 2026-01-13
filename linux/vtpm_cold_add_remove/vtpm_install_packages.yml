@@ -1,10 +1,17 @@
 # Copyright 2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+- name: "Set fact of packages list required by vTPM"
+  ansible.builtin.set_fact:
+    vtpm_package_list: |-
+      {%- if guest_os_ansible_distribution in ['SLES', 'SLED', 'openSUSE Leap'] -%}['tpm2-tss-engine-devel', 'tpm2.0-tools', 'tpm2.0-abrmd']
+      {%- elif  guest_os_ansible_distribution == 'Fedora' -%}['tpm2-tools', 'openssl']
+      {%- else -%}['tpm2-tools']{%- endif -%}
+
 - name: "Install 'tpm2-tools' for {{ guest_os_ansible_distribution }}"
   include_tasks: ../utils/install_uninstall_package.yml
   vars:
-    package_list: ["tpm2-tools"]
+    package_list: "{{ vtpm_package_list }}"
     package_state: "present"
   when: guest_os_ansible_distribution not in ['SLES', 'SLED', 'openSUSE Leap']
 
@@ -20,7 +27,7 @@
     - name: "Install packages for {{ guest_os_ansible_distribution }}"
       include_tasks: ../utils/install_uninstall_package.yml
       vars:
-        package_list: ["tpm2-tss-engine-devel", "tpm2.0-tools", "tpm2.0-abrmd"]
+        package_list: "{{ vtpm_package_list }}"
         package_state: "present"
 
 - name: "Initialize fact of tpm2-tools major version"
@@ -54,10 +61,3 @@
 
 - name: "Print tpm2-tools major version"
   ansible.builtin.debug: var=tpm2_major_version
-
-- name: "Install package openssl for {{ guest_os_ansible_distribution }}"
-  include_tasks: ../utils/install_uninstall_package.yml
-  vars:
-    package_list: ["openssl"]
-    package_state: "present"
-  when: guest_os_ansible_distribution == "Fedora"
