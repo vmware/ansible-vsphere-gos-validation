@@ -106,33 +106,15 @@
 - name: "Test vTPM for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
   when: tpm2_major_version is defined and tpm2_major_version | int >= 4
   block:
-    # vTPM.enable.tpm2_readpublic: Read public key
-    - name: "Check vTPM's Read public key function"
-      ansible.builtin.shell: |
-        tpm2_createprimary -c primary.ctx
-        tpm2_readpublic -c primary.ctx
-      delegate_to: "{{ vm_guest_ip }}"
-
-    # vTPM.enable.tpm2_rsadecrypt: Verify whether the virtual vTPM’s RSA decryption function is enabled and operating properly.
     - name: "Check vTPM's RSA decryption function"
       include_tasks: vtpm2_rsadecrypt_test.yml
 
-    # vTPM.enable.tpm2_verifysignature: Verify the validity of the digital signature
     - name: "Verify the validity of the digital signature"
-      ansible.builtin.shell: |
-        tpm2_createprimary -C o -c primary.ctx
-        tpm2_create -C primary.ctx -G rsa -u rsa.pub -r rsa.priv
-        tpm2_load -C primary.ctx -u rsa.pub -r rsa.priv -c rsa.ctx
-        echo "Hello_vTPM_Signature" > test_signature_data.txt
-        tpm2_sign -c rsa.ctx -g sha256 -o sig.dat test_signature_data.txt
-        tpm2_verifysignature -c rsa.ctx -g sha256 -m test_signature_data.txt -s sig.dat
-      delegate_to: "{{ vm_guest_ip }}"
+      include_tasks: vtpm2_verify_signature.yml
 
-    # vTPM.enable.tpm2_hash: Verify the validity of hash
     - name: "Verify the validity of hash"
       include_tasks: vtpm2_hash_test.yml
 
-    # vTPM.enable.pcr_consistency.ChangeHardware: Verify the impact of hardware changes on PCR values
     - name: "Verify the impact of hardware changes on PCR values"
       include_tasks: vtpm2_pcr_consistency_test.yml
 
