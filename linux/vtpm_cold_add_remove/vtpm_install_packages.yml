@@ -8,27 +8,11 @@
       {%- elif  guest_os_ansible_distribution == 'Fedora' -%}['tpm2-tools', 'openssl']
       {%- else -%}['tpm2-tools']{%- endif -%}
 
-- name: "Install 'tpm2-tools' for {{ guest_os_ansible_distribution }}"
+- name: "Install packages for {{ guest_os_ansible_distribution }}"
   include_tasks: ../utils/install_uninstall_package.yml
   vars:
     package_list: "{{ vtpm_package_list }}"
     package_state: "present"
-  when: guest_os_ansible_distribution not in ['SLES', 'SLED', 'openSUSE Leap']
-
-- name: "Add ISO repo and install packages from ISO"
-  when: guest_os_ansible_distribution in ['SLES', 'SLED', 'openSUSE Leap']
-  block:
-    - name: "Connect CDROM and add local repositories on {{ vm_guest_os_distribution }}"
-      include_tasks: ../utils/add_local_dvd_repo.yml
-      when:
-        - os_installation_iso_list is defined
-        - os_installation_iso_list | length > 0
-
-    - name: "Install packages for {{ guest_os_ansible_distribution }}"
-      include_tasks: ../utils/install_uninstall_package.yml
-      vars:
-        package_list: "{{ vtpm_package_list }}"
-        package_state: "present"
 
 - name: "Initialize fact of tpm2-tools major version"
   ansible.builtin.set_fact:
