@@ -1,0 +1,29 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Check TPM allow performing RSA private key decryption
+
+# Create RSA key pair / Load RSA key pair to TPM / Export public key / prepare, encrypt and decrypt test data
+- name: "Encrypt data with OpenSSL and Decrypt data with TPM"
+  ansible.builtin.shell: |
+    tpm2_createprimary -C o -c primary.ctx
+    tpm2_create -C primary.ctx -G rsa -u rsa.pub -r rsa.priv
+    tpm2_load -C primary.ctx -u rsa.pub -r rsa.priv -c rsa.ctx
+    tpm2_readpublic -c rsa.ctx -o rsa_pub.pem -f pem
+    echo "Hello_vTPM" > secret.txt
+    openssl pkeyutl -encrypt -inkey rsa_pub.pem -pubin -in secret.txt -out secret.enc
+    tpm2_rsadecrypt -c rsa.ctx -o secret.dec secret.enc
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Read the decrypted data"
+  ansible.builtin.shell: cat secret.dec
+  delegate_to: "{{ vm_guest_ip }}"
+  register: decrypted_data_result
+
+- name: "Check the decrypted data"
+  ansible.builtin.assert:
+    that:
+      - decrypted_data_result.stdout is defined
+      - decrypted_data_result.stdout == "Hello_vTPM"
+    fail_msg: "The decrypted data does not match the original data."
+    success_msg: "The decrypted data matches the original data."

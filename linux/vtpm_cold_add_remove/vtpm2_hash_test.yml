@@ -1,0 +1,45 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Hash testing using TPM 2.0
+#
+- name: "Prepare test data"
+  ansible.builtin.shell: echo "Hello_vTPM_Hash" > test_hash_data.txt
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Print file content"
+  ansible.builtin.shell: cat test_hash_data.txt
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Perform hash operation on the file with TPM in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+  ansible.builtin.shell: tpm2_hash -T device -H o -g sha256 -o hash.out test_hash_data.txt
+  delegate_to: "{{ vm_guest_ip }}"
+  when: tpm2_major_version is defined and tpm2_major_version | int < 4
+
+- name: "Perform hash operation on the file with TPM in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }}"
+  ansible.builtin.shell: tpm2_hash -C o -g sha256 -o hash.out test_hash_data.txt
+  delegate_to: "{{ vm_guest_ip }}"
+  when: tpm2_major_version is defined and tpm2_major_version | int >= 4
+
+- name: "Get the Hash with TPM"
+  ansible.builtin.shell: hexdump -v -e '1/1 "%02x"' hash.out
+  delegate_to: "{{ vm_guest_ip }}"
+  register: tpm_hash
+
+- name: "Compute reference hash using openssl" 
+  ansible.builtin.shell: openssl dgst -sha256 test_hash_data.txt | awk '{print $2}'
+  delegate_to: "{{ vm_guest_ip }}"
+  register: openssl_hash
+
+- name: "Display TPM hash and OpenSSL hash"
+  ansible.builtin.debug:
+    msg:
+      - "TPM Hash: {{ tpm_hash.stdout }}"
+      - "OpenSSL Hash: {{ openssl_hash.stdout }}"
+
+- name: "Verify TPM hash matches OpenSSL hash"
+  ansible.builtin.assert:
+    that:
+      - tpm_hash.stdout | lower == openssl_hash.stdout | lower
+    success_msg: "TPM hash matches OpenSSL hash. vTPM hashing works correctly."
+    fail_msg: "TPM hash does NOT match OpenSSL hash. vTPM hashing is incorrect."

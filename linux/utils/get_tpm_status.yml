@@ -1,0 +1,82 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get TPM device info in Linux guest OS
+# Return:
+#   tpm_present: the TPM device is present or not
+#   tpm_info: the dict of TPM device info
+#
+- name: "Initialize the TPM device info"
+  ansible.builtin.set_fact:
+    tpm_present: false
+    tpm_info: {}
+
+- name: "Get TPM device in guest OS"
+  ansible.builtin.shell: "ls /dev/tpm*"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: tpm_dev_result
+  ignore_errors: true
+  changed_when: false
+
+- name: "Display the TPM device in guest OS"
+  ansible.builtin.debug: var=tpm_dev_result
+
+- name: "Set TPM device present or not"
+  ansible.builtin.set_fact:
+    tpm_present: true
+  when:
+    - tpm_dev_result.failed is defined
+    - not tpm_dev_result.failed
+    - tpm_dev_result.stdout is defined
+    - tpm_dev_result.stdout | length != 0
+
+- name: "Get TPM information when TPM is present"
+  when: tpm_present
+  block: 
+    - name: "Get TPM info"
+      ansible.builtin.shell: tpm2_getcap properties-variable
+      delegate_to: "{{ vm_guest_ip }}"
+      register: tpm_info_results
+      ignore_errors: true
+
+    - name: "Set TPM device info dict"
+      ansible.builtin.set_fact:
+        tpm_info: "{{ tpm_info_results.stdout | from_yaml }}"
+      when:
+        - tpm_info_results.failed is defined
+        - not tpm_info_results.failed
+        - tpm_info_results.stdout is defined
+        - tpm_info_results.stdout | length != 0
+
+    - name: "Get manufacturer"
+      ansible.builtin.shell: tpm2_getcap properties-fixed | awk '/TPM2_PT_MANUFACTURER:/ {getline;getline; gsub(/"/, "", $2); print $2}'
+      delegate_to: "{{ vm_guest_ip }}"
+      register: tpm_manufacturer_results
+      ignore_errors: true
+
+    - name: "Add manafacturer info to dict tpm_info"
+      ansible.builtin.set_fact:
+        tpm_info: "{{ tpm_info | combine({'TPM2_PT_MANUFACTURER': tpm_manufacturer_results.stdout}) }}"
+      when:
+        - tpm_manufacturer_results.failed is defined
+        - not tpm_manufacturer_results.failed
+        - tpm_manufacturer_results.stdout is defined
+        - tpm_manufacturer_results.stdout | length != 0
+
+    - name: "Get TPM family"
+      ansible.builtin.shell: tpm2_getcap properties-fixed | awk '/TPM2_PT_FAMILY_INDICATOR:/ {getline;getline; gsub(/"/, "", $2); print $2}'
+      delegate_to: "{{ vm_guest_ip }}"
+      register: tpm_family_results
+      ignore_errors: true
+
+    - name: "Add TPM family info to dict tpm_info"
+      ansible.builtin.set_fact:
+        tpm_info: "{{ tpm_info | combine({'TPM2_PT_FAMILY_INDICATOR': tpm_family_results.stdout}) }}"
+      when:
+        - tpm_family_results.failed is defined
+        - not tpm_family_results.failed
+        - tpm_family_results.stdout is defined
+        - tpm_family_results.stdout | length != 0
+
+- name: "Display the TPM device info got in guest OS"
+  ansible.builtin.debug: var=tpm_info

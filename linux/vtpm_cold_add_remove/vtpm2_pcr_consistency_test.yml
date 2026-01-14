@@ -1,0 +1,63 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Initialize the changed VM CPU and cores per socket number to the VM default config values"
+  ansible.builtin.set_fact:
+    vtpm_cpus: "{{ (guest_config_options.rec_cpu_cores_per_socket | default(1) | int) * (guest_config_options.rec_cpu_socket | default(2) | int) }}"
+    vtpm_cpu_cores_per_socket: "{{ guest_config_options.rec_cpu_cores_per_socket | default(1) }}"
+
+- name: "Get CPU info"
+  include_tasks: ../../common/vm_get_cpu_info.yml
+
+- name: "Set changed VM CPU number when the VM current config matches the VM default config values"
+  ansible.builtin.set_fact:
+    vtpm_num_cpus: "{{ vtpm_cpus + vtpm_cpu_cores_per_socket }}"
+  when:
+    - vm_cpu_num == vtpm_cpus
+    - vm_cpu_cores_per_socket == vtpm_cpu_cores_per_socket
+
+- name: "Change vCPU and checks whether a PCR consistency validation is triggered"
+  block:
+    - name: "Record current PCR value"
+      ansible.builtin.shell: tpm2_pcrread sha256:0
+      delegate_to: "{{ vm_guest_ip }}"
+      register: pcr_before_result
+
+    - name: "Display current PCR value"
+      ansible.builtin.debug: var=pcr_before_result
+
+    - name: "Shutdown VM"
+      include_tasks: ../utils/shutdown.yml
+
+    - name: "Change VM vCPU number"
+      include_tasks: ../../common/vm_set_cpu_number.yml
+      vars:
+        num_cores_per_socket: "{{ vtpm_cpu_cores_per_socket }}"
+        num_cpus: "{{ vtpm_cpus }}"
+
+    - name: "Poweron VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-on'
+        
+    - name: "Update inventory"  
+      include_tasks: ../../common/update_inventory.yml
+
+    - name: "Re-read PCR values"
+      ansible.builtin.shell: tpm2_pcrread sha256:0
+      delegate_to: "{{ vm_guest_ip }}"
+      register: pcr_after_result
+
+    - name: "Display the new PCR value"
+      ansible.builtin.debug: var=pcr_after_result
+
+    - name: "Compare PCR value"
+      ansible.builtin.assert:
+        that:
+          - pcr_before_result.stdout is defined
+          - pcr_before_result.stdout | length != 0
+          - pcr_after_result.stdout is defined
+          - pcr_after_result.stdout | length != 0
+          - pcr_before_result.stdout == pcr_after_result.stdout
+        success_msg: "PCR value did not change. The vTPM correctly maintained PCR consistency after the vCPU modification."
+        fail_msg: "PCR value changed unexpectedly. The vTPM did not preserve PCR consistency after the vCPU modification."

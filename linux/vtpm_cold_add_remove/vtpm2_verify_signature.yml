@@ -1,0 +1,18 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Verify signature using TPM 2.0
+#
+- name: "Verify the validity of the digital signature"
+  ansible.builtin.shell: |
+    tpm2_createprimary -C o -c primary.ctx
+    tpm2_create -C primary.ctx -G rsa -u rsa.pub -r rsa.priv
+    tpm2_load -C primary.ctx -u rsa.pub -r rsa.priv -c rsa.ctx
+    echo "Hello_vTPM_Signature" > test_signature_data.txt
+    tpm2_sign -c rsa.ctx -g sha256 -o sig.dat test_signature_data.txt
+    tpm2_verifysignature -c rsa.ctx -g sha256 -m test_signature_data.txt -s sig.dat
+  delegate_to: "{{ vm_guest_ip }}"
+  register: verify_signature_result
+
+- name: "Display the result of signature verification"
+  ansible.builtin.debug: var=verify_signature_result
