@@ -69,6 +69,31 @@
     - enable_cloudinit_gosc
     - ip_assignment == "dhcp"
 
+- name: "Ignore Perl GOSC failure on DNS customization for {{ guest_os_ansible_distribution }} on vCenter {{ vcenter_version }}"
+  when:
+    - gosc_failed_items | length > 0
+    - guest_os_ansible_distribution == "Debian"
+    - guest_os_ansible_distribution_major_ver is version('13', '<=')
+    - not enable_cloudinit_gosc
+    - vcenter_version is version('9.0.1', '<=')
+  block:
+    - name: "Ignore DNS customization failures"
+      ansible.builtin.set_fact:
+        ignored_gosc_failed_items: ['dns_servers_success', 'dns_suffix_success']
+
+    - name: "Known issue - ignore Perl GOSC failure on DNS"
+      ansible.builtin.debug:
+        msg: 
+          - "{{ (gosc_validation_errors | dict2items | selectattr('key', 'in', ignored_gosc_failed_items) | map(attribute='value') | flatten) + ['Perl guest customization fails to configure DNS settings'] }}"
+          - "Please refer to https://knowledge.broadcom.com/external/article?articleId=419770 and https://knowledge.broadcom.com/external/article/422601"
+      tags:
+        - known_issue
+      when: (gosc_failed_items | length) > (gosc_failed_items | difference(ignored_gosc_failed_items) | length)
+
+    - name: "Update failed customization items"
+      ansible.builtin.set_fact:
+        gosc_failed_items: "{{ gosc_failed_items | difference(ignored_gosc_failed_items) }}"
+
 # User cannot customize the vCenter Server Appliance guest operating system to set a virtual NIC as a primary.
 # The issue was fixed on vCenter Server 6.5 U3, 6.7U2, and later releases.
 - block:
