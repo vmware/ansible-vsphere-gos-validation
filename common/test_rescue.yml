@@ -76,10 +76,19 @@
         - "vmware.log"
       when: vm_dir_name is defined and vm_dir_name
 
+    - name: "Set fact of the downloaded vmware.log file"
+      ansible.builtin.set_fact:
+        download_fail_vmware_log: "{{ datastore_file_download_result.dest }}"
+      when:
+        - datastore_file_download_success
+        - datastore_file_download_result.dest is defined
+        - datastore_file_download_result.dest | basename == "vmware.log"
+
     - name: "Check Windows guest BSOD in vmware.log"
       when:
         - gosv_test_suite == 'windows'
-        - datastore_file_download_success
+        - download_fail_vmware_log is defined
+        - download_fail_vmware_log | length != 0
       block:
         - name: "Look up Windows guest BSOD in vmware.log"
           ansible.builtin.set_fact:
