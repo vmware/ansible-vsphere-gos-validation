@@ -76,21 +76,34 @@
         - "vmware.log"
       when: vm_dir_name is defined and vm_dir_name
 
+    - name: "Set fact of the downloaded vmware.log file"
+      ansible.builtin.set_fact:
+        download_fail_vmware_log: "{{ datastore_file_download_result.dest }}"
+      when:
+        - datastore_file_download_success
+        - datastore_file_download_result.dest is defined
+        - datastore_file_download_result.dest | basename == "vmware.log"
+
     - name: "Check Windows guest BSOD in vmware.log"
       when:
         - gosv_test_suite == 'windows'
-        - datastore_file_download_success
+        - download_fail_vmware_log is defined
+        - download_fail_vmware_log | length != 0
       block:
         - name: "Look up Windows guest BSOD in vmware.log"
           ansible.builtin.set_fact:
             winbsod_in_vmware_log: "{{ lookup('file', datastore_file_download_result.dest) | regex_findall('.*WinBSOD:.*') }}"
 
-        - name: "Detected Windows guest BSOD in vmware.log"
-          ansible.builtin.debug:
-            msg: "{{ winbsod_in_vmware_log }}"
-          tags:
-            - fail_message
+        - name: "Detect Windows guest BSOD from vmware.log"
           when: winbsod_in_vmware_log | length > 0
+          block:
+            - name: "Collect VM suspended state and memory files"
+              include_tasks: vm_get_suspend_memory.yml
+            - name: "Print WinBSOD logs in vmware.log"
+              ansible.builtin.debug:
+                msg: "{{ winbsod_in_vmware_log }}"
+              tags:
+                - fail_message
 
     - name: "Take a snapshot at VM current state"
       include_tasks: vm_take_snapshot.yml

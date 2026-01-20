@@ -1,0 +1,65 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Initialize the VM suspended state file"
+  ansible.builtin.set_fact:
+    vm_suspend_file: ""
+
+- name: "Get VM power state"
+  include_tasks: vm_get_power_state.yml
+
+- name: "Save current VM power state"
+  ansible.builtin.set_fact:
+    vm_power_state_before: "{{ vm_power_state_get }}"
+
+- name: "Will not suspend VM"
+  ansible.builtin.debug:
+    msg: "Will not suspend this VM since it's already in '{{ vm_power_state_before }}' state."
+  when: vm_power_state_before == "suspended"
+
+- name: "Can not suspend VM"
+  ansible.builtin.debug:
+    msg: "Can not suspend this VM since it's in '{{ vm_power_state_before }}' state."
+  when: vm_power_state_before not in ["suspended", "poweredOn"]
+
+- name: "Suspend VM"
+  include_tasks: vm_set_power_state.yml
+  vars:
+    vm_power_state_set: "suspended"
+  when: vm_power_state_before == "poweredOn"
+
+- name: "Get VM suspended state and memory files"
+  when: >
+    vm_power_state_before == "suspended" or
+    (vm_power_state_before == "poweredOn" and vm_power_state_get == "suspended")
+  block:
+    - name: "Get VM config files list"
+      include_tasks: vm_get_config.yml
+      vars:
+        property_list:
+          - 'layout.configFile'
+
+    - name: "Set fact of the VM suspended state file"
+      ansible.builtin.set_fact:
+        vm_suspend_file: "{{ vm_config.layout.configFile | select('match', '.*vmss') }}"
+      when:
+        - vm_config.layout.configFile is defined
+        - vm_config.layout.configFile | length > 0
+
+    - name: "Get files from VM folder to current testing log folder"
+      include_tasks: esxi_download_datastore_file.yml
+      vars:
+        src_datastore: "{{ datastore }}"
+        src_file_path: "{{ vm_dir_name }}/{{ item }}"
+        dest_file_path: "{{ current_test_log_folder }}/{{ item }}"
+        download_file_fail_ignore: true
+        download_file_timeout: 600
+      with_items:
+        - "{{ vm_suspend_file }}"
+        - "{{ vm_suspend_file | replace('vmss', 'vmem')}}"
+      when: vm_suspend_file | length != 0
+
+    - name: "Will not fetch VM suspended state file"
+      ansible.builtin.debug:
+        msg: "Will not fetch VM suspended state file since not get .vmss file name '{{ vm_suspend_file }}'."
+      when: vm_suspend_file | length == 0
