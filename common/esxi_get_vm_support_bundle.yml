@@ -1,0 +1,65 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get vm-support bundle of VM on ESXi host and transfer this support bundle
+# to local path.
+#
+- name: "Initialize the VM support bundle file path on ESXi host"
+  ansible.builtin.set_fact:
+    vm_support_bundle_path: ""
+
+- name: "Get ESXi host encryption mode state"
+  include_tasks: esxi_get_property.yml
+  vars:
+    esxi_host_property_list:
+      - runtime.cryptoState
+
+- name: "Set fact of the ESXi host encryption mode state"
+  ansible.builtin.set_fact:
+    esxi_crypto_state: "{{ esxi_host_property_results.ansible_facts.runtime.cryptoState | default('') }}"
+
+- name: "Set fact of the command for collecting VM support bundle"
+  ansible.builtin.set_fact:
+    esxi_vm_support_cmd: |
+      {%- if esxi_crypto_state == 'safe' -%}
+      crypto-util keys vm-support --password='' prolog
+      vmx_path=$(/bin/vm-support --listvms | grep '/{{ vm_dir_name }}/' | awk '{print $1}')
+      /bin/vm-support --vm $vmx_path -q -w /vmfs/volumes/{{ datastore }}
+      crypto-util keys vm-support epilog
+      echo $vmx_path
+      {%- else -%}
+      vmx_path=$(/bin/vm-support --listvms | grep '/{{ vm_dir_name }}/' | awk '{print $1}')
+      /bin/vm-support --vm $vmx_path -q -w /vmfs/volumes/{{ datastore }}
+      echo $vmx_path 
+      {%- endif -%}
+
+- name: "Get VM '{{ vm_name }}' support bundle on ESXi host '{{ esxi_hostname }}'"
+  ansible.builtin.shell: "{{ esxi_vm_support_cmd }}"
+  delegate_to: "{{ esxi_hostname }}"
+  register: get_vm_support
+  ignore_errors: true
+
+- name: "Print the result of generating VM support bundle"
+  ansible.builtin.debug: var=get_vm_support
+  when: enable_debug
+
+- name: "Set fact of the gathered VM support bundle"
+  ansible.builtin.set_fact:
+    vm_support_bundle_path: "{{ (get_vm_support.stdout_lines[0] | regex_replace('File: (.*\\.tgz)', '\\1')).strip(\"'\") }}"
+  when:
+    - get_vm_support.failed is defined
+    - not get_vm_support.failed
+    - get_vm_support.stdout_lines is defined
+    - get_vm_support.stdout_lines | length > 0
+
+- name: "Print the VM support bundle file path"
+  ansible.builtin.debug: var=vm_support_bundle_path
+
+- name: "Transfer VM support bundle to local"
+  include_tasks: esxi_download_datastore_file.yml
+  vars:
+    src_datastore: "{{ datastore }}"
+    src_file_path: "{{ vm_support_bundle_path | basename }}"
+    dest_file_path: "{{ current_test_log_folder }}/{{ vm_support_bundle_path | basename }}"
+    download_file_fail_ignore: true
+  when: vm_support_bundle_path | length != 0

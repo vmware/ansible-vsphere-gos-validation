@@ -92,6 +92,7 @@
 
 ### Tasks for VM log files
 * vm_wait_log_msg.yml: Check or wait for a message appear in VM's log file
+* vm_get_suspend_memory.yml: Get VM suspended state and memory files and tranfer to local
 
 ### Tasks for VM vmx config
 * vm_get_extra_config.yml: Get all configs in the vmx file
@@ -140,6 +141,7 @@
 * esxi_check_delete_datastore_file.yml: Get datastore file status or delete file
 * esxi_upload_datastore_file.yml: Upload file to ESXi datastore
 * esxi_download_datastore_file.yml: Download file from ESXi datastore
+* esxi_get_vm_support_bundle.yml: Generate the VM support bundle and transfer to local
 
 ### Tasks for features on vCenter Server
 * vcenter_add_key_provider.yml: Add a Key Provider on vCenter Server
