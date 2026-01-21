@@ -48,7 +48,7 @@
   block:
     - name: "Initialize the variables for testing user password"
       ansible.builtin.set_fact:
-        gosc_log_pwd_need_change: false
+        gosc_test_pwd_works: true
         gosc_test_pwd_folder: "{{ 'C:\\gosc_test_pwd' ~ 10000 | random(start=1000) }}"
     - name: "Try to create test folder in guest OS"
       include_tasks: ../../common/vm_guest_file_operation.yml
@@ -59,7 +59,7 @@
         guest_file_ops_ignore_error: true
     - name: "Set fact of whether current user password works"
       ansible.builtin.set_fact:
-        gosc_log_pwd_need_change: true
+        gosc_test_pwd_works: false
       when:
         - create_dir_op.failed is defined
         - create_dir_op.failed
@@ -74,7 +74,7 @@
     - name: "Change the user password for fetching log files"
       ansible.builtin.set_fact:
         vm_password: "{{ win_gosc_spec.gosc_logon_password }}"
-      when: gosc_log_pwd_need_change
+      when: not gosc_test_pwd_works
 
 - name: "Fetch GOSC log files from guest OS"
   include_tasks: ../../common/vm_guest_file_operation.yml
