@@ -40,6 +40,42 @@
 - name: "Display the GOSC log files to be fetched"
   ansible.builtin.debug: var=win_gosc_log_src_dest
 
+# Administrator password may be already changed when GOSC task failed
+- name: "Check whether user 'Administrator' password is changed in guest OS"
+  when:
+    - vm_username | lower == "administrator"
+    - vm_password != win_gosc_spec.gosc_logon_password
+  block:
+    - name: "Initialize the variables for testing user password"
+      ansible.builtin.set_fact:
+        gosc_test_pwd_works: true
+        gosc_test_pwd_folder: "{{ 'C:\\gosc_test_pwd' ~ 10000 | random(start=1000) }}"
+    - name: "Try to create test folder in guest OS"
+      include_tasks: ../../common/vm_guest_file_operation.yml
+      vars:
+        operation: "create_dir"
+        dir_path: "{{ gosc_test_pwd_folder }}"
+        recurse: false
+        guest_file_ops_ignore_error: true
+    - name: "Set fact of whether current user password works"
+      ansible.builtin.set_fact:
+        gosc_test_pwd_works: false
+      when:
+        - create_dir_op.failed is defined
+        - create_dir_op.failed
+        - create_dir_op.msg is defined
+        - create_dir_op.msg is search("Invalid guest login for user Administrator")
+    - name: "Current user password works"
+      ansible.builtin.debug:
+        msg: "Creating test folder '{{ gosc_test_pwd_folder }}' in guest OS succeeded using user 'Administrator' current password."
+      when:
+        - create_dir_op.failed is defined
+        - not create_dir_op.failed
+    - name: "Change the user password for fetching log files"
+      ansible.builtin.set_fact:
+        vm_password: "{{ win_gosc_spec.gosc_logon_password }}"
+      when: not gosc_test_pwd_works
+
 - name: "Fetch GOSC log files from guest OS"
   include_tasks: ../../common/vm_guest_file_operation.yml
   vars:
