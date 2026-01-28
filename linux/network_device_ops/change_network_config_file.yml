@@ -1,0 +1,41 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Get network config file state"
+  include_tasks: ../utils/get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ guest_primary_nic_config_path }}"
+
+- name: "Update network config file to remove MAC address for '{{ guest_primary_nic_name }}'"
+  when: guest_file_exists
+  block:
+    - name: "Print the content of the network config file before changing"
+      ansible.builtin.shell: "cat {{ guest_primary_nic_config_path }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+
+    - name: "Remove MAC address or UUID from network config file for '{{ guest_primary_nic_name }}'"
+      ansible.builtin.lineinfile:
+        path: "{{ guest_primary_nic_config_path }}"
+        regexp: "^uuid|^UUID|^MAC|^mac|^HWADDR"
+        state: absent
+      delegate_to: "{{ vm_guest_ip }}"
+      when: guest_os_network_manager != "netplan"
+
+    - name: "Update netplan config for '{{ guest_primary_nic_name }}'"
+      when: guest_os_network_manager == "netplan"
+      block:
+        - name: "Remove MAC address from netplan config file for '{{ guest_primary_nic_name }}'"
+          ansible.builtin.lineinfile:
+            path: "{{ guest_primary_nic_config_path }}"
+            regexp: "^ *(match|macaddress|set-name)"
+            state: absent
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - name: "Apply new netplan config"
+          include_tasks: reload_network_configs.yml
+
+- name: "Print the content of the network config file after changing"
+  ansible.builtin.shell: "cat {{ guest_primary_nic_config_path }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: true
