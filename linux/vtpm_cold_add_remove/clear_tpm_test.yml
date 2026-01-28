@@ -3,19 +3,30 @@
 ---
 # Check OS still work well after clear TPM
 #
-- name: "Clear TPM in guest OS"
-  ansible.builtin.shell: tpm2_clear
+- name: "Check tpm2_clear exits or not"
+  ansible.builtin.shell: which tpm2_clear
   delegate_to: "{{ vm_guest_ip }}"
+  register: tpm2_clear_command_result
+  ignore_errors: true
 
-- name: "Sleep 5 seconds"
-  ansible.builtin.pause:
-    seconds: 5
+- name: "Clear TPM in guest OS"
+  when:
+    - tpm2_clear_command_result.failed is defined
+    - not tpm2_clear_command_result.failed
+  block:
+    - name: "Clear TPM in guest OS"
+      ansible.builtin.shell: tpm2_clear
+      delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Reboot guest OS"
-  include_tasks: ../utils/reboot.yml
+    - name: "Sleep 5 seconds"
+      ansible.builtin.pause:
+        seconds: 5
 
-- name: "Get TPM info after reset"
-  include_tasks: ../utils/get_tpm_status.yml
+    - name: "Reboot guest OS"
+      include_tasks: ../utils/reboot.yml
 
-- name: "Check TPM device status in guest OS after reset"
-  include_tasks: vtpm_check_status.yml
+    - name: "Get TPM info after reset"
+      include_tasks: ../utils/get_tpm_status.yml
+
+    - name: "Check TPM device status in guest OS after reset"
+      include_tasks: vtpm_check_status.yml
