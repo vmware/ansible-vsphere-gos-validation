@@ -9,6 +9,29 @@
   register: tpm2_clear_command_result
   ignore_errors: true
 
+- name: "Check command 'tpm2_clear' is required or not"
+  when:
+    - tpm2_clear_command_result.failed is defined
+    - tpm2_clear_command_result.failed
+  block:
+    - name: "Known issue - ignore failure of not found command tpm2_clear"
+      ansible.builtin.debug:
+        msg:
+          - "Not found the command 'tpm2_clear' in Debian 10 and Redhat 7.x"
+          - "Please refer to https://bugzilla-vcf.lvn.broadcom.net/show_bug.cgi?id=3645327"
+      tags:
+        - known_issue
+      when: >
+        (guest_os_ansible_distribution == "Debian" and guest_os_ansible_distribution_major_ver | int == 10) or
+        (guest_os_ansible_distribution == "RedHat" and guest_os_ansible_distribution_major_ver | int == 7)
+
+    - name: "Required command 'tpm2_clear' is not found"
+      ansible.builtin.fail:
+        msg: "Not found the command 'tpm2_clear' in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_major_ver }}"
+      when:
+        - not (guest_os_ansible_distribution == "Debian" and guest_os_ansible_distribution_major_ver | int == 10)
+        - not (guest_os_ansible_distribution == "RedHat" and guest_os_ansible_distribution_major_ver | int == 7)
+
 - name: "Test clear TPM in guest OS"
   when:
     - tpm2_clear_command_result.failed is defined
