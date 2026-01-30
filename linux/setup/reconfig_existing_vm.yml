@@ -1,0 +1,53 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Remove VM serial ports, which will affect VM instant clone,
+# remove VM CDROM attached ISO files, which may affect cloudinit GOSC.
+#
+- name: "Get all VM serial port devices"
+  include_tasks: ../../common/vm_get_serial_ports.yml
+
+- name: "Get all VM CDROM devices"
+  include_tasks: ../../common/vm_get_cdrom_devices.yml
+
+- name: "Get VM CDROM devices which attaching ISO file"
+  ansible.builtin.set_fact:
+    cdrom_device_with_iso_list: >-
+      {{ (cdrom_device_list | length > 0) | ternary((cdrom_device_list | selectattr('summary', 'match', 'ISO.*' )), []) }}
+
+- name: "Reconfig existing VM before testing"
+  when: >
+    (vm_serial_backings | length > 0) or
+    (cdrom_device_with_iso_list | length > 0)
+  block:
+    - name: "Shutdown guest OS"
+      include_tasks: ../utils/shutdown.yml
+
+    - name: "Remove VM serial port devices"
+      include_tasks: ../../common/vm_remove_serial_port.yml
+      vars:
+        vm_serial_backing: "{{ item }}"
+      with_items: "{{ vm_serial_backings }}"
+      when: vm_serial_backings | length > 0
+
+    - name: "Set VM CDROM devices to client device"
+      include_tasks: ../../common/vm_configure_cdrom.yml
+      vars:
+        cdrom_type: client
+        cdrom_controller_type: "{{ item.controller_label.split(' ')[0] | lower }}"
+        cdrom_controller_num: "{{ item.bus_num | int }}"
+        cdrom_unit_num: "{{ item.unit_num | int }}"
+      with_items: "{{ cdrom_device_with_iso_list }}"
+      when: cdrom_device_with_iso_list | length > 0
+
+    - name: "Pause 5 seconds before power on VM"
+      ansible.builtin.pause:
+        seconds: 5
+
+    - name: "Power on VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-on'
+
+    - name: "Update VM guest IP in inventory"
+      include_tasks: ../../common/update_inventory.yml

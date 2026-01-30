@@ -37,8 +37,15 @@
         vm_home_encrypted: true
       when: vm_key_id_info
 
-- name: "Change VM network config file before VM clone"
-  include_tasks: change_vm_network_config.yml
+# Remove MAC address info in network config file, or cloned VM may not
+# get IP address
+- name: "Get primary network adapter information"
+  include_tasks: ../utils/get_primary_network_adapter.yml
+
+- name: "Generalize network config file before VM clone"
+  include_tasks: ../utils/generalize_network_config_file.yml
+  vars:
+    network_config_file_path: "{{ guest_primary_nic_config_path }}"
 
 - name: "Set facts of cloned VM name and save current VM info"
   ansible.builtin.set_fact:

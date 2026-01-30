@@ -7,6 +7,11 @@
   ansible.builtin.set_fact:
     guest_os_network_manager: ""
 
+- name: "Set network device manager to netif for {{ guest_os_ansible_distribution }}"
+  ansible.builtin.set_fact:
+    guest_os_network_manager: "netif"
+  when: guest_os_ansible_distribution == "FreeBSD"
+
 # Debian and Pardus has NetworkManager, but they still uses traditional ifdown/ifup to manage network devices
 - name: "{{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} network device manager is traditional ifdown/ifup"
   ansible.builtin.set_fact:
@@ -64,7 +69,5 @@
         guest_os_network_manager: "traditional"
       when: not guest_os_network_manager
 
-- name: "Set network device manager to netif for {{ guest_os_ansible_distribution }}"
-  ansible.builtin.set_fact:
-    guest_os_network_manager: "netif"
-  when: guest_os_ansible_distribution == "FreeBSD"
+- name: "Print the network device manager type on {{ vm_guest_os_distribution }}"
+  ansible.builtin.debug: var=guest_os_network_manager
