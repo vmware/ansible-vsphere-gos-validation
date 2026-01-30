@@ -1,0 +1,63 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Remove system-specific identifiers (e.g., VM MAC addresses, UUIDs)
+# in the specified network configureation file when it exists in guest OS.
+# Parameters:
+#   network_config_file_path: the network configuration file path in guest OS.
+#
+- name: "Get specified network config file state"
+  include_tasks: get_file_stat_info.yml
+  vars:
+    guest_file_path: "{{ network_config_file_path }}"
+
+- name: "Specified network config file not exist"
+  ansible.builtin.debug:
+    msg: "Network config file '{{ network_config_file_path }}' does not exist in guest OS, skip modifying it."
+  when: not guest_file_exists
+
+- name: "Specified network config file exists"
+  when: guest_file_exists
+  block:
+    - name: "Print the content of the network config file before changing"
+      ansible.builtin.shell: "cat '{{ network_config_file_path }}'"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+
+    - name: "Remove MAC address or UUID from network config file"
+      ansible.builtin.lineinfile:
+        path: "{{ network_config_file_path }}"
+        regexp: "^uuid|^UUID|^MAC|^mac|^HWADDR"
+        state: absent
+      delegate_to: "{{ vm_guest_ip }}"
+      when: guest_os_network_manager != "netplan"
+
+    - name: "Network config file for netplan"
+      when: guest_os_network_manager == "netplan"
+      block:
+        - name: "Remove MAC address or set name from network config file"
+          ansible.builtin.lineinfile:
+            path: "{{ network_config_file_path }}"
+            regexp: "^ *(match|macaddress|set-name)"
+            state: absent
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - name: "Apply new netplan config"
+          ansible.builtin.shell: "netplan apply"
+          delegate_to: "{{ vm_guest_ip }}"
+          async: 20
+          poll: 0
+          ignore_errors: true
+
+        - name: "Sleep 30s for network reloading"
+          ansible.builtin.pause:
+            seconds: 30
+
+        - name: "Update VM IP address in host inventory when it's changed"
+          include_tasks: ../../common/update_inventory.yml
+
+    - name: "Print the content of the network config file after changing"
+      ansible.builtin.shell: "cat '{{ network_config_file_path }}'"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
