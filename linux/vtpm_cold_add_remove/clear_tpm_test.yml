@@ -3,19 +3,55 @@
 ---
 # Check OS still work well after clear TPM
 #
-- name: "Clear TPM in guest OS"
-  ansible.builtin.shell: tpm2_clear
+- name: "Check command 'tpm2_clear' exits or not"
+  ansible.builtin.shell: which tpm2_clear
   delegate_to: "{{ vm_guest_ip }}"
+  register: tpm2_clear_command_result
+  ignore_errors: true
 
-- name: "Sleep 5 seconds"
-  ansible.builtin.pause:
-    seconds: 5
+- name: "Check command 'tpm2_clear' is required or not"
+  when:
+    - tpm2_clear_command_result.failed is defined
+    - tpm2_clear_command_result.failed
+  block:
+    - name: "Set fact of ignoring the failure for not found command 'tpm2_clear'"
+      ansible.builtin.set_fact:
+        ignore_cmd_tpm2_clear: |-
+          {%- if guest_os_ansible_distribution == 'Debian' and guest_os_ansible_distribution_major_ver | int  == 10 -%}True
+          {%- elif guest_os_ansible_distribution == 'RedHat' and guest_os_ansible_distribution_major_ver | int  == 7 -%}True
+          {%- else -%}False{%- endif -%}
 
-- name: "Reboot guest OS"
-  include_tasks: ../utils/reboot.yml
+    - name: "Known issue - ignore failure of not found command tpm2_clear"
+      ansible.builtin.debug:
+        msg:
+          - "Not found the command 'tpm2_clear' in Debian 10.x and Redhat 7.x"
+      tags:
+        - known_issue
+      when: ignore_cmd_tpm2_clear | bool
 
-- name: "Get TPM info after reset"
-  include_tasks: ../utils/get_tpm_status.yml
+    - name: "Required command 'tpm2_clear' is not found"
+      ansible.builtin.fail:
+        msg: "Not found the command 'tpm2_clear' in {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_major_ver }}"
+      when: not ignore_cmd_tpm2_clear | bool
 
-- name: "Check TPM device status in guest OS after reset"
-  include_tasks: vtpm_check_status.yml
+- name: "Test clear TPM in guest OS"
+  when:
+    - tpm2_clear_command_result.failed is defined
+    - not tpm2_clear_command_result.failed
+  block:
+    - name: "Clear TPM in guest OS"
+      ansible.builtin.shell: tpm2_clear
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Sleep 5 seconds"
+      ansible.builtin.pause:
+        seconds: 5
+
+    - name: "Reboot guest OS"
+      include_tasks: ../utils/reboot.yml
+
+    - name: "Get TPM info after reset"
+      include_tasks: ../utils/get_tpm_status.yml
+
+    - name: "Check TPM device status in guest OS after reset"
+      include_tasks: vtpm_check_status.yml
