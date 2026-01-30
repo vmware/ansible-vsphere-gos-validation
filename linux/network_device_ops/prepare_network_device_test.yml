@@ -3,12 +3,6 @@
 ---
 # Prepare for network device testing
 #
-- name: "Get guest network device manager"
-  include_tasks: ../utils/get_network_manager.yml
-  when: >-
-    guest_os_network_manager is undefined or
-    not guest_os_network_manager
-
 - name: "Install 'distrib-compat' for {{ vm_guest_os_distribution }}"
   include_tasks: ../utils/install_uninstall_package.yml
   vars:
@@ -66,29 +60,6 @@
       include_tasks: ../utils/generalize_network_config_file.yml
       vars:
         network_config_file_path: "{{ guest_primary_nic_config_path }}"
-
-    - name: "Get all VM serial ports"
-      include_tasks: ../../common/vm_get_serial_ports.yml
-
-    - name: "Remove VM serial port devices"
-      when: vm_serial_backings | length > 0
-      block:
-        - name: "Shutdown guest OS for removing serial port"
-          include_tasks: ../utils/shutdown.yml
-
-        - name: "Remove VM serial port"
-          include_tasks: ../../common/vm_remove_serial_port.yml
-          vars:
-            vm_serial_backing: "{{ item }}"
-          with_items: "{{ vm_serial_backings }}"
-
-        - name: "Power on VM"
-          include_tasks: ../../common/vm_set_power_state.yml
-          vars:
-            vm_power_state_set: 'powered-on'
-
-        - name: "Update VM guest IP in inventory"
-          include_tasks: ../../common/update_inventory.yml
 
     # Clone a new VM as PVRDMA client VM from current VM, and current VM as server
     - name: "Clone a new VM as client VM from current VM"
