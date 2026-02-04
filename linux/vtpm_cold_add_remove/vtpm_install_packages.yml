@@ -8,6 +8,13 @@
       {%- elif  guest_os_ansible_distribution == 'Fedora' -%}['tpm2-tools', 'openssl']
       {%- else -%}['tpm2-tools']{%- endif -%}
 
+- name: "Set fact of packages list required by vTPM in Canonical Cloud Image"
+  ansible.builtin.set_fact:
+    vtpm_package_list: "{{ vtpm_package_list + ['util-linux'] }}"
+  when:
+    - guest_os_ansible_distribution == "Ubuntu"
+    - guest_os_edition == "CloudImage"
+
 - name: "Install packages for {{ guest_os_ansible_distribution }}"
   include_tasks: ../utils/install_uninstall_package.yml
   vars:
