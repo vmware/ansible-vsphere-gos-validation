@@ -8,9 +8,11 @@
     cdrom_device_list_config: []
     cdrom_device_list_info_selected: []
 
-- include_tasks: vm_get_config.yml
+- name: "Get VM hardware device info"
+  include_tasks: vm_get_config.yml
   vars:
     property_list: ['config.hardware.device']
+
 - name: "Set fact of CDROM devices list from VM config"
   ansible.builtin.set_fact:
     cdrom_device_list_config: "{{ vm_config.config.hardware.device | selectattr('deviceInfo.label', 'match', 'CD/DVD drive') }}"
@@ -26,6 +28,11 @@
     cdrom_device_list: "{{ cdrom_device_list + [item | combine( { 'bus_num': (vm_config.config.hardware.device | selectattr('key', 'equalto', item.controller_key))[0].busNumber, 'controller_label': (vm_config.config.hardware.device | selectattr('key', 'equalto', item.controller_key))[0].deviceInfo.label } )] }}"
   with_items: "{{ cdrom_device_list_info_selected }}"
   when: cdrom_device_list_info_selected | length != 0
+
+- name: "Sort CDROM devices info list with 'label'"
+  ansible.builtin.set_fact:
+    cdrom_device_list: "{{ cdrom_device_list | sort(attribute='label') }}"
+  when: cdrom_device_list | length != 0
 
 - name: "Print CDROM devices info list"
   ansible.builtin.debug: var=cdrom_device_list
