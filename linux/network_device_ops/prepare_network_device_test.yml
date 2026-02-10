@@ -3,12 +3,6 @@
 ---
 # Prepare for network device testing
 #
-- name: "Get guest network device manager"
-  include_tasks: ../utils/get_network_manager.yml
-  when: >-
-    guest_os_network_manager is undefined or
-    not guest_os_network_manager
-
 - name: "Install 'distrib-compat' for {{ vm_guest_os_distribution }}"
   include_tasks: ../utils/install_uninstall_package.yml
   vars:
@@ -62,67 +56,10 @@
         package_state: "present"
       when: guest_os_family in ["Suse", "RedHat"]
 
-    - name: "Get network config file state"
-      include_tasks: ../utils/get_file_stat_info.yml
+    - name: "Generalize network config file before VM clone"
+      include_tasks: ../utils/generalize_network_config_file.yml
       vars:
-        guest_file_path: "{{ guest_primary_nic_config_path }}"
-
-    - name: "Update network config file to remove MAC address for '{{ guest_primary_nic_name }}'"
-      when: guest_file_exists
-      block:
-        - name: "Print the content of the network config file before changing"
-          ansible.builtin.shell: "cat {{ guest_primary_nic_config_path }}"
-          delegate_to: "{{ vm_guest_ip }}"
-          ignore_errors: true
-
-        - name: "Remove MAC address or UUID from network config file for '{{ guest_primary_nic_name }}'"
-          ansible.builtin.lineinfile:
-            path: "{{ guest_primary_nic_config_path }}"
-            regexp: "^uuid|^UUID|^MAC|^mac|^HWADDR"
-            state: absent
-          delegate_to: "{{ vm_guest_ip }}"
-          when: guest_os_network_manager != "netplan"
-
-        - name: "Update netplan config for '{{ guest_primary_nic_name }}'"
-          when: guest_os_network_manager == "netplan"
-          block:
-            - name: "Remove MAC address from netplan config file for '{{ guest_primary_nic_name }}'"
-              ansible.builtin.lineinfile:
-                path: "{{ guest_primary_nic_config_path }}"
-                regexp: "^ *(match|macaddress|set-name)"
-                state: absent
-              delegate_to: "{{ vm_guest_ip }}"
-
-            - name: "Apply new netplan config"
-              include_tasks: reload_network_configs.yml
-
-    - name: "Print the content of the network config file after changing"
-      ansible.builtin.shell: "cat {{ guest_primary_nic_config_path }}"
-      delegate_to: "{{ vm_guest_ip }}"
-      ignore_errors: true
-
-    - name: "Get all VM serial ports"
-      include_tasks: ../../common/vm_get_serial_ports.yml
-
-    - name: "Remove VM serial port devices"
-      when: vm_serial_backings | length > 0
-      block:
-        - name: "Shutdown guest OS for removing serial port"
-          include_tasks: ../utils/shutdown.yml
-
-        - name: "Remove VM serial port"
-          include_tasks: ../../common/vm_remove_serial_port.yml
-          vars:
-            vm_serial_backing: "{{ item }}"
-          with_items: "{{ vm_serial_backings }}"
-
-        - name: "Power on VM"
-          include_tasks: ../../common/vm_set_power_state.yml
-          vars:
-            vm_power_state_set: 'powered-on'
-
-        - name: "Update VM guest IP in inventory"
-          include_tasks: ../../common/update_inventory.yml
+        network_config_file_path: "{{ guest_primary_nic_config_path }}"
 
     # Clone a new VM as PVRDMA client VM from current VM, and current VM as server
     - name: "Clone a new VM as client VM from current VM"
@@ -130,10 +67,6 @@
       vars:
         parent_vm_name: "{{ pvrdma_server_vm_name }}"
         cloned_vm_name: "{{ pvrdma_client_vm_name }}"
-
-    - name: "Pause 30 seconds after VM instant clone"
-      ansible.builtin.pause:
-        seconds: 30
 
     - name: "Set fact of client VM exists"
       ansible.builtin.set_fact:
