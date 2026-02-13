@@ -52,6 +52,7 @@
     vm_name_clone_to: "{{ vm_name }}_clone_{{ current_test_timestamp }}"
     vm_name_clone_from: "{{ vm_name }}"
     vm_nic_mac_clone_from: "{{ vm_primary_nic_mac }}"
+    vm_nic_mac_clone_to: ""
     vm_ip_clone_from: "{{ vm_guest_ip }}"
     vm_dir_name_clone_from: "{{ vm_dir_name }}"
 
@@ -75,6 +76,27 @@
   ansible.builtin.set_fact:
     vm_name: "{{ vm_name_clone_to }}"
 
+- name: "Get cloned VM primary network adapter MAC address"
+  include_tasks: ../../common/vm_get_network_facts.yml
+
+- name: "Set fact of cloned VM primary network adapter MAC address"
+  ansible.builtin.set_fact:
+    vm_nic_mac_clone_to: "{{ vm_network_adapters['0'].mac_addr }}"
+  when:
+    - vm_network_adapters is defined
+    - vm_network_adapters['0'] is defined
+    - vm_network_adapters['0'].mac_addr is defined
+
+- name: "Check the primary network adapter MAC address of cloned VM"
+  ansible.builtin.assert:
+    that:
+      - vm_nic_mac_clone_to | length != 0
+      - vm_nic_mac_clone_to != vm_nic_mac_clone_from
+    fail_msg: >-
+      The primary network adapter's MAC address of cloned VM '{{ vm_name_clone_to }}' is '{{ vm_nic_mac_clone_to }}',
+      which is empty or the same as the primary network adapter's MAC address of the original VM
+      VM '{{ vm_name_clone_from }}'.
+
 - name: "Get cloned VM file path"
   include_tasks: ../../common/vm_get_config.yml
   vars:
@@ -86,6 +108,12 @@
 
 - name: "Print the cloned VM file path"
   ansible.builtin.debug: var=vm_dir_name
+
+- name: "Get IP address of cloned VM before reset"
+  include_tasks: ../../common/vm_get_ip.yml
+  vars:
+    vm_primary_nic_mac: "{{ vm_nic_mac_clone_to }}"
+    vm_get_ip_timeout: 300
 
 - name: "Perform cold add vTPM device test"
   include_tasks: vtpm_cold_add.yml
