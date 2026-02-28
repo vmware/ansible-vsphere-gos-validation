@@ -34,14 +34,14 @@
     - guest_os_release.NAME is defined
     - guest_os_release.NAME == "Red Hat Enterprise Linux CoreOS"
 
-- name: "Correct OS distribution version for Miracle Linux 8.x"
+- name: "Correct OS distribution version for {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
-    guest_os_ansible_distribution_ver: "{{ guest_os_release.VERSION.split()[0] }}"
-    guest_os_ansible_distribution_minor_ver: "{{ guest_os_release.VERSION.split()[0].split('.')[-1] }}"
+    guest_os_ansible_distribution_ver: "{{ guest_os_release_version }}"
+    guest_os_ansible_distribution_minor_ver: "{{ guest_os_release_version.split('.')[1] }}"
   when:
-    - guest_os_ansible_distribution == "MIRACLE"
-    - guest_os_ansible_distribution_major_ver | int  == 8
-    - guest_os_release.VERSION is defined and (guest_os_release.VERSION | regex_search('\\d\\.\\d'))
+    - guest_os_ansible_distribution in ["MIRACLE", "Ubuntu"]
+    - guest_os_release_version.split('.') | length >= 2
+    - guest_os_release_version | length > guest_os_ansible_distribution_ver | length
 
 - name: "Set fact of guest OS ansible distribution is correct or not"
   ansible.builtin.set_fact:
@@ -115,11 +115,21 @@
   ansible.builtin.set_fact:
     guest_os_bit: "{% if guest_os_ansible_architecture in ['x86_64', 'amd64', 'aarch64'] %}64-bit{% else %}32-bit{% endif %}"
 
+- name: "Get guest OS edition"
+  include_tasks: get_os_edition.yml
+
+- name: "Set fact of VM guest OS type"
+  ansible.builtin.set_fact:
+    vm_guest_os_distribution: >-
+      {{ guest_os_ansible_distribution }}
+      {{ (guest_os_ansible_distribution_ver ~ ' ' ~ guest_os_edition).strip() }}
+      {{ guest_os_ansible_architecture }}
+
 - name: "Check whether guest OS has GUI"
   include_tasks: check_guest_os_gui.yml
 
-- name: "Get guest OS edition"
-  include_tasks: get_os_edition.yml
+- name: "Get cloud-init version"
+  include_tasks: get_cloudinit_version.yml
 
 - name: "Get guest OS network manager"
   include_tasks: get_network_manager.yml
@@ -142,14 +152,8 @@
       - "Guest OS display manager: {{ guest_os_display_manager }}"
       - "Guest OS session type: {{ guest_os_session_type }}"
       - "Guest OS session desktop: {{ guest_os_session_desktop }}"
+      - "Guest OS cloud-init version: {{ cloudinit_version }}"
       - "Guest OS network manager: {{ guest_os_network_manager }}"
-
-- name: "Set fact of VM guest OS type"
-  ansible.builtin.set_fact:
-    vm_guest_os_distribution: >-
-      {{ guest_os_ansible_distribution }}
-      {{ (guest_os_ansible_distribution_ver ~ ' ' ~ guest_os_edition).strip() }}
-      {{ guest_os_ansible_architecture }}
 
 - name: "Set fact that ansible system information about guest OS has been retrieved"
   ansible.builtin.set_fact:

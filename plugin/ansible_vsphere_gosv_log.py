@@ -228,6 +228,10 @@ class VmGuestInfo(object):
         :param ansible_gosv_facts:
         """
         self.Guest_OS_Distribution = ansible_gosv_facts.get('vm_guest_os_distribution', '')
+        if 'CloudImage' in self.Guest_OS_Distribution:
+            self.Cloud_Image_Build = (ansible_gosv_facts.get('cloud_image_build_name', '') + " (serial: "
+                                      + ansible_gosv_facts.get('cloud_image_build_serial', '') + ")")
+
         self.ESXi_Version = ansible_gosv_facts.get('esxi_version', '')
         if (self.ESXi_Version and
                 ansible_gosv_facts.get('esxi_update_version', '') and
@@ -261,6 +265,11 @@ class VmDetailInfo(VmGuestInfo):
                 ansible_gosv_facts = {}
 
             self.Guest_OS_Distribution = ansible_gosv_facts.get('vm_guest_os_distribution', '')
+
+            if 'CloudImage' in self.Guest_OS_Distribution:
+                self.Cloud_Image_Build = (ansible_gosv_facts.get('cloud_image_build_name', '') + " (serial: "
+                                          + ansible_gosv_facts.get('cloud_image_build_serial', '') + ")")
+
             self.IP = ansible_gosv_facts.get('vm_guest_ip', '')
             self.GUI_Installed = str(ansible_gosv_facts.get('guest_os_with_gui', ''))
             if self.GUI_Installed == 'True':
@@ -950,6 +959,7 @@ class CallbackModule(CallbackBase):
                            "vm_upgrade_hardware_version.yml",
                            "vm_get_guest_info.yml",
                            "get_linux_system_info.yml",
+                           "ubuntu_get_cloud_image_build.yml",
                            "get_cloudinit_version.yml",
                            "check_guest_os_gui.yml",
                            "get_display_manager.yml",
