@@ -7,8 +7,16 @@
   ansible.builtin.pause:
     seconds: 5
 
+- name: "Set fact of the 'poweroff' command"
+  ansible.builtin.set_fact:
+    poweroff_cmd: >-
+      {%- if (guest_os_family == 'RedHat') and (guest_os_ansible_distribution_major_ver | int >= 10) -%}
+      systemctl poweroff --check-inhibitors=no
+      {%- else -%}poweroff
+      {%- endif -%}
+
 - name: "Shutdown guest OS"
-  ansible.builtin.command: "poweroff"
+  ansible.builtin.command: "{{ poweroff_cmd }}"
   delegate_to: "{{ vm_guest_ip }}"
   become: true
   changed_when: false
