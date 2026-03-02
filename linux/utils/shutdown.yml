@@ -9,14 +9,27 @@
 
 - name: "Set fact of the 'poweroff' command"
   ansible.builtin.set_fact:
-    poweroff_cmd: >-
-      {%- if (guest_os_family == 'RedHat') and (guest_os_ansible_distribution_major_ver | int >= 10) -%}
-      systemctl poweroff --check-inhibitors=no
-      {%- else -%}poweroff
-      {%- endif -%}
+    inhibitor_list_cmd: "systemd-inhibit --list"
+    poweroff_cmd: "systemctl poweroff --check-inhibitors=no"
+  when:
+    - guest_os_family is defined
+    - guest_os_family == 'RedHat'
+    - guest_os_ansible_distribution_major_ver is defined
+    - guest_os_ansible_distribution_major_ver | int >= 10
+
+- name: "Check for active inhibitors in guest OS"
+  ansible.builtin.command: "{{ inhibitor_list_cmd }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  become: true
+  changed_when: false
+  ignore_errors: true
+  register: inhibitor_list
+  when:
+    - inhibitor_list_cmd is defined
+    - inhibitor_list_cmd | length != 0
 
 - name: "Shutdown guest OS"
-  ansible.builtin.command: "{{ poweroff_cmd }}"
+  ansible.builtin.command: "{{ poweroff_cmd | default('poweroff') }}"
   delegate_to: "{{ vm_guest_ip }}"
   become: true
   changed_when: false
