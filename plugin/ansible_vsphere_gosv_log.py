@@ -228,10 +228,6 @@ class VmGuestInfo(object):
         :param ansible_gosv_facts:
         """
         self.Guest_OS_Distribution = ansible_gosv_facts.get('vm_guest_os_distribution', '')
-        if 'CloudImage' in self.Guest_OS_Distribution:
-            self.Cloud_Image_Build = (ansible_gosv_facts.get('cloud_image_build_name', '') + " (serial: "
-                                      + ansible_gosv_facts.get('cloud_image_build_serial', '') + ")")
-
         self.ESXi_Version = ansible_gosv_facts.get('esxi_version', '')
         if (self.ESXi_Version and
                 ansible_gosv_facts.get('esxi_update_version', '') and

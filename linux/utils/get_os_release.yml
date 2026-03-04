@@ -18,7 +18,7 @@
     fetch_file_ignore_errors: true
 
 - name: "Get guest OS release info from /etc/os-release"
-  when: fetch_file_local_path
+  when: fetch_file_local_path | length > 0
   block:
     - name: "Set fact of the local path for {{ guest_os_release_path }} fetched from guest OS"
       ansible.builtin.set_fact:
@@ -46,7 +46,7 @@
 - name: "Get Ubuntu cloud image build info"
   when:
     - guest_os_ansible_distribution == "Ubuntu"
-    - guest_os_release_version
+    - guest_os_release_version | length > 0
   block:
     - name: "Get Ubuntu cloud image build info"
       include_tasks: ubuntu_get_cloud_image_build.yml
@@ -54,4 +54,4 @@
     - name: "Update Ubuntu release version with build serial number"
       ansible.builtin.set_fact:
         guest_os_release_version: "{{ guest_os_release_version }}-{{ cloud_image_build_serial }}"
-      when: cloud_image_build_serial
+      when: cloud_image_build_serial | length > 0
