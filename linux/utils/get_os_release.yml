@@ -8,6 +8,7 @@
     guest_os_release_path: "/etc/os-release"
     guest_os_release_local_path: ""
     guest_os_release: {}
+    guest_os_release_version: ""
 
 - name: "Fetch {{ guest_os_release_path }} to localhost"
   include_tasks: fetch_file.yml
@@ -17,7 +18,7 @@
     fetch_file_ignore_errors: true
 
 - name: "Get guest OS release info from /etc/os-release"
-  when: fetch_file_local_path
+  when: fetch_file_local_path | length > 0
   block:
     - name: "Set fact of the local path for {{ guest_os_release_path }} fetched from guest OS"
       ansible.builtin.set_fact:
@@ -30,3 +31,27 @@
         _lines: "{{ lookup('file', guest_os_release_local_path).splitlines() | map('trim') | select() | list }}"
         _keys: "{{ _lines | map('split', '=') | map('first') | map('trim') | list }}"
         _vals: "{{ _lines | map('split', '=') | map('last') | map('trim') | map('regex_replace', '^\"(.*)\"$', '\\1') | list }}"
+
+    - name: "Set fact of guest OS release version"
+      ansible.builtin.set_fact:
+        guest_os_release_version: >-
+          {%- if _os_release_version | length >= _os_release_version_id | length -%}{{ _os_release_version }}
+          {%- else -%}{{ _os_release_version_id }}
+          {%- endif -%}
+      vars:
+        _os_release_version: "{{ guest_os_release.VERSION | default('') | regex_search('\\d+(\\.\\d+)*') }}"
+        _os_release_version_id: "{{ guest_os_release.VERSION_ID | default('') }}"
+
+# Get Ubuntu cloud image build from /etc/cloud/build.info
+- name: "Get Ubuntu cloud image build info"
+  when:
+    - guest_os_ansible_distribution == "Ubuntu"
+    - guest_os_release_version | length > 0
+  block:
+    - name: "Get Ubuntu cloud image build info"
+      include_tasks: ubuntu_get_cloud_image_build.yml
+
+    - name: "Update Ubuntu release version with build serial number"
+      ansible.builtin.set_fact:
+        guest_os_release_version: "{{ guest_os_release_version }}-{{ cloud_image_build_serial }}"
+      when: cloud_image_build_serial | length > 0

@@ -13,18 +13,28 @@
 - name: "Get Ubuntu edition"
   when: guest_os_ansible_distribution == "Ubuntu"
   block:
-    - name: "Get installed packages on {{ guest_os_ansible_distribution }}"
-      include_tasks: get_installed_packages.yml
-
-    - name: "Set fact of Ubuntu edition"
+    - name: "Current Ubuntu has a cloud image build"
       ansible.builtin.set_fact:
-        guest_os_edition: |-
-          {%- if guest_installed_packages | select('search', 'linux-image-virtual|ubuntu-cloud-minimal') | length > 0 -%}CloudImage
-          {%- elif guest_installed_packages | select('search', 'ubuntu-server') | length > 0 -%}Server
-          {%- elif guest_installed_packages | select('search', 'ubuntu-desktop') | length > 0 -%}Desktop
-          {%- else -%}CloudImage
-          {%- endif -%}
-      when: guest_installed_packages | length > 0
+        guest_os_edition: "CloudImage"
+      when:
+        - cloud_image_build_info_exists is defined
+        - cloud_image_build_info_exists
+
+    - name: "Current Ubuntu doesn't have a cloud image build"
+      when: cloud_image_build_info_exists is undefined or not cloud_image_build_info_exists
+      block:
+        - name: "Get installed packages on Ubuntu"
+          include_tasks: get_installed_packages.yml
+
+        - name: "Set fact of Ubuntu edition"
+          ansible.builtin.set_fact:
+            guest_os_edition: |-
+              {%- if guest_installed_packages | select('search', 'linux-image-virtual|ubuntu-cloud-minimal') | length > 0 -%}CloudImage
+              {%- elif guest_installed_packages | select('search', 'ubuntu-server') | length > 0 -%}Server
+              {%- elif guest_installed_packages | select('search', 'ubuntu-desktop') | length > 0 -%}Desktop
+              {%- else -%}CloudImage
+              {%- endif -%}
+          when: guest_installed_packages | length > 0
 
 - name: "Set fact of Pardus edition"
   ansible.builtin.set_fact:
