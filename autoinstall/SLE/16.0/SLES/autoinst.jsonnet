@@ -24,7 +24,8 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
 
 {
   product: {
-    id: "SLES"
+    id: "SLES",
+    mode: "standard"
   },
   software: {
     patterns: {
