@@ -3,8 +3,33 @@
 ---
 # Shutdown VM via executing 'poweroff' command in guest OS
 #
+- name: "Pause 5 seconds"
+  ansible.builtin.pause:
+    seconds: 5
+
+- name: "Set fact of the 'poweroff' command"
+  ansible.builtin.set_fact:
+    inhibitor_list_cmd: "systemd-inhibit --list"
+    poweroff_cmd: "systemctl poweroff -f"
+  when:
+    - guest_os_family is defined
+    - guest_os_family == 'RedHat'
+    - guest_os_ansible_distribution_major_ver is defined
+    - guest_os_ansible_distribution_major_ver | int >= 10
+
+- name: "Check for active inhibitors in guest OS"
+  ansible.builtin.command: "{{ inhibitor_list_cmd }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  become: true
+  changed_when: false
+  ignore_errors: true
+  register: inhibitor_list
+  when:
+    - inhibitor_list_cmd is defined
+    - inhibitor_list_cmd | length != 0
+
 - name: "Shutdown guest OS"
-  ansible.builtin.command: "poweroff"
+  ansible.builtin.command: "{{ poweroff_cmd | default('poweroff') }}"
   delegate_to: "{{ vm_guest_ip }}"
   become: true
   changed_when: false
@@ -15,4 +40,4 @@
   include_tasks: ../../common/vm_wait_power_state.yml
   vars:
     expected_power_status: 'poweredOff'
-    wait_power_state_timeout: 600
+    wait_power_state_timeout: 300
