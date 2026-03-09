@@ -954,6 +954,7 @@ class CallbackModule(CallbackBase):
                            "vm_get_vm_info.yml",
                            "vm_upgrade_hardware_version.yml",
                            "vm_get_guest_info.yml",
+                           "get_guest_system_info.yml",
                            "get_linux_system_info.yml",
                            "ubuntu_get_cloud_image_build.yml",
                            "get_cloudinit_version.yml",
