@@ -24,8 +24,7 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
 
 {
   product: {
-    id: "SLES",
-    mode: "standard"
+    id: "SLES"
   },
   software: {
     patterns: {
@@ -42,8 +41,7 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
   user: {
     fullName: "{{ new_user }}",
     password: "{{ vm_password }}",
-    userName: "{{ new_user }}",
-    autologin: true
+    userName: "{{ new_user }}"
   },
 {% endif %}
   root: {
