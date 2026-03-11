@@ -34,15 +34,16 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
       "openssh-server-config-rootlogin",
       "cloud-init",
       "tpm2-tss-engine-devel",
-      "tpm2.0-tools"
+      "tpm2.0-tools",
+      "open-vm-tools",
+      "open-vm-tools-desktop"
     ]
   },
 {% if new_user is defined and new_user %}
   user: {
     fullName: "{{ new_user }}",
     password: "{{ vm_password }}",
-    userName: "{{ new_user }}",
-    autologin: true
+    userName: "{{ new_user }}"
   },
 {% endif %}
   root: {
