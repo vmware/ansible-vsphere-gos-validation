@@ -67,7 +67,7 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
            generate: "default"
           }
        ]
-     },
+     }
     ]
   },
   network: {
