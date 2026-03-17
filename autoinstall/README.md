@@ -7,6 +7,7 @@
 - For SLED 15 SP4 or later unattend auto-install, please use file SLE/15/SP4/SLED/autoinst.xml.
 - For SLES 15 SP3 or later unattend auto-install, please use files under SLE/15/SP3/SLES or SLE/15/SP3/SLES_Minimal.
 - For SLES 16.0 unattend auto-install, please use file SLE/16.0/SLES/autoinst.jsonnet.
+- For SLES 16.1 unattend auto-install, please use file SLE/16.1/SLES/autoinst.jsonnet.
 - For Windows 10, or Windows 11 with TPM device unattend auto-install, please use files under Windows/win10.
 - For Windows 11 without TPM device unattend auto-install, please use files under Windows/win11 to bypass TPM check during installation.
 - For Windows Server LTSC releases unattend auto-install, please use files under Windows/win_server.
