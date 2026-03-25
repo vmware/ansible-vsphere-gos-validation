@@ -19,7 +19,7 @@ echo 'kern.geom.label.ufsid.enable="1"' >>/boot/loader.conf
 
 if [ "$machtype" != "amd64" ] && [ "$machtype" != "x86_64" ]; then
     # Workaround for FreeBSD issue https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=283276
-    echo 'kern.kstack_pages=8' >>/boot/loader.conf
+    echo 'kern.kstack_pages=16' >>/boot/loader.conf
 fi
 echo "DONE" >/dev/ttyu0
 
