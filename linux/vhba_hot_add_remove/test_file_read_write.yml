@@ -42,8 +42,42 @@
     mount_point_path: "{{ new_partition_mount_path }}"
     mount_state: "unmounted"
 
+# Encountered an issue: the OS hangs during VM shutdown on Ubuntu 24.04 and 25.10 when using BIOS firmware and testing the LSILogic controller.
+# Determine whether VM needs poweroff instead of reboot
+- name: "Set the fact vm_poweroff based on controller, firmware, and Ubuntu version"
+  ansible.builtin.set_fact:
+    vm_poweroff: >
+      {{ new_disk_ctrl_type == 'lsilogic'
+         and firmware == 'bios'
+         and guest_os_ansible_distribution == 'Ubuntu'
+         and ( '24.04' in guest_os_ansible_distribution_ver
+               or '25.10' in guest_os_ansible_distribution_ver ) }}
+
 - name: "Reboot guest OS to check file content again"
   include_tasks: ../utils/reboot.yml
+  when: not vm_poweroff | bool
+
+- name: "Poweroff and then Power on VM for {{ guest_os_ansible_distribution }}"
+  when: vm_poweroff | bool
+  block:
+    - name: "Power off the VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-off'
+
+    - name: "Wait for VM being powered off"
+      include_tasks: ../../common/vm_wait_power_state.yml
+      vars:
+        expected_power_status: 'poweredOff'
+        wait_power_state_timeout: 900
+
+    - name: "Power on the VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-on'
+
+- name: "Update in-memory inventory after VM power on"
+  include_tasks: ../../common/update_inventory.yml
 
 - name: "Get new partition device path and mount path after reboot on {{ guest_os_ansible_distribution }}"
   when: guest_os_family != 'FreeBSD'
