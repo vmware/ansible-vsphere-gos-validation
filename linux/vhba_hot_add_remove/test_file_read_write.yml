@@ -42,14 +42,8 @@
     mount_point_path: "{{ new_partition_mount_path }}"
     mount_state: "unmounted"
 
-# Encountered an issue: the OS hangs during VM shutdown on Ubuntu 24.04 and 25.10 when using BIOS firmware and testing the LSILogic controller.
-# Determine whether VM needs poweroff instead of reboot
-- name: "Will check reboot manually"
-  ansible.builtin.assert:
-    that:
-      - 1 == 2 
-    fail_msg: "Fail at this point and will check reboot manually"
-
+# Encountered an issue: the OS hangs during VM reboot when taking reboot.yml on Ubuntu 24.04 and 25.10 when using BIOS firmware and testing the LSILogic controller.
+# Determine whether VM needs poweroff instead of reboot.yml
 - name: "Set the fact vm_poweroff based on controller, firmware, and Ubuntu version"
   ansible.builtin.set_fact:
     vm_poweroff: >
@@ -71,6 +65,13 @@
       include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: 'powered-off'
+      when: not vmtools_is_running
+    
+    - name: "Shutdown instant cloned VM"
+      include_tasks: ../../common/vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'shutdown-guest'
+      when: vmtools_is_running
 
     - name: "Wait for VM being powered off"
       include_tasks: ../../common/vm_wait_power_state.yml
