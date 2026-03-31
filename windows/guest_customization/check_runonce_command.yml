@@ -8,7 +8,13 @@
 - name: "Get GOSC run once command output file"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
-    win_powershell_cmd: "Get-Content -Path {{ win_gosc_spec.gosc_echo_file }}"
+    win_powershell_cmd: >-
+      $t=60;
+      while(!(Test-Path "{{ win_gosc_spec.gosc_echo_file }}") -and ($t -gt 0))
+      {sleep 5; $t-=5};
+      if(Test-Path "{{ win_gosc_spec.gosc_echo_file }}")
+      {Get-Content -Path "{{ win_gosc_spec.gosc_echo_file }}"}
+      else{echo "60s timeout reached"}
 
 - name: "Check GOSC run once command executed in guest OS"
   ansible.builtin.assert:
