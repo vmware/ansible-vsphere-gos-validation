@@ -44,12 +44,9 @@
 
 # Encountered an issue: the OS hangs during VM reboot when taking reboot.yml on Ubuntu 24.04 and 25.10 when using BIOS firmware and testing the LSILogic controller.
 # Determine whether VM needs poweroff instead of reboot.yml
-- name: Stop running tasks for this host
-  meta: end_host
-
 - name: "Set the fact vm_poweroff based on controller, firmware, and Ubuntu version"
   ansible.builtin.set_fact:
-    vm_poweroff: >
+    vm_poweroff_f: >
       {{ new_disk_ctrl_type is defined
          and new_disk_ctrl_type | lower == 'lsilogic'
          and firmware | lower == 'bios'
@@ -59,15 +56,23 @@
 
 - name: "Reboot guest OS to check file content again"
   include_tasks: ../utils/reboot.yml
-  when: not vm_poweroff | bool
+  when: not vm_poweroff_f | bool
 
 - name: "Poweroff and then Power on VM for {{ guest_os_ansible_distribution }}"
-  when: vm_poweroff | bool
+  when: vm_poweroff_f | bool
   block:
-    - name: "Power off the VM"
-      include_tasks: ../../common/vm_set_power_state.yml
-      vars:
-        vm_power_state_set: 'powered-off'
+    # - name: "Power off the VM"
+    #   include_tasks: ../../common/vm_set_power_state.yml
+    #   vars:
+    #     vm_power_state_set: 'powered-off'
+
+    - name: "Shutdown guest OS"
+      ansible.builtin.command: "poweroff -f"
+      delegate_to: "{{ vm_guest_ip }}"
+      become: true
+      changed_when: false
+      async: 1
+      poll: 0
 
     - name: "Wait for VM being powered off"
       include_tasks: ../../common/vm_wait_power_state.yml
