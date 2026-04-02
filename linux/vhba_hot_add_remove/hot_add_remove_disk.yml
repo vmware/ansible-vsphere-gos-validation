@@ -84,6 +84,10 @@
   vars:
     current_guest_disk_list: "{{ guest_disk_list_after_hotadd }}"
 
+- name: Stop running tasks for this host before create new partition
+  meta: end_host
+  when: new_disk_ctrl_state == "existing"
+
 - name: "Create new partition on the new disk {{ new_guest_disk_info.name }}"
   when: guest_os_family != 'FreeBSD'
   include_tasks: ../utils/create_disk_partition.yml
@@ -97,10 +101,6 @@
   vars:
     disk_name: "{{ new_guest_disk_info.name }}"
     partition_fstype: "ufs"
-
-- name: Stop running tasks for this host before test_disk_io
-  meta: end_host
-  when: new_disk_ctrl_state == "existing"
 
 - name: "Run I/O test on new disk {{ new_guest_disk_info.name }}"
   include_tasks: test_disk_io.yml
