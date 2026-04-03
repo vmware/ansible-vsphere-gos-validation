@@ -47,7 +47,9 @@
         - name: "Rescan all SCSI buses on {{ vm_guest_os_distribution }}"
           ansible.builtin.shell: |
             for i in `find /sys/ -iname rescan`;do echo 1 >$i; done;
-            for i in `find /sys/ -iname scan`;do echo "- - -" >$i; done;
+            for i in /sys/class/scsi_host/host*/scan; do
+                [ -w "$i" ] && echo "- - -" > "$i"
+            done
           delegate_to: "{{ vm_guest_ip }}"
 
         - name: "Update the state of hot removed SCSI disk '{{ wait_device_name }}'"
