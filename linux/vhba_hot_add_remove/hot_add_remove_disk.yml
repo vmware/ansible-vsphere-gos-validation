@@ -41,6 +41,10 @@
       include_tasks: ../../common/update_inventory.yml
       when: esxi_cpu_vendor == 'arm'
 
+- name: "Stop running tasks for this host before hot add disk on exsting ctl"
+  meta: end_host
+  when: new_disk_ctrl_state == "existing"
+
 - name: "Hot add a new disk on an existing {{ new_disk_ctrl_type }} controller"
   include_tasks: ../../common/vm_hot_add_remove_disk.yml
   vars:
@@ -49,10 +53,6 @@
     disk_size_gb: "{{ new_disk_size_gb }}"
     ctrl_number: "{{ new_ctrl_number }}"
     unit_number: "{{ new_unit_number }}"
-  when: new_disk_ctrl_state == "existing"
-
-- name: "Stop running tasks for this host after hot add disk on exsting ctl"
-  meta: end_host
   when: new_disk_ctrl_state == "existing"
 
 - name: "Collect dmesg after hot adding a disk to {{ new_disk_ctrl_state }} {{ new_disk_ctrl_type }} controller"
