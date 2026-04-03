@@ -42,6 +42,10 @@
         disk_provision_type: 'thin'
       when: disk_provision_type is undefined or not disk_provision_type
 
+- name: "Stop running tasks for this host before Manage disk on VM with state {{ disk_operation }}"
+  meta: end_host
+  when: new_disk_ctrl_state == "existing"
+
 - name: "Manage disk on VM with state {{ disk_operation }}"
   community.vmware.vmware_guest_disk:
     hostname: "{{ vsphere_host_name }}"
@@ -66,6 +70,3 @@
   ansible.builtin.debug: var=manage_disk_result
   when: enable_debug
 
-- name: "Stop running tasks for this host after Manage disk on VM with state {{ disk_operation }}"
-  meta: end_host
-  when: new_disk_ctrl_state == "existing"
