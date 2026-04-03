@@ -37,8 +37,10 @@
         ctrl_number: "{{ new_ctrl_number }}"
         unit_number: "{{ new_unit_number }}"
 
-    - name: "Stop running tasks: After add a new disk on a new {{ new_disk_ctrl_type }} controller"
-      meta: end_host
+    - name: "Not stuck here with poweroff command:1"
+      ansible.builtin.debug:
+        msg:
+          - "Not stuck here with poweroff command:1"
 
     - name: "Power on VM and refresh guest OS IP in the in-memory inventory hosts info"
       include_tasks: ../../common/update_inventory.yml
@@ -107,6 +109,10 @@
 
 - name: "Run I/O test on new disk {{ new_guest_disk_info.name }}"
   include_tasks: test_disk_io.yml
+
+- name: "Stop running tasks for this host after test_disk_io with new_disk_ctrl_state is new"
+  meta: end_host
+  when: new_disk_ctrl_state == "new"
 
 # Disk hot-remove
 - name: "Get guest disk list before hot-remove"
