@@ -37,9 +37,18 @@
         ctrl_number: "{{ new_ctrl_number }}"
         unit_number: "{{ new_unit_number }}"
 
+    - name: "Not stuck here with poweroff command:1"
+      ansible.builtin.debug:
+        msg:
+          - "Not stuck here with poweroff command:1"
+
     - name: "Power on VM and refresh guest OS IP in the in-memory inventory hosts info"
       include_tasks: ../../common/update_inventory.yml
       when: esxi_cpu_vendor == 'arm'
+
+- name: "Stuck with poweroff command: Stop running tasks for this host before hot add disk on exsting ctl"
+  meta: end_host
+  when: new_disk_ctrl_state == "existing"
 
 - name: "Hot add a new disk on an existing {{ new_disk_ctrl_type }} controller"
   include_tasks: ../../common/vm_hot_add_remove_disk.yml
@@ -101,6 +110,11 @@
 - name: "Run I/O test on new disk {{ new_guest_disk_info.name }}"
   include_tasks: test_disk_io.yml
 
+- name: "Not stuck here with poweroff command here with new_disk_ctrl_state is new"
+  ansible.builtin.debug:
+    msg:
+      - "Not stuck here with poweroff command here with new_disk_ctrl_state is new"
+
 # Disk hot-remove
 - name: "Get guest disk list before hot-remove"
   include_tasks: ../utils/get_device_list.yml
@@ -138,12 +152,22 @@
     dmesg_no_log: true
     dmesg_check_call_trace: true
 
+- name: "Not Stuck here with poweroff command here with new_disk_ctrl_state is new"
+  ansible.builtin.debug:
+    msg:
+      - "Not Stuck here with poweroff command here with new_disk_ctrl_state is new"
+
 - name: "Wait for disk being absent in guest OS"
   include_tasks: wait_device_list_changed.yml
   vars:
     wait_device_state: "absent"
     wait_device_count: "{{ guest_disk_list_before_hotremove | length - 1 }}"
     wait_device_name: "{{ new_guest_disk_info.name }}"
+
+- name: "Stuck here with poweroff command here with new_disk_ctrl_state is new"
+  ansible.builtin.debug:
+    msg:
+      - "Stuck here with poweroff command here with new_disk_ctrl_state is new"
 
 - name: "Set the fact of guest disk list after hot-remove"
   ansible.builtin.set_fact:
