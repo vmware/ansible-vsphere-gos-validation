@@ -151,6 +151,10 @@
     dmesg_output_file_name: "dmesg_after_{{ new_disk_ctrl_state }}_ctrl_disk_hot_remove.log"
     dmesg_no_log: true
     dmesg_check_call_trace: true
+ 
+- name: "Stop running tasks: before Wait for disk being absent in guest OS"
+  meta: end_host
+  when: new_disk_ctrl_state == "new"
 
 - name: "Wait for disk being absent in guest OS"
   include_tasks: wait_device_list_changed.yml
@@ -159,9 +163,10 @@
     wait_device_count: "{{ guest_disk_list_before_hotremove | length - 1 }}"
     wait_device_name: "{{ new_guest_disk_info.name }}"
 
-- name: "Stop running tasks: before Set the fact of guest disk list after hot-remove"
-  meta: end_host
-  when: new_disk_ctrl_state == "new"
+- name: "Stuck here with poweroff command here with new_disk_ctrl_state is new"
+  ansible.builtin.debug:
+    msg:
+      - "Stuck here with poweroff command here with new_disk_ctrl_state is new"
 
 - name: "Set the fact of guest disk list after hot-remove"
   ansible.builtin.set_fact:
