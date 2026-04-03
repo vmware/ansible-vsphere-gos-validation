@@ -110,9 +110,10 @@
 - name: "Run I/O test on new disk {{ new_guest_disk_info.name }}"
   include_tasks: test_disk_io.yml
 
-- name: "Stop running tasks for this host after test_disk_io with new_disk_ctrl_state is new"
-  meta: end_host
-  when: new_disk_ctrl_state == "new"
+- name: "Not stuck here with poweroff command here with new_disk_ctrl_state is new"
+  ansible.builtin.debug:
+    msg:
+      - "Not stuck here with poweroff command here with new_disk_ctrl_state is new"
 
 # Disk hot-remove
 - name: "Get guest disk list before hot-remove"
@@ -157,6 +158,10 @@
     wait_device_state: "absent"
     wait_device_count: "{{ guest_disk_list_before_hotremove | length - 1 }}"
     wait_device_name: "{{ new_guest_disk_info.name }}"
+
+- name: "Stop running tasks: before Set the fact of guest disk list after hot-remove"
+  meta: end_host
+  when: new_disk_ctrl_state == "new"
 
 - name: "Set the fact of guest disk list after hot-remove"
   ansible.builtin.set_fact:
