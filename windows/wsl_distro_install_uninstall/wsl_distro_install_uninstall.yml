@@ -44,11 +44,23 @@
           when:
             - guest_os_installation_type == "Server Core"
 
+        # By default downloading the latest version of WSL from github,
+        # or set this parameter 'wsl_install_source' to 'cmd' to install
+        # through 'wsl.exe' command in guest OS.
+        - name: "Set fact of the WSL install source"
+          ansible.builtin.set_fact:
+            wsl_install_source: "github"
+
         - name: "Prepare WSL testing"
           include_tasks: wsl_test_prepare.yml
 
-        - name: "Install WSL and distribution"
-          include_tasks: install_wsl.yml
+        - name: "Install WSL via 'wsl.exe' tool"
+          include_tasks: install_wsl_via_cmd.yml
+          when: wsl_install_source == "cmd"
+
+        - name: "Install WSL via downloaded MSI from github"
+          include_tasks: install_wsl_via_msi.yml
+          when: wsl_install_source == "github"
 
         - name: "Run the distribution"
           include_tasks: run_wsl_distro.yml
