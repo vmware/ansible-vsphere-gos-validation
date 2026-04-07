@@ -13,49 +13,43 @@
   ansible.builtin.set_fact:
     skip_set_wsl_ver: false
 
-- name: "Install WSL for Windows Client"
-  when: guest_os_product_type == 'client'
-  block:
-    - name: "Set installation command for inbox version of WSL"
-      ansible.builtin.set_fact:
-        wsl_install_cmd: "wsl --install --inbox -d {{ wsl_distribution_name }} *> '{{ wsl_file_path_win }}\\wsl_install.txt'"
-      when:
-        - guest_os_build_num | int < 25267
-        - guest_os_build_num | int >= 22000
+- name: "Set installation command for inbox version of WSL"
+  ansible.builtin.set_fact:
+    wsl_install_cmd: "wsl --install --inbox -d {{ wsl_distribution_name }} *> '{{ wsl_file_path_win }}\\wsl_install.txt'"
+  when:
+    - guest_os_product_type == 'client'
+    - guest_os_build_num | int < 25267
+    - guest_os_build_num | int >= 22000
 
-    - name: "Set installation command for store version of WSL"
-      ansible.builtin.set_fact:
-        wsl_install_cmd: "wsl --install -d {{ wsl_distribution_name }} *> '{{ wsl_file_path_win }}\\wsl_install.txt'"
-      when: > 
-        (guest_os_build_num | int >= 25267) or
-        (guest_os_build_num | int < 22000)
+- name: "Set installation command for store version of WSL"
+  ansible.builtin.set_fact:
+    wsl_install_cmd: "wsl --install -d {{ wsl_distribution_name }} *> '{{ wsl_file_path_win }}\\wsl_install.txt'"
+  when: >
+    (guest_os_product_type == 'server') or
+    ((guest_os_build_num | int >= 25267) or (guest_os_build_num | int < 22000))
 
-    - name: "Install WSL and distribution"
-      include_tasks: ../utils/win_execute_cmd.yml
-      vars:
-        win_powershell_cmd: "{{ wsl_install_cmd }}"
-        win_execute_cmd_ignore_error: true
+- name: "Execute installation command to install WSL in guest OS"
+  ansible.windows.win_shell: "{{ wsl_install_cmd }}"
+  register: win_powershell_cmd_output
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_unreachable: true
+  become: "{{ guest_os_product_type == 'server' }}"
+  become_method: runas
+  become_user: Administrator
+  when:
+    - wsl_install_cmd is defined
+    - wsl_install_cmd | length != 0
 
-- name: "Install WSL for Windows Server"
-  when: guest_os_product_type == 'server'
-  block:
-    - name: "Install WSL and distribution"
-      ansible.windows.win_shell: "wsl --install -d {{ wsl_distribution_name }} *> '{{ wsl_file_path_win }}\\wsl_install.txt'"
-      register: win_powershell_cmd_output
-      ignore_errors: true
-      delegate_to: "{{ vm_guest_ip }}"
-      ignore_unreachable: true
-      become: true
-      become_method: runas
-      become_user: Administrator
-
-    # For Windows Server 2022
-    # 1. The default WSL version is 1.
-    # 2. The RC is 1 for above installation task, though WSL and distribution are actually installed.
-    - name: "Set the fact of skipping setting WSL version"
-      ansible.builtin.set_fact:
-        skip_set_wsl_ver: true
-      when: guest_os_build_num | int <= 23048
+# For Windows Server 2022
+# 1. The default WSL version is 1.
+# 2. The RC is 1 for above installation task, though WSL and distribution are actually installed.
+- name: "Set the fact of skipping setting WSL version"
+  ansible.builtin.set_fact:
+    skip_set_wsl_ver: true
+  when:
+    - guest_os_product_type == 'server'
+    - guest_os_build_num | int <= 23048
 
 - name: "Process the WSL output message"
   include_tasks: wsl_convert_binary_to_txt.yml

@@ -1,0 +1,49 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get the download link of the latest version of WSL from this page:
+# https://github.com/microsoft/WSL/releases
+#
+- name: "Initialize the latest WSL release info"
+  ansible.builtin.set_fact:
+    wsl_download_path: "{{ current_test_log_folder }}/wsl_installer.msi"
+    wsl_msi_path: "{{ wsl_file_path_win }}\\wsl_installer.msi"
+
+- name: "Get the latest version tag of WSL via redirect"
+  ansible.builtin.uri:
+    url: "https://github.com/microsoft/WSL/releases/latest"
+    method: GET
+    follow_redirects: none
+    status_code: 302
+  register: wsl_redirect
+
+# This takes "https://github.com/microsoft/WSL/releases/tag/2.6.3"
+# and extracts "2.6.3
+- name: "Extract WSL version from the redirect URL"
+  ansible.builtin.set_fact:
+    wsl_latest_tag: "{{ wsl_redirect.location | split('/') | last }}"
+
+- name: "Set fact of the download URL of the latest version of WSL"
+  ansible.builtin.set_fact:
+    wsl_msi_url: "https://github.com/microsoft/WSL/releases/download/{{ latest_tag }}/wsl.{{ latest_tag }}.0.x64.msi"
+
+- name: "Print the latest WSL release download URL"
+  ansible.builtin.debug: var=wsl_msi_url
+
+- name: "Download the latest version of WSL"
+  ansible.builtin.get_url:
+    url: "{{ wsl_msi_url }}"
+    dest: "{{ wsl_download_path }}"
+    validate_certs: false
+  register: wsl_download
+
+- name: "Transfer the downloaded WSL installation file to guest OS"
+  include_tasks: ../utils/win_copy_file_from_local.yml
+  vars:
+    src_path_local: "{{ wsl_download_path }}"
+    dest_path_remote: "{{ wsl_file_path_win }}"
+
+- name: "Check WSL installation file in guest OS"
+  include_tasks: ../utils/win_check_file_exist.yml
+  vars:
+    win_check_file_exist_file: "{{ wsl_msi_path }}"
