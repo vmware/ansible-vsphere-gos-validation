@@ -19,6 +19,7 @@
   tags:
     - known_issue
 
+# Executing rescan-scsi-bus.sh -w -r on Ubuntu 22.04.1 Live Server caused all disks to drop/disappear from the system, this issue was fixed in Ubuntu 22.04.2 and 23.04.
 - name: "Handle LSI Logic Parallel SCSI known issue on Linux"
   when: guest_os_ansible_system == 'linux'
   block:
@@ -28,7 +29,8 @@
           {{
             not (guest_os_ansible_distribution in ['Flatcar', 'Fedora', 'RHCOS'] or
                 (guest_os_ansible_distribution == "Ubuntu" and
-                 guest_os_ansible_distribution_major_ver | int >= 22) or
+                 guest_os_ansible_distribution_major_ver | int >= 22 and
+                 guest_os_ansible_distribution_major_ver | int < 24) or
                 (guest_os_ansible_distribution == "Debian" and
                  guest_os_ansible_distribution_major_ver | int >= 12) or
                 (guest_os_ansible_distribution == "Pardus GNU/Linux" and
@@ -39,6 +41,7 @@
       ansible.builtin.command: "/usr/bin/rescan-scsi-bus.sh -a -r"
       register: rescan_scsi_result
       delegate_to: "{{ vm_guest_ip }}"
+      no_log: true
       when: rescan_scsi_with_script
 
     - name: "Rescan all SCSI buses with commands"
