@@ -33,8 +33,11 @@
                  guest_os_ansible_distribution_major_ver | int >= 23))
           }}
 
+    # Encountered an issue where running rescan-scsi-bus.sh -w -r caused all disks to disappear on Ubuntu 22.04.1 Live Server
     - name: "Check whether to use SCSI rescan script for {{ guest_os_ansible_distribution }}"
-      when: guest_os_ansible_distribution == "Ubuntu"
+      when: 
+        - guest_os_ansible_distribution == "Ubuntu"
+        - guest_os_ansible_distribution_major_ver | int < 24
       block:
         - name: "Get script file status in guest OS"
           ansible.builtin.stat:
