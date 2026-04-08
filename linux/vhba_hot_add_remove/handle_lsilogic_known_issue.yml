@@ -33,16 +33,16 @@
                  guest_os_ansible_distribution_major_ver | int >= 23))
           }}
 
-    - name: "Chen whether to use SCSI rescan script for {{ guest_os_ansible_distribution }}"
+    - name: "Check whether to use SCSI rescan script for {{ guest_os_ansible_distribution }}"
       when: guest_os_ansible_distribution == "Ubuntu"
       block:
-        - name: "Check script file exists"
+        - name: "Get script file status in guest OS"
           ansible.builtin.stat:
             path: "/usr/bin/rescan-scsi-bus.sh"
           delegate_to: "{{ vm_guest_ip }}"
           register: rescan_script_exist_result
 
-        - name: "Set fact whether to use SCSI rescan script for {{ guest_os_ansible_distribution }}"
+        - name: "Set fact that not use SCSI rescan script when it's not available"
           ansible.builtin.set_fact:
             rescan_scsi_with_script: false
           when: rescan_script_exist_result.stat.exists is undefined or not rescan_script_exist_result.stat.exists
