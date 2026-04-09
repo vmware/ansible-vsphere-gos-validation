@@ -1,28 +1,26 @@
 # Copyright 2023-2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Initialize the variables"
+- name: "Initialize the variable of VM Hardware virtualization status"
   ansible.builtin.set_fact:
     vm_nested_virt_status: false
 
-# Get CPU Hardware virtualization status
 - name: "Get VM Hardware virtualization status"
   include_tasks: ../../common/vm_get_config.yml
   vars:
     property_list: ['config.nestedHVEnabled']
 
-- name: "Set fact of VM CPU Hardware virtualization status"
+- name: "Set fact of VM Hardware virtualization status"
   ansible.builtin.set_fact:
     vm_nested_virt_status: "{{ vm_config.config.nestedHVEnabled }}"
   when:
     - vm_config.config is defined
     - vm_config.config.nestedHVEnabled is defined
 
-- name: "Display VM CPU Hardware virtualization status"
-  ansible.builtin.debug:
-    msg: "VM CPU Hardware virtualization status: {{ vm_nested_virt_status }}"
+- name: "Display VM Hardware virtualization enablement status"
+  ansible.builtin.debug: var=vm_nested_virt_status
 
-- name: "Enable CPU Hardware virtualization"
+- name: "Enable VM Hardware virtualization"
   when: not vm_nested_virt_status | bool
   block:
     - name: "Shutdown VM"
