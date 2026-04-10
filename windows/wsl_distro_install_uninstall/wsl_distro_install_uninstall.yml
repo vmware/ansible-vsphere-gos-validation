@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This test case is to install WSL in guest OS.
+#   This test case is for WSL 2 and Linux distribution installation testing
+# in Windoows guest OS.
 # The Windows Subsystem for Linux (WSL) is available for installation on:
 # 1. Windows Server 2019 (version 1709) and later
 #    https://docs.microsoft.com/en-us/windows/wsl/install-on-server
@@ -26,6 +27,9 @@
 
         - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
+          vars:
+            create_current_test_folder: true
+
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
           vars:
@@ -44,16 +48,34 @@
           when:
             - guest_os_installation_type == "Server Core"
 
+        # Install the latest version of WSL downloaded from github by default.
+        # Change 'wsl_install_source' to 'cmd' to install WSL by executing
+        # 'wsl.exe' command in guest OS directly.
+        - name: "Set fact of the WSL install source"
+          ansible.builtin.set_fact:
+            wsl_install_source: "github"
+
         - name: "Prepare WSL testing"
           include_tasks: wsl_test_prepare.yml
 
-        - name: "Install WSL and distribution"
-          include_tasks: install_wsl.yml
+        - name: "Install WSL via 'wsl.exe' tool"
+          include_tasks: install_wsl_via_cmd.yml
+          when: wsl_install_source == "cmd"
 
-        - name: "Run the distribution"
-          include_tasks: run_wsl_distro.yml
+        - name: "Install WSL via downloaded MSI from github"
+          include_tasks: install_wsl_via_msi.yml
+          when: wsl_install_source == "github"
 
-        - name: "Uninstall the distribution"
+        - name: "Check default WSL version 2"
+          include_tasks: check_wsl_version.yml
+
+        - name: "Install WSL distribution"
+          include_tasks: install_wsl_distro.yml
+
+        - name: "Check WSL distribution"
+          include_tasks: check_wsl_distro.yml
+
+        - name: "Uninstall WSL distribution"
           include_tasks: unregister_wsl_distro.yml
       rescue:
         - name: "Test case failure"
