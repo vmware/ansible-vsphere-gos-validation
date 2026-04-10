@@ -12,7 +12,7 @@
   async: 600
   poll: 0
 
-- name: "List installed WSL distribution"
+- name: "Retry to list installed WSL distribution"
   ansible.windows.win_shell: >-
     $result = wsl.exe --list;
     $clean_result = $result -replace '\u0000','';
@@ -37,8 +37,8 @@
       - list_wsl_distro_result.stdout is defined
       - list_wsl_distro_result.stdout is search(wsl_distribution_name)
     fail_msg: >-
-      List WSL distribution command failed or distribution '{{ wsl_distribution_name }}'
-      is not listed after install.
+      List WSL distribution command 'wsl.exe --list' failed or distribution '{{ wsl_distribution_name }}'
+      is not listed in the command output '{{ list_wsl_distro_result.stdout | default('') }}'.
 
 - name: "Pause 10 seconds after distribution install"
   ansible.builtin.pause:
@@ -48,26 +48,3 @@
   include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"
-
-# Execute command in the WSL distribution
-- name: "Set the command executed in WSL distribution"
-  ansible.builtin.set_fact:
-    distro_command: "cat /etc/os-release"
-
-- name: "Run the command '{{ distro_command }}' in WSL distribution"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: >-
-      $result = wsl -d {{ wsl_distribution_name }} {{ distro_command }};
-      $clean_result = $result -replace '\u0000','';
-      Write-host $clean_result
-    win_execute_cmd_ignore_error: true
-
-- name: "Check the result of the command executed in WSL distribution"
-  ansible.builtin.assert:
-    that:
-      - win_powershell_cmd_output.rc is defined
-      - win_powershell_cmd_output.rc == 0
-      - win_powershell_cmd_output.stdout is defined
-      - win_powershell_cmd_output.stdout is search(wsl_distribution_name)
-    fail_msg: "The command {{ distro_command }} failed on WSL {{ wsl_distribution_name }} distribution."

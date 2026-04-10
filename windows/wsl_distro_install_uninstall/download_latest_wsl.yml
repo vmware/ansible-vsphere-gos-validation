@@ -2,10 +2,9 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Download the latest version of WSL from this page:
-# https://github.com/microsoft/WSL/releases, and transfer
-# to guest OS.
+# https://github.com/microsoft/WSL/releases, and transfer to guest OS.
 #
-- name: "Initialize the latest WSL release info"
+- name: "Initialize the paths of WSL installation file"
   ansible.builtin.set_fact:
     wsl_download_path: "{{ current_test_log_folder }}/wsl_installer.msi"
     wsl_msi_path: "{{ wsl_file_path_win }}\\wsl_installer.msi"
@@ -19,7 +18,7 @@
   register: wsl_redirect
 
 # This takes "https://github.com/microsoft/WSL/releases/tag/2.6.3"
-# and extracts "2.6.3
+# and extracts "2.6.3"
 - name: "Extract WSL version from the redirect URL"
   ansible.builtin.set_fact:
     wsl_latest_tag: "{{ wsl_redirect.location | split('/') | last }}"
@@ -31,7 +30,7 @@
 - name: "Print the latest WSL release download URL"
   ansible.builtin.debug: var=wsl_msi_url
 
-- name: "Download the latest version of WSL"
+- name: "Download the installation file of the latest WSL version"
   ansible.builtin.get_url:
     url: "{{ wsl_msi_url }}"
     dest: "{{ wsl_download_path }}"
@@ -49,7 +48,7 @@
   vars:
     win_check_file_exist_file: "{{ wsl_msi_path }}"
 
-- name: "Remove the downloaded WSL installation file on local machine"
+- name: "Delete the downloaded WSL installation file on local machine"
   include_tasks: ../../common/delete_local_file.yml
   vars:
     local_path: "{{ wsl_download_path }}"

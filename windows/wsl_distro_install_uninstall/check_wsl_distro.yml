@@ -1,0 +1,28 @@
+# Copyright 2023-2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Execute command in the WSL distribution
+- name: "Set the command executed in WSL distribution"
+  ansible.builtin.set_fact:
+    distro_command: "cat /etc/os-release"
+
+- name: "Run the command '{{ distro_command }}' in WSL distribution"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      $result = wsl -d {{ wsl_distribution_name }} {{ distro_command }};
+      $clean_result = $result -replace '\u0000','';
+      Write-host $clean_result
+    win_execute_cmd_ignore_error: true
+
+- name: "Check the result of the command executed in WSL distribution"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.rc is defined
+      - win_powershell_cmd_output.rc == 0
+      - win_powershell_cmd_output.stdout is defined
+      - win_powershell_cmd_output.stdout is search(wsl_distribution_name)
+    fail_msg: >-
+      Execute command '{{ distro_command }}' in WSL distribution failed with error message
+      '{{ list_wsl_distro_result.stderr | default('') }}', or distribution '{{ wsl_distribution_name }}'
+      is not in the command output '{{ list_wsl_distro_result.stdout | default('') }}'.
