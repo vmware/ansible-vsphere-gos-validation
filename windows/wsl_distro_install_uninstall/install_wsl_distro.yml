@@ -12,6 +12,10 @@
   async: 600
   poll: 0
 
+- name: "Wait 2 minutes before getting WSL distribution"
+  ansible.builtin.pause:
+    minutes: 2
+
 - name: "Retry to list installed WSL distribution"
   ansible.windows.win_shell: >-
     $result = wsl.exe --list;
@@ -25,7 +29,7 @@
     - list_wsl_distro_result.rc is defined
     - list_wsl_distro_result.rc == 0
     - list_wsl_distro_result.stdout is defined
-    - list_wsl_distro_result.stdout | length != 0
+    - list_wsl_distro_result.stdout is search(wsl_distribution_name)
   retries: 20
   delay: 30
 
