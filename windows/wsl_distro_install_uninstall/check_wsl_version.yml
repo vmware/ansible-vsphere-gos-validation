@@ -1,31 +1,32 @@
 # Copyright 2023-2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Get installed WSL version info"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: >-
-      $result = wsl.exe --version;
-      $clean_result = $result -replace '\u0000','';
-      Write-host $clean_result
-    win_execute_cmd_ignore_error: true
+- name: "Get WSL default version after WSL install"
+  include_tasks: get_wsl_default_version.yml
 
-- name: "Get installed WSL status"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: >-
-      $result = wsl.exe --status;
-      $clean_result = $result -replace '\u0000','';
-      Write-host $clean_result
-    win_execute_cmd_ignore_error: true
+- name: "Save the WSL default version after WSL install"
+  ansible.builtin.set_fact:
+    wsl_default_version_install: "{{ wsl_default_version }}"
+
+- name: "Set the WSL default version to 2 from 1"
+  when:
+    - wsl_default_version_install | int != 0
+    - wsl_default_version_install | int == 1
+  block:
+    - name: "Set the WSL default version to 2 in guest OS"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: >-
+          $result = wsl.exe --set-default-version 2;
+          $clean_result = $result -replace '\u0000','';
+          Write-host $clean_result
+    - name: "Get the WSL default version after setting"
+      include_tasks: get_wsl_default_version.yml
 
 - name: "Check the default version is WSL 2"
   ansible.builtin.assert:
     that:
-      - win_powershell_cmd_output.rc is defined
-      - win_powershell_cmd_output.rc == 0
-      - win_powershell_cmd_output.stdout is defined
-      - win_powershell_cmd_output.stdout is search("Default Version:\ 2")
+      - (wsl_default_version_install | int == 2) or (wsl_default_version | int == 2)
     fail_msg: >-
-      Failed to get the default version WSL 2 in the output of command 'wsl.exe --status':
-      '{{ win_powershell_cmd_output.stdout | default('') }}'.
+      Neither the original WSL default version '{{ wsl_default_version_install }}'
+      nor the version after setting '{{ wsl_default_version }}' matches the required version 2.
