@@ -20,9 +20,8 @@
     that:
       - win_powershell_cmd_output.rc is defined
       - win_powershell_cmd_output.rc == 0
+      - win_powershell_cmd_output.stderr is defined
+      - win_powershell_cmd_output.stderr | length == 0
       - win_powershell_cmd_output.stdout is defined
       - win_powershell_cmd_output.stdout is search(wsl_distribution_name)
-    fail_msg: >-
-      Execute command '{{ distro_command }}' in WSL distribution failed with error message
-      '{{ list_wsl_distro_result.stderr | default('') }}', or distribution '{{ wsl_distribution_name }}'
-      is not in the command output '{{ list_wsl_distro_result.stdout | default('') }}'.
+    fail_msg: "Executing command '{{ distro_command }}' in WSL distribution returns error message: {{ list_wsl_distro_result.stderr | default('') | replace('\u0000', '') }}, or not get the distribution '{{ wsl_distribution_name }}' info in the command output: {{ list_wsl_distro_result.stdout | default('') }}."
