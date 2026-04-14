@@ -1,0 +1,33 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Enable Windows Optional Feautre in guest OS.
+# Parameters:
+#   win_optional_features: the list of Windows Optional Feature names
+#     to be enabled in guest OS.
+#
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - win_optional_features is defined
+      - win_optional_features | type_debug == list
+      - win_optional_features | length != 0
+    fail_msg: "Parameter 'win_optional_features' is not set or is an empty list: '{{ win_optional_features | default([]) }}'"
+
+- name: "Set fact of the PowerShell command for enabling optional features"
+  ansible.builtin.set_fact:
+    win_enable_optional_feature: "Enable-WindowsOptionalFeature -Online -FeatureName {{ win_optional_features | join(',') }} -All -NoRestart -WarningAction SilentlyContinue"
+
+- name: "Execute enabling optional feature command in guest OS"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ win_enable_optional_feature }}"
+
+- name: "Wait 10 seconds after enabling optional feature"
+  ansible.builtin.pause:
+    seconds: 10
+
+- name: "Restart guest OS after enabling optional feature"
+  include_tasks: win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
