@@ -6,12 +6,11 @@
 
 - name: "Save the WSL default version after install"
   ansible.builtin.set_fact:
-    wsl_default_version_install: "{{ wsl_default_version }}"
+    wsl_default_version_original: "{{ wsl_default_version }}"
 
+# Here setting WSL version to 2 only when version 1 is detected above
 - name: "Set the WSL default version to 2 from 1"
-  when:
-    - wsl_default_version_install | int != 0
-    - wsl_default_version_install | int == 1
+  when: wsl_default_version_original | int == 1
   block:
     - name: "Set the WSL default version to 2 in guest OS"
       include_tasks: ../utils/win_execute_cmd.yml
@@ -26,7 +25,7 @@
 - name: "Check the default version is WSL 2"
   ansible.builtin.assert:
     that:
-      - (wsl_default_version_install | int == 2) or (wsl_default_version | int == 2)
+      - (wsl_default_version_original | int == 2) or (wsl_default_version | int == 2)
     fail_msg: >-
-      Neither the original WSL default version '{{ wsl_default_version_install }}'
+      Neither the original WSL default version '{{ wsl_default_version_original }}'
       nor the version after setting '{{ wsl_default_version }}' matches the required version 2.
