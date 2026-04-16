@@ -4,7 +4,13 @@
 - name: "Get WSL default version after WSL install"
   include_tasks: get_wsl_default_version.yml
 
-- name: "Save the WSL default version after install"
+- name: "Check the WSL default version is 1 or 2"
+  ansible.builtin.assert:
+    that:
+      - wsl_default_version | int in [1, 2]
+    fail_msg: "Unexpected original WSL default version: {{ wsl_default_version }}, expected 1 or 2."
+
+- name: "Save the original WSL default version"
   ansible.builtin.set_fact:
     wsl_default_version_original: "{{ wsl_default_version }}"
 
@@ -12,20 +18,18 @@
 - name: "Set the WSL default version to 2 from 1"
   when: wsl_default_version_original | int == 1
   block:
-    - name: "Set the WSL default version to 2 in guest OS"
+    - name: "Set the WSL default version to 2"
       include_tasks: ../utils/win_execute_cmd.yml
       vars:
         win_powershell_cmd: >-
           $result = wsl.exe --set-default-version 2;
           $clean_result = $result -replace '\u0000','';
           Write-host $clean_result
-    - name: "Get WSL default version after setting to 2"
+    - name: "Get WSL default version after setting"
       include_tasks: get_wsl_default_version.yml
 
-- name: "Check the default version is WSL 2"
-  ansible.builtin.assert:
-    that:
-      - (wsl_default_version_original | int == 2) or (wsl_default_version | int == 2)
-    fail_msg: >-
-      Neither the original WSL default version '{{ wsl_default_version_original }}'
-      nor the version after setting '{{ wsl_default_version }}' matches the required version 2.
+    - name: "Check the WSL default version is 2 after setting"
+      ansible.builtin.assert:
+        that:
+          - wsl_default_version | int == 2
+        fail_msg: "Unexpected WSL default version after setting to 2: {{ wsl_default_version }}, expected 2."
