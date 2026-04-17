@@ -7,8 +7,8 @@
   ansible.builtin.set_fact:
     win_auto_logon_reg_path: "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon"
     win_pwdless_reg_path: "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\PasswordLess\\Device"
-    win_autoadminlogon_value: "0"
-    win_defaultpassword_value: ""
+    win_auto_admin_logon_value: "0"
+    win_default_password_value: ""
 
 - name: "Get the value for the registry key AutoAdminLogon"
   include_tasks: win_execute_cmd.yml
@@ -19,7 +19,7 @@
 
 - name: "Set fact of the value for the registry key AutoAdminLogon"
   ansible.builtin.set_fact:
-    win_autoadminlogon_value: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+    win_auto_admin_logon_value: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
   when:
     - win_powershell_cmd_output.failed is defined
     - not win_powershell_cmd_output.failed
@@ -35,7 +35,7 @@
 
 - name: "Set fact of the value for the registry key DefaultPassword"
   ansible.builtin.set_fact:
-    win_autoadminlogon_value: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+    win_auto_admin_logon_value: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
   when:
     - win_powershell_cmd_output.failed is defined
     - not win_powershell_cmd_output.failed
@@ -52,4 +52,4 @@
       Set-ItemProperty -Path '{{ win_auto_logon_reg_path }}' -Name DefaultPassword -Value '{{ vm_password }}' -Type String;
       if (Test-Path '{{ win_pwdless_reg_path }}') {
         Set-ItemProperty -Path '{{ win_pwdless_reg_path }}' -Name DevicePasswordLessBuildVersion -Value 0 -Type DWord}
-  when: (win_autoadminlogon_value | int != 1 or win_defaultpassword_value | length == 0)
+  when: (win_auto_admin_logon_value | int != 1 or win_default_password_value | length == 0)
