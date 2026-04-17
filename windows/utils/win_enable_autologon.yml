@@ -1,0 +1,55 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Enable Windows AutoLogon
+#
+- name: "Set fact of the registry paths and initialize the registry values for AutoLogon"
+  ansible.builtin.set_fact:
+    win_auto_logon_reg_path: "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon"
+    win_pwdless_reg_path: "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\PasswordLess\\Device"
+    win_auto_admin_logon_value: "0"
+    win_default_password_value: ""
+
+- name: "Get the value for the registry key AutoAdminLogon"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >- 
+      (Get-ItemProperty -Path "{{ win_auto_logon_reg_path }}").AutoAdminLogon
+    win_execute_cmd_ignore_error: true
+
+- name: "Set fact of the value for the registry key AutoAdminLogon"
+  ansible.builtin.set_fact:
+    win_auto_admin_logon_value: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when:
+    - win_powershell_cmd_output.failed is defined
+    - not win_powershell_cmd_output.failed
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length == 1
+
+- name: "Get the value for the registry key DefaultPassword"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >- 
+      (Get-ItemProperty -Path "{{ win_auto_logon_reg_path }}").DefaultPassword
+    win_execute_cmd_ignore_error: true
+
+- name: "Set fact of the value for the registry key DefaultPassword"
+  ansible.builtin.set_fact:
+    win_default_password_value: "{{ win_powershell_cmd_output.stdout_lines[0] }}"
+  when:
+    - win_powershell_cmd_output.failed is defined
+    - not win_powershell_cmd_output.failed
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length > 0
+
+- name: "Enable Windows AutoLogon"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: |-
+      New-Item -Path '{{ win_auto_logon_reg_path }}' -Force -ErrorAction SilentlyContinue | Out-Null;
+      Set-ItemProperty -Path '{{ win_auto_logon_reg_path }}' -Name AutoAdminLogon -Value '1' -Type String;
+      Set-ItemProperty -Path '{{ win_auto_logon_reg_path }}' -Name DefaultUserName -Value '{{ vm_username }}' -Type String;
+      Set-ItemProperty -Path '{{ win_auto_logon_reg_path }}' -Name DefaultPassword -Value '{{ vm_password }}' -Type String;
+      if (Test-Path '{{ win_pwdless_reg_path }}') {
+        Set-ItemProperty -Path '{{ win_pwdless_reg_path }}' -Name DevicePasswordLessBuildVersion -Value 0 -Type DWord}
+  when: (win_auto_admin_logon_value | int != 1 or win_default_password_value | length == 0)
