@@ -13,16 +13,27 @@
           ansible.builtin.pause:
             seconds: 30
 
-        - name: "Select 'install SUSE SLE 16' option"
+        - name: "Select the 'Install' menu entry for SLE or openSUSE 16.0"
           include_tasks: ../../common/vm_guest_send_key.yml
           vars:
             keys_send:
               - DOWNARROW
               - DOWNARROW
               - ENTER
+          when: sle_opensuse_version is version('16.0', '==')
+        
+        - name: "Select the 'Install' menu entry for SLE or openSUSE 16.1 or later"
+          include_tasks: ../../common/vm_guest_send_key.yml
+          vars:
+            keys_send:
+              - DOWNARROW
+              - ENTER
+          when: sle_opensuse_version is version('16.1', '>=')
 
     - name: "VM firmware is EFI"
-      when: firmware == "efi"
+      when: 
+        - firmware == "efi"
+        - sle_opensuse_version is version('16.0', '==')
       block:
         - name: "Take a screenshot before selecting boot from CDROM"
           include_tasks: ../../common/vm_take_screenshot.yml
