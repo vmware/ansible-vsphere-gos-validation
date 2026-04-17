@@ -1,40 +1,56 @@
-# Copyright 2025-2026 VMware, Inc.
+# Copyright 2023-2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Install WSL distribution
-
-- name: "Set the variables related to WSL distribution installation"
-  ansible.builtin.set_fact:
-    install_distro_cmd: "wsl --install {{ wsl_distribution_name }} *> '{{ wsl_file_path_win }}\\wsl_distro_install.txt'"
-    install_distro_timeout: 600
-
 - name: "Install WSL distribution"
-  ansible.windows.win_shell: "{{ install_distro_cmd }}"
+  ansible.windows.win_shell: >-
+    $result = wsl.exe --install {{ wsl_distribution_name }};
+    $clean_result = $result -replace '\u0000','';
+    Write-host $clean_result
   delegate_to: "{{ vm_guest_ip }}"
   register: wsl_distro_install_result
   ignore_errors: true
-  async: "{{ install_distro_timeout }}"
+  async: 600
   poll: 0
 
-- name: "Check if the WSL distribution is installed"
-  include_tasks: check_wsl_distro.yml
-  vars:
-    wsl_distro_list_timeout: "{{ install_distro_timeout }}"
-    wsl_distro_list_file_name: "wsl_list_after_install_distro.txt"
+- name: "Wait 30 seconds before getting WSL distribution"
+  ansible.builtin.pause:
+    seconds: 30
 
-- name: "Assert if the WSL distribution is not installed"
+- name: "Retry to list installed WSL distribution"
+  ansible.windows.win_shell: >-
+    $result = wsl.exe --list;
+    $clean_result = $result -replace '\u0000','';
+    Write-host $clean_result
+  register: list_wsl_distro_result
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_unreachable: true
+  until:
+    - list_wsl_distro_result.rc is defined
+    - list_wsl_distro_result.rc == 0
+    - list_wsl_distro_result.stdout is defined
+    - list_wsl_distro_result.stdout is search(wsl_distribution_name)
+  retries: 20
+  delay: 30
+
+- name: "Check WSL distribution is listed"
   ansible.builtin.assert:
     that:
-      - wsl_distro_installed
-    fail_msg: "Failed to install the WSL distribution: {{ wsl_distribution_name }}."
+      - list_wsl_distro_result.rc is defined
+      - list_wsl_distro_result.rc == 0
+      - list_wsl_distro_result.stdout is defined
+      - list_wsl_distro_result.stdout is search(wsl_distribution_name)
+    fail_msg: >-
+      List WSL distribution command 'wsl.exe --list' failed with error message
+      '{{ list_wsl_distro_result.stderr | default('') }}',
+      or distribution '{{ wsl_distribution_name }}' is not listed in the command output
+      '{{ list_wsl_distro_result.stdout | default('') }}'.
+
+- name: "Pause 10 seconds after distribution install"
+  ansible.builtin.pause:
+    seconds: 10
 
 - name: "Restart the guest OS"
   include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"
-
-- name: "Get the log file for WSL distribution installation"
-  include_tasks: wsl_convert_binary_to_txt.yml
-  vars:
-    source_path: "{{ wsl_file_path_win }}\\wsl_distro_install.txt"
-    file_name: "wsl_distro_install.txt"

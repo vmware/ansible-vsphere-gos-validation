@@ -1,0 +1,29 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Initialize the WSL default version"
+  ansible.builtin.set_fact:
+    wsl_default_version: 0
+
+- name: "Get installed WSL status"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      $result = wsl.exe --status;
+      $clean_result = $result -replace '\u0000','';
+      Write-host $clean_result
+    win_execute_cmd_ignore_error: true
+
+- name: "Set fact of the WSL default version"
+  ansible.builtin.set_fact:
+    wsl_default_version: " {{ win_powershell_cmd_output.stdout.strip() | regex_replace('(?s).*Default Version:\\s*(\\d+).*', '\\1') | regex_replace('[^0-9]', '') }}"
+  when:
+    - win_powershell_cmd_output.rc is defined
+    - win_powershell_cmd_output.rc == 0
+    - win_powershell_cmd_output.stderr is defined
+    - win_powershell_cmd_output.stderr | length == 0
+    - win_powershell_cmd_output.stdout is defined
+    - win_powershell_cmd_output.stdout | length != 0
+
+- name: "Print the WSL default version got in guest OS"
+  ansible.builtin.debug: var=wsl_default_version

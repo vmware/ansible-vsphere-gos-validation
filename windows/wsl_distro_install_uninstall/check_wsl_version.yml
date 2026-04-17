@@ -1,34 +1,35 @@
 # Copyright 2023-2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Description:
-# Check the WSL Version
-# Return:
-#   wsl_default_version: the default version of WSL
-#
-- name: "Initialize the variables"
+- name: "Get WSL default version after WSL install"
+  include_tasks: get_wsl_default_version.yml
+
+- name: "Check the WSL default version is 1 or 2"
+  ansible.builtin.assert:
+    that:
+      - wsl_default_version | int in [1, 2]
+    fail_msg: "Unexpected original WSL default version: {{ wsl_default_version }}, expected 1 or 2."
+
+- name: "Save the original WSL default version"
   ansible.builtin.set_fact:
-    wsl_version_info: ""
-    wsl_default_version: ""
+    wsl_default_version_original: "{{ wsl_default_version }}"
 
-- name: "Check WSL status"
-  include_tasks: ../utils/win_execute_cmd.yml
-  vars:
-    win_powershell_cmd: "wsl --status *> '{{ wsl_file_path_win }}\\wsl_status.txt'"
-    win_execute_cmd_ignore_error: true
+# Here setting WSL version to 2 only when version 1 is detected above
+- name: "Set the WSL default version to 2 from 1"
+  when: wsl_default_version_original | int == 1
+  block:
+    - name: "Set the WSL default version to 2"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: >-
+          $result = wsl.exe --set-default-version 2;
+          $clean_result = $result -replace '\u0000','';
+          Write-host $clean_result
+    - name: "Get WSL default version after setting"
+      include_tasks: get_wsl_default_version.yml
 
-- name: "Process the WSL output message"
-  include_tasks: wsl_convert_binary_to_txt.yml
-  vars:
-    source_path: "{{ wsl_file_path_win }}\\wsl_status.txt"
-    file_name: "wsl_status.txt"
-
-- name: "Set fact of WSL version info"
-  ansible.builtin.set_fact:
-    wsl_version_info: "{{ lookup('ansible.builtin.file', wsl_new_file).split('\n') | select('match', '^Default Version:') }}"
-
-- name: "Set fact of WSL default version"
-  ansible.builtin.set_fact:
-    wsl_default_version: "{{ wsl_version_info[0].split(':')[-1].strip() | int }}"
-  when:
-    - wsl_version_info | length > 0
+    - name: "Check the WSL default version is 2 after setting"
+      ansible.builtin.assert:
+        that:
+          - wsl_default_version | int == 2
+        fail_msg: "Unexpected WSL default version after setting to 2: {{ wsl_default_version }}, expected 2."
