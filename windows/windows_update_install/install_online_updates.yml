@@ -6,17 +6,24 @@
 - name: "Display the guest OS version build before installing Windows online updates"
   ansible.builtin.debug: var=win_os_version_build
 
-- name: "Set the Windows online updates reject list"
-  ansible.builtin.set_fact:
-    win_updates_reject_list: "{{ windows_updates_reject_list.split(',') | map('trim') }}"
-  when:
-    - windows_updates_reject_list is defined
-    - windows_updates_reject_list
-
 - name: "Get Windows online updates"
   include_tasks: ../utils/win_get_online_updates.yml
   vars:
     win_updates_ignore_errors: true
+
+# KB2267602: Security Intelligence Update for Microsoft Defender Antivirus.
+# Always add it to the reject list to reduce the failure rate of installing windows online updates.
+# There's no impact on the OS because it can still be updated via many other channels, not just Windows Updates.
+- name: "Initialize the Windows online updates reject list"
+  ansible.builtin.set_fact:
+    win_updates_reject_list: ['KB2267602']
+
+- name: "Set the Windows online updates reject list"
+  ansible.builtin.set_fact:
+    win_updates_reject_list: "{{ (windows_updates_reject_list.split(',') | map('trim') | list) + ['KB2267602'] | unique }}"
+  when:
+    - windows_updates_reject_list is defined
+    - windows_updates_reject_list
 
 - name: "Install Windows online updates"
   include_tasks: ../utils/win_install_online_updates.yml
