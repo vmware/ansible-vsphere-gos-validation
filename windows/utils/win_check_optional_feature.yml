@@ -1,0 +1,45 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get and check Windows Optional Feautre state in guest OS.
+# Parameters:
+#   win_optional_feature: the name of Windows Optional Feature.
+#
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - win_optional_feature is defined
+      - win_optional_feature | length != 0
+    fail_msg: "Parameter 'win_optional_feature' is not set or is empty: '{{ win_optional_feature | default('') }}'"
+
+- name: "Initialize the optional feature state and the PowerShell command for getting optional feature"
+  ansible.builtin.set_fact:
+    win_optional_feature_state: ""
+    win_get_optional_feature_cmd: "(Get-WindowsOptionalFeature -Online -FeatureName {{ win_optional_feature }}).State"
+
+- name: "Get optional feature state in guest OS"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ win_get_optional_feature_cmd }}"
+    win_execute_cmd_ignore_error: true
+
+- name: "Set fact of the optional feature state"
+  ansible.builtin.set_fact:
+    win_optional_feature_state: "{{ win_powershell_cmd_output.stdout_lines[0].strip() }}"
+  when:
+    - win_powershell_cmd_output.failed is defined
+    - not win_powershell_cmd_output.failed
+    - win_powershell_cmd_output.stdout_lines is defined
+    - win_powershell_cmd_output.stdout_lines | length == 1
+
+- name: "Print the state of the optional feature '{{ win_optional_feature }}'"
+  ansible.builtin.debug: var=win_optional_feature_state
+
+- name: "Check optional feature '{{ win_optional_feature }}' state"
+  ansible.builtin.assert:
+    that:
+      - win_optional_feature_state in ['Installed', 'Enabled']
+    fail_msg: >-
+      Windows optional feature '{{ win_optional_feature }}' state got in guest OS is
+      '{{ win_powershell_cmd_output.stdout_lines | default([]) }}', not expected value
+      'Installed' or 'Enabled'.

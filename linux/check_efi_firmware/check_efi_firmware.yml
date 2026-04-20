@@ -11,17 +11,27 @@
   tasks:
     - name: "Test case block"
       block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_test_log_folder: true
+
+        - name: "Check Ubuntu cloud image firmware"
+          ansible.builtin.assert:
+            that:
+              - vm_firmware == "efi"
+            fail_msg: "The Ubuntu cloud image for minimal-vmware is not using EFI firmware"
+          when:
+            - guest_os_ansible_distribution == "Ubuntu"
+            - guest_os_edition == "CloudImage"
+            - cloud_image_build_name == "minimal-vmware"
+
         - name: "Skip testcase '{{ ansible_play_name }}' for {{ vm_firmware | upper }} VM"
           include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Skip test case due to VM's firmware is {{ vm_firmware }}"
             skip_reason: "Not Applicable"
           when: vm_firmware != "efi"
-
-        - name: "Test setup"
-          include_tasks: ../setup/test_setup.yml
-          vars:
-            create_test_log_folder: true
 
         - name: "Check EFI ROM in vmware.log"
           include_tasks: ../../common/vm_wait_log_msg.yml

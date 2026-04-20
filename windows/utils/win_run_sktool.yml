@@ -1,0 +1,58 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# From this page:
+# https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-hvci-enablement
+# Use SkTool in Windows SDK for displaying the current state of the Hypervisor and VBS,
+# providing also the motivation why VBS has been started or not started.
+# Parameters:
+#   win_sktool_download_url: the URL for downloading the SkTool.exe file.
+#
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - win_sktool_download_url is defined
+      - win_sktool_download_url | length != 0
+    fail_msg: "Parameter 'win_sktool_download_url' is not set or is empty: '{{ win_sktool_download_url | default('') }}'."
+
+- name: "Set facts of the files' paths"
+  ansible.builtin.set_fact:
+    win_sktool_download_path: "{{ current_test_log_folder }}/SkTool.exe"
+    win_sktool_guest_path: "C:\\SkTool.exe"
+    win_sktool_output_path: "C:\\sktool_output.log"
+
+- name: "Download the SkTool file"
+  ansible.builtin.get_url:
+    url: "{{ win_sktool_download_url }}"
+    dest: "{{ win_sktool_download_path }}"
+    validate_certs: false
+  register: sktool_download
+
+- name: "Transfer the downloaded SkTool file to guest OS"
+  include_tasks: win_copy_file_from_local.yml
+  vars:
+    src_path_local: "{{ win_sktool_download_path }}"
+    dest_path_remote: "C:\\"
+
+- name: "Check SkTool file in guest OS"
+  include_tasks: win_check_file_exist.yml
+  vars:
+    win_check_file_exist_file: "{{ win_sktool_guest_path }}"
+
+- name: "Delete the downloaded SkTool file on local machine"
+  include_tasks: ../../common/delete_local_file.yml
+  vars:
+    local_path: "{{ win_sktool_download_path }}"
+    del_local_file_ignore_errors: true
+
+- name: "Run SkTool in guest OS"
+  include_tasks: win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "{{ win_sktool_guest_path }} /out:{{ win_sktool_output_path }} /nowait"
+
+- name: "Get the output file of SkTool from guest OS"
+  include_tasks: win_get_file.yml
+  vars:
+    win_get_file_src_path: "{{ win_sktool_output_path }}"
+    win_get_file_dst_path: "{{ current_test_log_folder }}"
+    win_get_file_ignore_error: true
