@@ -118,6 +118,8 @@
 * esxi_get_hardware_versions.yml: Get supported hardware versions and default hardware version on ESXi host
 * esxi_get_guest_ids.yml: Get supported guest ids for a hardware version on ESXi host
 * esxi_get_guest_config_options.yml: Get VM config options for a guest id on a hardware version
+* esxi_get_guest_config_options_from_api.yml: Get VM config options for a guest id on a hardware version from API
+* esxi_get_guest_config_options_from_xml.yml: Get VM config options for a guest id on a hardware version from VM config option file in XML
 * esxi_get_pmem_info.yml: Get ESXi host total and available persistent memroy size in MB
 * esxi_set_advanced_system_settings.yml: Configure ESXi host's advanced system settings
 * esxi_get_advanced_system_settings.yml: Get ESXi host's advanced system settings

@@ -1,0 +1,43 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get default VM config options for a specific guest ID from API
+# Parameters:
+#   guest_id: The VM's guest ID
+#   esxi_hardware_version: The ESXi hardware version supporting the guest ID
+# Return:
+#   guest_default_config_options: The guest ID default config options on a hardware version
+#
+- name: "Initialize the guest default config options dict"
+  ansible.builtin.set_fact:
+    guest_default_config_options: {}
+
+# Get config options from ansible module vmware_vm_config_option
+- name: "Get VM config options for guest ID {{ guest_id }} on hardware version {{ esxi_hardware_version }}"
+  community.vmware.vmware_vm_config_option:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    esxi_hostname: "{{ esxi_hostname }}"
+    get_config_options: true
+    hardware_version: "vmx-{{ esxi_hardware_version }}"
+    guest_id: "{{ guest_id }}"
+  register: get_config_options_result
+  ignore_errors: true
+
+- name: "Check guest ID {{ guest_id }} default config options are retrieved from API"
+  ansible.builtin.assert:
+    that:
+      - get_config_options_result is defined
+      - get_config_options_result.instance is defined
+      - get_config_options_result.instance.recommended_config_options is defined
+    fail_msg: "Failed to get VM config options from API"
+
+- name: "Set fact of guest ID {{ guest_id }} default config options on hardware version {{ hardware_version }}"
+  ansible.builtin.set_fact:
+    guest_default_config_options: "{{ get_config_options_result.instance.recommended_config_options }}"
+
+- name: "Display guest ID {{ guest_id }} default config options on hardware version {{ esxi_hardware_version }} from API"
+  ansible.builtin.debug: var=guest_default_config_options
