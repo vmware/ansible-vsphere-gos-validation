@@ -13,16 +13,14 @@
 
 # KB2267602: Security Intelligence Update for Microsoft Defender Antivirus.
 # Always add it to the reject list to reduce the failure rate of installing Windows online updates.
-- name: "Initialize the Windows online updates reject list"
-  ansible.builtin.set_fact:
-    win_updates_reject_list: ['KB2267602']
-
 - name: "Set the Windows online updates reject list"
   ansible.builtin.set_fact:
-    win_updates_reject_list: "{{ (windows_updates_reject_list.split(',') | map('trim') | list) + ['KB2267602'] | unique }}"
-  when:
-    - windows_updates_reject_list is defined
-    - windows_updates_reject_list
+    win_updates_reject_list: >-
+      {%- if windows_updates_reject_list is defined and windows_updates_reject_list -%}
+        {{ ((windows_updates_reject_list.split(',') | map('trim') | list) + ['KB2267602']) | unique }}
+      {%- else -%}
+        ['KB2267602']
+      {%- endif -%}
 
 - name: "Install Windows online updates"
   include_tasks: ../utils/win_install_online_updates.yml
@@ -77,9 +75,9 @@
         remove_old_base_snapshot: true
         base_snapshot_description: "{{ win_os_version_build }}"
 
-- name: "Assert when no Windows online updates installed"
+- name: "Check if Windows online updates were installed successfully or no one was installed"
   ansible.builtin.assert:
     that:
       - (win_online_updates_succeed or win_online_updates_installed)
-    fail_msg:
-      Windows online updates were found, but no one was installed successfully. Please check.
+    fail_msg: >-
+      Windows online updates installation failed and no one was installed. Please check.
