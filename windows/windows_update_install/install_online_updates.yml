@@ -6,17 +6,21 @@
 - name: "Display the guest OS version build before installing Windows online updates"
   ansible.builtin.debug: var=win_os_version_build
 
-- name: "Set the Windows online updates reject list"
-  ansible.builtin.set_fact:
-    win_updates_reject_list: "{{ windows_updates_reject_list.split(',') | map('trim') }}"
-  when:
-    - windows_updates_reject_list is defined
-    - windows_updates_reject_list
-
 - name: "Get Windows online updates"
   include_tasks: ../utils/win_get_online_updates.yml
   vars:
     win_updates_ignore_errors: true
+
+# KB2267602: Security Intelligence Update for Microsoft Defender Antivirus.
+# Always add it to the reject list to reduce the failure rate of installing Windows online updates.
+- name: "Set the Windows online updates reject list"
+  ansible.builtin.set_fact:
+    win_updates_reject_list: >-
+      {%- if windows_updates_reject_list is defined and windows_updates_reject_list -%}
+        {{ ((windows_updates_reject_list.split(',') | map('trim') | list) + ['KB2267602']) | unique }}
+      {%- else -%}
+        ['KB2267602']
+      {%- endif -%}
 
 - name: "Install Windows online updates"
   include_tasks: ../utils/win_install_online_updates.yml
@@ -71,8 +75,9 @@
         remove_old_base_snapshot: true
         base_snapshot_description: "{{ win_os_version_build }}"
 
-- name: "Revert to the base snapshot when no Windows online update installed"
-  include_tasks: ../../common/base_snapshot_check_revert.yml
-  when:
-    - not win_online_updates_installed
-    - not win_online_updates_succeed
+- name: "Check if Windows online updates were installed successfully or no one was installed"
+  ansible.builtin.assert:
+    that:
+      - (win_online_updates_succeed or win_online_updates_installed)
+    fail_msg: >-
+      Windows online updates installation failed and no one was installed. Please check.
