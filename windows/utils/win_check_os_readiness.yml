@@ -1,9 +1,9 @@
-# Copyright 2025 VMware, Inc.
+# Copyright 2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Check Windows system readiness after booting up 
 #
-- name: "Initialize the readiness of Windows"
+- name: "Initialize the fact that Windows is not actively installing updates"
   ansible.builtin.set_fact:
     os_in_active_updates: false
 
@@ -28,7 +28,7 @@
 - name: "Wait for Windows updates installation completes"
   when: os_in_active_updates
   block:
-    - name: "Retry to check if Windows completes installing updates"
+    - name: "Retry to check if Windows completes updates installation"
       include_tasks: win_check_active_update.yml
       loop: "{{ range(1, 201) | list }}"
       loop_control:
@@ -41,5 +41,5 @@
       when: os_in_active_updates
     - name: "Debug message"
       ansible.builtin.debug:
-        msg: "Windows guest OS completes the updates install."
+        msg: "Windows guest OS completes the updates installation."
       when: not os_in_active_updates
