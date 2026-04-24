@@ -12,28 +12,20 @@
   tasks:
     - name: "Test case block"
       block:
-        - name: "Skip test case"
-          include_tasks: ../../common/skip_test_case.yml
-          vars:
-            skip_msg: >-
-              Skip test case '{{ ansible_play_name }}' because VMware pointing device driver is not available
-              in the Windows guest OS on ESXi on ARM.
-            skip_reason: "Not Supported"
-          when: esxi_cpu_vendor == 'arm'
-
         - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
           vars:
             skip_test_no_vmtools: true
 
-        - name: "Initialize the fact of VMware pointing device driver version"
+        - name: "Initialize the device name and driver version"
           ansible.builtin.set_fact:
             vmware_pointing_device_driver: ""
+            vmware_pointing_device_name: "{{ (esxi_cpu_vendor == 'arm') | ternary('VMware USB Pointing Device', 'VMware Pointing Device') }}"
 
-        - name: "Get VMware pointing device driver version in Windows guest OS"
+        - name: "Get pointing device driver version in Windows guest OS"
           include_tasks: ../utils/win_execute_cmd.yml
           vars:
-            win_powershell_cmd: "(Get-WmiObject Win32_PnpSignedDriver | where-object {$_.DeviceName -Match 'VMware Pointing Device'}).DriverVersion"
+            win_powershell_cmd: "(Get-WmiObject Win32_PnpSignedDriver | where-object {$_.DeviceName -Match '{{ vmware_pointing_device_name }}'}).DriverVersion"
             win_execute_cmd_ignore_error: true
 
         - name: "Set fact of the VMware pointing device driver version"
@@ -49,9 +41,12 @@
         - name: "Verify VMware pointing device driver version"
           ansible.builtin.assert:
             that:
+              - vmware_pointing_device_driver | length != 0
               - vmware_pointing_device_driver is regex("^\d+\.\d+\.\d+\.\d+$")
-            fail_msg: "Failed to get VMware pointing device driver version info due to '{{ win_powershell_cmd_output.msg | default('') }}'."
-            success_msg: "Get VMware pointing device driver version '{{ vmware_pointing_device_driver }}'."
+            fail_msg: >-
+              Failed to get '{{ vmware_pointing_device_name }}' driver version due to '{{ win_powershell_cmd_output.msg | default('') }}',
+              or the driver version '{{ vmware_pointing_device_name }}' is not in the expected format as '1.2.3.4'.
+            success_msg: "Get '{{ vmware_pointing_device_name }}' driver version '{{ vmware_pointing_device_driver }}'."
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
