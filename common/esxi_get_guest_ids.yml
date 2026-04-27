@@ -26,7 +26,7 @@
       {%- else -%}api
       {%- endif -%}
 
-- name: "Get ESXi server supported guest IDs from API"
+- name: "Get ESXi server supported guest IDs via the API"
   when: get_method == 'api'
   block:
     - name: "Get ESXi server supported guest IDs on hardware version {{ esxi_hardware_version }}"
@@ -41,21 +41,21 @@
         hardware_version: "vmx-{{ esxi_hardware_version }}"
       register: get_guest_os_ids_result
 
-    - name: "Check ESXi server supported guest IDs are retrieved from API"
+    - name: "Check ESXi server supported guest IDs are retrieved via the API"
       ansible.builtin.assert:
         that:
           - get_guest_os_ids_result is defined
           - get_guest_os_ids_result.instance is defined
           - get_guest_os_ids_result.instance | length > 0
         fail_msg: >-
-           Failed to get ESXi server supported guest IDs from API.
-           Caught error: {{ get_guest_os_ids_result.msg | default('') }}
+          Failed to get ESXi server supported guest IDs on hardware version {{ esxi_hardware_version }}
+          via the API
 
     - name: "Set fact of ESXi server supported guest IDs for hardware version {{ esxi_hardware_version }}"
       ansible.builtin.set_fact:
         esxi_guest_ids: "{{ get_guest_os_ids_result.instance | dict2items | map(attribute='value') | flatten }}"
 
-- name: "Get ESXi server supported guest IDs from VM config option file"
+- name: "Get ESXi server supported guest IDs from the XML configuration file"
   when: get_method == 'xml'
   block:
     - name: "Initialize variables for getting hardware version supported guest IDs"
@@ -64,7 +64,7 @@
         vm_default_config_xpath: "/ConfigRoot/ConfigurationOption/guestOSDescriptor/e/id"
 
     - name: "Get hardware version {{ esxi_hardware_version }} supported guest IDs on ESXi server"
-      xml:
+      community.general.xml:
         path: "{{ vm_config_option_esx_hw }}"
         xpath: "{{ vm_default_config_xpath }}"
         content: text
