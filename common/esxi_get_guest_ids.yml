@@ -5,7 +5,7 @@
 # Parameter:
 #   esxi_hardware_version: The hardware version on ESXi server, e.g. 13, 14, 15, etc.
 # Return:
-#   esxi_guest_ids: A list of all supported guest IDs for hardware version
+#   esxi_guest_ids: A list of all supported guest IDs on a hardware version
 
 - name: "Check esxi_hardware_version is set with valid value"
   ansible.builtin.assert:
@@ -14,35 +14,49 @@
       - esxi_hardware_version is match('^\d+')
     fail_msg: "Incorrect hardware version '{{ esxi_hardware_version }}'"
 
-- name: "Initialize ESXi supported guest IDs with hardware version {{ esxi_hardware_version }}"
+- name: "Initialize ESXi server supported guest IDs on hardware version {{ esxi_hardware_version }}"
   ansible.builtin.set_fact:
     esxi_guest_ids: []
 
-- name: "Get ESXi server supported hardware versions"
-  community.vmware.vmware_vm_config_option:
-    hostname: "{{ vsphere_host_name }}"
-    username: "{{ vsphere_host_user }}"
-    password: "{{ vsphere_host_user_password }}"
-    validate_certs: "{{ validate_certs | default(false) }}"
-    datacenter: "{{ vsphere_host_datacenter }}"
-    esxi_hostname: "{{ esxi_hostname }}"
-    get_guest_os_ids: true
-    hardware_version: "vmx-{{ esxi_hardware_version }}"
-  register: get_guest_os_ids_result
-  ignore_errors: true
+ - name: "Set default method for getting ESXi server supported guest IDs"
+   ansible.builtin.set_fact:
+    get_method: >-
+      {%- if esxi_version is match('7.0.*') -%}xml
+      {%- elif esxi_latest_hardware_version | int < esxi_hardware_version | int -%}xml
+      {%- else -%}api
+      {%- endif -%}
 
-- name: "Set fact of ESXi supported guest IDs for hardware version {{ esxi_hardware_version }}"
-  ansible.builtin.set_fact:
-    esxi_guest_ids: "{{ get_guest_os_ids_result.instance | dict2items | map(attribute='value') | flatten }}"
-  when:
-    - get_guest_os_ids_result is defined
-    - get_guest_os_ids_result.instance is defined
-    - get_guest_os_ids_result.instance | length > 0
+- name: "Get ESXi server supported guest IDs via the API"
+  when: get_method == 'api'
+  block:
+    - name: "Get ESXi server supported guest IDs on hardware version {{ esxi_hardware_version }}"
+      community.vmware.vmware_vm_config_option:
+        hostname: "{{ vsphere_host_name }}"
+        username: "{{ vsphere_host_user }}"
+        password: "{{ vsphere_host_user_password }}"
+        validate_certs: "{{ validate_certs | default(false) }}"
+        datacenter: "{{ vsphere_host_datacenter }}"
+        esxi_hostname: "{{ esxi_hostname }}"
+        get_guest_os_ids: true
+        hardware_version: "vmx-{{ esxi_hardware_version }}"
+      register: get_guest_os_ids_result
 
-- name: "Get ESXi supported guest IDs from config options file"
-  when: >
-    get_guest_os_ids_result.instance is undefined or
-    get_guest_os_ids_result.failed
+    - name: "Check ESXi server supported guest IDs are retrieved via the API"
+      ansible.builtin.assert:
+        that:
+          - get_guest_os_ids_result is defined
+          - get_guest_os_ids_result.instance is defined
+          - get_guest_os_ids_result.instance | length > 0
+        fail_msg: >-
+          Failed to get ESXi server supported guest IDs on hardware version {{ esxi_hardware_version }}
+          via the API
+
+    - name: "Set fact of ESXi server supported guest IDs for hardware version {{ esxi_hardware_version }}"
+      ansible.builtin.set_fact:
+        esxi_guest_ids: "{{ get_guest_os_ids_result.instance | dict2items | map(attribute='value') | flatten }}"
+
+- name: "Get ESXi server supported guest IDs from the XML configuration file"
+  when: get_method == 'xml'
   block:
     - name: "Initialize variables for getting hardware version supported guest IDs"
       ansible.builtin.set_fact:
@@ -50,7 +64,7 @@
         vm_default_config_xpath: "/ConfigRoot/ConfigurationOption/guestOSDescriptor/e/id"
 
     - name: "Get hardware version {{ esxi_hardware_version }} supported guest IDs on ESXi server"
-      xml:
+      community.general.xml:
         path: "{{ vm_config_option_esx_hw }}"
         xpath: "{{ vm_default_config_xpath }}"
         content: text
@@ -58,7 +72,7 @@
       delegate_to: "{{ esxi_hostname }}"
       register: guest_os_desc_ids_result
 
-    - name: "Set fact of ESXi supported guest IDs for hardware version {{ esxi_hardware_version }}"
+    - name: "Set fact of ESXi server supported guest IDs for hardware version {{ esxi_hardware_version }}"
       ansible.builtin.set_fact:
         esxi_guest_ids: "{{ guest_os_desc_ids_result.matches | map(attribute='id') | list }}"
 
