@@ -68,12 +68,13 @@
           ansible.builtin.debug: var=rpm_package_result
 
         - name: "link rpm to /usr/lib/python3.11/site-packages/"
-          ansible.builtin.command: "ln -s {{ rpm_package_result.stdout.split() }} /usr/lib/python3.11/site-packages/"
+          ansible.builtin.command: "ln -s {{ rpm_package_result.stdout_lines[0].split() }} /usr/lib/python3.11/site-packages/"
           delegate_to: "{{ vm_guest_ip }}"
+          ignore_errors: true
           when: 
             - not rpm_package_result.failed
-            - rpm_package_result.stdout is defined
-            - rpm_package_result.stdout | length > 0
+            - rpm_package_result.stdout_lines is defined
+            - rpm_package_result.stdout_lines | length > 0
 
 - name: "Reconfigure {{ guest_os_ansible_distribution }}"
   when:
