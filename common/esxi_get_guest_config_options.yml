@@ -69,11 +69,11 @@
     guest_config_options: {}
 
 - name: "Get VM default config options from API"
-  include_tasks: esxi_get_guest_config_options_from_api.yml
+  include_tasks: esxi_get_guest_config_options_api.yml
   when: get_method == "api"
 
 - name: "Get VM default config options from XML"
-  include_tasks: esxi_get_guest_config_options_from_xml.yml
+  include_tasks: esxi_get_guest_config_options_xml.yml
   when: get_method == "xml"
 
 - name: "Set default CPU number for VM with guest ID {{ guest_id }}"
@@ -83,15 +83,9 @@
         guest_default_config_options |
         combine({
                  'default_cpu_number':
-                 (guest_default_config_options.rec_cpu_cores_per_socket | int) * (guest_default_config_options.rec_cpu_socket | int)
+                 (guest_default_config_options.rec_cpu_cores_per_socket | default(1) | int) * (guest_default_config_options.rec_cpu_socket | default(1) | int)
                 })
        }}
-  when:
-    - guest_default_config_options is defined
-    - guest_default_config_options.rec_cpu_cores_per_socket | default('')
-    - guest_default_config_options.rec_cpu_cores_per_socket | int >= 1
-    - guest_default_config_options.rec_cpu_socket | default('')
-    - guest_default_config_options.rec_cpu_socket | int >= 1
 
 - name: "Display guest ID {{ guest_id }} config options on hardware version {{ esxi_hardware_version }} get from {{ get_method }}"
   ansible.builtin.debug: var=guest_config_options
