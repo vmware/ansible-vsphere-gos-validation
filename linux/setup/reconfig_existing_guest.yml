@@ -54,6 +54,12 @@
       vars:
         package_list: ["sudo", "gawk", "tar", "wget", "curl"]
         package_state: "latest"
+    
+    # Fix issue: Failed to import the required Python library (rpm) on photon-autoinstall-machine's Python /usr/bin/python3.11
+    - name: "link rpm to /usr/lib/python3.11/site-packages/"
+      ansible.builtin.command: "ln -s /usr/lib/python3.14/site-packages/rpm /usr/lib/python3.11/site-packages/"
+      delegate_to: "{{ vm_guest_ip }}"
+      when: guest_os_ansible_distribution_major_ver | int == 5
 
 - name: "Reconfigure {{ guest_os_ansible_distribution }}"
   when:
@@ -86,3 +92,5 @@
 
     - name: "Update /etc/fstab with partition UUID"
       include_tasks: ../utils/freebsd_update_fstab_with_uuid.yml
+
+  
