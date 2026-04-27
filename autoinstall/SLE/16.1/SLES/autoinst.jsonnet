@@ -112,6 +112,11 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
         content: |||
           #!/bin/bash
           echo "Execute post-install script" >/dev/ttyS0
+          # Mask the systemd tmpfs mount service
+          echo "Configuring /tmp to use disk space instead of RAM..." >/dev/ttyS0
+          systemctl mask tmp.mount
+          # Remove any /tmp mount entries from /etc/fstab
+          sed -i '/[[:space:]]\/tmp[[:space:]]/d' /etc/fstab
           echo "{{ autoinstall_complete_msg }}" >/dev/ttyS0
         |||
       }
