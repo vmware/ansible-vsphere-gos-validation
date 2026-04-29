@@ -57,7 +57,9 @@
     
     # Fix issue in photon 5 GA ISO/OVA: Failed to import the required Python library (rpm) on bunleded Python /usr/bin/python3.11
     - name: "Get path of package python3-rpm and link to /usr/lib/python3.11/site-packages/"
-      when: guest_os_ansible_distribution_major_ver | int == 5
+      when: 
+        - guest_os_ansible_distribution_major_ver | int == 5
+        - ansible_python_version == "3.11.0"
       block:
         - name: "Get path of package python3-rpm"
           ansible.builtin.shell: "rpm -ql python3-rpm | grep 'site-packages\/rpm$'"
@@ -75,7 +77,7 @@
             - not rpm_package_result.failed
             - rpm_package_result.stdout is defined
             - rpm_package_result.stdout | length > 0
-            - ansible_python_version == "3.11.0"
+            - not rpm_package_result.stdout is search('python3\.11')
 
 - name: "Reconfigure {{ guest_os_ansible_distribution }}"
   when:
