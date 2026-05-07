@@ -71,6 +71,7 @@ else
     echo "Create symbolic links for python3"
     ln -sf "$ap_python3_install_path/bin/python3" "$ap_python3_bin_dir/python"
     ln -sf "$ap_python3_install_path/bin/python3" "$ap_python3_bin_dir/python3"
+    ln -sf "$ap_python3_install_path/bin/python3" "/usr/bin/python3"
 
     echo "Create symbolic link for virtualenv"
     ln -sf "$ap_python3_install_path/bin/virtualenv" "$ap_python3_bin_dir/virtualenv"
