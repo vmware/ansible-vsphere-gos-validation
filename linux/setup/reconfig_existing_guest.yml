@@ -55,28 +55,32 @@
         package_list: ["sudo", "gawk", "tar", "wget", "curl"]
         package_state: "latest"
     
-    # Workaround for Photon OS 5.0 GA: Resolving 'python3-rpm' import failure in the default Python 3.11 environment.
-    - name: "Get path of package python3-rpm and create symbol link to it"
+    # Workaround for Photon OS 5.0 GA / update ISO / OVA: Resolving 'python3-rpm' import failure in the default Python 3.11 environment.
+    - name: "Reinstall latest python3-rpm-4.18.* for python 3.11.x"
       when: 
         - guest_os_ansible_distribution_major_ver | int == 5
-        - ansible_python_version == "3.11.0"
+        - ansible_python_version is match("^3\.11")
       block:
-        - name: "Get path of package python3-rpm"
-          ansible.builtin.shell: "rpm -ql python3-rpm | grep 'site-packages\/rpm$'"
+        - name: "Get latest 4.18 python3-rpm package"
+          ansible.builtin.shell: >
+            curl -s https://packages.broadcom.com/photon/5.0/photon_5.0_x86_64/x86_64/
+            | grep python3-rpm-4.18
+            | sed 's/<[^>]*>//g'
+            | awk '{print $1}'
+            | sort -V
+            | tail -1
           delegate_to: "{{ vm_guest_ip }}"
-          register: rpm_package_result
+          register: python3_rpm_pkg
 
-        - name: "Display the path of package python3-rpm"
-          ansible.builtin.debug: var=rpm_package_result
+        - name: "Display the latest package python3-rpm-4.18.*"
+          ansible.builtin.debug: var=python3_rpm_pkg
 
-        - name: "Create symbol link '/usr/lib/python3.11/site-packages/rpm'"
-          ansible.builtin.shell: "ln -s {{ rpm_package_result.stdout.strip() }} /usr/lib/python3.11/site-packages/"
+        - name: "Install the package python3-rpm-4.18.*"
+          ansible.builtin.shell: "tdnf install https://packages.broadcom.com/photon/5.0/photon_5.0_x86_64/x86_64/{{ python3_rpm_pkg.stdout }} --nogpgcheck"
           delegate_to: "{{ vm_guest_ip }}"
-          ignore_errors: true
           when:
-            - rpm_package_result.stdout is defined
-            - rpm_package_result.stdout | length > 0
-            - not rpm_package_result.stdout is search('python3\.11')
+            - python3_rpm_pkg.stdout is defined
+            - python3_rpm_pkg.stdout | length > 0
 
 - name: "Reconfigure {{ guest_os_ansible_distribution }}"
   when:
