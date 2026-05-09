@@ -10,6 +10,30 @@
 - name: "Display the result of python install"
   ansible.builtin.debug: var=ap3_install_result
 
+- name: "Get python path in flatcar"
+  ansible.builtin.shell: which python
+  delegate_to: "{{ vm_guest_ip }}"
+  register: python3_path_result
+
+- name: "Update VM's python path to in-memory inventory"
+  when:
+    - python3_path_result.stdout is defined
+    - python3_path_result.stdout | length > 0
+  block:
+    - name: "Reset vm_python for flatcar"
+      ansible.builtin.set_fact:
+        vm_python: "{{ python3_path_result.stdout }}"
+
+    - name: "Update python path in memory inventory"
+      include_tasks: ../../../common/add_host_in_memory_inventory.yml
+      vars:
+        add_host_in_memory_inventory_ip: "{{ vm_guest_ip }}"
+        add_host_in_memory_inventory_gp: "target_vm"
+        add_host_in_memory_inventory_user: "{{ vm_username }}"
+        add_host_in_memory_inventory_pwd: "{{ vm_password }}"
+        add_host_in_memory_inventory_python: "{{ vm_python }}"
+        add_host_in_memory_inventory_ssh_pipeline: "{{ vm_ssh_pipeline_enable | default(false) }}"
+
 - name: "Check /etc/ssh/sshd_config status"
   include_tasks: ../../utils/get_file_stat_info.yml
   vars:
