@@ -49,6 +49,13 @@
 #      ]
 #  }
 #
+- name: "Check esxi_hardware_version is set with valid value"
+  ansible.builtin.assert:
+    that:
+      - esxi_hardware_version is defined
+      - esxi_hardware_version is match('^\d+')
+    fail_msg: "Incorrect parameter: esxi_hardware_version={{ esxi_hardware_version | default('') }}"
+
 - name: "Set default method for getting VM default config options"
   ansible.builtin.set_fact:
     get_method: >-
@@ -56,13 +63,6 @@
       {%- elif esxi_latest_hardware_version | int < esxi_hardware_version | int -%}xml
       {%- else -%}api
       {%- endif -%}
-
-- name: "Check esxi_hardware_version is set with valid value"
-  ansible.builtin.assert:
-    that:
-      - esxi_hardware_version is defined
-      - esxi_hardware_version is match('^\d+')
-    fail_msg: "Incorrect parameter: esxi_hardware_version={{ esxi_hardware_version | default('') }}"
 
 - name: "Initialize the guest config options dict"
   ansible.builtin.set_fact:
