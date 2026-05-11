@@ -44,6 +44,28 @@
         rejectattr('status', 'equalto', repo_state)
       }}
 
+- name: "Standardize openSUSE Repositories to HTTPS"
+  delegate_to: "{{ vm_guest_ip }}"
+  when:
+    - repo_state == "enabled"
+    - guest_os_ansible_distribution is search('openSUSE')
+    - guest_os_ansible_distribution_ver is version('16.0','==')
+    - existing_repos | length > 0
+  block:
+    - name: "Find openSUSE repo files on target VM"
+      ansible.builtin.find:
+        paths: "/etc/zypp/repos.d"
+        patterns: "*.repo"
+      register: found_repo_files
+
+    - name: "Change 'http' to 'https' and add trailing slash in the repo URL"
+      ansible.builtin.replace:
+        path: "{{ item.path }}"
+        regexp: '^baseurl=http://(.*[^/])$'
+        replace: 'baseurl=https://\1/'
+      loop: "{{ found_repo_files.files | default([]) }}"
+      when: found_repo_files.matched > 0
+
 - name: "Set fact of repository ids need to be {{ repo_state }}"
   ansible.builtin.set_fact:
     existing_repo_ids: "{{ existing_repos | map(attribute='id') }}"
