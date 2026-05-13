@@ -54,6 +54,40 @@
       vars:
         package_list: ["sudo", "gawk", "tar", "wget", "curl"]
         package_state: "latest"
+    
+    # Workaround for Photon OS 5.0 GA / update ISO / OVA: Resolving 'python3-rpm' import failure in the default Python 3.11 environment.
+    - name: "Reinstall latest python3-rpm-4.18.* for python 3.11.x in Photon 5"
+      when: 
+        - guest_os_ansible_distribution_major_ver | int == 5
+        - ansible_python_version is match("^3\.11")
+      block:
+        - name: "Set fact of package python3-rpm-4.18.x URL"
+          ansible.builtin.set_fact:
+            python3_rpm_url: |-
+              {%- if esxi_cpu_vendor == 'arm' -%}https://packages.broadcom.com/photon/5.0/photon_5.0_aarch64/aarch64/
+              {%- else -%}https://packages.broadcom.com/photon/5.0/photon_release_5.0_x86_64/x86_64/
+              {%- endif -%}
+        
+        - name: "Get latest 4.18 python3-rpm package"
+          ansible.builtin.shell: >
+            curl -s {{ python3_rpm_url }}
+            | grep python3-rpm-4.18
+            | sed 's/<[^>]*>//g'
+            | awk '{print $1}'
+            | sort -V
+            | tail -1
+          delegate_to: "{{ vm_guest_ip }}"
+          register: python3_rpm_pkg
+
+        - name: "Display the latest package python3-rpm-4.18.*"
+          ansible.builtin.debug: var=python3_rpm_pkg
+
+        - name: "Install the package python3-rpm-4.18.*"
+          ansible.builtin.shell: "tdnf install -y {{ python3_rpm_url }}{{ python3_rpm_pkg.stdout }} --nogpgcheck"
+          delegate_to: "{{ vm_guest_ip }}"
+          when:
+            - python3_rpm_pkg.stdout is defined
+            - python3_rpm_pkg.stdout | length > 0
 
 - name: "Reconfigure {{ guest_os_ansible_distribution }}"
   when:
