@@ -138,34 +138,8 @@
   when: guest_os_ansible_distribution == "openSUSE Leap"
 
 - name: "Add VMware Photon OS online repositories"
+  include_tasks: photon_config_repo.yml
   when: guest_os_ansible_distribution == 'VMware Photon OS'
-  block:
-    - name: "Set fact of online repository names on {{ vm_guest_os_distribution }}"
-      ansible.builtin.set_fact:
-        photon_repo_names: ["photon-release", "photon-updates"]
-      when: guest_os_ansible_distribution_major_ver | int < 4
-
-    - name: "Set fact of online repository names on {{ vm_guest_os_distribution }}"
-      ansible.builtin.set_fact:
-        photon_repo_names: ["photon", "photon-release", "photon-updates"]
-      when: guest_os_ansible_distribution_major_ver | int >= 4
-
-    - name: "Set fact of online repositories on {{ vm_guest_os_distribution }}"
-      ansible.builtin.set_fact:
-        guest_online_repos: "{{ guest_online_repos | union([{'name': item, 'baseurl': repo_baseurl}]) }}"
-      vars:
-        repo_baseurl: "https://packages.broadcom.com/photon/$releasever/{{ item | replace('-', '_') }}_$releasever_$basearch"
-      with_items: "{{ photon_repo_names }}"
-
-    - name: "Update repository's baseurl"
-      ansible.builtin.shell: |-
-        sed -i 's#packages.vmware.com#packages.broadcom.com#g' /etc/yum.repos.d/*.repo;
-        invalid_repo_files=`grep -l 'dl.bintray.com/vmware' /etc/yum.repos.d/*.repo`;
-        if [ "$invalid_repo_files" != "" ] ; then
-          sed -i 's#dl.bintray.com/vmware/#packages.broadcom.com/photon/$releasever/#' $invalid_repo_files;
-        fi
-      delegate_to: "{{ vm_guest_ip }}"
-      with_items: "{{ photon_repo_names }}"
 
 - name: "Display the list of guest OS online repositories"
   ansible.builtin.debug: var=guest_online_repos
