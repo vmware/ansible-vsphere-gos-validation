@@ -1,0 +1,86 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Config VMware Photon OS online repositories
+#
+- name: "Add VMware Photon OS online repositories"
+  when: guest_os_ansible_distribution_major_ver | int <= 4
+  block:
+    - name: "Set fact of online repository names on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        photon_repo_names: ["photon-release", "photon-updates"]
+      when: guest_os_ansible_distribution_major_ver | int < 4
+
+    - name: "Set fact of online repository names on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        photon_repo_names: ["photon", "photon-release", "photon-updates"]
+      when: guest_os_ansible_distribution_major_ver | int >= 4
+
+    - name: "Set fact of online repositories on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_online_repos: "{{ guest_online_repos | union([{'name': item, 'baseurl': repo_baseurl}]) }}"
+      vars:
+        repo_baseurl: "https://packages.broadcom.com/photon/$releasever/{{ item | replace('-', '_') }}_$releasever_$basearch"
+      with_items: "{{ photon_repo_names }}"
+
+    - name: "Update repository's baseurl"
+      ansible.builtin.shell: |-
+        sed -i 's#packages.vmware.com#packages.broadcom.com#g' /etc/yum.repos.d/*.repo;
+        invalid_repo_files=`grep -l 'dl.bintray.com/vmware' /etc/yum.repos.d/*.repo`;
+        if [ "$invalid_repo_files" != "" ] ; then
+          sed -i 's#dl.bintray.com/vmware/#packages.broadcom.com/photon/$releasever/#' $invalid_repo_files;
+        fi
+      delegate_to: "{{ vm_guest_ip }}"
+      with_items: "{{ photon_repo_names }}"
+
+- name: "Add VMware Photon OS online repositories"
+  when: guest_os_ansible_distribution_major_ver | int >= 5
+  block:
+    - name: "Get list of all photon repos"
+      ansible.builtin.shell: "tdnf --enablerepo=photon --disablerepo=photon-updates provides photon-repos | grep photon-repos | cut -d ':' -f 1"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: photon_repos_result
+    
+    - name: "Display all the photon repos"
+      ansible.builtin.debug: var=photon_repos_result
+    
+    - name: "Check the repos"
+      ansible.builtin.assert:
+        that:
+          - photon_repos_result.stdout | length > 0
+        fail_msg: "There is no repos"
+
+    - name: "Set repo version suffix"
+      ansible.builtin.set_fact:
+        repo_suffix: "{{ '92' if guest_os_python_version is version('3.14', '>=') else '91' }}"
+    
+    - name: "Get specified repos"
+      ansible.builtin.set_fact:
+        photon_repo_list: >-
+          {{ repo_output.stdout
+            | regex_findall('photon-repos-5\\.0-[\\d\\.]+\\.' ~ repo_suffix ~ '\\.ph5\\.noarch')
+            | sort
+          }}
+
+    - name: "Display specified repos"
+      ansible.builtin.debug: var=photon_repo_list
+    
+    - name: "Check the specified repos"
+      ansible.builtin.assert:
+        that:
+          - photon_repo_list | length > 0
+        fail_msg: "There is no specified repos"
+
+    - name: "Disable current all the repos"
+      ansible.builtin.shell: sed -i 's/enabled=1/enabled=0/g' /etc/yum.repos.d/*.repo
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+
+    - name: "Install the specified repo"
+      ansible.builtin.command: tdnf update -y photon_repo_list[0]
+      delegate_to: "{{ vm_guest_ip }}"
+
+        
+
+
