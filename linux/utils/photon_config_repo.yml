@@ -44,7 +44,7 @@
         | cut -d ':' -f 1
       delegate_to: "{{ vm_guest_ip }}"
       register: photon_repos_result
-    
+
     - name: "Display all the photon repos"
       ansible.builtin.debug: var=photon_repos_result
     
@@ -75,13 +75,16 @@
           - photon_repo_list | length > 0
         fail_msg: "There is no specified repos"
 
-    - name: "Disable current all the repos"
-      ansible.builtin.shell: sed -i 's/enabled=1/enabled=0/g' /etc/yum.repos.d/*.repo
+    - name: "Disable current all the repos except photon-snapshot.repo"
+      ansible.builtin.shell: |
+        for f in $(ls /etc/yum.repos.d/*.repo | grep -v photon-snapshot.repo); do
+          sed -i 's/enabled=1/enabled=0/g' "$f";
+        done
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: true
 
     - name: "Install the selected Photon repo"
-      ansible.builtin.command: tdnf update -y photon_repo_list[0]
+      ansible.builtin.command: tdnf --enablerepo=photon update -y photon_repo_list[0]
       delegate_to: "{{ vm_guest_ip }}"
 
 
