@@ -53,10 +53,43 @@
     - name: "Config specific repo"
       include: ../utils/photon_config_repo.yml
 
+    - name: "Check package python3-rpm"
+      ansible.builtin.command: rpm -ql python3-rpm
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_error: true
+      regitster: rpm_package_result
+    
+    - name: "Display package python3-rpm"
+      ansible.builtin.debug: var=rpm_package_result
+  
+    - name: "Check all enabled repos"
+      ansible.builtin.command: tdnf repolist
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_error: true
+      register: repolist_result
+
+    - name: "Display all enabled repos"
+      ansible.builtin.debug: var=repolist_result
+
     - name: "Install required packages on VMware Photon OS"
       include_tasks: ../utils/install_uninstall_package.yml
       vars:
-        package_list: ["python3-rpm", "sudo", "gawk", "tar", "wget", "curl"]
+        package_list: ["python3-rpm"]
+        package_state: "latest"
+
+    - name: "Check package python3-rpm after install python3-rpm"
+      ansible.builtin.command: rpm -ql python3-rpm
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_error: true
+      regitster: rpm_package_result
+    
+    - name: "Display the package after install python3-rpm"
+      ansible.builtin.debug: var=rpm_package_result
+
+    - name: "Install required packages on VMware Photon OS"
+      include_tasks: ../utils/install_uninstall_package.yml
+      vars:
+        package_list: ["sudo", "gawk", "tar", "wget", "curl"]
         package_state: "latest"
 
 - name: "Reconfigure {{ guest_os_ansible_distribution }}"
