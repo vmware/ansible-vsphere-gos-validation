@@ -51,7 +51,7 @@
     - name: "Check the repos"
       ansible.builtin.assert:
         that:
-          - photon_repos_result.stdout | length > 0
+          - photon_repos_result.stdout_lines | length > 0
         fail_msg: "No Photon repos found"
 
     - name: "Set repo version suffix"
@@ -61,9 +61,12 @@
     - name: "Get the matching Photon repo packages"
       ansible.builtin.set_fact:
         photon_repo_list: >-
-          {{ photon_repos_result.stdout
-            | regex_findall('photon-repos-5\\.0-[\\d\\.]+\\.' ~ repo_suffix ~ '\\.ph5\\.noarch')
+          {{
+            photon_repos_result.stdout_lines
+            | map('trim')
+            | select('search', '\.' ~ repo_suffix ~ '\.ph5\.noarch$')
             | sort
+            | list
           }}
 
     - name: "Display the matching Photon repo packages"
