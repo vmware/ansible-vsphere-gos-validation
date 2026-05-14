@@ -34,11 +34,14 @@
       delegate_to: "{{ vm_guest_ip }}"
       with_items: "{{ photon_repo_names }}"
 
-- name: "Add VMware Photon OS online repositories"
+- name: "Add Photon OS online repositories"
   when: guest_os_ansible_distribution_major_ver | int >= 5
   block:
     - name: "Get list of all photon repos"
-      ansible.builtin.shell: "tdnf --enablerepo=photon --disablerepo=photon-updates provides photon-repos | grep photon-repos | cut -d ':' -f 1"
+      ansible.builtin.shell: > 
+        tdnf --enablerepo=photon --disablerepo=photon-updates provides photon-repos 
+        | grep photon-repos 
+        | cut -d ':' -f 1"
       delegate_to: "{{ vm_guest_ip }}"
       register: photon_repos_result
     
@@ -49,24 +52,24 @@
       ansible.builtin.assert:
         that:
           - photon_repos_result.stdout | length > 0
-        fail_msg: "There is no repos"
+        fail_msg: "No Photon repos found"
 
     - name: "Set repo version suffix"
       ansible.builtin.set_fact:
         repo_suffix: "{{ '92' if guest_os_python_version is version('3.14', '>=') else '91' }}"
-    
-    - name: "Get specified repos"
+
+    - name: "Get the matching Photon repo packages"
       ansible.builtin.set_fact:
         photon_repo_list: >-
-          {{ repo_output.stdout
+          {{ photon_repos_result.stdout
             | regex_findall('photon-repos-5\\.0-[\\d\\.]+\\.' ~ repo_suffix ~ '\\.ph5\\.noarch')
             | sort
           }}
 
-    - name: "Display specified repos"
+    - name: "Display the matching Photon repo packages"
       ansible.builtin.debug: var=photon_repo_list
     
-    - name: "Check the specified repos"
+    - name: "Ensure the matching Photon repos exist"
       ansible.builtin.assert:
         that:
           - photon_repo_list | length > 0
@@ -77,10 +80,9 @@
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: true
 
-    - name: "Install the specified repo"
+    - name: "Install the selected Photon repo"
       ansible.builtin.command: tdnf update -y photon_repo_list[0]
       delegate_to: "{{ vm_guest_ip }}"
 
-        
 
 
