@@ -7,15 +7,17 @@
 - name: "Add VMware Photon OS online repositories"
   when: guest_os_ansible_distribution_major_ver | int <= 4
   block:
-    - name: "Set fact of online repository names on {{ vm_guest_os_distribution }}"
+    - name: "Initialize the fact of guest OS online repositories"
       ansible.builtin.set_fact:
-        photon_repo_names: ["photon-release", "photon-updates"]
-      when: guest_os_ansible_distribution_major_ver | int < 4
+        guest_online_repos: []
+      when: guest_online_repos is not defined
 
     - name: "Set fact of online repository names on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
-        photon_repo_names: ["photon", "photon-release", "photon-updates"]
-      when: guest_os_ansible_distribution_major_ver | int >= 4
+        photon_repo_names: >-
+          {{ ["photon", "photon-release", "photon-updates"]
+            if (guest_os_ansible_distribution_major_ver | int) == 4
+            else ["photon-release", "photon-updates"] }}
 
     - name: "Set fact of online repositories on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
