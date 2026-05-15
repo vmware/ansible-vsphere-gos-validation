@@ -65,11 +65,14 @@
       ignore_errors: true
       register: repolist_result
 
+    - name: "Pause 60 seconds to wait photon repo cache refresh"
+      ansible.builtin.pause:
+        seconds: 60
+
     - name: "Install required packages on VMware Photon OS"
-      include_tasks: ../utils/install_uninstall_package.yml
-      vars:
-        package_list: ["python3-rpm"]
-        package_state: "latest"
+      ansible.builtin.command: "tdnf install -y python3-rpm"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: rpm_install_result
 
     - name: "Check package python3-rpm after install python3-rpm"
       ansible.builtin.command: rpm -ql python3-rpm
