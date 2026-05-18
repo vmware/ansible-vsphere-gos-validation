@@ -53,14 +53,29 @@
     - name: "Config specific repo"
       include: ../utils/photon_config_repo.yml
 
-    - name: "Check package python3-rpm"
+    - name: "Get package python3-rpm"
       ansible.builtin.command: "rpm -ql python3-rpm"
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: true
       register: rpm_package_result
 
+    - name: "Initialize the fact expected_python3_rpm"
+      ansible.builtin.set_fact:
+        expected_python3_rpm: "python{{ ansible_python_version | regex_replace('(\\d+\\.\\d+).*', '\\1') }}"
+
+    - name: "Check if the package pyhton3_rpm is correct version or not"
+      ansible.builtin.set_fact:
+        correct_pyhton3_rpm: true
+      when: 
+        - not rpm_package_result.failed
+        - rpm_package_result.stdout_lines is defined
+        - rpm_package_result.stdout_lines | length > 0
+        - expected_python3_rpm in rpm_package_result.stdout_lines[0]
+
     - name: "Check and install python3-rpm for Photon 5"
-      when: guest_os_ansible_distribution_major_ver | int >= 5
+      when: 
+        - guest_os_ansible_distribution_major_ver | int >= 5
+        - correct_pyhton3_rpm is not defined or (not correct_pyhton3_rpm)
       block:
         - name: "Check all enabled repos"
           ansible.builtin.command: "tdnf repolist"
@@ -89,11 +104,6 @@
           vars:
             package_list: ["python3-rpm"]
             package_state: "latest"
-
-        - name: "Install required packages on VMware Photon OS"
-          ansible.builtin.command: "tdnf install -y python3-rpm"
-          delegate_to: "{{ vm_guest_ip }}"
-          register: rpm_install_result
 
     - name: "Install required packages on VMware Photon OS"
       include_tasks: ../utils/install_uninstall_package.yml
