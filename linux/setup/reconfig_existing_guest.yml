@@ -31,7 +31,7 @@
   when:
     - guest_os_python_version is version('3.0.0', '>=')
     - guest_os_ansible_pkg_mgr is search('yum|dnf|zypper')
-    - guest_os_ansible_distribution != "VMware Photon OS"
+    - not (guest_os_ansible_distribution == "VMware Photon OS" and guest_os_ansible_distribution_major_ver | int == 5)
 
 - name: "Reconfigure VMware Photon OS"
   when: guest_os_ansible_distribution == "VMware Photon OS"
@@ -54,7 +54,7 @@
       include: ../utils/photon_config_repo.yml
 
     - name: "Check and install python3-rpm for Photon 5"
-      when: guest_os_ansible_distribution_major_ver | int >= 4
+      when: guest_os_ansible_distribution_major_ver | int >= 5
       block:
         - name: "Check package python3-rpm"
           ansible.builtin.command: "rpm -ql python3-rpm"
@@ -96,7 +96,7 @@
           register: rpm_package_result
 
         - name: "Uninstall the packages on VMware Photon OS"
-          ansible.builtin.command: tdnf remove -y python3-rpm
+          ansible.builtin.command: tdnf remove -y python3-rpm --nogpgcheck
           delegate_to: "{{ vm_guest_ip }}"
           ignore_errors: true
         
