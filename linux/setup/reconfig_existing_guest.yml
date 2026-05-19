@@ -50,50 +50,34 @@
     - name: "Disable DNSSEC and DNSOverTLS settings for VMware Photon OS"
       include_tasks: ../utils/set_dns.yml
 
-    - name: "Config specific repo"
+    - name: "Config Photon snapshot repo"
       include: ../utils/photon_config_repo.yml
 
     - name: "Get package python3-rpm"
       ansible.builtin.command: "rpm -ql python3-rpm"
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: true
-      register: rpm_package_result
+      register: rpm_package_query_result
 
-    - name: "Initialize the fact expected_python3_rpm"
+    - name: "Set the fact expected_rpm_python3_version and correct_pyhton3_rpm"
       ansible.builtin.set_fact:
-        expected_python3_rpm: "python{{ ansible_python_version | regex_replace('(\\d+\\.\\d+).*', '\\1') }}"
+        expected_rpm_python3_version: "python{{ ansible_python_version | regex_replace('(\\d+\\.\\d+).*', '\\1') }}"
+        correct_pyhton3_rpm: false
 
     - name: "Check if the package pyhton3_rpm is correct version or not"
       ansible.builtin.set_fact:
         correct_pyhton3_rpm: true
       when: 
-        - not rpm_package_result.failed
-        - rpm_package_result.stdout_lines is defined
-        - rpm_package_result.stdout_lines | length > 0
-        - expected_python3_rpm in rpm_package_result.stdout_lines[0]
+        - not rpm_package_query_result.failed
+        - rpm_package_query_result.stdout_lines is defined
+        - rpm_package_query_result.stdout_lines | length > 0
+        - expected_rpm_python3_version in rpm_package_query_result.stdout_lines[0]
 
     - name: "Check and install python3-rpm for Photon 5"
       when: 
         - guest_os_ansible_distribution_major_ver | int >= 5
-        - correct_pyhton3_rpm is not defined or (not correct_pyhton3_rpm)
+        - not correct_pyhton3_rpm
       block:
-        - name: "Check all enabled repos"
-          ansible.builtin.command: "tdnf repolist"
-          delegate_to: "{{ vm_guest_ip }}"
-          ignore_errors: true
-          register: repolist_result
-
-        - name: "Check 'tdnf list python3-rpm'"
-          ansible.builtin.command: "tdnf list python3-rpm"
-          delegate_to: "{{ vm_guest_ip }}"
-          ignore_errors: true
-          register: python_version_result
-
-        - name: "Take a snapshot before install python3-rpm"
-          include_tasks: ../../common/vm_take_snapshot.yml
-          vars:
-            snapshot_name: "before_install_rpm"
-
         - name: "Uninstall the packages on VMware Photon OS"
           ansible.builtin.command: "tdnf remove -y python3-rpm"
           delegate_to: "{{ vm_guest_ip }}"
