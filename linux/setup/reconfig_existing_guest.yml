@@ -50,9 +50,6 @@
     - name: "Disable DNSSEC and DNSOverTLS settings for VMware Photon OS"
       include_tasks: ../utils/set_dns.yml
 
-    - name: "Config Photon snapshot repo"
-      include: ../utils/photon_config_repo.yml
-
     - name: "Install 'python3-rpm' on {{ vm_guest_os_distribution }} with parameter 'present'"
       include_tasks: ../utils/install_uninstall_package.yml
       vars:
@@ -64,20 +61,6 @@
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: true
       register: rpm_package_query_result
-
-    - name: "Set the fact expected_rpm_python3_version and correct_pyhton3_rpm"
-      ansible.builtin.set_fact:
-        expected_rpm_python3_version: "python{{ ansible_python_version | regex_replace('(\\d+\\.\\d+).*', '\\1') }}"
-        correct_pyhton3_rpm: false
-
-    - name: "Check if the package pyhton3_rpm is correct version or not"
-      ansible.builtin.set_fact:
-        correct_pyhton3_rpm: true
-      when: 
-        - not rpm_package_query_result.failed
-        - rpm_package_query_result.stdout_lines is defined
-        - rpm_package_query_result.stdout_lines | length > 0
-        - expected_rpm_python3_version in rpm_package_query_result.stdout_lines[0]
 
     - name: "Check and install python3-rpm for Photon 5"
       when: guest_os_ansible_distribution_major_ver | int >= 5
@@ -107,17 +90,6 @@
           include_tasks: ../../common/vm_take_snapshot.yml
           vars:
             snapshot_name: "before_install_rpm"
-
-        - name: "Uninstall the packages on VMware Photon OS"
-          ansible.builtin.command: "tdnf remove -y python3-rpm"
-          delegate_to: "{{ vm_guest_ip }}"
-          ignore_errors: true
-        
-        - name: "Install required packages on VMware Photon OS"
-          include_tasks: ../utils/install_uninstall_package.yml
-          vars:
-            package_list: ["python3-rpm"]
-            package_state: "latest"
 
     - name: "Install required packages on VMware Photon OS"
       include_tasks: ../utils/install_uninstall_package.yml
