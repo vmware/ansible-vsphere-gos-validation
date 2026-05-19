@@ -50,46 +50,8 @@
     - name: "Disable DNSSEC and DNSOverTLS settings for VMware Photon OS"
       include_tasks: ../utils/set_dns.yml
 
-    - name: "Install 'python3-rpm' on {{ vm_guest_os_distribution }} with parameter 'present'"
-      include_tasks: ../utils/install_uninstall_package.yml
-      vars:
-        package_list: ["python3-rpm"]
-        package_state: "present"
-    
-    - name: "Get package python3-rpm after install python3-rpm with parament 'present'"
-      ansible.builtin.command: "rpm -ql python3-rpm"
-      delegate_to: "{{ vm_guest_ip }}"
-      ignore_errors: true
-      register: rpm_package_query_result
-
-    - name: "Check and install python3-rpm for Photon 5"
-      when: guest_os_ansible_distribution_major_ver | int >= 5
-      block:
-        - name: "Check all enabled repos"
-          ansible.builtin.command: "tdnf repolist"
-          delegate_to: "{{ vm_guest_ip }}"
-          ignore_errors: true
-          register: repolist_result
-
-        - name: "Check 'tdnf list python3-rpm'"
-          ansible.builtin.command: "tdnf list python3-rpm"
-          delegate_to: "{{ vm_guest_ip }}"
-          ignore_errors: true
-          register: python_version_result
-
-        - name: "Get snapshot repo content"
-          ansible.builtin.command: "cat /etc/yum.repos.d/photon-snapshot.repo"
-          delegate_to: "{{ vm_guest_ip }}"
-          ignore_errors: true
-          register: snapshot_repo_content_result
-
-        - name: "Print snapshot repo content"
-          ansible.builtin.debug: var=snapshot_repo_content_result
-
-        - name: "Take a snapshot before install python3-rpm"
-          include_tasks: ../../common/vm_take_snapshot.yml
-          vars:
-            snapshot_name: "before_install_rpm"
+    - name: "Install 'python3-rpm' on {{ vm_guest_os_distribution }} if it does not exists"
+      include_tasks: ../utils/photon_install_python3_rpm.yml
 
     - name: "Install required packages on VMware Photon OS"
       include_tasks: ../utils/install_uninstall_package.yml
