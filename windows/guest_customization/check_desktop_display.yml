@@ -23,6 +23,10 @@
       vars:
         local_screenshot_path: "{{ vm_screenshot_local_path }}"
 
-    - name: "Display extracted text from screenshot"
-      ansible.builtin.debug:
-        msg: "{{ text_in_screenshot }}"
+    - name: "Set fact of Windows desktop displayed when date and time in extracted text list"
+      ansible.builtin.set_fact:
+        win_desktop_displayed: true
+      when:
+        - text_in_screenshot | length > 0
+        - text_in_screenshot | select('match', '\d{1,2}/\d{1,2}/\d{4}') | list | length > 0
+        - text_in_screenshot | select('match', '\d{1,2}:\d{2}\s(AM|PM)$') | list | length > 0
