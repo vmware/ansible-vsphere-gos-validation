@@ -18,37 +18,37 @@
           vars:
             skip_test_no_vmtools: true
 
-        - name: "Get VM guest info"
+        - name: "Get VM guestinfo from VMware Tools"
           include_tasks: ../../common/vm_get_guest_info.yml
 
-        - name: "Set fact of the pre-defined guest OS info list"
-          include_tasks: win_guest_os_info.yml
+        - name: "Include guest OS defination list"
+          include_tasks: win_guest_os_defination.yml
 
-        - name: "Print the guest OS info before checking"
+        - name: "Print the VM and installed guest OS info before checking"
           ansible.builtin.debug:
             msg:
               - "OS architecture got in guest OS: {{ guest_os_ansible_architecture }}"
               - "OS fullname got in guest OS: {{ guest_os_ansible_distribution }}"
-              - "OS fullname got in VM guest info: {{ guestinfo_guest_full_name }}"
+              - "OS fullname got in VM guestinfo: {{ guestinfo_guest_full_name }}"
               - "VM guest ID configured: {{ vm_guest_id }}"
-              - "VM guest ID got in VM guest info: {{ guestinfo_guest_id }}"
+              - "VM guest ID got in VM guestinfo: {{ guestinfo_guest_id }}"
               - "VM hardware version: {{ vm_hardware_version }}"
  
         - name: "Set fact of current OS name"
           ansible.builtin.set_fact:
             current_gos: "{{ guest_os_ansible_distribution | regex_search('Windows( Server)? ([0-9]+)') }}"
 
-        - name: "Get OS info in the pre-defined guest OS info list matched current OS"
+        - name: "Get matched info in the guest OS defination list for current OS name"
           ansible.builtin.set_fact:
             current_gos_info: "{{ win_gos_info | selectattr('win_guest', 'equalto', current_gos) }}"
 
-        - name: "Check current OS in the pre-defined guest OS info list"
+        - name: "Check matched info"
           ansible.builtin.assert:
             that:
               - current_gos_info | length == 1
             fail_msg: >
-              "The pre-defined guest OS info list does not contain this OS version: {{ current_gos }},
-              please check whether this guest OS is supported and add it to the list accordingly."
+              "Do not get the matched info in the guest OS defination list for current OS name '{{ current_gos }}',
+              Please check whether this guest OS is supported and is added to the defination list file."
 
         - name: "Set fact of the matched current OS info"
           ansible.builtin.set_fact:
@@ -57,7 +57,7 @@
         - name: "Handle Windows 11 known issue"
           include_tasks: win11_guest_info_exception.yml
 
-        - name: "Check guest fullname in VM guest info"
+        - name: "Check VM guestinfo from VMware Tools"
           include_tasks: check_vm_guest_info.yml
           when: win11_70u3c_exception is undefined
       rescue:
