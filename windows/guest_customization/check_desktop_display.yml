@@ -1,0 +1,28 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Take screenshots to check Windows desktop displayed after GOSC
+#
+- name: "Initialize the fact of Windows desktop displayed"
+  ansible.builtin.set_fact:
+    win_desktop_displayed: false
+
+- name: "Take VM screenshot"
+  include_tasks: ../../common/vm_take_screenshot.yml
+  vars:
+    vm_screenshot_local_dir: "{{ current_test_log_folder }}"
+    vm_screenshot_local_name: "screenshot_after_gosc_{{ retry_time }}.png"
+
+- name: "Extract text from VM screenshot"
+  when:
+    - tesseract_is_installed
+    - vm_screenshot_local_path
+  block:
+    - name: "Extract text from VM screenshot"
+      include_tasks: ../../common/extract_text_from_screenshot.yml
+      vars:
+        local_screenshot_path: "{{ vm_screenshot_local_path }}"
+
+    - name: "Display extracted text from screenshot"
+      ansible.builtin.debug:
+        msg: "{{ text_in_screenshot }}"

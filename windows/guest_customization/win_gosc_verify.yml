@@ -27,3 +27,12 @@
       include_tasks: check_runonce_command.yml
     - name: "Check timezone configured"
       include_tasks: check_timezone.yml
+    - name: "Retry to check Windows desktop displayed"
+      include_tasks:
+        file: check_desktop_display.yml
+        apply:
+          when: not (win_desktop_displayed | default(false))
+      loop: "{{ range(1, 7) }}"
+      loop_control:
+        loop_var: retry_time
+        pause: 10
