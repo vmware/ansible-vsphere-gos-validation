@@ -1,20 +1,13 @@
-# Copyright 2025 VMware, Inc.
+# Copyright 2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Initialize the facts of whether guest ID and guest fullname are expected"
+- name: "Initialize the facts of expected VM guest ID and guest fullname states"
   ansible.builtin.set_fact:
     current_guest_id_expected: false
     current_os_recognized: false
 
-- name: "Get supported guest IDs on ESXi {{ esxi_version }} with hardware version {{ vm_hardware_version_num }}"
-  include_tasks: ../../common/esxi_get_guest_ids.yml
-  vars:
-    esxi_hardware_version: "{{ vm_hardware_version_num }}"
-
-# VM configured guest ID should be the current OS guest ID when
-# 1. ESXi version
-# 2. VM hardware version
-- name: "Set fact of the current guest ID is the expected configured VM guest ID"
+# VM configured guest ID should be the current OS guest ID
+- name: "Set fact of the current OS guest ID is the expected configured VM guest ID"
   ansible.builtin.set_fact:
     current_guest_id_expected: true
   when:
@@ -22,17 +15,16 @@
     - vm_hardware_version_num | int >= current_gos_info.win_guest_creation_hwv | int
 
 # Guest OS should be recognized
-- name: "Set fact of the current OS fullname is the expected guest OS fullname"
+- name: "Set fact of the current OS fullname is the expected VM guest OS fullname"
   ansible.builtin.set_fact:
     current_os_recognized: true
   when: >
-    (esxi_version is version(current_gos_info.win_guest_creation_esxi, '>=')) or
-    ((current_gos_info.win_guest_add_esxi != current_gos_info.win_guest_creation_esxi) and
-    esxi_version is version(current_gos_info.win_guest_add_esxi, '>=') and
-    esxi_version is version(current_gos_info.win_guest_creation_esxi, '<') and
-    vmtools_version is version(current_gos_info.win_guest_vmtools, '>='))
+    current_guest_id_expected or
+    ((current_gos_info.win_guest_add_hwv is defined and
+    vm_hardware_version_num | int >= current_gos_info.win_guest_add_hwv | int) and
+    (vmtools_version is version(current_gos_info.win_guest_vmtools, '>=')))
 
-# Set expected guest ID corresponding to the current OS
+# Set expected guest ID corresponding to the current OS version
 - name: "Set fact of expected guest ID of current {{ guest_os_ansible_architecture }} OS"
   ansible.builtin.set_fact:
     current_os_guest_id: >-
@@ -40,6 +32,7 @@
       {%- else -%}{{ (current_gos_info.win_guest_id | select('match', '.*64Guest'))[0] }}
       {%- endif -%}
 
+# VM configured guest ID is the guest ID for the previous OS version of current OS
 - name: "Set expected guest ID corresponding to previous OS version"
   when: not current_guest_id_expected
   block:
