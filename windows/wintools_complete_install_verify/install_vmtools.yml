@@ -15,62 +15,26 @@
 
 - name: "Set fact of VMware Tools silent install command and getting install log file"
   ansible.builtin.set_fact:
-    vmtools_install_cmd: >-
-      D:\\{{ wintools_setup_exe }} /S /v "/qn ADDLOCAL=ALL REBOOT=R"
     get_vmtools_install_log: true
 
-# In Windows Server 2012 R2 guest OS, need to set 'become' to run
-# VMware Tools install command
-- name: "Execute VMware Tools silent install command in guest"
-  ansible.windows.win_shell: "{{ vmtools_install_cmd }}"
+- name: "Execute VMware Tools silent install in guest OS"
+  ansible.windows.win_package:
+    path: "D:\\{{ wintools_setup_exe }}"
+    arguments: '/S /v "/qn ADDLOCAL=ALL REBOOT=R"'
   delegate_to: "{{ vm_guest_ip }}"
-  ignore_errors: true
-  become: "{{ guest_os_product_version | int == 2012 }}"
-  become_method: runas
-  become_user: "{{ 'Administrator' if (guest_os_product_version | int == 2012) else omit }}"
   register: wintools_install_result
-  async: 600
-  poll: 0
-  environment:
-    ANSIBLE_WIN_ASYNC_STARTUP_TIMEOUT: 60
-
-- name: "Pause 2 minutes before checking task status"
-  ansible.builtin.pause:
-    minutes: 2
-  when: not (wintools_install_result.failed | default(true))
-
-- name: "Check VMware Tools install task started"
-  ansible.builtin.assert:
-    that:
-      - wintools_install_result is defined
-      - wintools_install_result.ansible_job_id is defined
-    fail_msg: >-
-      The async task of VMware Tools installation in guest OS is not started.
-      Task returned message: {{ wintools_install_result.msg | default('') }}.
-
-- name: "Check VMware Tools install task status every 3 seconds"
-  ansible.builtin.async_status:
-    jid: "{{ wintools_install_result.ansible_job_id }}"
-  register: wintools_install_job
-  delegate_to: "{{ vm_guest_ip }}"
+  become: yes
+  become_method: runas
+  become_user: System
   ignore_errors: true
-  until:
-    - wintools_install_job.finished is defined
-    - wintools_install_job.finished | int == 1
-  retries: 100
-  delay: 3
-  when:
-    - wintools_install_result is defined
-    - wintools_install_result.ansible_job_id is defined
 
-- name: "Check VMware Tools install task finished"
+- name: "Check VMware Tools install task"
   ansible.builtin.assert:
     that:
-      - wintools_install_job.finished is defined
-      - wintools_install_job.finished | int == 1
-    fail_msg: >-
-      Failed to get the finished status of VMware Tools install task in guest OS, error message
-      '{{ wintools_install_job.msg | default('') }}'
+      - wintools_install_result.failed is defined
+      - not wintools_install_result.failed
+      - wintools_install_result.rc is defined
+    fail_msg: "VMware Tools install task in guest OS failed with error, {{ wintools_install_result.msg | default('') }}."
 
 - name: "Pause 30 seconds after VMware Tools install"
   ansible.builtin.pause:
