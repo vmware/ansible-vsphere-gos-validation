@@ -25,24 +25,22 @@
         arguments: '/S /v "/qn ADDLOCAL=ALL REBOOT=R"'
     username: SYSTEM
     state: present
-    enabled: yes
+    enabled: true
   delegate_to: "{{ vm_guest_ip }}"
   register: create_sched_task_result
 
-- name: "Trigger the scheduled task"
-  community.windows.win_scheduled_task:
-    name: "VMwareToolsInstall"
-    state: present
-    sub_state: ready
-  delegate_to: "{{ vm_guest_ip }}"
-  register: trigger_sched_task_result
-
-- name: "Pause 5 seconds after starting VMware Tools install task"
+- name: "Pause 5 seconds after creating VMware Tools install scheduled task"
   ansible.builtin.pause:
     seconds: 5
 
+- name: "Trigger the scheduled task"
+  ansible.windows.win_shell: "Start-ScheduledTask -TaskName 'VMwareToolsInstall'"
+  delegate_to: "{{ vm_guest_ip }}"
+  async: 900
+  poll: 0
+
 - name: "Wait for the VMware Tools install scheduled task to finish"
-  community.windows.win_scheduled_task:
+  community.windows.win_scheduled_task_stat:
     name: "VMwareToolsInstall"
   delegate_to: "{{ vm_guest_ip }}"
   register: sched_task_status
@@ -50,7 +48,7 @@
     - sched_task_status is defined
     - sched_task_status.task.state.status is defined
     - sched_task_status.task.state.status != "TASK_STATE_RUNNING"
-  retries: 30
+  retries: 45
   delay: 20
   failed_when: false
 
