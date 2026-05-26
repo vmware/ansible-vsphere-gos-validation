@@ -17,24 +17,51 @@
   ansible.builtin.set_fact:
     get_vmtools_install_log: true
 
-- name: "Execute VMware Tools silent install in guest OS"
-  ansible.windows.win_package:
-    path: "D:\\{{ wintools_setup_exe }}"
-    arguments: '/S /v "/qn ADDLOCAL=ALL REBOOT=R"'
+- name: "Create a scheduled task to run the VMware Tools install"
+  community.windows.win_scheduled_task:
+    name: "VMwareToolsInstall"
+    actions:
+      - path: "D:\\{{ wintools_setup_exe }}"
+        arguments: '/S /v "/qn ADDLOCAL=ALL REBOOT=R"'
+    username: SYSTEM
+    state: present
+    enabled: yes
   delegate_to: "{{ vm_guest_ip }}"
-  register: wintools_install_result
-  become: yes
-  become_method: runas
-  become_user: System
-  ignore_errors: true
+  register: create_sched_task_result
 
-- name: "Check VMware Tools install task"
-  ansible.builtin.assert:
-    that:
-      - wintools_install_result.failed is defined
-      - not wintools_install_result.failed
-      - wintools_install_result.rc is defined
-    fail_msg: "VMware Tools install task in guest OS failed with error, {{ wintools_install_result.msg | default('') }}."
+- name: "Trigger the scheduled task"
+  community.windows.win_scheduled_task:
+    name: "VMwareToolsInstall"
+    state: present
+    sub_state: ready
+  delegate_to: "{{ vm_guest_ip }}"
+  register: trigger_sched_task_result
+
+- name: "Pause 5 seconds after starting VMware Tools install task"
+  ansible.builtin.pause:
+    seconds: 5
+
+- name: "Wait for the VMware Tools install scheduled task to finish"
+  community.windows.win_scheduled_task:
+    name: "VMwareToolsInstall"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: sched_task_status
+  until:
+    - sched_task_status is defined
+    - sched_task_status.task.state.status is defined
+    - sched_task_status.task.state.status != "TASK_STATE_RUNNING"
+  retries: 30
+  delay: 20
+  failed_when: false
+
+- name: "Display the status of scheduled task"
+  ansible.builtin.debug: var=sched_task_status
+
+- name: "Clean up the scheduled task"
+  community.windows.win_scheduled_task:
+    name: "VMwareToolsInstall"
+    state: absent
+  delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Pause 30 seconds after VMware Tools install"
   ansible.builtin.pause:
