@@ -7,11 +7,6 @@
 - name: "Add VMware Photon OS online repositories"
   when: guest_os_ansible_distribution_major_ver | int <= 4
   block:
-    - name: "Initialize the fact of guest OS online repositories"
-      ansible.builtin.set_fact:
-        guest_online_repos: []
-      when: guest_online_repos is not defined
-
     - name: "Set fact of online repository names on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
         photon_repo_names: >-
@@ -39,7 +34,7 @@
 - name: "Add Photon OS online repositories"
   when: guest_os_ansible_distribution_major_ver | int >= 5
   block:
-    - name: "Get list of all photon repos"
+    - name: "Get list of 'photon-repos' packages in photon repository"
       ansible.builtin.shell: >-
         tdnf --enablerepo=photon --disablerepo=photon-updates provides photon-repos
         | grep photon-repos
@@ -47,14 +42,14 @@
       delegate_to: "{{ vm_guest_ip }}"
       register: photon_repos_result
 
-    - name: "Display all the photon repos"
+    - name: "Display the list of 'photon-repos' packages"
       ansible.builtin.debug: var=photon_repos_result
     
-    - name: "Check the repos"
+    - name: "Check 'photon-repos' package listed"
       ansible.builtin.assert:
         that:
           - photon_repos_result.stdout_lines | length > 0
-        fail_msg: "No Photon repos found"
+        fail_msg: "No 'photon-repos' package listed from the photon repository."
 
     - name: "Set repo version suffix"
       ansible.builtin.set_fact:
@@ -92,5 +87,3 @@
       ansible.builtin.command: "tdnf --enablerepo=photon update -y {{ photon_repo_list[0] }}"
       delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Update packages metadata"
-  include_tasks: repo_update.yml
