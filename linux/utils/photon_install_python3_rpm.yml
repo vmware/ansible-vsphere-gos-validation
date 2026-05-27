@@ -18,10 +18,42 @@
     - name: "Config online repository for Photon OS"
       include_tasks: photon_config_repo.yml
 
+    # Start: test code and will be deleted
+    - name: "Check all enabled repos"
+      ansible.builtin.command: "tdnf repolist"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      register: repolist_result
+
+    - name: "Check 'tdnf list python3-rpm'"
+      ansible.builtin.command: "tdnf list python3-rpm"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      register: python_version_result
+
+    - name: "Get snapshot repo content"
+      ansible.builtin.command: "cat /etc/yum.repos.d/photon-snapshot.repo"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      register: snapshot_repo_content_result
+
+    - name: "Print snapshot repo content"
+      ansible.builtin.debug: var=snapshot_repo_content_result
+
+    - name: "Take a snapshot before install python3-rpm"
+      include_tasks: ../../common/vm_take_snapshot.yml
+      vars:
+        snapshot_name: "before_install_rpm"
+    # End: test code and will be deleted
+
     - name: "Update the package manager 'tdnf'"
       ansible.builtin.command: "tdnf update -y tdnf --nogpgcheck"
       delegate_to: "{{ vm_guest_ip }}"
 
     - name: "Install the packages 'python3-rpm' on Photon OS"
       ansible.builtin.command: "tdnf install -y python3-rpm --nogpgcheck"
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Get the package 'python3-rpm' after install it from online repository"
+      ansible.builtin.command: "rpm -ql python3-rpm"
       delegate_to: "{{ vm_guest_ip }}"
