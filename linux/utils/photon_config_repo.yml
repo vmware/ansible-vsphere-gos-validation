@@ -34,7 +34,7 @@
 - name: "Add Photon OS online repository"
   when: guest_os_ansible_distribution_major_ver | int >= 5
   block:
-    - name: "Disable current all other repositories and enable photon-release.repo for Photon OVA"
+    - name: "Disable current all other repositories and enable photon-release.repo for Photon 5 GA image"
       ansible.builtin.shell: |
         for f in $(ls /etc/yum.repos.d/*.repo); do
           if [[ "$f" == *photon-release.repo ]]; then
@@ -44,10 +44,14 @@
           fi
         done
       delegate_to: "{{ vm_guest_ip }}"
-      when: vm_deploy_method == 'ova'
+      when:
+        - guest_os_ansible_distribution_major_ver | int == 5
+        - ansible_kernel == '6.1.10-10.ph5-esx'
 
-    - name: "Add Photon OS online repository for Photon ISO image"
-      when: vm_deploy_method == 'iso'
+    - name: "Add Photon OS online repository for Photon 5 update image"
+      when:
+        - guest_os_ansible_distribution_major_ver | int == 5
+        - ansible_kernel != '6.1.10-10.ph5-esx'
       block:
         - name: "Get list of 'photon-repos' package name in photon OS repository"
           ansible.builtin.shell: >-
