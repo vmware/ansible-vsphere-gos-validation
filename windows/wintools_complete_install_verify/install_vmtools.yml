@@ -13,9 +13,31 @@
     - is_development_tools is defined
     - is_development_tools | bool
 
-- name: "Set fact of VMware Tools silent install command and getting install log file"
+- name: "Initialize the date time info in guest OS"
   ansible.builtin.set_fact:
-    get_vmtools_install_log: true
+    win_date_time: ''
+
+- name: "Get the date time info in guest OS"
+  ansible.windows.win_shell: >
+    (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss")
+  delegate_to: "{{ vm_guest_ip }}"
+  register: win_date_time_result
+
+- name: "Set fact of the date time got in guest OS"
+  ansible.builtin.set_fact:
+    win_date_time: "{{ win_date_time_result.stdout | trim }}"
+  when:
+    - win_date_time_result.stdout is defined
+    - win_date_time_result.stdout | trim | length != 0
+
+- name: "Print the date time got in guest OS"
+  ansible.builtin.debug: var=win_date_time
+
+- name: "Check the date time got in guest OS"
+  ansible.builtin.assert:
+    that:
+      - win_date_time | length != 0
+    fail_msg: "Failed to get the current date time info in guest OS: {{ win_date_time }}."
 
 - name: "Create a scheduled task to run the VMware Tools install"
   community.windows.win_scheduled_task:
@@ -23,6 +45,10 @@
     actions:
       - path: "D:\\{{ wintools_setup_exe }}"
         arguments: '/S /v "/qn ADDLOCAL=ALL REBOOT=R"'
+    triggers:
+      - type: time
+        start_boundary: "{{ '%Y-%m-%dT%H:%M:%S' | strftime((win_date_time | to_datetime('%Y-%m-%dT%H:%M:%S')).strftime('%s') | int + 60) }}"
+        enabled: true
     username: SYSTEM
     state: present
     enabled: true
@@ -33,11 +59,9 @@
   ansible.builtin.pause:
     seconds: 5
 
-- name: "Trigger the scheduled task"
-  ansible.windows.win_shell: "Start-ScheduledTask -TaskName 'VMwareToolsInstall'"
-  delegate_to: "{{ vm_guest_ip }}"
-  async: 900
-  poll: 0
+- name: "Set fact of getting VMware Tools install log file"
+  ansible.builtin.set_fact:
+    get_vmtools_install_log: true
 
 - name: "Wait for the VMware Tools install scheduled task to finish"
   community.windows.win_scheduled_task_stat:
