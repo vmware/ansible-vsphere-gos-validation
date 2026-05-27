@@ -4,7 +4,7 @@
 # Description:
 #   Config VMware Photon OS online repositories
 #
-- name: "Add VMware Photon OS online repositories"
+- name: "Add Photon OS online repository"
   when: guest_os_ansible_distribution_major_ver | int <= 4
   block:
     - name: "Set fact of online repository names on {{ vm_guest_os_distribution }}"
@@ -31,10 +31,10 @@
       delegate_to: "{{ vm_guest_ip }}"
       with_items: "{{ photon_repo_names }}"
 
-- name: "Add Photon OS online repositories"
+- name: "Add Photon OS online repository"
   when: guest_os_ansible_distribution_major_ver | int >= 5
   block:
-    - name: "Get list of 'photon-repos' packages in photon repository"
+    - name: "Get list of 'photon-repos' package name in photon OS repository"
       ansible.builtin.shell: >-
         tdnf --enablerepo=photon --disablerepo=photon-updates provides photon-repos
         | grep photon-repos
@@ -42,7 +42,7 @@
       delegate_to: "{{ vm_guest_ip }}"
       register: photon_repos_result
 
-    - name: "Display the list of 'photon-repos' packages"
+    - name: "Display the list of 'photon-repos' package name"
       ansible.builtin.debug: var=photon_repos_result
     
     - name: "Check 'photon-repos' package listed"
@@ -51,11 +51,11 @@
           - photon_repos_result.stdout_lines | length > 0
         fail_msg: "No 'photon-repos' package listed from the photon repository."
 
-    - name: "Set repo version suffix"
+    - name: "Set the package version of 'photon-repos' to be installed"
       ansible.builtin.set_fact:
         repo_suffix: "{{ '92' if guest_os_python_version is version('3.14', '>=') else '91' }}"
 
-    - name: "Get the matching Photon repo packages"
+    - name: "Get the matching 'photon-repos' package name"
       ansible.builtin.set_fact:
         photon_repo_list: >-
           {{
@@ -66,16 +66,16 @@
             | list
           }}
 
-    - name: "Display the matching Photon repo packages"
+    - name: "Display the matching 'photon-repos' package name"
       ansible.builtin.debug: var=photon_repo_list
     
-    - name: "Ensure the matching Photon repos exist"
+    - name: "Ensure the matching repository exist"
       ansible.builtin.assert:
         that:
           - photon_repo_list | length > 0
-        fail_msg: "There is no specified repos"
+        fail_msg: "No matching 'photon-repos' package name"
 
-    - name: "Disable current all the repos except photon-snapshot.repo"
+    - name: "Disable current all the repositories except photon-snapshot.repo"
       ansible.builtin.shell: |
         for f in $(ls /etc/yum.repos.d/*.repo | grep -v photon-snapshot.repo); do
           sed -i 's/enabled=1/enabled=0/g' "$f";
@@ -83,7 +83,7 @@
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: true
 
-    - name: "Install the selected Photon repo"
+    - name: "Install the selected repository for Photon OS"
       ansible.builtin.command: "tdnf --enablerepo=photon update -y {{ photon_repo_list[0] }}"
       delegate_to: "{{ vm_guest_ip }}"
 
