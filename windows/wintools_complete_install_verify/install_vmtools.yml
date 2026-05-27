@@ -70,8 +70,8 @@
   register: sched_task_status
   until:
     - sched_task_status is defined
-    - sched_task_status.task.state.status is defined
-    - sched_task_status.task.state.status != "TASK_STATE_RUNNING"
+    - sched_task_status.state.last_task_result is defined
+    - sched_task_status.state.last_task_result | int in [0, 3010]
   retries: 45
   delay: 20
   failed_when: false
@@ -79,15 +79,37 @@
 - name: "Display the status of scheduled task"
   ansible.builtin.debug: var=sched_task_status
 
+- name: "Retry to get 'VMTools' service"
+  include_tasks:
+    file: ../utils/win_get_vmtools_service_list.yml
+    apply:
+      when: >
+        (retry_time == 1) or
+        (vmtools_service_dict | default({}) | length == 0) or
+        (vmtools_service_dict.VMTools | default('') != "Running")
+  loop: "{{ range(1, 7) }}"
+  loop_control:
+    loop_var: retry_time
+    pause: 5
+
+- name: "Check service 'VMTools' is running"
+  ansible.builtin.assert:
+    that:
+      - vmtools_service_dict.VMTools is defined
+      - vmtools_service_dict['VMTools'] == "Running"
+    fail_msg: >-
+      Not get 'Running' status of service 'VMTools' in guest OS within 30s after VMware Tools install
+      scheduled task finished. Got services status dict: {{ vmtools_service_dict }}.
+
+- name: "Pause 10 seconds after VMware Tools install"
+  ansible.builtin.pause:
+    seconds: 10
+
 - name: "Clean up the scheduled task"
   community.windows.win_scheduled_task:
     name: "VMwareToolsInstall"
     state: absent
   delegate_to: "{{ vm_guest_ip }}"
-
-- name: "Pause 30 seconds after VMware Tools install"
-  ansible.builtin.pause:
-    seconds: 30
 
 - name: "Restart guest OS after VMware Tools install"
   include_tasks: ../utils/win_shutdown_restart.yml
