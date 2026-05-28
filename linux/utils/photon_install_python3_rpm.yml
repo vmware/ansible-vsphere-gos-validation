@@ -4,7 +4,7 @@
 # Description:
 #   Install python3_rpm package from VMware Photon OS online repositories
 #   To fix the issue: incompatible package 'python3-rpm' installed in Photon 5 OVA and ISO
-
+#
 - name: "Get the package 'python3-rpm'"
   ansible.builtin.command: "rpm -ql python3-rpm"
   delegate_to: "{{ vm_guest_ip }}"
@@ -17,7 +17,7 @@
     - rpm_package_query_result.failed
   block:
     - name: "Config online repository for Photon OS"
-      include_tasks: photon_config_repo.yml
+      include_tasks: add_official_online_repo.yml
 
     - name: "Install the packages 'python3-rpm' on Photon OS"
       ansible.builtin.command: "tdnf install -y python3-rpm --nogpgcheck --allowerasing"
@@ -26,3 +26,17 @@
     - name: "Get the package 'python3-rpm' after install it from online repository"
       ansible.builtin.command: "rpm -ql python3-rpm"
       delegate_to: "{{ vm_guest_ip }}"
+      register: rpm_package_query_result
+    
+    - name: "Set the fact expected_python3_version"
+      ansible.builtin.set_fact:
+        expected_python3_version: "python{{ ansible_python_version | regex_replace('(\\d+\\.\\d+).*', '\\1') }}"
+
+    - name: "Check if the package pyhton3-rpm is correct version or not"
+      ansible.builtin.assert:
+        that:
+          - not rpm_package_query_result.failed
+          - rpm_package_query_result.stdout_lines is defined
+          - rpm_package_query_result.stdout_lines | length > 0
+          - expected_python3_version in rpm_package_query_result.stdout_lines[0]
+        fail_msg: "No found correct version of package python3-rpm"
