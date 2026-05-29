@@ -1,0 +1,64 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Config VMware Photon OS online repositories
+#
+- name: "Add Photon OS online repository"
+  when: guest_os_ansible_distribution_major_ver | int <= 4
+  block:
+    - name: "Set fact of online repository names on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        photon_repo_names: >-
+          {{ ["photon", "photon-release", "photon-updates"]
+            if (guest_os_ansible_distribution_major_ver | int) == 4
+            else ["photon-release", "photon-updates"] }}
+
+    - name: "Set fact of online repositories on {{ vm_guest_os_distribution }}"
+      ansible.builtin.set_fact:
+        guest_online_repos: "{{ guest_online_repos | union([{'name': item, 'baseurl': repo_baseurl}]) }}"
+      vars:
+        repo_baseurl: "https://packages.broadcom.com/photon/$releasever/{{ item | replace('-', '_') }}_$releasever_$basearch"
+      with_items: "{{ photon_repo_names }}"
+
+    - name: "Update repository's baseurl"
+      ansible.builtin.shell: |-
+        sed -i 's#packages.vmware.com#packages.broadcom.com#g' /etc/yum.repos.d/*.repo;
+        invalid_repo_files=`grep -l 'dl.bintray.com/vmware' /etc/yum.repos.d/*.repo`;
+        if [ "$invalid_repo_files" != "" ] ; then
+          sed -i 's#dl.bintray.com/vmware/#packages.broadcom.com/photon/$releasever/#' $invalid_repo_files;
+        fi
+      delegate_to: "{{ vm_guest_ip }}"
+      with_items: "{{ photon_repo_names }}"
+
+- name: "Add Photon OS online repository for Photon OS 5 and later"
+  when: guest_os_ansible_distribution_major_ver | int >= 5
+  block:
+    - name: "Disable current all other repositories and enable photon-release.repo for Photon 5 GA image"
+      ansible.builtin.shell: |
+        for f in $(ls /etc/yum.repos.d/*.repo); do
+          if [[ "$f" == *photon-release.repo ]]; then
+            sed -i 's/enabled=0/enabled=1/g' "$f";
+          else
+            sed -i 's/enabled=1/enabled=0/g' "$f";
+          fi
+        done
+      delegate_to: "{{ vm_guest_ip }}"
+      when: ansible_kernel == '6.1.10-10.ph5-esx'
+
+    - name: "Disable current all other repositories and enable photon-snapshot.repo for Photon 5 Update image and later"
+      ansible.builtin.shell: |
+        for f in $(ls /etc/yum.repos.d/*.repo); do
+          if [[ "$f" == *photon-snapshot.repo ]]; then
+            sed -i 's/enabled=0/enabled=1/g' "$f";
+          else
+            sed -i 's/enabled=1/enabled=0/g' "$f";
+          fi
+        done
+      delegate_to: "{{ vm_guest_ip }}"
+      when: ansible_kernel != '6.1.10-10.ph5-esx'
+    
+    - name: "Check all enabled repos"
+      ansible.builtin.command: "tdnf repolist"
+      delegate_to: "{{ vm_guest_ip }}"
+

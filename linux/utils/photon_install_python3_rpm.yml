@@ -1,0 +1,43 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   Install python3_rpm package from VMware Photon OS online repositories
+#   To fix the issue: incompatible package 'python3-rpm' installed in Photon 5 OVA and ISO
+#
+- name: "Get the package 'python3-rpm'"
+  ansible.builtin.command: "rpm -ql python3-rpm"
+  delegate_to: "{{ vm_guest_ip }}"
+  ignore_errors: true
+  register: rpm_package_query_result
+
+- name: "Install package python3-rpm for Photon OS"
+  when:
+    - rpm_package_query_result.failed is defined
+    - rpm_package_query_result.failed
+  block:
+    - name: "Config online repository for Photon OS"
+      include_tasks: add_official_online_repo.yml
+
+    - name: "Install the packages 'python3-rpm' on Photon OS"
+      ansible.builtin.command: "tdnf install -y python3-rpm --nogpgcheck --allowerasing"
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Get the package 'python3-rpm' after install it from online repository"
+      ansible.builtin.command: "rpm -ql python3-rpm"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: installed_rpm_package_query_result
+    
+    - name: "Set the fact expected_python3_version"
+      ansible.builtin.set_fact:
+        expected_python3_version: "python{{ ansible_python_version | regex_replace('(\\d+\\.\\d+).*', '\\1') }}"
+
+    - name: "Check if the package 'pyhton3-rpm' is compatible with current python version or not"
+      ansible.builtin.assert:
+        that:
+          - installed_rpm_package_query_result.failed is defined
+          - not installed_rpm_package_query_result.failed
+          - installed_rpm_package_query_result.stdout_lines is defined
+          - installed_rpm_package_query_result.stdout_lines | length > 0
+          - expected_python3_version in installed_rpm_package_query_result.stdout_lines[0]
+        fail_msg: "Incompatible package 'python3-rpm' installed with current python version {{ expected_python3_version }}"
