@@ -63,18 +63,33 @@
   ansible.builtin.set_fact:
     get_vmtools_install_log: true
 
-- name: "Wait for the VMware Tools install scheduled task to finish"
-  community.windows.win_scheduled_task_stat:
-    name: "VMwareToolsInstall"
-  delegate_to: "{{ vm_guest_ip }}"
-  register: sched_task_status
-  until:
-    - sched_task_status is defined
-    - sched_task_status.state.last_task_result is defined
-    - sched_task_status.state.last_task_result | int in [0, 3010]
-  retries: 45
-  delay: 20
-  failed_when: false
+- name: "Retry to check the status of the scheduled task"
+  block:
+    - name: "Get VMware Tools install scheduled task state"
+      community.windows.win_scheduled_task_stat:
+        name: "VMwareToolsInstall"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: sched_task_status
+      until:
+        - sched_task_status is defined
+        - sched_task_status.state.last_task_result is defined
+        - sched_task_status.state.last_task_result | int in [0, 3010]
+      retries: 45
+      delay: 20
+  rescue:
+    - name: "Check connection to Windows guest OS"
+      when: >
+        sched_task_status.state is undefined or
+        sched_task_status.state.last_task_result is undefined or
+        (sched_task_status.msg is defined and sched_task_status.msg | lower | search("connection"))
+    - name: "Not get expected scheduled task state"
+      ansible.builtin.fail:
+        msg: >-
+          VMware Tools install scheduled task state '{{ sched_task_status.state.last_task_result }}'
+          got in guest OS is not in the expected value list [0, 3010].
+      when:
+        - sched_task_status.state.last_task_result is defined
+        - sched_task_status.state.last_task_result | int not in [0, 3010]
 
 - name: "Display the status of scheduled task"
   ansible.builtin.debug: var=sched_task_status
