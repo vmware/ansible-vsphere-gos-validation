@@ -28,5 +28,14 @@
         win_desktop_displayed: true
       when:
         - text_in_screenshot | length > 0
-        - text_in_screenshot | select('match', '.*\d{1,2}/\d{1,2}/\d{4}.*') | list | length > 0
-        - text_in_screenshot | select('match', '^\d{1,2}:\d{2}\s(AM|PM)$') | list | length > 0
+        - (text_in_screenshot | select('match', '.*\d{1,2}\/\d{1,2}\/\d{4}.*') | list | length > 0) or 
+          (text_in_screenshot | select('match', '.*\d{1,2}:\d{2}\s*(AM|PM).*') | list | length > 0) or
+          (text_in_screenshot | select('match', '.*Microsoft\s*Edge.*') | list | length > 0)
+    - name: "Remove screenshot file"
+      include_tasks: ../../common/delete_local_file.yml
+      vars:
+        local_path: "{{ vm_screenshot_local_path }}"
+        del_local_file_ignore_errors: true
+      when:
+        - not win_desktop_displayed
+        - retry_time not in [1, 30]
