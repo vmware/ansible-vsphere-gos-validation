@@ -26,7 +26,7 @@
     - name: "Get the package 'python3-rpm' after install it from online repository"
       ansible.builtin.command: "rpm -ql python3-rpm"
       delegate_to: "{{ vm_guest_ip }}"
-      register: rpm_package_query_result
+      register: installed_rpm_package_query_result
     
     - name: "Set the fact expected_python3_version"
       ansible.builtin.set_fact:
@@ -35,9 +35,9 @@
     - name: "Check if the package 'pyhton3-rpm' is compatible with current python version or not"
       ansible.builtin.assert:
         that:
-          - rpm_package_query_result.failed is defined
-          - not rpm_package_query_result.failed
-          - rpm_package_query_result.stdout_lines is defined
-          - rpm_package_query_result.stdout_lines | length > 0
-          - expected_python3_version in rpm_package_query_result.stdout_lines[0]
+          - installed_rpm_package_query_result.failed is defined
+          - not installed_rpm_package_query_result.failed
+          - installed_rpm_package_query_result.stdout_lines is defined
+          - installed_rpm_package_query_result.stdout_lines | length > 0
+          - expected_python3_version in installed_rpm_package_query_result.stdout_lines[0]
         fail_msg: "Incompatible package 'python3-rpm' installed with current python version {{ expected_python3_version }}"
