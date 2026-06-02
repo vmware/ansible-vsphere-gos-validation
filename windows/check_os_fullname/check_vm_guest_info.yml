@@ -18,11 +18,9 @@
 - name: "Set fact of the current OS fullname is the expected VM guest OS fullname"
   ansible.builtin.set_fact:
     current_os_recognized: true
-  when: >
-    current_guest_id_expected or
-    (current_gos_info.win_guest_add_esxi is defined and
-    esxi_version is version(current_gos_info.win_guest_add_esxi, '>=') and
-    vmtools_version is version(current_gos_info.win_guest_vmtools, '>='))
+  when:
+    - esxi_version is version(current_gos_info.win_guest_add_esxi | default(current_gos_info.win_guest_creation_esxi), '>=')
+    - vmtools_version is version(current_gos_info.win_guest_vmtools, '>=')
 
 # Set expected guest ID corresponding to the current OS version
 - name: "Set fact of expected guest ID of current {{ guest_os_ansible_architecture }} OS"
@@ -75,10 +73,24 @@
       VM guest ID '{{ guestinfo_guest_id }}' and guest fullname '{{ guestinfo_guest_full_name }}' in
       VM guest info do not match the guest ID '{{ current_os_guest_id }}' and fullname
       '{{ current_gos_info.win_guest_fullname }}' for the current OS version '{{ guest_os_ansible_distribution }}'
-      on ESXi host '{{ esxi_version }}' with VM hardware version '{{ vm_hardware_version_num }}'.
-  when: >
-    current_guest_id_expected or
-    current_os_recognized
+      on ESXi host '{{ esxi_version }}' with VMware Tools version '{{ vmtools_version }}'.
+  when:
+    - current_guest_id_expected
+    - current_os_recognized
+
+- name: "Check guest ID and fullname in VM guest info"
+  ansible.builtin.assert:
+    that:
+      - guestinfo_guest_id == current_os_guest_id
+      - guestinfo_guest_full_name in current_gos_info.win_guest_fullname
+    fail_msg: >-
+      VM guest ID '{{ guestinfo_guest_id }}' and guest fullname '{{ guestinfo_guest_full_name }}' in
+      VM guest info do not match the guest ID '{{ current_os_guest_id }}' and fullname
+      '{{ current_gos_info.win_guest_fullname }}' for the current OS version '{{ guest_os_ansible_distribution }}'
+      on ESXi host '{{ esxi_version }}' with VMware Tools version '{{ vmtools_version }}'.
+  when:
+    - current_guest_id_expected
+    - not current_os_recognized
 
 - name: "Check guest ID and fullname in VM guest info"
   ansible.builtin.assert:
@@ -89,7 +101,8 @@
       VM guest ID '{{ guestinfo_guest_id }}' and guest fullname '{{ guestinfo_guest_full_name }}' in
       VM guest info do not match the guest ID '{{ previous_os_guest_id }}' and fullname
       '{{ previous_gos_info.win_guest_fullname }}' for the previous version of current OS
-      '{{ guest_os_ansible_distribution }}' on ESXi host '{{ esxi_version }}' with VM hardware version '{{ vm_hardware_version_num }}'.
+      '{{ guest_os_ansible_distribution }}' on ESXi host '{{ esxi_version }}'
+      with VMware Tools version '{{ vmtools_version }}'.
   when:
     - not current_guest_id_expected
     - not current_os_recognized
