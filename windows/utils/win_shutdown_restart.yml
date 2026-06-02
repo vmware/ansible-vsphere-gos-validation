@@ -64,21 +64,24 @@
         - name: "Get VM guest IP again after OS restart"
           include_tasks: win_update_inventory.yml
 
-        # Check user logon in console session
-        - name: "Query user in guest OS after OS restart"
-          ansible.windows.win_shell: "query user console"
-          register: query_user_result
-          ignore_errors: true
-          delegate_to: "{{ vm_guest_ip }}"
-          ignore_unreachable: true
-          retries: "{{ ((win_query_user_timeout | default(300) | int) / 5) | int }}"
-          delay: 5
-          until:
-            - query_user_result.stdout_lines is defined
-            - query_user_result.stdout_lines | length != 0
-        - name: "Check query user result"
-          ansible.builtin.assert:
-            that:
+        - name: "query user console"
+          when: win_reboot_query_user | default(true)
+          block:
+          # Check user logon in console session
+          - name: "Query user in guest OS after OS restart"
+            ansible.windows.win_shell: "query user console"
+            register: query_user_result
+            ignore_errors: true
+            delegate_to: "{{ vm_guest_ip }}"
+            ignore_unreachable: true
+            retries: "{{ ((win_query_user_timeout | default(300) | int) / 5) | int }}"
+            delay: 5
+            until:
               - query_user_result.stdout_lines is defined
               - query_user_result.stdout_lines | length != 0
-            fail_msg: "Not get logon user in console session after {{ win_query_user_timeout | default(300) }} seconds: {{ query_user_result }}"
+          - name: "Check query user result"
+            ansible.builtin.assert:
+              that:
+                - query_user_result.stdout_lines is defined
+                - query_user_result.stdout_lines | length != 0
+              fail_msg: "Not get logon user in console session after {{ win_query_user_timeout | default(300) }} seconds: {{ query_user_result }}"
