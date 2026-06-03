@@ -64,19 +64,11 @@
       on ESXi host '{{ esxi_version }}' with VM hardware version '{{ vm_hardware_version_num }}'.
   when: not current_guest_id_expected
 
-- name: "Check guest ID and fullname in VM guest info"
-  ansible.builtin.assert:
-    that:
-      - guestinfo_guest_id == current_os_guest_id
-      - guestinfo_guest_full_name in current_gos_info.win_guest_fullname
-    fail_msg: >-
-      VM guest ID '{{ guestinfo_guest_id }}' and guest fullname '{{ guestinfo_guest_full_name }}' in
-      VM guest info do not match the guest ID '{{ current_os_guest_id }}' and fullname
-      '{{ current_gos_info.win_guest_fullname }}' for the current OS version '{{ guest_os_ansible_distribution }}'
-      on ESXi host '{{ esxi_version }}' with VMware Tools version '{{ vmtools_version }}'.
-  when:
-    - current_guest_id_expected
-    - current_os_recognized
+# There is a situation that install old VMware Tools in the VM on
+# the new ESXi host, which causing guest ID and fullname are incorrect
+# when:
+#   - current_guest_id_expected
+#   - not current_os_recognized
 
 - name: "Check guest ID and fullname in VM guest info"
   ansible.builtin.assert:
@@ -88,9 +80,9 @@
       VM guest info do not match the guest ID '{{ current_os_guest_id }}' and fullname
       '{{ current_gos_info.win_guest_fullname }}' for the current OS version '{{ guest_os_ansible_distribution }}'
       on ESXi host '{{ esxi_version }}' with VMware Tools version '{{ vmtools_version }}'.
-  when:
-    - current_guest_id_expected
-    - not current_os_recognized
+  when: >
+    current_guest_id_expected or
+    current_os_recognized
 
 - name: "Check guest ID and fullname in VM guest info"
   ansible.builtin.assert:
