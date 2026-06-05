@@ -7,6 +7,14 @@
   ansible.builtin.set_fact:
     win_desktop_displayed: false
 
+- name: "Set fact of the keywords to check in the screenshot files"
+  ansible.builtin.set_fact:
+    win_desktop_text:
+      - '.*\d{1,2}\/\d{1,2}\/\d{4}.*'
+      - '.*\d{1,2}:\d{2}\s*(AM|PM).*'
+      - '.*Microsoft\s*Edge.*'
+      - '.*Recycle\s*Bin.*'
+
 - name: "Take VM screenshot"
   include_tasks: ../../common/vm_take_screenshot.yml
   vars:
@@ -28,9 +36,8 @@
         win_desktop_displayed: true
       when:
         - text_in_screenshot | length > 0
-        - (text_in_screenshot | select('match', '.*\d{1,2}\/\d{1,2}\/\d{4}.*') | list | length > 0) or 
-          (text_in_screenshot | select('match', '.*\d{1,2}:\d{2}\s*(AM|PM).*') | list | length > 0) or
-          (text_in_screenshot | select('match', '.*Microsoft\s*Edge.*') | list | length > 0)
+        - text_in_screenshot | select('search', win_desktop_text | join('|')) | list | length > 0
+
     - name: "Remove screenshot file"
       include_tasks: ../../common/delete_local_file.yml
       vars:
