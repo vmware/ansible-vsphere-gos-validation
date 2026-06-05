@@ -64,41 +64,48 @@
     get_vmtools_install_log: true
 
 - name: "Retry to check the status of the scheduled task"
+  community.windows.win_scheduled_task_stat:
+    name: "VMwareToolsInstall"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: sched_task_status
+  until:
+    - sched_task_status is defined
+    - sched_task_status.state.last_task_result is defined
+    - sched_task_status.state.last_task_result | int in [0, 3010]
+  retries: 45
+  delay: 20
+  ignore_errors: true
+  ignore_unreachable: true
+
+- name: "Connection to guest OS lost"
+  when: >
+    sched_task_status.state is undefined or
+    sched_task_status.state.last_task_result is undefined or
+    (sched_task_status.msg is defined and sched_task_status.msg | lower is search("connection")) or
+    (sched_task_status.unreachable is defined and sched_task_status.unreachable)
   block:
+    - name: "Get VM IP address again to refresh the connection"
+      include_tasks: ../utils/win_update_inventory.yml
     - name: "Get VMware Tools install scheduled task state"
       community.windows.win_scheduled_task_stat:
         name: "VMwareToolsInstall"
       delegate_to: "{{ vm_guest_ip }}"
-      register: sched_task_status
+      register: sched_task_status_2
       until:
-        - sched_task_status is defined
-        - sched_task_status.state.last_task_result is defined
-        - sched_task_status.state.last_task_result | int in [0, 3010]
-      retries: 45
+        - sched_task_status_2 is defined
+        - sched_task_status_2.state.last_task_result is defined
+        - sched_task_status_2.state.last_task_result | int in [0, 3010]
+      retries: "{{ 45 | int - sched_task_status.attempts | default(0) | int }}"
       delay: 20
-  rescue:
-    - name: "Connection lost to guest OS"
-      when: >
-        sched_task_status.state is undefined or
-        sched_task_status.state.last_task_result is undefined or
-        (sched_task_status.msg is defined and sched_task_status.msg | lower is search("connection"))
-      block:
-        - name: "Get VM IP address again to refresh the connection"
-          include_tasks: ../utils/win_update_inventory.yml
-        - name: "Get VMware Tools install scheduled task state"
-          community.windows.win_scheduled_task_stat:
-            name: "VMwareToolsInstall"
-          delegate_to: "{{ vm_guest_ip }}"
-          register: sched_task_status_2
-          until:
-            - sched_task_status_2 is defined
-            - sched_task_status_2.state.last_task_result is defined
-            - sched_task_status_2.state.last_task_result | int in [0, 3010]
-          retries: "{{ 45 | int - sched_task_status.attempts | default(0) | int }}"
-          delay: 20
+      ignore_errors: true
+      ignore_unreachable: true
 
-- name: "Display the status of scheduled task"
-  ansible.builtin.debug: var=sched_task_status
+- name: "Check the status of scheduled task"
+  ansible.builtin.assert:
+    that:
+      - (sched_task_status.state.last_task_result is defined and sched_task_status.state.last_task_result | int in [0, 3010]) or
+        (sched_task_status_2.state.last_task_result is defined and sched_task_status_2.state.last_task_result | int in [0, 3010])
+    fail_msg: "Wait the expected state value '0' or '3010' of VMware Tools install scheduled task in guest OS failed."
 
 - name: "Retry to get 'VMTools' service"
   include_tasks:
