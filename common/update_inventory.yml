@@ -6,13 +6,17 @@
 #   update_inventory_timeout (optional): the timeout to get VM IP address
 #     and the timeout to wait SSH to be connectable
 #
-- include_tasks: vm_get_ip.yml
+- name: "Get VM IP address"
+  include_tasks: vm_get_ip.yml
   vars:
     vm_get_ip_timeout: "{{ update_inventory_timeout | default(900) }}"
-- ansible.builtin.debug:
+
+- name: "Print VM IP address"
+  ansible.builtin.debug:
     msg: "Get '{{ vm_name }}' IP address: {{ vm_guest_ip }}"
 
-- include_tasks: vm_wait_connection.yml
+- name: "Wait for VM connectable"
+  include_tasks: vm_wait_connection.yml
   vars:
     vm_wait_connection_timeout: "{{ update_inventory_timeout | default(900) }}"
 
@@ -20,22 +24,22 @@
   ansible.builtin.set_fact:
     update_inventory: true
 
-- block:
-    - name: Loop groups to update update_inventory
+- name: "Check whether VM IP address in host group 'target_vm'"
+  when: groups['target_vm'] is defined
+  block:
+    - name: "Set fact that VM IP address already in the host group"
       ansible.builtin.set_fact:
         update_inventory: false
       when: vm_guest_ip == item
       loop: "{{ groups['target_vm'] }}"
-  when: groups['target_vm'] is defined
 
-- name: "If VM IP Address not exist then update inventory"
-  block:
-    - include_tasks: add_host_in_memory_inventory.yml
-      vars:
-        add_host_in_memory_inventory_ip: "{{ vm_guest_ip }}"
-        add_host_in_memory_inventory_gp: "target_vm"
-        add_host_in_memory_inventory_user: "{{ vm_username }}"
-        add_host_in_memory_inventory_pwd: "{{ vm_password }}"
-        add_host_in_memory_inventory_python: "{{ vm_python | default('auto') }}"
-        add_host_in_memory_inventory_ssh_pipeline: "{{ vm_ssh_pipeline_enable | default(false) }}"
+- name: "Add VM IP address to the host in-memeory inventory"
+  include_tasks: add_host_in_memory_inventory.yml
+  vars:
+    add_host_in_memory_inventory_ip: "{{ vm_guest_ip }}"
+    add_host_in_memory_inventory_gp: "target_vm"
+    add_host_in_memory_inventory_user: "{{ vm_username }}"
+    add_host_in_memory_inventory_pwd: "{{ vm_password }}"
+    add_host_in_memory_inventory_python: "{{ vm_python | default('auto') }}"
+    add_host_in_memory_inventory_ssh_pipeline: "{{ vm_ssh_pipeline_enable | default(false) }}"
   when: update_inventory
