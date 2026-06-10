@@ -86,10 +86,11 @@
 
 - name: "Connection to guest OS lost"
   when: >
-    sched_task_status.state is undefined or
+    (sched_task_status.attempts is undefined or sched_task_status.attempts | int < 45) and
+    (sched_task_status.state is undefined or
     sched_task_status.state.last_task_result is undefined or
     (sched_task_status.msg is defined and sched_task_status.msg | lower is search("connection")) or
-    (sched_task_status.unreachable is defined and sched_task_status.unreachable)
+    (sched_task_status.unreachable is defined and sched_task_status.unreachable))
   block:
     - name: "Get VM IP address again to refresh the connection"
       include_tasks: ../utils/win_update_inventory.yml
