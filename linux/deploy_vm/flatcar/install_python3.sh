@@ -78,6 +78,7 @@ else
     echo "Remove directory $ap_python3_download_dir"
     rm -rf $ap_python3_download_dir
 
+    echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:$ap_python3_bin_dir" >>/etc/environment
     python_version=$($ap_python3_bin_dir/python -V)
     rc=$?
     if [ $rc -eq 0 ]; then
