@@ -79,6 +79,13 @@ else
     rm -rf $ap_python3_download_dir
 
     echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:$ap_python3_bin_dir" >>/etc/environment
+    if [ $? -eq 0 ]; then
+        echo "Successfully updated /etc/environment with Python path."
+    else
+        echo "Error: Failed to write to /etc/environment"
+        exit 1
+    fi
+
     python_version=$($ap_python3_bin_dir/python -V)
     rc=$?
     if [ $rc -eq 0 ]; then
