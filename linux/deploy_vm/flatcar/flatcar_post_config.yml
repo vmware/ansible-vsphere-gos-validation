@@ -32,8 +32,8 @@
 - name: "Get default PATH"
   ansible.builtin.command: "echo $PATH"
   register: path_env_result
-  ignore_errors: true
   delegate_to: "{{ vm_guest_ip }}"
+  failed_when: (path_env_result.stdout is not defined) or (path_env_result.stdout | trim == "")
 
 - name: "Inject Python path into sshd"
   ansible.builtin.copy:
@@ -44,6 +44,4 @@
       SetEnv PATH={{ path_env_result.stdout | trim }}:/opt/bin
       {% endif %}
   delegate_to: "{{ vm_guest_ip }}"
-  failed_when: (path_env_result.stdout is not defined) or (path_env_result.stdout | trim == "")
-
 
