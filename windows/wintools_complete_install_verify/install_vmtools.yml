@@ -13,68 +13,137 @@
     - is_development_tools is defined
     - is_development_tools | bool
 
-- name: "Set fact of VMware Tools silent install command and getting install log file"
+- name: "Initialize the date time info in guest OS"
   ansible.builtin.set_fact:
-    vmtools_install_cmd: >-
-      D:\\{{ wintools_setup_exe }} /S /v "/qn ADDLOCAL=ALL REBOOT=R"
+    win_date_time: ''
+
+- name: "Get the date time info in guest OS"
+  ansible.windows.win_shell: >
+    (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss")
+  delegate_to: "{{ vm_guest_ip }}"
+  register: win_date_time_result
+
+- name: "Set fact of the date time got in guest OS"
+  ansible.builtin.set_fact:
+    win_date_time: "{{ win_date_time_result.stdout | trim }}"
+  when:
+    - win_date_time_result.stdout is defined
+    - win_date_time_result.stdout | trim | length != 0
+
+- name: "Print the date time got in guest OS"
+  ansible.builtin.debug: var=win_date_time
+
+- name: "Check the date time got in guest OS"
+  ansible.builtin.assert:
+    that:
+      - win_date_time | length != 0
+    fail_msg: "Failed to get the current date time info in guest OS: {{ win_date_time }}."
+
+- name: "Create a scheduled task to run the VMware Tools install"
+  community.windows.win_scheduled_task:
+    name: "VMwareToolsInstall"
+    actions:
+      - path: "D:\\{{ wintools_setup_exe }}"
+        arguments: '/S /v "/qn ADDLOCAL=ALL REBOOT=R"'
+    triggers:
+      - type: time
+        start_boundary: "{{ '%Y-%m-%dT%H:%M:%S' | strftime((win_date_time | to_datetime('%Y-%m-%dT%H:%M:%S')).strftime('%s') | int + 60) }}"
+        enabled: true
+    username: SYSTEM
+    state: present
+    enabled: true
+  delegate_to: "{{ vm_guest_ip }}"
+  register: create_sched_task_result
+
+- name: "Check VMware Tools install scheduled task is created"
+  ansible.builtin.assert:
+    that:
+      - create_sched_task_result.changed is defined
+      - create_sched_task_result.changed
+    fail_msg: "Not get the 'changed' state in the result of creating scheduled task '{{ create_sched_task_result | default('') }}'."
+
+- name: "Pause 5 seconds after creating VMware Tools install scheduled task"
+  ansible.builtin.pause:
+    seconds: 5
+
+- name: "Set fact of getting VMware Tools install log file"
+  ansible.builtin.set_fact:
     get_vmtools_install_log: true
 
-# In Windows Server 2012 R2 guest OS, need to set 'become' to run
-# VMware Tools install command
-- name: "Execute VMware Tools silent install command in guest"
-  ansible.windows.win_shell: "{{ vmtools_install_cmd }}"
+- name: "Retry to check the status of the scheduled task"
+  community.windows.win_scheduled_task_stat:
+    name: "VMwareToolsInstall"
   delegate_to: "{{ vm_guest_ip }}"
-  ignore_errors: true
-  become: "{{ guest_os_product_version | int == 2012 }}"
-  become_method: runas
-  become_user: "{{ 'Administrator' if (guest_os_product_version | int == 2012) else omit }}"
-  register: wintools_install_result
-  async: 600
-  poll: 0
-  environment:
-    ANSIBLE_WIN_ASYNC_STARTUP_TIMEOUT: 60
-
-- name: "Pause 2 minutes before checking task status"
-  ansible.builtin.pause:
-    minutes: 2
-  when: not (wintools_install_result.failed | default(true))
-
-- name: "Check VMware Tools install task started"
-  ansible.builtin.assert:
-    that:
-      - wintools_install_result is defined
-      - wintools_install_result.ansible_job_id is defined
-    fail_msg: >-
-      The async task of VMware Tools installation in guest OS is not started.
-      Task returned message: {{ wintools_install_result.msg | default('') }}.
-
-- name: "Check VMware Tools install task status every 3 seconds"
-  ansible.builtin.async_status:
-    jid: "{{ wintools_install_result.ansible_job_id }}"
-  register: wintools_install_job
-  delegate_to: "{{ vm_guest_ip }}"
-  ignore_errors: true
+  register: sched_task_status
   until:
-    - wintools_install_job.finished is defined
-    - wintools_install_job.finished | int == 1
-  retries: 100
-  delay: 3
-  when:
-    - wintools_install_result is defined
-    - wintools_install_result.ansible_job_id is defined
+    - sched_task_status is defined
+    - sched_task_status.state.last_task_result is defined
+    - sched_task_status.state.last_task_result | int in [0, 3010]
+  retries: 45
+  delay: 20
+  ignore_errors: true
+  ignore_unreachable: true
 
-- name: "Check VMware Tools install task finished"
+- name: "Connection to guest OS lost"
+  when: >
+    (sched_task_status.attempts is undefined or sched_task_status.attempts | int < 45) and
+    ((sched_task_status.msg is defined and sched_task_status.msg | lower is search("connection")) or
+    (sched_task_status.unreachable is defined and sched_task_status.unreachable))
+  block:
+    - name: "Get VM IP address again to refresh the connection"
+      include_tasks: ../utils/win_update_inventory.yml
+    - name: "Get VMware Tools install scheduled task state"
+      community.windows.win_scheduled_task_stat:
+        name: "VMwareToolsInstall"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: sched_task_status_2
+      until:
+        - sched_task_status_2 is defined
+        - sched_task_status_2.state.last_task_result is defined
+        - sched_task_status_2.state.last_task_result | int in [0, 3010]
+      retries: "{{ 45 | int - sched_task_status.attempts | default(0) | int }}"
+      delay: 20
+      ignore_errors: true
+      ignore_unreachable: true
+
+- name: "Check the status of scheduled task"
   ansible.builtin.assert:
     that:
-      - wintools_install_job.finished is defined
-      - wintools_install_job.finished | int == 1
-    fail_msg: >-
-      Failed to get the finished status of VMware Tools install task in guest OS, error message
-      '{{ wintools_install_job.msg | default('') }}'
+      - (sched_task_status.state.last_task_result is defined and sched_task_status.state.last_task_result | int in [0, 3010]) or
+        (sched_task_status_2.state.last_task_result is defined and sched_task_status_2.state.last_task_result | int in [0, 3010])
+    fail_msg: "Wait the expected state value '0' or '3010' of VMware Tools install scheduled task in guest OS failed."
 
-- name: "Pause 30 seconds after VMware Tools install"
+- name: "Retry to get 'VMTools' service"
+  include_tasks:
+    file: ../utils/win_get_vmtools_service_list.yml
+    apply:
+      when: >
+        (retry_time == 1) or
+        (vmtools_service_dict | default({}) | length == 0) or
+        (vmtools_service_dict.VMTools | default('') != "Running")
+  loop: "{{ range(1, 7) }}"
+  loop_control:
+    loop_var: retry_time
+    pause: 5
+
+- name: "Check service 'VMTools' is running"
+  ansible.builtin.assert:
+    that:
+      - vmtools_service_dict.VMTools is defined
+      - vmtools_service_dict['VMTools'] == "Running"
+    fail_msg: >-
+      Not get 'Running' status of service 'VMTools' in guest OS within 30s after VMware Tools install
+      scheduled task finished. Got services status dict: {{ vmtools_service_dict }}.
+
+- name: "Pause 10 seconds after VMware Tools install"
   ansible.builtin.pause:
-    seconds: 30
+    seconds: 10
+
+- name: "Clean up the scheduled task"
+  community.windows.win_scheduled_task:
+    name: "VMwareToolsInstall"
+    state: absent
+  delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Restart guest OS after VMware Tools install"
   include_tasks: ../utils/win_shutdown_restart.yml

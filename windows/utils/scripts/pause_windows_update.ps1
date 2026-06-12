@@ -1,4 +1,4 @@
-﻿# Copyright 2022 VMware, Inc.
+﻿# Copyright 2022-2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Script to disable Windows Auto Update in registry and

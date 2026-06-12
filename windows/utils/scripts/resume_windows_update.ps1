@@ -1,4 +1,4 @@
-﻿# Copyright 2024 VMware, Inc.
+﻿# Copyright 2024-2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Script to remove pausing Windows Update config from registry
