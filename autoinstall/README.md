@@ -26,6 +26,7 @@
 - For Pardus 23.x Server and XFCE Desktop unattend auto-install, please use file Pardus/preseed.cfg.
 - For openSUSE Leap 15.3 or later unattend auto-install, please use file openSUSE/15/autoinst.xml.
 - For openSUSE Leap 16.0 unattend auto-install, please use file openSUSE/16.0/autoinst.jsonnet.
+- For openSUSE Leap 16.1 unattend auto-install, please use file openSUSE/16.1/autoinst.jsonnet.
 - For BCLinux 8.x unattend auto-install, please use file BCLinux/8/ks.cfg.
 - For BCLinux-for-Euler 21.10 unattend auto-install, please use file BCLinux-for-Euler/21.10/ks.cfg.
 - For FusionOS 22 unattend auto-install, please use files under Fusion.

@@ -75,7 +75,7 @@ This project supports below scenarios for end-to-end guest operating system vali
 | AlmaLinux 8.x, 9.x, 10.x                               | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise Desktop 15 SP3 and later         | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | SUSE Linux Enterprise Server 15 SP3 and later          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| SUSE Linux Enterprise Server 16.0                      | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| SUSE Linux Enterprise Server 16.0 and later            | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | VMware Photon OS 4.0, 5.0                              | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Ubuntu 20.04 and later                                 | :heavy_check_mark:               | :heavy_check_mark:       | :heavy_check_mark:                 |
 | Flatcar 2592.0.0 and later                             |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
@@ -86,7 +86,7 @@ This project supports below scenarios for end-to-end guest operating system vali
 | ProLinux Server 7.9, 8.5                               | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | FreeBSD 13 and later                                   | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Pardus 21.2 and later, 23.x, 25.0 Server/XFCE          | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
-| openSUSE Leap 15.3 and later, 16.0                     | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
+| openSUSE Leap 15.3 and later, 16.0 and later           | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Red Hat Enterprise Linux CoreOS (RHCOS) 4.13 and later |                                  | :heavy_check_mark:       | :heavy_check_mark:                 |
 | FusionOS 22, 23                                        | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
 | Miracle Linux 8.x, 9.x                                 | :heavy_check_mark:               |                          | :heavy_check_mark:                 |
