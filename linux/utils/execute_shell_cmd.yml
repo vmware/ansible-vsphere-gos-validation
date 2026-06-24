@@ -1,0 +1,52 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Execute shell command in guest OS.
+# Parameters:
+#   lin_shell_cmd: the shell command to be executed.
+#   lin_shell_cmd_ignore_errors: whether to ignore errors when executing
+#     shell command in guest OS. Default value is false.
+#   lin_shell_cmd_no_log: whether to print the task result in the log.
+#     Default is false.
+# Return:
+#   lin_shell_cmd_output: the result of executing shell command task.
+#
+- name: "Check required parameter"
+  ansible.builtin.assert:
+    that:
+      - lin_shell_cmd is defined
+      - lin_shell_cmd | length ! = 0
+    fail_msg: "Parameter 'lin_shell_cmd' is not specified or is empty."
+
+- name: "Initialize the shell command execution result"
+  ansible.builtin.set_fact:
+    lin_shell_cmd_output: ""
+
+- name: "Execute shell command in guest OS"
+  ansible.builtin.shell: "{{ lin_shell_cmd }}"
+  ignore_errors: "{{ lin_shell_cmd_ignore_errors | default(false) }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: lin_shell_cmd_output
+  no_log: "{{ lin_shell_cmd_no_log | default(false) }}"
+  ignore_unreachable: true
+
+- name: "Test network connection when guest OS unreachable"
+  when:
+    - lin_shell_cmd_output.unreachable is defined
+    - lin_shell_cmd_output.unreachable
+  block:
+    - name: "Test network connection to VM"
+      ansible.builtin.command: ping -c 10 "{{ vm_guest_ip }}"
+      register: ping_vm_result
+      changed_when: false
+      ignore_errors: true
+    - name: "Print the result of ping VM IP"
+      ansible.builtin.debug: var=ping_vm_result
+
+    - name: "Execute shell command task in guest OS failed"
+      ansible.builtin.fail:
+        msg: >-
+          Execute shell command '{{ lin_shell_cmd }}' in guest OS failed due to host unreachable
+          with error message '{{ lin_shell_cmd_output.msg | default('') }}',
+          while ping guest OS IP '{{ vm_guest_ip }}'
+          {{ (ping_vm_result.rc | default(1) == 0) | ternary('passed', 'failed') }}.
