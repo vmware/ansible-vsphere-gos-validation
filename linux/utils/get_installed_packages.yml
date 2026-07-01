@@ -14,6 +14,28 @@
     manager: auto
   delegate_to: "{{ vm_guest_ip }}"
   register: guest_package_facts
+  ignore_unreachable: true
+
+- name: "Test network connection when guest OS unreachable"
+  when:
+    - guest_package_facts.unreachable is defined
+    - guest_package_facts.unreachable
+  block:
+    - name: "Test network connection to VM"
+      ansible.builtin.command: ping -c 10 "{{ vm_guest_ip }}"
+      register: ping_vm_result
+      changed_when: false
+      ignore_errors: true
+    - name: "Print the result of ping VM IP"
+      ansible.builtin.debug: var=ping_vm_result
+
+    - name: "Get installed packages task in guest OS failed"
+      ansible.builtin.fail:
+        msg: >-
+          Get installed packages task in guest OS failed due to host unreachable error
+          with error message '{{ guest_package_facts.msg | default('') }}',
+          while ping guest OS IP '{{ vm_guest_ip }}'
+          {{ (ping_vm_result.rc | default(1) == 0) | ternary('passed', 'failed') }}.
 
 - name: "Set fact of installed packages on {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
