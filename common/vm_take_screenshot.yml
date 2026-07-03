@@ -25,13 +25,17 @@
 - name: "Take screenshot when VM is 'poweredOn'"
   when: vm_power_state_get == 'poweredOn'
   block:
-    - name: "Send a TAB key to active screen in case it is blank"
+    - name: "Send a key to active screen in case it is blank"
       include_tasks: vm_guest_send_key.yml
       vars:
         keys_send:
-          - TAB
+          - CTRL_ALT_DELETE
         vm_send_key_ignore_errors: true
       when: vm_screen_active | default(false)
+
+    - name: "Wait 10 seconds for OS to render the active screen"
+      ansible.builtin.pause:
+        seconds: 10
 
     - name: "Take console screenshot for VM '{{ vm_name }}'"
       community.vmware.vmware_guest_screenshot:
