@@ -29,13 +29,27 @@
       include_tasks: vm_guest_send_key.yml
       vars:
         keys_send:
-          - CTRL_ALT_DELETE
+          - TAB
         vm_send_key_ignore_errors: true
-      when: vm_screen_active | default(false)
+      when: 
+        - vm_screen_active | default(false)
+        - guest_os_ansible_distribution != "Ubuntu"
 
-    - name: "Wait 10 seconds for OS to render the active screen"
-      ansible.builtin.pause:
-        seconds: 10
+    - name: "Send a key to active screen in case it is blank for {{ guest_os_ansible_distribution }} and then pause 10 secs"
+      when:
+        - vm_screen_active | default(false)
+        - guest_os_ansible_distribution == "Ubuntu"
+      block:
+        - name: "Send a key to active screen in case it is blank"
+          include_tasks: vm_guest_send_key.yml
+          vars:
+            keys_send:
+              - CTRL_ALT_DELETE
+            vm_send_key_ignore_errors: true
+
+        - name: "Wait 10 seconds for OS to render the active screen"
+          ansible.builtin.pause:
+            seconds: 10
 
     - name: "Take console screenshot for VM '{{ vm_name }}'"
       community.vmware.vmware_guest_screenshot:
