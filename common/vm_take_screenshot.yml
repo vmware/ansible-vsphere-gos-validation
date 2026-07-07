@@ -25,7 +25,7 @@
 - name: "Take screenshot when VM is 'poweredOn'"
   when: vm_power_state_get == 'poweredOn'
   block:
-    - name: "Send wake up key to active screen if blank"
+    - name: "Send wake up key to active screen in case it is blank"
       when: vm_screen_active | default(false)
       block:
         - name: "Send key to active screen (TAB for generic, CTRL_ALT_DELETE for Ubuntu)"
@@ -34,7 +34,7 @@
             keys_send:
               - "{{ (vm_guest_id | lower | search('ubuntu')) | ternary('CTRL_ALT_DELETE', 'TAB') }}"
             vm_send_key_ignore_errors: true
-  
+
         - name: "Wait 5 seconds for OS to render the active screen"
           ansible.builtin.pause:
             seconds: 5
