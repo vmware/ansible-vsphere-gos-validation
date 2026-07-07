@@ -25,31 +25,19 @@
 - name: "Take screenshot when VM is 'poweredOn'"
   when: vm_power_state_get == 'poweredOn'
   block:
-    - name: "Send a TAB to active screen in case it is blank"
-      include_tasks: vm_guest_send_key.yml
-      vars:
-        keys_send:
-          - TAB
-        vm_send_key_ignore_errors: true
-      when: 
-        - vm_screen_active | default(false)
-        - guest_os_ansible_distribution != "Ubuntu"
-
-    - name: "Send CTRL_ALT_DELETE to active screen in case it is blank for {{ guest_os_ansible_distribution }} and then pause 10 secs"
-      when:
-        - vm_screen_active | default(false)
-        - guest_os_ansible_distribution == "Ubuntu"
+    - name: "Send wake up key to active screen if blank"
+      when: vm_screen_active | default(false)
       block:
-        - name: "Send a key to active screen in case it is blank"
+        - name: "Send key to active screen (TAB for generic, CTRL_ALT_DELETE for Ubuntu)"
           include_tasks: vm_guest_send_key.yml
           vars:
             keys_send:
-              - CTRL_ALT_DELETE
+              - "{{ (vm_guest_id | lower | search('ubuntu')) | ternary('CTRL_ALT_DELETE', 'TAB') }}"
             vm_send_key_ignore_errors: true
-
-        - name: "Wait 10 seconds for OS to render the active screen"
+  
+        - name: "Wait 5 seconds for OS to render the active screen"
           ansible.builtin.pause:
-            seconds: 10
+            seconds: 5
 
     - name: "Take console screenshot for VM '{{ vm_name }}'"
       community.vmware.vmware_guest_screenshot:
