@@ -31,8 +31,14 @@
         - name: "Send key to active screen (TAB for generic, CTRL_ALT_DELETE for Ubuntu)"
           include_tasks: vm_guest_send_key.yml
           vars:
-            keys_send:
-              - "{{ ('ubuntu' in (vm_guest_id | lower)) | ternary('CTRL_ALT_DELETE', 'TAB') }}"
+            keys_send: >-
+              {% if 'ubuntu' in (vm_guest_id | lower) %}
+              - CTRL
+              - ALT
+              - DELETE
+              {% else %}
+              - TAB
+              {% endif %}
             vm_send_key_ignore_errors: true
 
         - name: "Wait 5 seconds for OS to render the active screen"
