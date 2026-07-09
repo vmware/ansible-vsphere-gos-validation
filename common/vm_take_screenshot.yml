@@ -28,18 +28,23 @@
     - name: "Send wake up key to active screen in case it is blank"
       when: vm_screen_active | default(false)
       block:
-        - name: "Send key to active screen (TAB for generic, CTRL_ALT_DELETE for Ubuntu)"
+        - name: "Send TAB key for Non-Ubuntu"
           include_tasks: vm_guest_send_key.yml
           vars:
-            keys_send: >-
-              {% if 'ubuntu' in (vm_guest_id | lower) %}
-              - SPACE
-              - SPACE
-              - SPACE
-              {% else %}
+            keys_send:
               - TAB
-              {% endif %}
             vm_send_key_ignore_errors: true
+          when: "'ubuntu' not in (vm_guest_id | lower)"
+
+        - name: "Send SPACE key for Ubuntu"
+          include_tasks: vm_guest_send_key.yml
+          vars:
+            keys_send:
+              - SPACE
+              - SPACE
+              - SPACE
+            vm_send_key_ignore_errors: true
+          when: "'ubuntu' in (vm_guest_id | lower)"
 
         - name: "Wait 10 seconds for OS to render the active screen"
           ansible.builtin.pause:
