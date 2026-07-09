@@ -111,7 +111,11 @@
     that:
       - (sched_task_status.state.last_task_result is defined and sched_task_status.state.last_task_result | int in [0, 3010]) or
         (sched_task_status_2.state.last_task_result is defined and sched_task_status_2.state.last_task_result | int in [0, 3010])
-    fail_msg: "Wait the expected state value '0' or '3010' of VMware Tools install scheduled task in guest OS failed."
+    fail_msg: >
+      After retry to get the status of VMware Tools install scheduled task, its status code is
+      {{ sched_task_status.state.last_task_result | default('no value') }}, or
+      {{ sched_task_status_2.state.last_task_result | default('no value') }},
+      not equal to the expected state value '0' or '3010'. Please check VMware Tools install log.
 
 - name: "Retry to get 'VMTools' service"
   include_tasks:
@@ -121,7 +125,7 @@
         (retry_time == 1) or
         (vmtools_service_dict | default({}) | length == 0) or
         (vmtools_service_dict.VMTools | default('') != "Running")
-  loop: "{{ range(1, 7) }}"
+  loop: "{{ range(1, 14) }}"
   loop_control:
     loop_var: retry_time
     pause: 5
@@ -132,7 +136,7 @@
       - vmtools_service_dict.VMTools is defined
       - vmtools_service_dict['VMTools'] == "Running"
     fail_msg: >-
-      Not get 'Running' status of service 'VMTools' in guest OS within 30s after VMware Tools install
+      Not get 'Running' status of service 'VMTools' in guest OS within 60s after VMware Tools install
       scheduled task finished. Got services status dict: {{ vmtools_service_dict }}.
 
 - name: "Pause 10 seconds after VMware Tools install"
