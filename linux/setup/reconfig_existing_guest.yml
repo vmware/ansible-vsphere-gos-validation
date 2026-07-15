@@ -8,11 +8,44 @@
   include_tasks: ../utils/ssh_keep_alive.yml
   when: guest_os_family in ["Debian", "FreeBSD"]
 
-- name: "Diable auto update for Ubuntu"
-  include_tasks: ../utils/disable_auto_update.yml
+- name: "Reconfig Ubuntu desktop to disable auto update and black screen"
   when:
     - guest_os_ansible_distribution == "Ubuntu"
     - guest_os_edition == "Desktop"
+  block:
+    - name: "Diable auto update for Ubuntu"
+      include_tasks: ../utils/disable_auto_update.yml
+    
+    - name: Check if Greeter config file exists
+      ansible.builtin.stat:
+        path: /etc/gdm3/greeter.dconf-defaults
+      ignore_errors: true
+      delegate_to: "{{ vm_guest_ip }}"
+      register: greeter_config_file
+  
+    - name: "Append never-sleep config to GDM defaults"
+      when:
+        - greeter_config_file.stat.exists is defined
+        - greeter_config_file.stat.exists
+      block:
+        - name: "Append never-sleep config to GDM defaults"
+          ansible.builtin.blockinfile:
+          path: /etc/gdm3/greeter.dconf-defaults
+          block: |
+            [org/gnome/desktop/session]
+            idle-delay=uint32 0
+
+            [org/gnome/settings-daemon/plugins/power]
+            sleep-inactive-ac-timeout=0
+            sleep-inactive-ac-type='nothing'
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - name: "Restart service gdm3"
+          include_tasks: ../utils/service_operation.yml
+          vars:
+            service_name: "gdm3"
+            service_enabled: true
+            service_state: "restarted"
 
 # 'python3-libdnf5' is required by dnf5 module
 - name: "Install 'python3-libdnf5' on {{ vm_guest_os_distribution }}"
