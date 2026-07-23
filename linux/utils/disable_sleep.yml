@@ -1,0 +1,32 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Disable sleeping for desktop to void black screen.
+#
+- name: Check if Greeter config file exists
+  ansible.builtin.stat:
+    path: /etc/gdm3/greeter.dconf-defaults
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
+  register: greeter_config_file
+
+- name: "Append never-sleep config to GDM defaults"
+  when:
+    - greeter_config_file.stat.exists is defined
+    - greeter_config_file.stat.exists
+  block:
+    - name: "Append never-sleep config to GDM defaults"
+      ansible.builtin.blockinfile:
+        path: /etc/gdm3/greeter.dconf-defaults
+        block: |
+          [org/gnome/desktop/session]
+          idle-delay=uint32 0
+
+          [org/gnome/settings-daemon/plugins/power]
+          sleep-inactive-ac-timeout=0
+          sleep-inactive-ac-type='nothing'
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Restart gdm3"
+      ansible.builtin.command: "systemctl restart gdm3"
+      delegate_to: "{{ vm_guest_ip }}"
