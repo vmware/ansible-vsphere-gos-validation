@@ -67,7 +67,7 @@ env ASSUME_ALWAYS_YES=YES pkg bootstrap -y
 
 # Different packages between the 32bit image and 64bit image
 # The open-vm-tools is not installed by default
-packages_to_install="bash sudo wget curl e2fsprogs iozone lsblk open-vm-tools-nox11"
+packages_to_install="bash sudo wget curl e2fsprogs iozone lsblk python open-vm-tools-nox11"
 
 # Try to install package from CDROM repo. There is no default CDROM repo file FreeBSD_install_cdrom.conf on FreeBSD 15 or obove.
 failed_packages="$packages_to_install"
