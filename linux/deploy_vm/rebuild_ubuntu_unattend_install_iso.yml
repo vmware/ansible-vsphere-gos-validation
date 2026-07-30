@@ -57,7 +57,8 @@
 
 - name: "Set fact of grub parameters"
   ansible.builtin.set_fact:
-    ubuntu_grub_opts: "{{ (ubuntu_arch_result.stdout == 'arm64') | ternary('nvme_core.write_zeroes=N nvme_core.io_timeout=255', 'console=ttyS0,115200n8') }}"
+    ubuntu_grub_opts: "{{ (ubuntu_arch_result.stdout == 'arm64') | ternary('', 'console=ttyS0,115200n8') }}"
+    ubuntu_grub_nvme_opts: "{{ (ubuntu_arch_result.stdout == 'arm64') | ternary('nvme_core.write_zeroes=N nvme_core.io_timeout=255', '') }}"
 
 - name: "Set fact of BIOS boot config file isolinux.cfg exists or not"
   ansible.builtin.set_fact:
@@ -124,13 +125,13 @@
       ansible.builtin.replace:
         path: "{{ unattend_iso_cache }}/grub.cfg"
         regexp: '(.*vmlinuz )(.*)'
-        replace: "\\1autoinstall \\2 {{ ubuntu_grub_opts }} "
+        replace: "\\1autoinstall {{ ubuntu_grub_nvme_opts }}\\2 {{ ubuntu_grub_opts }} "
 
     - name: "Update boot command options in isolinux/txt.cfg"
       ansible.builtin.replace:
         path: "{{ unattend_iso_cache }}/txt.cfg"
         regexp: '(.*initrd )(.*)'
-        replace: "\\1autoinstall \\2 {{ ubuntu_grub_opts }} "
+        replace: "\\1autoinstall {{ ubuntu_grub_nvme_opts }}\\2 {{ ubuntu_grub_opts }} "
       when: ubuntu_bios_cfg_exist | bool
 
     - name: "Set facts of files to be updated or added into Ubuntu ISO"
