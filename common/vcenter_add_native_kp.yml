@@ -1,0 +1,38 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Adding a new native key provider on vCenter.
+# Parameters:
+#   native_kp_name: the native key provider name to be added.
+#   native_kp_default (optional): whether to mark this new added native key provider as default one.
+#     Default value is true.
+#
+- name: "Add native key provider on vCenter"
+  vmware.vmware.key_provider_native:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    provider_name: "{{ native_kp_name }}"
+    state: 'present'
+    tpm_required: false
+    default_provider: "{{ native_kp_default | default(true) }}"
+  register: add_nkp_result
+
+- name: "Display the result of adding native key provider"
+  ansible.builtin.debug: var=add_nkp_result
+
+- name: "Backup native key provider"
+  ansible.builtin.get_url:
+    url: "{{ add_nkp_result.export_info.url }}"
+    dest: "{{ current_test_log_folder }}/{{ native_kp_name }}.p12"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    headers:
+      Authorization: "Bearer {{ add_nkp_result.export_info.token }}"
+  when:
+    - add_nkp_result.changed is defined
+    - add_nkp_result.changed
+    - add_nkp_result.export_info.url is defined
+    - add_nkp_result.export_info.url | length != 0
+    - add_nkp_result.export_info.token is defined
+    - add_nkp_result.export_info.token | length != 0
