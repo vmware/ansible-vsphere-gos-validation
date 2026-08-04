@@ -36,25 +36,25 @@
     - name: "Check key provider type"
       ansible.builtin.assert:
         that:
-          - key_provider_type | lower in ['standard', 'native']
+          - key_provider_type in ['standard', 'native']
         fail_msg: "Parameter 'key_provider_type' is set to '{{ key_provider_type }}', which is not expected 'standard' or 'native'."
 
     - name: "Set fact of new key provider name"
       ansible.builtin.set_fact:
-        new_kp_name: "{{ key_provider_type | lower }}{{ current_test_timestamp }}"
+        new_kp_name: "{{ key_provider_type }}{{ current_test_timestamp }}"
 
     - name: "Add standard key provider on vCenter server"
       include_tasks: vcenter_add_standard_kp.yml
       vars:
         standard_kp_name: "{{ new_kp_name }}"
-      when: key_provider_type | lower == 'standard'
+      when: key_provider_type == 'standard'
 
     - name: "Add native key provider on vCenter server"
       include_tasks: vcenter_add_native_kp.yml
       vars:
         native_kp_name: "{{ new_kp_name }}"
-      when: key_provider_type | lower == 'native'
+      when: key_provider_type == 'native'
 
-    - name: "Set fact of key provider added to vCenter"
+    - name: "Set fact of key provider has been added on vCenter server"
       ansible.builtin.set_fact:
         key_provider_added: true
