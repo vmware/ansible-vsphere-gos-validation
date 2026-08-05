@@ -37,29 +37,20 @@
     - name: "Disable current all other repositories and enable photon-release.repo for Photon 5 GA image"
       when: ansible_kernel == '6.1.10-10.ph5-esx'
       block:
-        - name: "Disable current all other repositories and enable photon-release.repo for Photon 5 {{ ansible_architecture }} GA image"
-          ansible.builtin.shell: |
-            for f in $(ls /etc/yum.repos.d/*.repo); do
-              if [[ "$f" == *photon-release.repo ]]; then
-                sed -i 's/enabled=0/enabled=1/g' "$f";
-              else
-                sed -i 's/enabled=1/enabled=0/g' "$f";
-              fi
-            done
-          delegate_to: "{{ vm_guest_ip }}"
-          when: ansible_architecture != 'aarch64'
+        - name: "Set repo matching pattern based on architecture"
+          ansible.builtin.set_fact:
+            photon_repo_pattern: "{{ '(photon-release|photon-updates)\\.repo$' if ansible_architecture == 'aarch64' else 'photon-release\\.repo$' }}"
 
-        - name: "Disable current all other repositories and enable photon-release.repo/photon-updates.repo for Photon 5 {{ ansible_architecture }} GA image"
+        - name: "Disable current all other repositories and enable {{ photon_repo_pattern }} for Photon 5 {{ ansible_architecture }} GA image"
           ansible.builtin.shell: |
             for f in $(ls /etc/yum.repos.d/*.repo); do
-              if [[ "$f" =~ (photon-release|photon-updates)\.repo$ ]]; then
+              if [[ "$f" =~ {{ photon_repo_pattern }} ]]; then
                 sed -i 's/enabled=0/enabled=1/g' "$f";
               else
                 sed -i 's/enabled=1/enabled=0/g' "$f";
               fi
             done
           delegate_to: "{{ vm_guest_ip }}"
-          when: ansible_architecture == 'aarch64'
 
     - name: "Disable current all other repositories and enable photon-snapshot.repo/photon-updates.repo for Photon 5 Update image and later"
       ansible.builtin.shell: |
