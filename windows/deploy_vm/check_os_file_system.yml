@@ -1,0 +1,28 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Get boot volume type in guest OS"
+  ansible.windows.win_shell: "Get-Volume -DriveLetter C | Format-List DriveLetter, FileSystemType, Size, SizeRemaining"
+  register: get_boot_volume_result
+  ignore_errors: true
+  ignore_unreachable: true
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Check boot volume is ReFS"
+  ansible.builtin.assert:
+    that:
+      - get_boot_volume_result.rc is defined
+      - get_boot_volume_result.rc == 0
+      - get_boot_volume_result.FileSystemType is defined
+      - get_boot_volume_result.FileSystemType == "ReFS"
+    fail_msg: "Not get ReFS filesystem type on C: drive in guest OS."
+
+- name: "Get the current WinRE state in guest OS"
+  ansible.windows.win_shell: "reagentc /info"
+  register: get_recovery_result
+  ignore_errors: true
+  ignore_unreachable: true
+  delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Display the current WinRE state"
+  ansible.builtin.debug: var=get_recovery_result
