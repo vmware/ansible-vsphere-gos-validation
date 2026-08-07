@@ -1,0 +1,54 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Try to shutdown VM gracefully first, if there is no VMware Tools
+# installed in guest OS or shutdown VM failed, then will power off VM.
+#
+- name: "Get VM power state"
+  include_tasks: vm_get_power_state.yml
+
+- name: "Set fact of the VM power state before shutdown"
+  ansible.builtin.set_fact:
+    vm_power_state_before: "{{ vm_power_state_get }}"
+
+- name: "VM is not in powered off state"
+  when: vm_power_state_before != 'poweredOff'
+  block:
+    - name: "Get VMware Tools status in VM"
+      include_tasks: vm_get_vmtools_status.yml
+
+    - name: "Shutdown VM through VMware Tools"
+      when:
+        - vmtools_is_running is defined
+        - vmtools_is_running
+      block:
+        - name: "Shutdown VM"
+          vmware.vmware.vm_powerstate:
+            validate_certs: "{{ validate_certs | default(false) }}"
+            datacenter: "{{ vsphere_host_datacenter }}"
+            hostname: "{{ vsphere_host_name }}"
+            username: "{{ vsphere_host_user }}"
+            password: "{{ vsphere_host_user_password }}"
+            folder: "{{ vm_folder }}"
+            name: "{{ vm_name }}"
+            state: "shutdown-guest"
+            timeout: 300
+            force: true
+          register: shutdown_vm_result
+          ignore_errors: true
+
+        - name: "Pause 10 seconds after shutdown VM task executed successfully"
+          ansible.builtin.pause:
+            seconds: 10
+          when:
+            - shutdown_vm_result.failed is defined
+            - not shutdown_vm_result.failed
+
+        - name: "Get VM power state after shutdown"
+          include_tasks: vm_get_power_state.yml
+
+        - name: "Power off VM"
+          include_tasks: vm_set_power_state.yml
+          vars:
+            vm_power_state_set: 'powered-off'
+          when: vm_power_state_get != 'poweredOff'
