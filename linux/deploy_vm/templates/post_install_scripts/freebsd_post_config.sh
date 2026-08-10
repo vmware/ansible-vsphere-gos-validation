@@ -83,7 +83,7 @@ if [ -f "/dist/packages/repos/FreeBSD_install_cdrom.conf" ]; then
         echo "Install package $package_to_install ..." > /dev/ttyu0
         env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install > /dev/ttyu0 2>&1
         ret=$?
-        if [ $ret == 0 ]
+        if [ $ret -eq 0 ]
         then 
             echo "Successfully installed the package $package_to_install from ISO repo" > /dev/ttyu0
         else
@@ -144,10 +144,12 @@ sed -i '' -e 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
 echo "DONE" >/dev/ttyu0
 
 # Enable services
-printf "Enabling sshd and ntpd services ..." > /dev/ttyu0
+printf "Enabling sshd, ntpd and vmtoolsd services ..." > /dev/ttyu0
 sysrc sshd_enable="YES"
 sysrc ntpd_enable="YES"
 sysrc ntpd_sync_on_start="YES"
+sysrc vmware_guest_kmod_enable="YES"
+sysrc vmware_guestd_enable="YES"
 echo "DONE" >/dev/ttyu0
 
 # Eanble ZFS
