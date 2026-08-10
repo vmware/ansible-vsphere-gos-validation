@@ -65,6 +65,10 @@ echo "DONE" >/dev/ttyu0
 echo "Installing packages ..." > /dev/ttyu0
 env ASSUME_ALWAYS_YES=YES pkg bootstrap -y
 
+# Disable FreeBSD-kmods repository as its URL on Beta/RC/STABLE releases often returns 404
+mkdir -p /usr/local/etc/pkg/repos
+echo 'FreeBSD-kmods: { enabled: no }' > /usr/local/etc/pkg/repos/FreeBSD-kmods.conf
+
 # Different packages between the 32bit image and 64bit image
 # The open-vm-tools is not installed by default
 packages_to_install="bash sudo wget curl e2fsprogs iozone lsblk python open-vm-tools-nox11"
