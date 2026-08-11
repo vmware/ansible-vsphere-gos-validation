@@ -92,5 +92,76 @@
       - win_disk_volume_size_after | int == 2
     fail_msg: "Got disk volume '{{ drive_letter_new }}' size '{{ win_disk_volume_size_after }}' GB after extend, not 2GB."
 
+- name: "Hot remove the new added disk from the new disk controller"
+  include_tasks: ../../common/vm_hot_add_remove_disk.yml
+  vars:
+    disk_operation: 'absent'
+    disk_controller_type: "{{ test_disk_ctrl_type }}"
+    ctrl_number: "{{ new_vhba_bus_number }}"
+    unit_number: 0
+
+- name: "Hot add a new disk to the new disk controller and format with ReFS"
+  include_tasks: ../../common/vm_hot_add_remove_disk.yml
+  vars:
+    disk_operation: 'present'
+    disk_controller_type: "{{ test_disk_ctrl_type }}"
+    ctrl_number: "{{ new_vhba_bus_number }}"
+    unit_number: 0
+    disk_size_gb: 1
+
+- name: "Wait 15 seconds after disk hot add"
+  ansible.builtin.pause:
+    seconds: 15
+
+- name: "Get disk number in guest OS after hot adding disk to new controller"
+  include_tasks: ../utils/win_get_disk_num.yml
+  vars:
+    win_get_disk_num_ignore_error: true
+
+- name: "Set fact of disk number after hot adding disk to new controller"
+  ansible.builtin.set_fact:
+    disk_num_guest_after: "{{ disk_num_guest }}"
+
+- name: "Initialize new disk and create disk partition in guest OS"
+  include_tasks: create_partition_raw_disk.yml
+  vars:
+    new_disk_node_ctrl_bus: "{{ new_vhba_bus_number }}"
+    new_disk_node_unit_num: 0
+    target_fs: "ReFS"
+  when: disk_num_guest_after | int > 0
+
+- name: "Hot extend the VM ReFS disk size to 2GB"
+  include_tasks: ../../common/vm_hot_add_remove_disk.yml
+  vars:
+    disk_operation: 'present'
+    disk_controller_type: "{{ test_disk_ctrl_type }}"
+    ctrl_number: "{{ new_vhba_bus_number }}"
+    unit_number: 0
+    disk_size_gb: 2
+
+- name: "Wait 10 seconds after disk hot extend"
+  ansible.builtin.pause:
+    seconds: 10
+
+- name: "Extend ReFS disk volume to the new size"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Resize-Partition -DriveLetter {{ drive_letter_new }} -Size (Get-PartitionSupportedSize -DriveLetter {{ drive_letter_new }}).SizeMax"
+
+- name: "Get ReFS disk volume size in guest OS after extend"
+  include_tasks: ../utils/win_get_disk_volume_size.yml
+  vars:
+    win_disk_volume_letter: "{{ drive_letter_new }}"
+
+- name: "Set fact of the ReFS disk volume size after extend"
+  ansible.builtin.set_fact:
+    win_disk_volume_size_after: "{{ win_get_volume_size_gb }}"
+
+- name: "Check ReFS disk volume size after extend"
+  ansible.builtin.assert:
+    that:
+      - win_disk_volume_size_after | int == 2
+    fail_msg: "Got ReFS disk volume '{{ drive_letter_new }}' size '{{ win_disk_volume_size_after }}' GB after extend, not 2GB."
+
 - name: "Get NVMe spec version in guest OS"
   include_tasks: ../utils/win_get_nvme_spec_version.yml
