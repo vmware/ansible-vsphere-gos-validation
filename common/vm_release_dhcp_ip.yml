@@ -5,11 +5,20 @@
 - name: "Get VMware Tools status in guest OS"
   include_tasks: vm_get_vmtools_status.yml
 
+- name: "Set fact of the command for release DHCP IP address in Linux guest OS"
+  ansible.builtin.set_fact:
+    vm_release_dhcp_ip_lin: "dhclient -r || ip addr flush dev $(ip -o -4 route show to default | awk '{print $5}')"
+  when: gosv_test_suite == 'linux'
+
+- name: "Set fact of the command for release DHCP IP address in Windows guest OS"
+  ansible.builtin.set_fact:
+    vm_release_dhcp_ip_win: "ipconfig /release"
+  when: gosv_test_suite == 'windows'
+
 - name: "Release DHCP IP address in guest OS via VMware Tools"
   include_tasks: vm_shell_in_guest.yml
   vars:
-    vm_shell_cmd: "{{ (gosv_test_suite | default('linux') == 'windows') | ternary('C:\\Windows\\System32\\ipconfig.exe', 'dhclient') }}"
-    vm_shell_args: "{{ (gosv_test_suite | default('linux') == 'windows') | ternary('/release', '-r') }}"
+    vm_shell_cmd: "{{ (gosv_test_suite == 'windows') | ternary(vm_release_dhcp_ip_win, vm_release_dhcp_ip_lin) }}"
     vm_shell_ignore_errors: true
   when: vmtools_is_running
 
@@ -19,20 +28,15 @@
     - vm_guest_ip is defined and vm_guest_ip
   block:
     - name: "Release DHCP IP address in Windows guest OS"
-      ansible.windows.win_shell: "ipconfig /release"
+      ansible.windows.win_shell: "{{ vm_release_dhcp_ip_win }}"
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: true
       ignore_unreachable: true
-      when: gosv_test_suite is defined and gosv_test_suite == 'windows'
+      when: gosv_test_suite == 'windows'
 
     - name: "Release DHCP IP address in Linux guest OS"
-      ansible.builtin.shell: >-
-        {% if guest_os_ansible_distribution | default('') == 'FreeBSD' %}
-          dhclient -r
-        {% else %}
-          dhclient -r || ip addr flush dev $(ip -o -4 route show to default | awk '{print $5}')
-        {% endif %}
+      ansible.builtin.shell: "{{ vm_release_dhcp_ip_lin }}"
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: true
       ignore_unreachable: true
-      when: gosv_test_suite is defined and gosv_test_suite == 'linux'
+      when: gosv_test_suite == 'linux'
