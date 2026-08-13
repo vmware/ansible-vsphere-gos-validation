@@ -14,6 +14,7 @@
     manager: auto
   delegate_to: "{{ vm_guest_ip }}"
   register: guest_package_facts
+  ignore_errors: true
 
 - name: "Set fact of installed packages on {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
@@ -23,8 +24,64 @@
         dict2items |
         map(attribute='value') |
         flatten |
-        map(attribute='name')
+        map(attribute='name') |
+        unique
       }}
   when:
+    - guest_package_facts is not failed
+    - guest_package_facts.ansible_facts is defined
     - guest_package_facts.ansible_facts.packages is defined
     - guest_package_facts.ansible_facts.packages | length > 0
+
+# Fallback when package_facts fails (e.g. required python library is missing on target OS)
+- name: "Get installed packages via OS command when package_facts failed"
+  when: guest_installed_packages | length == 0
+  block:
+    - name: "Get installed RPM packages on {{ guest_os_ansible_distribution }}"
+      ansible.builtin.command: "rpm -qa --queryformat '%{NAME}\n'"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: rpm_packages_output
+      ignore_errors: true
+      when: guest_os_ansible_pkg_mgr is search('yum|dnf|zypper|tdnf|rpm') or guest_os_family in ['Suse', 'RedHat', 'VMware Photon OS']
+
+    - name: "Set fact of installed RPM packages"
+      ansible.builtin.set_fact:
+        guest_installed_packages: "{{ rpm_packages_output.stdout_lines | unique }}"
+      when:
+        - rpm_packages_output is defined
+        - rpm_packages_output.stdout_lines is defined
+        - rpm_packages_output.stdout_lines | length > 0
+
+    - name: "Get installed DPKG packages on {{ guest_os_ansible_distribution }}"
+      ansible.builtin.command: "dpkg-query -W -f='${Package}\n'"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: dpkg_packages_output
+      ignore_errors: true
+      when:
+        - guest_installed_packages | length == 0
+        - guest_os_family in ['Debian', 'Astra Linux (Orel)'] or guest_os_ansible_pkg_mgr == 'apt'
+
+    - name: "Set fact of installed DPKG packages"
+      ansible.builtin.set_fact:
+        guest_installed_packages: "{{ dpkg_packages_output.stdout_lines | unique }}"
+      when:
+        - dpkg_packages_output is defined
+        - dpkg_packages_output.stdout_lines is defined
+        - dpkg_packages_output.stdout_lines | length > 0
+
+    - name: "Get installed PKG packages on {{ guest_os_ansible_distribution }}"
+      ansible.builtin.command: "pkg query %n"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: pkg_packages_output
+      ignore_errors: true
+      when:
+        - guest_installed_packages | length == 0
+        - guest_os_family == 'FreeBSD' or guest_os_ansible_pkg_mgr == 'pkg'
+
+    - name: "Set fact of installed PKG packages"
+      ansible.builtin.set_fact:
+        guest_installed_packages: "{{ pkg_packages_output.stdout_lines | unique }}"
+      when:
+        - pkg_packages_output is defined
+        - pkg_packages_output.stdout_lines is defined
+        - pkg_packages_output.stdout_lines | length > 0
