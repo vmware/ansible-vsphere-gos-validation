@@ -19,13 +19,16 @@
         - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
 
-        # Flatcar doesn't support to uninstall open-vm-tools
+        # Flatcar, RHCOS and SLES/SLED 16.1 or later Immutable Mode don't support to uninstall open-vm-tools
         - name: "Skip test case for {{ guest_os_ansible_distribution }}"
           include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: "Skip test case because {{ guest_os_ansible_distribution }} doesn't support uninstalling open-vm-tools"
             skip_reason: "Not Supported"
-          when: guest_os_ansible_distribution in ['Flatcar', 'RHCOS']
+          when: >-
+            guest_os_ansible_distribution in ['Flatcar', 'RHCOS'] or
+            (guest_os_ansible_distribution in ['SLES', 'SLED'] and
+             guest_os_ansible_distribution_major_ver | int >= 16)
 
         - name: "Block test case when guest OS doesn't have open-vm-tools"
           include_tasks: ../../common/skip_test_case.yml
