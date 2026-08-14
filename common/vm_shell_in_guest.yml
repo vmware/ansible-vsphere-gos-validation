@@ -1,14 +1,24 @@
 # Copyright 2021-2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Run command in guest OS without ssh connection
+# Run command in guest OS without SSH connection when VMware Tools is running.
 # Parameters:
-#   vm_shell_cmd: command to be run in guest OS
-#   vm_shell_args: command arguments
-#   vm_shell_out: the output file path
+#   vm_shell_cmd: command to be run in guest OS.
+#   vm_shell_args: command arguments.
+#   vm_shell_out: the output file path.
+#   vm_shell_env: environment variables to be set.
 #   vm_shell_ignore_errors: whether to ignore errors. Default is false.
 #
-- name: Run command in guest OS
+- name: "Set default environment variables for Linux guest OS"
+  ansible.builtin.set_fact:
+    vm_shell_env:
+      - "PATH=/usr/local/bin:/usr/bin:/sbin/bin:/bin"
+      - "LC_ALL=en_US.UTF-8"
+  when:
+    - gosv_test_suite == 'linux'
+    - vm_shell_env is undefined or vm_shell_env | length == 0
+
+- name: "Run command in guest OS"
   community.vmware.vmware_vm_shell:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -21,15 +31,13 @@
     vm_password: "{{ vm_password }}"
     vm_shell: "{{ vm_shell_cmd }}"
     vm_shell_args: "{% if vm_shell_out is defined and vm_shell_out %}{{ vm_shell_args | default('') }} > {{ vm_shell_out }}{% else %}{{ vm_shell_args | default('') }}{% endif %}"
-    vm_shell_env:
-      - "PATH=/usr/local/bin:/usr/bin:/sbin/bin:/bin"
-      - "LC_ALL=en_US.UTF-8"
+    vm_shell_env: "{{ vm_shell_env | default(omit) }}"
     vm_shell_cwd: "/tmp"
     wait_for_process: true
   failed_when: false
   ignore_errors: "{{ vm_shell_ignore_errors | default(false) }}"
   register: vm_shell_result
 
-- name: Display the result of running command in guest OS
+- name: "Display the result of running command in guest OS"
   ansible.builtin.debug: var=vm_shell_result
-  when: enable_debug is defined and enable_debug
+  when: enable_debug

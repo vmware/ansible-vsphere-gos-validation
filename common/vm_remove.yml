@@ -1,8 +1,12 @@
 # Copyright 2021-2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Delete VM from datastore on ESXi host
-- name: "Remove VM '{{ vm_name }}' on host '{{ vsphere_host_name }}'"
+# Delete VM from datastore on ESXi host.
+# Parameters:
+#   vm_remove_ignore_errors (optional): ignore errors when removing VM.
+#     Default value is false.
+#
+- name: "Remove VM '{{ vm_name }}' from VC/ESXi '{{ vsphere_host_name }}'"
   community.vmware.vmware_guest:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
@@ -13,14 +17,17 @@
     name: "{{ vm_name }}"
     state: "absent"
   register: vm_remove_result
-- name: Display the VM remove result
-  ansible.builtin.debug: var=vm_remove_result
-  when: enable_debug is defined and enable_debug
+  ignore_errors: "{{ vm_remove_ignore_errors | default(false) }}"
 
-- name: Check VM remove operation result
+- name: "Display the result of removing VM"
+  ansible.builtin.debug: var=vm_remove_result
+  when: enable_debug
+
+- name: "Check the result of removing VM"
   ansible.builtin.assert:
     that:
-      - "'changed' in vm_remove_result"
-      - "vm_remove_result.changed"
-    fail_msg: "Remove VM '{{ vm_name }}' on '{{ vsphere_host_name }}' failed."
-    success_msg: "VM '{{ vm_name }}' on '{{ vsphere_host_name }}' is removed successfully."
+      - vm_remove_result.changed is defined
+      - vm_remove_result.changed
+    fail_msg: "Failed to remove VM '{{ vm_name }}' from VC/ESXi '{{ vsphere_host_name }}' due to '{{ vm_remove_result.msg | default('') }}'."
+    success_msg: "VM '{{ vm_name }}' on VC/ESXi '{{ vsphere_host_name }}' is removed successfully."
+  when: not vm_remove_ignore_errors | default(false)
