@@ -5,6 +5,22 @@
 - name: "Get VMware Tools status in guest OS"
   include_tasks: vm_get_vmtools_status.yml
 
+- name: "Set fact of the shell command to release DHCP IP address in Linux guest OS"
+  ansible.builtin.set_fact:
+    vm_release_dhcp_ip_cmd: >-
+      {% if guest_os_network_manager | default('') == 'NetworkManager' %}
+        iface=$(ip -o -4 route show to default | head -n 1 | awk '{print $5}');
+        conn=$(nmcli -t -f NAME,DEVICE connection show --active | grep ":$iface$" | head -n 1 | cut -d: -f1);
+        nmcli connection modify "$conn" ipv4.dhcp-send-release yes;
+        nmcli connection up "$conn";
+        nmcli connection down "$conn"
+      {% elif guest_os_network_manager | default('') == 'wicked' %}
+        wicked ifdown --release $(ip route show default | awk '{print $5}')
+      {% else %}
+        dhclient -r eth0
+      {% endif %}
+  when: gosv_test_suite == 'linux'
+
 - name: "Release DHCP IP address in guest OS via VMware Tools"
   when: vmtools_is_running
   block:
@@ -12,21 +28,8 @@
       include_tasks: vm_shell_in_guest.yml
       vars:
         vm_shell_cmd: >-
-          {{ (gosv_test_suite == 'windows') | ternary('ipconfig', '/bin/sh') }}
-        vm_shell_args: >-
-          {% if gosv_test_suite == 'windows' %}
-          /release
-          {% elif guest_os_network_manager | default('') == 'NetworkManager' %}
-          -c "iface=$(ip -o -4 route show to default | head -n 1 | awk '{print $5}');
-          conn=$(nmcli -t -f NAME,DEVICE connection show --active | grep \":$iface$\" | head -n 1 | cut -d: -f1);
-          nmcli connection modify \"$conn\" ipv4.dhcp-send-release yes;
-          nmcli connection up \"$conn\";
-          nmcli connection down \"$conn\""
-          {% elif guest_os_network_manager | default('') == 'wicked' %}
-          -c "wicked ifdown --release $(ip route show default | awk '{print $5}')"
-          {% else %}
-          -c "dhclient -r eth0"
-          {% endif %}
+          {{ (gosv_test_suite == 'windows') | ternary('ipconfig', vm_release_dhcp_ip_cmd) }}
+        vm_shell_args: "{{ (gosv_test_suite == 'windows') | ternary('/release', '') }}"
         vm_shell_ignore_errors: true
     
     - name: "Shutdown Linux guest OS via VMware Tools"
@@ -57,18 +60,7 @@
       when: gosv_test_suite == 'windows'
 
     - name: "Release DHCP IP address in Linux guest OS via SSH"
-      ansible.builtin.shell: >-
-        {% if guest_os_network_manager | default('') == 'NetworkManager' %}
-        iface=$(ip -o -4 route show to default | head -n 1 | awk '{print $5}');
-        conn=$(nmcli -t -f NAME,DEVICE connection show --active | grep ":$iface$" | head -n 1 | cut -d: -f1);
-        nmcli connection modify "$conn" ipv4.dhcp-send-release yes;
-        nmcli connection up "$conn";
-        nmcli connection down "$conn"
-        {% elif guest_os_network_manager | default('') == 'wicked' %}
-        wicked ifdown --release $(ip route show default | awk '{print $5}')
-        {% else %}
-        dhclient -r eth0
-        {% endif %}
+      ansible.builtin.shell: "{{ vm_release_dhcp_ip_cmd }}"
       delegate_to: "{{ vm_guest_ip }}"
       ignore_errors: true
       ignore_unreachable: true
