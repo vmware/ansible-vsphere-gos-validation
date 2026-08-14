@@ -14,7 +14,12 @@
     new_partition_device_path: "{{ partition_device_path }}"
     new_partition_fstype: "{{ 'ext4' if guest_os_family != 'FreeBSD' else 'ufs' }}"
     new_partition_uuid: "{{ partition_uuid }}"
-    new_partition_mount_path: "/mnt/{{ partition_uuid }}"
+    new_partition_mount_path: |-
+      {%- if guest_os_ansible_distribution in ['Flatcar', 'RHCOS'] or
+             (guest_os_ansible_distribution in ['SLES', 'SLED'] and
+              guest_os_ansible_distribution_major_ver | int >= 16) -%}/var/mnt/{{ partition_uuid }}
+      {%- else -%}/mnt/{{ partition_uuid }}
+      {%- endif -%}
     new_partition_mount_src: |-
       {%- if guest_os_family == 'FreeBSD' -%}/dev/gptid/{{ partition_uuid }}
       {%- else -%}UUID={{ partition_uuid }}
