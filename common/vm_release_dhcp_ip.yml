@@ -17,9 +17,15 @@
           {% if gosv_test_suite == 'windows' %}
           /release
           {% elif guest_os_network_manager | default('') == 'NetworkManager' %}
-          -c "iface=$(ip -o -4 route show to default | head -n 1 | awk '{print $5}'); conn=$(nmcli -t -f NAME,DEVICE connection show --active | grep \":$iface$\" | head -n 1 | cut -d: -f1); nmcli connection modify \"$conn\" ipv4.dhcp-send-release yes && nmcli device disconnect $iface"
+          -c "iface=$(ip -o -4 route show to default | head -n 1 | awk '{print $5}');
+          conn=$(nmcli -t -f NAME,DEVICE connection show --active | grep \":$iface$\" | head -n 1 | cut -d: -f1);
+          nmcli connection modify \"$conn\" ipv4.dhcp-send-release yes;
+          nmcli connection up \"$conn\";
+          nmcli connection down \"$conn\""
+          {% elif guest_os_network_manager | default('') == 'wicked' %}
+          -c "wicked ifdown --release $(ip route show default | awk '{print $5}')"
           {% else %}
-          -c "dhclient -r"
+          -c "dhclient -r eth0"
           {% endif %}
         vm_shell_ignore_errors: true
     
@@ -50,22 +56,20 @@
       ignore_unreachable: true
       when: gosv_test_suite == 'windows'
 
-    - name: "Release DHCP IP address in Linux guest OS"
+    - name: "Release DHCP IP address in Linux guest OS via SSH"
+      ansible.builtin.shell: >-
+        {% if guest_os_network_manager | default('') == 'NetworkManager' %}
+        iface=$(ip -o -4 route show to default | head -n 1 | awk '{print $5}');
+        conn=$(nmcli -t -f NAME,DEVICE connection show --active | grep ":$iface$" | head -n 1 | cut -d: -f1);
+        nmcli connection modify "$conn" ipv4.dhcp-send-release yes;
+        nmcli connection up "$conn";
+        nmcli connection down "$conn"
+        {% elif guest_os_network_manager | default('') == 'wicked' %}
+        wicked ifdown --release $(ip route show default | awk '{print $5}')
+        {% else %}
+        dhclient -r eth0
+        {% endif %}
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      ignore_unreachable: true
       when: gosv_test_suite == 'linux'
-      block:
-        - name: "Run command in Linux guest OS via SSH"
-          ansible.builtin.shell: >-
-            {% if guest_os_network_manager | default('') == 'NetworkManager' %}
-            iface=$(ip -o -4 route show to default | head -n 1 | awk '{print $5}'); conn=$(nmcli -t -f NAME,DEVICE connection show --active | grep ":$iface$" | head -n 1 | cut -d: -f1); nmcli connection modify "$conn" ipv4.dhcp-send-release yes && nmcli device disconnect $iface
-            {% else %}
-            dhclient -r
-            {% endif %}
-          delegate_to: "{{ vm_guest_ip }}"
-          ignore_errors: true
-          ignore_unreachable: true
-
-        - name: "Shutdown Linux guest OS via SSH"
-          ansible.builtin.shell: "poweroff"
-          delegate_to: "{{ vm_guest_ip }}"
-          ignore_errors: true
-          ignore_unreachable: true
