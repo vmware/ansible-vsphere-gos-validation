@@ -3,10 +3,10 @@
 ---
 # Remove specified VM snapshot or remove all snapshots of VM
 # Parameters:
-#   snapshot_remove_state: can be set to 'remove_all' or 'absent' (default)
+#   snapshot_remove_all: can be set to true or false (default)
 #   snapshot_name:
-#     if snapshot_remove_state is set to 'remove_all', then it's not required,
-#     if snapshot_remove_state is set to 'absent', then it's required to pass an existing snapshot name
+#     if snapshot_remove_all is set to true, then it's not required,
+#     if snapshot_remove_all is set to false, then it's required to pass an existing snapshot name
 #
 - name: "Remove snapshot on '{{ vm_name }}'"
   vmware.vmware.vm_snapshot:
@@ -18,15 +18,16 @@
     folder: "{{ vm_folder }}"
     name: "{{ vm_name }}"
     state: absent
-    remove_all: "{{ (snapshot_remove_state is defined) and (snapshot_remove_state == 'remove_all') }}"
-    snapshot_name: "{{ omit if ((snapshot_remove_state is defined) and (snapshot_remove_state == 'remove_all')) else snapshot_name | default(omit) }}"
+    remove_all: "{{ (snapshot_remove_all | default(false)) | bool }}"
+    snapshot_name: "{{ omit if ((snapshot_remove_all | default(false)) | bool) else snapshot_name | default(omit) }}"
   register: task_result
+
 - name: Display the result of remove snapshot
   ansible.builtin.debug: var=task_result
   when: enable_debug is defined and enable_debug
 
 - name: "Check if the snapshot '{{ snapshot_name }}' is removed"
-  when: snapshot_remove_state | default('absent') == 'absent'
+  when: not ((snapshot_remove_all | default(false)) | bool)
   block:
     - name: "Get VM's snapshots"
       include_tasks: vm_get_snapshot_facts.yml
