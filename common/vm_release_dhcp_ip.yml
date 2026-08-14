@@ -7,17 +7,17 @@
   block:
     - name: "Set fact of the shell command according to the network manager in Linux guest OS"
       ansible.builtin.set_fact:
-        vm_release_dhcp_ip_cmd: >-
+        vm_release_dhcp_ip_cmd: >
           {% if guest_os_network_manager | default('') == 'NetworkManager' %}
-            iface=$(ip -o -4 route show to default | head -n 1 | awk '{print $5}');
-            conn=$(nmcli -t -f NAME,DEVICE connection show --active | grep ":$iface$" | head -n 1 | cut -d: -f1);
-            nmcli connection modify "$conn" ipv4.dhcp-send-release yes;
-            nmcli connection up "$conn";
-            nmcli connection down "$conn"
+          iface=$(ip -o -4 route show to default | head -n 1 | awk '{print $5}');
+          conn=$(nmcli -t -f NAME,DEVICE connection show --active | grep ":$iface$" | head -n 1 | cut -d: -f1);
+          nmcli connection modify "$conn" ipv4.dhcp-send-release yes;
+          nmcli connection up "$conn";
+          nmcli connection down "$conn"
           {% elif guest_os_network_manager | default('') == 'wicked' %}
-            wicked ifdown --release $(ip route show default | awk '{print $5}')
+          wicked ifdown --release $(ip route show default | awk '{print $5}')
           {% else %}
-            dhclient -r eth0
+          dhclient -r eth0
           {% endif %}
     - name: "Print the shell command to release DHCP IP address in Linux guest OS"
       ansible.builtin.debug: var=vm_release_dhcp_ip_cmd
@@ -25,24 +25,31 @@
 - name: "Execute command to release DHCP IP address in guest OS"
   when: vm_guest_ip is defined and vm_guest_ip
   block:
+    # The network is disconnected immediately after the DHCP IP address is released,
+    # so no need to wait for the task result.
     - name: "Release DHCP IP address in Windows guest OS"
       ansible.windows.win_shell: "ipconfig /release"
       delegate_to: "{{ vm_guest_ip }}"
+      async: 5
+      poll: 0
       ignore_errors: true
       ignore_unreachable: true
-      register: vm_release_dhcp_ip_result
       when: gosv_test_suite == 'windows'
 
     - name: "Release DHCP IP address in Linux guest OS"
       ansible.builtin.shell: "{{ vm_release_dhcp_ip_cmd }}"
       delegate_to: "{{ vm_guest_ip }}"
+      become: true
+      changed_when: false
+      async: 5
+      poll: 0
       ignore_errors: true
       ignore_unreachable: true
-      register: vm_release_dhcp_ip_result
       when: gosv_test_suite == 'linux'
 
-    - name: "Debug the result of releasing DHCP IP address in guest OS"
-      ansible.builtin.debug: var=vm_release_dhcp_ip_result
+    - name: "Pause for 5 seconds"
+      ansible.builtin.pause:
+        seconds: 5
 
 - name: "Get VMware Tools status in guest OS"
   include_tasks: vm_get_vmtools_status.yml
