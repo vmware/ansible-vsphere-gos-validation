@@ -2,9 +2,6 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Release DHCP IP address in guest OS
-- name: "Get VMware Tools status in guest OS"
-  include_tasks: vm_get_vmtools_status.yml
-
 - name: "Set fact of the shell command to release DHCP IP address in Linux guest OS"
   ansible.builtin.set_fact:
     vm_release_dhcp_ip_cmd: >-
@@ -21,36 +18,8 @@
       {% endif %}
   when: gosv_test_suite == 'linux'
 
-- name: "Release DHCP IP address in guest OS via VMware Tools"
-  when: vmtools_is_running
-  block:
-    - name: "Run command in guest OS via VMware Tools"
-      include_tasks: vm_shell_in_guest.yml
-      vars:
-        vm_shell_cmd: >-
-          {{ (gosv_test_suite == 'windows') | ternary('ipconfig', vm_release_dhcp_ip_cmd) }}
-        vm_shell_args: "{{ (gosv_test_suite == 'windows') | ternary('/release', '') }}"
-        vm_shell_ignore_errors: true
-    
-    - name: "Shutdown Linux guest OS via VMware Tools"
-      vmware.vmware.vm_powerstate:
-        validate_certs: "{{ validate_certs | default(false) }}"
-        datacenter: "{{ vsphere_host_datacenter }}"
-        hostname: "{{ vsphere_host_name }}"
-        username: "{{ vsphere_host_user }}"
-        password: "{{ vsphere_host_user_password }}"
-        folder: "{{ vm_folder }}"
-        name: "{{ vm_name }}"
-        state: "shutdown-guest"
-        timeout: 300
-        force: true
-      ignore_errors: true
-      when: gosv_test_suite == 'linux'
-
-- name: "Release DHCP IP via SSH/WinRM when VMware Tools is not running"
-  when:
-    - not vmtools_is_running
-    - vm_guest_ip is defined and vm_guest_ip
+- name: "Execute command to release DHCP IP address in guest OS"
+  when: vm_guest_ip is defined and vm_guest_ip
   block:
     - name: "Release DHCP IP address in Windows guest OS"
       ansible.windows.win_shell: "ipconfig /release"
@@ -65,3 +34,21 @@
       ignore_errors: true
       ignore_unreachable: true
       when: gosv_test_suite == 'linux'
+
+- name: "Get VMware Tools status in guest OS"
+  include_tasks: vm_get_vmtools_status.yml
+
+- name: "Shutdown Linux guest OS via VMware Tools"
+  vmware.vmware.vm_powerstate:
+    validate_certs: "{{ validate_certs | default(false) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    state: "shutdown-guest"
+    timeout: 300
+    force: true
+  ignore_errors: true
+  when: vmtools_is_running
