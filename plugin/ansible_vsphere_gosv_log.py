@@ -531,6 +531,22 @@ class CallbackModule(CallbackBase):
 
         return formatted_msg
 
+    def _get_task_call_trace(self, task):
+        """
+        Get the call trace of a task by traversing its parent blocks
+        """
+        trace = []
+        current = task
+        while current is not None:
+            if hasattr(current, 'get_path'):
+                path = current.get_path()
+                if path and (not trace or trace[-1] != path):
+                    trace.append(path)
+            current = getattr(current, '_parent', None)
+
+        trace.reverse()
+        return trace
+
     def _print_task_details(self, result,
                             task_status=None,
                             delegated_vars=None,
@@ -649,6 +665,12 @@ class CallbackModule(CallbackBase):
             result_in_json = json.loads(self._dump_results(result._result, indent=4))
             error_msg = extract_error_msg(result_in_json)
             task_details += "\nerror message:\n" + error_msg
+
+            call_trace = self._get_task_call_trace(task)
+            if call_trace and len(call_trace) > 1:
+                task_details += "call trace:\n"
+                for trace_path in call_trace:
+                    task_details += "  - {}\n".format(trace_path)
 
             self.add_logger_file_handler(self.failed_tasks_log)
 
