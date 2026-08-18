@@ -540,8 +540,14 @@ class CallbackModule(CallbackBase):
         while current is not None:
             if hasattr(current, 'get_path'):
                 path = current.get_path()
-                if path and (not trace or trace[-1] != path):
-                    trace.append(path)
+                if path:
+                    file_path = re.sub(r':\d+$', '', path)
+                    if not trace:
+                        trace.append(path)
+                    else:
+                        prev_file_path = re.sub(r':\d+$', '', trace[-1])
+                        if file_path != prev_file_path:
+                            trace.append(path)
             current = getattr(current, '_parent', None)
 
         trace.reverse()
