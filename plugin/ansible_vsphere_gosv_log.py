@@ -537,7 +537,7 @@ class CallbackModule(CallbackBase):
         """
         trace = []
         current = task
-        base_dir = os.path.dirname(self.cwd)
+        base_dir = self.cwd
         if not base_dir.endswith(os.path.sep):
             base_dir += os.path.sep
 
@@ -549,16 +549,30 @@ class CallbackModule(CallbackBase):
                         path = path[len(base_dir):]
 
                     file_path = re.sub(r':\d+$', '', path)
+                    
+                    name = getattr(current, 'get_name', lambda: '')()
+                    action = getattr(current, 'action', '')
+                    
+                    details = []
+                    if name:
+                        details.append("name: {}".format(name))
+                    if action:
+                        details.append("module: {}".format(action))
+                    
+                    formatted_path = path
+                    if details:
+                        formatted_path += " ({})".format(", ".join(details))
+
                     if not trace:
-                        trace.append(path)
+                        trace.append((formatted_path, file_path))
                     else:
-                        prev_file_path = re.sub(r':\d+$', '', trace[-1])
+                        prev_file_path = trace[-1][1]
                         if file_path != prev_file_path:
-                            trace.append(path)
+                            trace.append((formatted_path, file_path))
             current = getattr(current, '_parent', None)
 
         trace.reverse()
-        return trace
+        return [t[0] for t in trace]
 
     def _print_task_details(self, result,
                             task_status=None,
