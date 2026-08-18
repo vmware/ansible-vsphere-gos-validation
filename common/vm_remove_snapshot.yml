@@ -8,6 +8,25 @@
 #     if snapshot_remove_all is set to true, then it's not required,
 #     if snapshot_remove_all is set to false, then it's required to pass an existing snapshot name
 #
+- name: "Check snapshot name is valid or not when remove the existing snapshot"
+  when: not (snapshot_remove_all | default(false) | bool)
+  block:
+    - name: "Check snapshot name is not empty"
+      ansible.builtin.assert:
+        that:
+          - snapshot_name is defined
+          - snapshot_name | trim | length > 0
+        fail_msg: "The snapshot name is not defined or is empty."
+  
+    - name: "Get VM's snapshots"
+      include_tasks: vm_get_snapshot_facts.yml
+
+    - name: "Check if snapshot exists on the VM"
+      ansible.builtin.assert:
+        that:
+          - snapshot_name in (vm_snapshot_facts.guest_snapshots.snapshots | default([]) | map(attribute='name') | list)
+        fail_msg: "The snapshot '{{ snapshot_name }}' does not exist on the VM"
+
 - name: "Remove snapshot on '{{ vm_name }}'"
   vmware.vmware.vm_snapshot:
     hostname: "{{ vsphere_host_name }}"
