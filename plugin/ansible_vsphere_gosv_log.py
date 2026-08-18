@@ -537,10 +537,17 @@ class CallbackModule(CallbackBase):
         """
         trace = []
         current = task
+        base_dir = os.path.dirname(self.cwd)
+        if not base_dir.endswith(os.path.sep):
+            base_dir += os.path.sep
+
         while current is not None:
             if hasattr(current, 'get_path'):
                 path = current.get_path()
                 if path:
+                    if path.startswith(base_dir):
+                        path = path[len(base_dir):]
+
                     file_path = re.sub(r':\d+$', '', path)
                     if not trace:
                         trace.append(path)
