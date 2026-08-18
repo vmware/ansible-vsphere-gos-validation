@@ -16,8 +16,8 @@
         that:
           - snapshot_name is defined
           - snapshot_name | trim | length > 0
-        fail_msg: "The snapshot name is not defined or is empty."
-  
+        fail_msg: "The parameter 'snapshot_name' is not defined or is empty."
+
     - name: "Get VM's snapshots"
       include_tasks: vm_get_snapshot_facts.yml
 
@@ -38,7 +38,7 @@
     name: "{{ vm_name }}"
     state: absent
     remove_all: "{{ (snapshot_remove_all | default(false)) | bool }}"
-    snapshot_name: "{{ omit if ((snapshot_remove_all | default(false)) | bool) else snapshot_name | default(omit) }}"
+    snapshot_name: "{{ omit if ((snapshot_remove_all | default(false)) | bool) else snapshot_name }}"
   register: task_result
 
 - name: Display the result of remove snapshot
@@ -54,7 +54,5 @@
     - name: "Assert snapshot '{{ snapshot_name }}' not exist"
       ansible.builtin.assert:
         that:
-          - item.name != snapshot_name
+          - snapshot_name in (vm_snapshot_facts.guest_snapshots.snapshots | default([]) | map(attribute='name') | list)
         fail_msg: "Failed to remove snapshot {{ snapshot_name }}"
-      with_items: "{{ vm_snapshot_facts.guest_snapshots.snapshots }}"
-      when: vm_snapshot_facts.guest_snapshots | length > 0
