@@ -8,17 +8,17 @@
     - name: "Set fact of the shell command according to the network manager in Linux guest OS"
       ansible.builtin.set_fact:
         vm_release_dhcp_ip_cmd: >
-          {% if guest_os_network_manager | default('') == 'NetworkManager' %}
+          {%- if guest_os_network_manager | default('') == 'NetworkManager' -%}
           iface=$(ip -o -4 route show to default | head -n 1 | awk '{print $5}');
           conn=$(nmcli -t -f NAME,DEVICE connection show --active | grep ":$iface$" | head -n 1 | cut -d: -f1);
           nmcli connection modify "$conn" ipv4.dhcp-send-release yes;
           nmcli connection up "$conn";
           nmcli connection down "$conn"
-          {% elif guest_os_network_manager | default('') == 'wicked' %}
+          {%- elif guest_os_network_manager | default('') == 'wicked' -%}
           wicked ifdown --release $(ip route show default | awk '{print $5}')
-          {% else %}
-          dhclient -r eth0
-          {% endif %}
+          {%- else -%}
+          dhclient -r
+          {%- endif -%}
     - name: "Print the shell command to release DHCP IP address in Linux guest OS"
       ansible.builtin.debug: var=vm_release_dhcp_ip_cmd
 
