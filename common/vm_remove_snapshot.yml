@@ -8,24 +8,20 @@
 #     if snapshot_remove_all is set to true, then it's not required,
 #     if snapshot_remove_all is set to false, then it's required to pass an existing snapshot name
 #
+- name: "Set facts of snapshot_remove_all"
+  ansible.builtin.set_fact:
+    snapshot_remove_all: false
+  when: snapshot_remove_all is undefined
+
 - name: "Check snapshot name is valid or not when remove the existing snapshot"
-  when: not (snapshot_remove_all | default(false) | bool)
+  when: not (snapshot_remove_all | bool)
   block:
     - name: "Check snapshot name is not empty"
       ansible.builtin.assert:
         that:
           - snapshot_name is defined
-          - snapshot_name | string | trim | length > 0
+          - snapshot_name | trim | length > 0
         fail_msg: "The parameter 'snapshot_name' is not defined or is empty."
-
-    - name: "Check if snapshot {{ snapshot_name }} exists"
-      include_tasks: vm_check_snapshot_exist.yml
-
-    - name: "Assert if snapshot does not exist on the VM"
-      ansible.builtin.assert:
-        that:
-          - snapshot_exist
-        fail_msg: "The snapshot '{{ snapshot_name }}' does not exist on the VM"
 
 - name: "Remove snapshot on '{{ vm_name }}'"
   vmware.vmware.vm_snapshot:
@@ -38,7 +34,7 @@
     name: "{{ vm_name }}"
     state: absent
     remove_all: "{{ (snapshot_remove_all | default(false)) | bool }}"
-    snapshot_name: "{{ omit if ((snapshot_remove_all | default(false)) | bool) else snapshot_name }}"
+    snapshot_name: "{{ omit if (snapshot_remove_all | bool) else snapshot_name }}"
   register: task_result
 
 - name: Display the result of remove snapshot
@@ -46,7 +42,7 @@
   when: enable_debug is defined and enable_debug
 
 - name: "Check if the snapshot '{{ snapshot_name }}' is removed"
-  when: not ((snapshot_remove_all | default(false)) | bool)
+  when: not (snapshot_remove_all | bool)
   block:
     - name: "Check if snapshot {{ snapshot_name }} still exists"
       include_tasks: vm_check_snapshot_exist.yml
