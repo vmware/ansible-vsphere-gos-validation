@@ -15,16 +15,16 @@
       ansible.builtin.assert:
         that:
           - snapshot_name is defined
-          - snapshot_name | trim | length > 0
+          - snapshot_name | string | trim | length > 0
         fail_msg: "The parameter 'snapshot_name' is not defined or is empty."
 
-    - name: "Get VM's snapshots"
-      include_tasks: vm_get_snapshot_facts.yml
+    - name: "Check if snapshot {{ snapshot_name }} exists"
+      include_tasks: vm_check_snapshot_exist.yml
 
-    - name: "Check if snapshot exists on the VM"
+    - name: "Assert if snapshot does not exist on the VM"
       ansible.builtin.assert:
         that:
-          - snapshot_name in (vm_snapshot_facts.guest_snapshots.snapshots | default([]) | map(attribute='name') | list)
+          - snapshot_exist
         fail_msg: "The snapshot '{{ snapshot_name }}' does not exist on the VM"
 
 - name: "Remove snapshot on '{{ vm_name }}'"
@@ -48,11 +48,11 @@
 - name: "Check if the snapshot '{{ snapshot_name }}' is removed"
   when: not ((snapshot_remove_all | default(false)) | bool)
   block:
-    - name: "Get VM's snapshots"
-      include_tasks: vm_get_snapshot_facts.yml
+    - name: "Check if snapshot {{ snapshot_name }} still exists"
+      include_tasks: vm_check_snapshot_exist.yml
 
-    - name: "Assert snapshot '{{ snapshot_name }}' not exist"
+    - name: "Assert snapshot '{{ snapshot_name }}' still exist"
       ansible.builtin.assert:
         that:
-          - snapshot_name in (vm_snapshot_facts.guest_snapshots.snapshots | default([]) | map(attribute='name') | list)
+          - not snapshot_exist
         fail_msg: "Failed to remove snapshot {{ snapshot_name }}"
