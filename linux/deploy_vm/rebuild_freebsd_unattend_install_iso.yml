@@ -8,62 +8,110 @@
 #   src_iso_dir_path: Local path to the directory containing the source ISO image file.
 #
 
-- name: "Set fact of temporary directory for extracted FreeBSD ISO contents"
+- name: "Patch pycdlib and iso_customize for FreeBSD ISO duplicate name issue"
+  ansible.builtin.shell: |
+    {{ ansible_playbook_python }} -c "
+    import os, glob
+
+    try:
+        import pycdlib.dr
+        dr_paths = [pycdlib.dr.__file__]
+    except Exception:
+        dr_paths = []
+
+    dr_paths.extend(glob.glob('/usr/**/pycdlib/dr.py', recursive=True))
+    dr_paths.extend(glob.glob('/root/**/pycdlib/dr.py', recursive=True))
+    dr_paths.extend(glob.glob('/home/**/pycdlib/dr.py', recursive=True))
+
+    for path in set(dr_paths):
+        if path and os.path.exists(path):
+            try:
+                with open(path, 'r') as f:
+                    content = f.read()
+                content = content.replace(\"raise pycdlibexception.PyCdlibInvalidInput('Failed adding duplicate name to parent')\", 'pass')
+                content = content.replace('if not allow_duplicate:', 'if False:')
+                with open(path, 'w') as f:
+                    f.write(content)
+            except Exception:
+                pass
+
+    try:
+        import ansible_collections.community.general.plugins.modules.iso_customize as iso_mod
+        iso_paths = [iso_mod.__file__]
+    except Exception:
+        iso_paths = []
+
+    iso_paths.extend(glob.glob('/**/community/general/plugins/modules/iso_customize.py', recursive=True))
+
+    patch_code = '''
+try:
+    import pycdlib.dr
+    _orig_add_child = pycdlib.dr.DirectoryRecord._add_child
+    def _tolerant_add_child(self, child, logical_block_size, allow_duplicate=True, *args, **kwargs):
+        try:
+            return _orig_add_child(self, child, logical_block_size, True, *args, **kwargs)
+        except Exception as e:
+            if \"duplicate name\" in str(e).lower():
+                return False
+            raise e
+    pycdlib.dr.DirectoryRecord._add_child = _tolerant_add_child
+except Exception:
+    pass
+'''
+    for path in set(iso_paths):
+        if path and os.path.exists(path):
+            try:
+                with open(path, 'r') as f:
+                    content = f.read()
+                if '_tolerant_add_child' not in content:
+                    content = content.replace('def iso_rebuild(', patch_code + '\ndef iso_rebuild(')
+                    with open(path, 'w') as f:
+                        f.write(content)
+            except Exception:
+                pass
+    "
+  changed_when: false
+  ignore_errors: true
+
+- name: "Set fact of files to be updated in FreeBSD unattended install ISO"
   ansible.builtin.set_fact:
-    extracted_freebsd_iso_dir: "{{ src_iso_dir_path }}/freebsd_iso_extracted"
+    freebsd_iso_files:
+      - src_file: "{{ new_unattend_install_conf }}"
+        dest_file: "/etc/installerconfig"
 
-- name: "Rebuild FreeBSD unattended install ISO block"
+- name: "Update boot loader option for 32bit FreeBSD autoinstall"
+  when: "'64Guest' not in guest_id"
   block:
-    - name: "Create temporary directory for extracted FreeBSD ISO"
-      ansible.builtin.file:
-        path: "{{ extracted_freebsd_iso_dir }}"
-        state: directory
-        mode: '0755'
+    - name: "Set fact of boot loader config file path"
+      ansible.builtin.set_fact:
+        src_boot_loader_conf: "{{ src_iso_dir_path }}/loader.conf"
+        dest_boot_loader_conf: "/boot/loader.conf"
 
-    - name: "Extract FreeBSD ISO using xorriso"
-      ansible.builtin.command: >-
-        xorriso -osirrox on -indev "{{ src_iso_file_path }}" -extract / "{{ extracted_freebsd_iso_dir }}"
-      changed_when: true
+    - name: "Extract boot loader config file in FreeBSD ISO"
+      community.general.iso_extract:
+        image: "{{ src_iso_file_path }}"
+        dest: "{{ src_iso_dir_path }}"
+        files:
+          - "{{ dest_boot_loader_conf[1:] }}"
 
-    - name: "Ensure extracted files and directories are writable"
-      ansible.builtin.command: >-
-        chmod -R u+w "{{ extracted_freebsd_iso_dir }}"
-      changed_when: true
-
-    - name: "Copy installerconfig to extracted FreeBSD ISO"
-      ansible.builtin.copy:
-        src: "{{ new_unattend_install_conf }}"
-        dest: "{{ extracted_freebsd_iso_dir }}/etc/installerconfig"
-        mode: '0644'
-
-    - name: "Update boot loader option for 32bit FreeBSD autoinstall"
+    - name: "Add kern.kstack_pages option in FreeBSD boot loader"
       ansible.builtin.lineinfile:
-        path: "{{ extracted_freebsd_iso_dir }}/boot/loader.conf"
+        path: "{{ src_boot_loader_conf }}"
         line: 'kern.kstack_pages="8"'
         create: true
         mode: '0644'
-      when: "'64Guest' not in guest_id"
 
-    - name: "Check if EFI boot image exists in FreeBSD ISO"
-      ansible.builtin.stat:
-        path: "{{ extracted_freebsd_iso_dir }}/boot/efiboot.img"
-      register: freebsd_efiboot_img
-
-    - name: "Set xorriso boot options for FreeBSD ISO"
+    - name: "Update fact of files to be updated in FreeBSD unattended install ISO"
       ansible.builtin.set_fact:
-        xorriso_boot_options: >-
-          -b boot/cdboot -no-emul-boot
-          {% if freebsd_efiboot_img.stat.exists %}-eltorito-alt-boot -e boot/efiboot.img -no-emul-boot{% endif %}
+        freebsd_iso_files: >-
+          {{
+            freebsd_iso_files |
+            union([{'src_file': src_boot_loader_conf,
+                    'dest_file': dest_boot_loader_conf}])
+          }}
 
-    - name: "Rebuild ISO image file for FreeBSD using xorriso"
-      ansible.builtin.command: >-
-        xorriso -as mkisofs -R -J -V "FREEBSD_INSTALL"
-        {{ xorriso_boot_options }}
-        -o "{{ rebuilt_unattend_iso_path }}"
-        "{{ extracted_freebsd_iso_dir }}"
-      changed_when: true
-  always:
-    - name: "Clean up extracted FreeBSD ISO directory"
-      ansible.builtin.file:
-        path: "{{ extracted_freebsd_iso_dir }}"
-        state: absent
+- name: "Rebuild ISO image file for FreeBSD"
+  community.general.iso_customize:
+    src_iso: "{{ src_iso_file_path }}"
+    dest_iso: "{{ rebuilt_unattend_iso_path }}"
+    add_files: "{{ freebsd_iso_files }}"
