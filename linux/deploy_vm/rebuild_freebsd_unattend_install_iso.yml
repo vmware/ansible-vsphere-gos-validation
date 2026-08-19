@@ -7,43 +7,63 @@
 #   src_iso_file_path: Local path to the source ISO image file
 #   src_iso_dir_path: Local path to the directory containing the source ISO image file.
 #
-- name: "Set fact of files to be updated in FreeBSD unattended install ISO"
+
+- name: "Set fact of temporary directory for extracted FreeBSD ISO contents"
   ansible.builtin.set_fact:
-    freebsd_iso_files:
-      - src_file: "{{ new_unattend_install_conf }}"
-        dest_file: "/etc/installerconfig"
+    extracted_freebsd_iso_dir: "{{ src_iso_dir_path }}/freebsd_iso_extracted"
 
-- name: "Update boot loader option for 32bit FreeBSD autoinstall"
-  when: "'64Guest' not in guest_id"
+- name: "Rebuild FreeBSD unattended install ISO block"
   block:
-    - name: "Set fact of boot loader config file path"
-      ansible.builtin.set_fact:
-        src_boot_loader_conf: "{{ src_iso_dir_path }}/loader.conf"
-        dest_boot_loader_conf: "/boot/loader.conf"
+    - name: "Create temporary directory for extracted FreeBSD ISO"
+      ansible.builtin.file:
+        path: "{{ extracted_freebsd_iso_dir }}"
+        state: directory
+        mode: '0755'
 
-    - name: "Extract boot loader config file in FreeBSD ISO"
-      community.general.iso_extract:
-        image: "{{ src_iso_file_path }}"
-        dest: "{{ src_iso_dir_path }}"
-        files:
-          - "{{ dest_boot_loader_conf[1:] }}"
+    - name: "Extract FreeBSD ISO using bsdtar"
+      ansible.builtin.command: >-
+        bsdtar -xf "{{ src_iso_file_path }}" -C "{{ extracted_freebsd_iso_dir }}"
+      changed_when: true
 
-    - name: "Add kern.kstack_pages option in FreeBSD boot loader"
+    - name: "Ensure extracted files and directories are writable"
+      ansible.builtin.command: >-
+        chmod -R u+w "{{ extracted_freebsd_iso_dir }}"
+      changed_when: true
+
+    - name: "Copy installerconfig to extracted FreeBSD ISO"
+      ansible.builtin.copy:
+        src: "{{ new_unattend_install_conf }}"
+        dest: "{{ extracted_freebsd_iso_dir }}/etc/installerconfig"
+        mode: '0644'
+
+    - name: "Update boot loader option for 32bit FreeBSD autoinstall"
       ansible.builtin.lineinfile:
-        path: "{{ src_boot_loader_conf }}"
+        path: "{{ extracted_freebsd_iso_dir }}/boot/loader.conf"
         line: 'kern.kstack_pages="8"'
+        create: true
+        mode: '0644'
+      when: "'64Guest' not in guest_id"
 
-    - name: "Update fact of files to be updated in FreeBSD unattended install ISO"
+    - name: "Check if EFI boot image exists in FreeBSD ISO"
+      ansible.builtin.stat:
+        path: "{{ extracted_freebsd_iso_dir }}/boot/efiboot.img"
+      register: freebsd_efiboot_img
+
+    - name: "Set xorriso boot options for FreeBSD ISO"
       ansible.builtin.set_fact:
-        freebsd_iso_files: >-
-          {{
-            freebsd_iso_files |
-            union([{'src_file': src_boot_loader_conf,
-                    'dest_file': dest_boot_loader_conf}])
-          }}
+        xorriso_boot_options: >-
+          -b boot/cdboot -no-emul-boot
+          {% if freebsd_efiboot_img.stat.exists %}-eltorito-alt-boot -e boot/efiboot.img -no-emul-boot{% endif %}
 
-- name: "Rebuild ISO image file for FreeBSD"
-  community.general.iso_customize:
-    src_iso: "{{ src_iso_file_path }}"
-    dest_iso: "{{ rebuilt_unattend_iso_path }}"
-    add_files: "{{ freebsd_iso_files }}"
+    - name: "Rebuild ISO image file for FreeBSD using xorriso"
+      ansible.builtin.command: >-
+        xorriso -as mkisofs -R -J -V "FREEBSD_INSTALL"
+        {{ xorriso_boot_options }}
+        -o "{{ rebuilt_unattend_iso_path }}"
+        "{{ extracted_freebsd_iso_dir }}"
+      changed_when: true
+  always:
+    - name: "Clean up extracted FreeBSD ISO directory"
+      ansible.builtin.file:
+        path: "{{ extracted_freebsd_iso_dir }}"
+        state: absent
