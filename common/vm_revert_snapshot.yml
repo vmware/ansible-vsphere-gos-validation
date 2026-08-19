@@ -16,20 +16,20 @@
   ansible.builtin.assert:
     that:
       - snapshot_name is defined
-      - snapshot_name | string | trim | length > 0
+      - snapshot_name | length > 0
     fail_msg: "The parameter 'snapshot_name' is not defined or is empty."
 
 - name: "Check if snapshot {{ snapshot_name }} exists"
   include_tasks: vm_check_snapshot_exist.yml
 
-- name: "Assert if the snapshot doesn't exists but skip_if_not_exist is false"
+- name: "Ensure snapshot exists when skip_if_not_exist is set to false"
   ansible.builtin.assert:
     that:
       - snapshot_exist
     fail_msg: "The snapshot '{{ snapshot_name }}' does not exist on VM '{{ vm_name }}'."
   when: not (skip_if_not_exist | bool)
 
-- name: "Log warning if snapshot does not exist but skip_if_not_exist is true"
+- name: "Skip reverting snapshot when it does not exist"
   ansible.builtin.debug:
     msg: "Snapshot '{{ snapshot_name }}' does not exist on VM '{{ vm_name }}'. Skipping revert task as 'skip_if_not_exist' is true."
   when:
@@ -53,7 +53,7 @@
 
     - name: "Display revert snapshot result"
       ansible.builtin.debug: var=revert_result
-      when: enable_debug is defined and enable_debug
+      when: enable_debug
 
     - name: "Wait for VM current snapshot is the expected one after revert to snapshot"
       include_tasks: vm_wait_expected_snapshot.yml
