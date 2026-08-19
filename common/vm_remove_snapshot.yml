@@ -13,15 +13,13 @@
     snapshot_remove_all: false
   when: snapshot_remove_all is undefined
 
-- name: "Check snapshot name is valid or not when remove the existing snapshot"
+- name: "Check snapshot name is not empty"
+  ansible.builtin.assert:
+    that:
+      - snapshot_name is defined
+      - snapshot_name | length > 0
+    fail_msg: "The parameter 'snapshot_name' is not defined or is empty."
   when: not snapshot_remove_all
-  block:
-    - name: "Check snapshot name is not empty"
-      ansible.builtin.assert:
-        that:
-          - snapshot_name is defined
-          - snapshot_name | trim | length > 0
-        fail_msg: "The parameter 'snapshot_name' is not defined or is empty."
 
 - name: "Remove snapshot on '{{ vm_name }}'"
   vmware.vmware.vm_snapshot:
