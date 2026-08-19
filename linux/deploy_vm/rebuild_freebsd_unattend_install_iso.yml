@@ -8,19 +8,29 @@
 #   src_iso_dir_path: Local path to the directory containing the source ISO image file.
 #
 
-- name: "Patch pycdlib for FreeBSD ISO duplicate name issue"
-  ansible.builtin.shell:
-    cmd: >-
-      {{ ansible_playbook_python }} -c "
-      import pycdlib.dr;
-      p = pycdlib.dr.__file__;
-      s = open(p).read();
-      s = s.replace('raise pycdlibexception.PyCdlibInvalidInput(\'Failed adding duplicate name to parent\')', 'pass');
-      s = s.replace('if not allow_duplicate:', 'if False:');
-      open(p, 'w').write(s)
-      "
-  changed_when: false
-  ignore_errors: true
+- name: "Set fact of pycdlib patch directory"
+  ansible.builtin.set_fact:
+    pycdlib_patch_dir: "{{ src_iso_dir_path }}/pycdlib_patch"
+
+- name: "Create directory for pycdlib patch"
+  ansible.builtin.file:
+    path: "{{ pycdlib_patch_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: "Create sitecustomize.py to patch pycdlib for FreeBSD ISO duplicate name issue"
+  ansible.builtin.copy:
+    dest: "{{ pycdlib_patch_dir }}/sitecustomize.py"
+    mode: '0644'
+    content: |
+      try:
+          import pycdlib.dr
+          _orig_add_child = pycdlib.dr.DirectoryRecord._add_child
+          def _patched_add_child(self, child, logical_block_size, allow_duplicate=True, is_rr=False):
+              return _orig_add_child(self, child, logical_block_size, allow_duplicate=True, is_rr=is_rr)
+          pycdlib.dr.DirectoryRecord._add_child = _patched_add_child
+      except Exception:
+          pass
 
 - name: "Set fact of files to be updated in FreeBSD unattended install ISO"
   ansible.builtin.set_fact:
@@ -42,6 +52,8 @@
         dest: "{{ src_iso_dir_path }}"
         files:
           - "{{ dest_boot_loader_conf[1:] }}"
+      environment:
+        PYTHONPATH: "{{ pycdlib_patch_dir }}:{{ lookup('env', 'PYTHONPATH') }}"
 
     - name: "Add kern.kstack_pages option in FreeBSD boot loader"
       ansible.builtin.lineinfile:
@@ -64,3 +76,5 @@
     src_iso: "{{ src_iso_file_path }}"
     dest_iso: "{{ rebuilt_unattend_iso_path }}"
     add_files: "{{ freebsd_iso_files }}"
+  environment:
+    PYTHONPATH: "{{ pycdlib_patch_dir }}:{{ lookup('env', 'PYTHONPATH') }}"
