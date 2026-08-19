@@ -8,68 +8,17 @@
 #   src_iso_dir_path: Local path to the directory containing the source ISO image file.
 #
 
-- name: "Patch pycdlib and iso_customize for FreeBSD ISO duplicate name issue"
-  ansible.builtin.shell: |
-    {{ ansible_playbook_python }} -c "
-    import os, glob
-
-    try:
-        import pycdlib.dr
-        dr_paths = [pycdlib.dr.__file__]
-    except Exception:
-        dr_paths = []
-
-    dr_paths.extend(glob.glob('/usr/**/pycdlib/dr.py', recursive=True))
-    dr_paths.extend(glob.glob('/root/**/pycdlib/dr.py', recursive=True))
-    dr_paths.extend(glob.glob('/home/**/pycdlib/dr.py', recursive=True))
-
-    for path in set(dr_paths):
-        if path and os.path.exists(path):
-            try:
-                with open(path, 'r') as f:
-                    content = f.read()
-                content = content.replace(\"raise pycdlibexception.PyCdlibInvalidInput('Failed adding duplicate name to parent')\", 'pass')
-                content = content.replace('if not allow_duplicate:', 'if False:')
-                with open(path, 'w') as f:
-                    f.write(content)
-            except Exception:
-                pass
-
-    try:
-        import ansible_collections.community.general.plugins.modules.iso_customize as iso_mod
-        iso_paths = [iso_mod.__file__]
-    except Exception:
-        iso_paths = []
-
-    iso_paths.extend(glob.glob('/**/community/general/plugins/modules/iso_customize.py', recursive=True))
-
-    patch_code = '''
-try:
-    import pycdlib.dr
-    _orig_add_child = pycdlib.dr.DirectoryRecord._add_child
-    def _tolerant_add_child(self, child, logical_block_size, allow_duplicate=True, *args, **kwargs):
-        try:
-            return _orig_add_child(self, child, logical_block_size, True, *args, **kwargs)
-        except Exception as e:
-            if \"duplicate name\" in str(e).lower():
-                return False
-            raise e
-    pycdlib.dr.DirectoryRecord._add_child = _tolerant_add_child
-except Exception:
-    pass
-'''
-    for path in set(iso_paths):
-        if path and os.path.exists(path):
-            try:
-                with open(path, 'r') as f:
-                    content = f.read()
-                if '_tolerant_add_child' not in content:
-                    content = content.replace('def iso_rebuild(', patch_code + '\ndef iso_rebuild(')
-                    with open(path, 'w') as f:
-                        f.write(content)
-            except Exception:
-                pass
-    "
+- name: "Patch pycdlib for FreeBSD ISO duplicate name issue"
+  ansible.builtin.shell:
+    cmd: >-
+      {{ ansible_playbook_python }} -c "
+      import pycdlib.dr;
+      p = pycdlib.dr.__file__;
+      s = open(p).read();
+      s = s.replace('raise pycdlibexception.PyCdlibInvalidInput(\'Failed adding duplicate name to parent\')', 'pass');
+      s = s.replace('if not allow_duplicate:', 'if False:');
+      open(p, 'w').write(s)
+      "
   changed_when: false
   ignore_errors: true
 
