@@ -37,8 +37,7 @@
               'vss_script_bin_' ~ guest_os_bit | replace('-', '')) }}
             vss_log_path: |-
               {%- if guest_os_ansible_distribution in ['Flatcar', 'RHCOS'] or
-                     (guest_os_ansible_distribution in ['SLES', 'SLED'] and
-                      guest_os_ansible_distribution_major_ver | int >= 16) -%}/var/vss.log
+                     (is_sles_immutable | default(false)) -%}/var/vss.log
               {%- else -%}/vss.log
               {%- endif -%}
             vss_content: ""
@@ -70,8 +69,7 @@
           delegate_to: "{{ vm_guest_ip }}"
           when: >-
             guest_os_ansible_distribution not in ['Flatcar', 'RHCOS'] and
-            not (guest_os_ansible_distribution in ['SLES', 'SLED'] and
-                 guest_os_ansible_distribution_major_ver | int >= 16)
+            not (is_sles_immutable | default(false))
 
         - name: "Remove {{ vss_log_path }} if it exists"
           ansible.builtin.file:
@@ -126,8 +124,7 @@
             fail_msg: "{{ vss_log_path }} has incorrect content"
           when: >-
             guest_os_ansible_distribution not in ['Flatcar', 'RHCOS'] and
-            not (guest_os_ansible_distribution in ['SLES', 'SLED'] and
-                 guest_os_ansible_distribution_major_ver | int >= 16)
+            not (is_sles_immutable | default(false))
 
         # Guest OS is Flatcar, RHCOS or SLES/SLED 16+ Immutable Mode
         # After quiesce snapshot is taken, guest log file /var/vss.log should have below contents:
@@ -143,8 +140,7 @@
             fail_msg: "{{ vss_log_path }} has incorrect content"
           when: >-
             guest_os_ansible_distribution in ['Flatcar', 'RHCOS'] or
-            (guest_os_ansible_distribution in ['SLES', 'SLED'] and
-             guest_os_ansible_distribution_major_ver | int >= 16)
+            (is_sles_immutable | default(false))
 
         - name: "Remove quiesce snapshot for successful test"
           include_tasks: ../../common/vm_remove_snapshot.yml

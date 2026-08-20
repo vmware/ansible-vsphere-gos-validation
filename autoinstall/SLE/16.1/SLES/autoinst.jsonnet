@@ -24,8 +24,8 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
 
 {
   product: {
-    id: "SLES",
-    mode: "immutable"
+    id: "SLES"{% if (sles_operating_mode is defined and sles_operating_mode | lower == 'immutable') or (is_sles_immutable is defined and is_sles_immutable) %},
+    mode: "immutable"{% endif %}
   },
   software: {
     patterns: {

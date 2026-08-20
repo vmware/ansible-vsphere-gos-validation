@@ -11,6 +11,14 @@
       {%- else -%}{{ unattend_install_conf.split('/')[0] }}
       {%- endif -%}
 
+- name: "Set SLES operating mode before deployment if specified"
+  ansible.builtin.set_fact:
+    sles_operating_mode: "immutable"
+    is_sles_immutable: true
+  when: >-
+    (sles_operating_mode is defined and sles_operating_mode | lower == 'immutable') or
+    (unattend_install_conf is defined and 'immutable' in unattend_install_conf | lower)
+
 - name: "Set fact of the unattend install config file version for SLE or openSUSE"
   ansible.builtin.set_fact:
     sle_opensuse_version: >-
