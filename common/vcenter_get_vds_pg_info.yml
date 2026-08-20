@@ -1,0 +1,28 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Gather information about vSphere Distributed Switch Port Group (PG)
+#
+- name: "Initialize the fact of vSphere Distributed Switch Port Group info"
+  ansible.builtin.set_fact:
+    vds_pg_info: {}
+
+- name: "Get info of vSphere Distributed Switch Port Group"
+  community.vmware.vmware_dvs_portgroup_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+  register: get_vds_pg_result
+
+- name: "Display the result of getting vSphere Distributed Switch Port Group info"
+  ansible.builtin.debug: var=get_vds_pg_result
+  when: enable_debug
+
+- name: "Set fact of vSphere Distributed Switch Port Group"
+  ansible.builtin.set_fact:
+    vds_pg_info: "{{ get_vds_pg_result }}"
+
+- name: "Display the vSphere Distributed Switch Port Group info"
+  ansible.builtin.debug: var=vds_info
+  when: enable_debug

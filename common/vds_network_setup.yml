@@ -20,10 +20,14 @@
       connected by ESXi host '{{ esxi_hostname }}', please remove any unused ones to adhere to the recommended maximum of 16.
       Exceeding this value can lead to unexpected behavior and is generally not a supported configuration.
 
+- name: "Generate a random number between 1000 to 9999"
+  ansible.builtin.set_fact:
+    vds_random_number: "{{ range(1000, 10000) | ansible.builtin.random }}"
+
 - name: "Set facts to prepare vSphere Distributed Switch network"
   ansible.builtin.set_fact:
-    vds_name: "DSwitch{{ testrun_timestamp }}"
-    vds_portgroup_name: "DPortGroup{{ testrun_timestamp }}"
+    vds_name: "DSwitch{{ testrun_timestamp }}-{{ vds_random_number }}"
+    vds_portgroup_name: "DPortGroup{{ testrun_timestamp }}-{{ vds_random_number }}"
     network_env_net_mask: "255.255.255.0"
     network_env_net_prefix: 24
 
@@ -42,6 +46,21 @@
   vars:
     vds_host_state: "present"
 
+- name: "Add a new VMkernel network adapter on the ESXi host and assign with distributed port group"
+  include_tasks: esxi_manage_vmkernel_adapter.yml
+  vars:
+    vmk_state: "present"
+    vmk_vds_name: "{{ vds_name }}"
+    vmk_portgroup_name: "{{ vds_portgroup_name }}"
+    vmk_enable_mgmt: false
+
+- name: "Get the VMkernel network adapter device names on the ESXi host"
+  include_tasks: esxi_get_vmkernel_adapters.yml
+
+- name: "Set fact of new created VMkernel network adapter device name"
+  ansible.builtin.set_fact:
+    vds_vmk_device_name: "{{ esxi_vmkernels_info }}"
+
 - name: "Get new VMkernel network adapter device"
   include_tasks: esxi_get_new_vmkernel_adapter.yml
 
@@ -58,16 +77,6 @@
       ip_address: "{{ vds_vmk_ip_addr }}"
       subnet_mask: "{{ network_env_net_mask }}"
       default_gateway: "{{ vds_vmk_ip_addr }}"
-
-- name: "Add a VMkernel network adapter assigned to the distributed port group for the ESXi host"
-  include_tasks: esxi_manage_vmkernel_adapter.yml
-  vars:
-    vmk_device: "{{ vds_vmk_device_name }}"
-    vmk_state: "present"
-    vmk_vds_name: "{{ vds_name }}"
-    vmk_portgroup_name: "{{ vds_portgroup_name }}"
-    vmk_network: "{{ vds_vmk_network }}"
-    vmk_enable_mgmt: false
 
 - name: "Check the result of adding new VMkernel network adapter device"
   ansible.builtin.assert:
