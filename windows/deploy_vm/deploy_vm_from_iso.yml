@@ -57,9 +57,6 @@
       block:
         - name: "Add key provider on vCenter server"
           include_tasks: ../../common/vcenter_add_key_provider.yml
-          vars:
-            vc_cert_path: "{{ current_test_log_folder }}"
-          when: key_provider_type is defined and key_provider_type
         - name: "Add virtual TPM device to VM"
           include_tasks: ../../common/vm_add_remove_vtpm.yml
           vars:
@@ -134,6 +131,10 @@
 
 - name: "Get guest OS system info"
   include_tasks: ../utils/get_windows_system_info.yml
+
+- name: "Check guest OS file system created successfully"
+  include_tasks: check_os_file_system.yml
+  when: "'refs' in unattend_install_conf"
 
 - name: "Enable VBS in guest OS"
   when:

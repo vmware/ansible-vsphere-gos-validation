@@ -3,13 +3,26 @@
 ---
 # Remove specified VM snapshot or remove all snapshots of VM
 # Parameters:
-#   snapshot_remove_state: can be set to 'remove_all' or 'absent' (default)
+#   snapshot_remove_all: can be set to true or false (default)
 #   snapshot_name:
-#     if snapshot_remove_state is set to 'remove_all', then it's not required,
-#     if snapshot_remove_state is set to 'absent', then it's required to pass an existing snapshot name
+#     if snapshot_remove_all is set to true, then it's not required,
+#     if snapshot_remove_all is set to false, then it's required to pass an existing snapshot name
 #
+- name: "Set the fact of snapshot_remove_all"
+  ansible.builtin.set_fact:
+    snapshot_remove_all: false
+  when: snapshot_remove_all is undefined
+
+- name: "Check snapshot name is not empty"
+  ansible.builtin.assert:
+    that:
+      - snapshot_name is defined
+      - snapshot_name | length > 0
+    fail_msg: "The parameter 'snapshot_name' is not defined or is empty."
+  when: not snapshot_remove_all
+
 - name: "Remove snapshot on '{{ vm_name }}'"
-  community.vmware.vmware_guest_snapshot:
+  vmware.vmware.vm_snapshot:
     hostname: "{{ vsphere_host_name }}"
     username: "{{ vsphere_host_user }}"
     password: "{{ vsphere_host_user_password }}"
@@ -17,23 +30,23 @@
     datacenter: "{{ vsphere_host_datacenter }}"
     folder: "{{ vm_folder }}"
     name: "{{ vm_name }}"
-    state: "{{ snapshot_remove_state | default('absent') }}"
-    snapshot_name: "{{ snapshot_name | default(omit) }}"
+    state: absent
+    remove_all: "{{ snapshot_remove_all }}"
+    snapshot_name: "{{ omit if snapshot_remove_all else snapshot_name }}"
   register: task_result
+
 - name: Display the result of remove snapshot
   ansible.builtin.debug: var=task_result
-  when: enable_debug is defined and enable_debug
+  when: enable_debug
 
 - name: "Check if the snapshot '{{ snapshot_name }}' is removed"
-  when: snapshot_remove_state | default('absent') == 'absent'
+  when: not snapshot_remove_all
   block:
-    - name: "Get VM's snapshots"
-      include_tasks: vm_get_snapshot_facts.yml
+    - name: "Check if snapshot {{ snapshot_name }} still exists"
+      include_tasks: vm_check_snapshot_exist.yml
 
     - name: "Assert snapshot '{{ snapshot_name }}' not exist"
       ansible.builtin.assert:
         that:
-          - item.name != snapshot_name
+          - not snapshot_exist
         fail_msg: "Failed to remove snapshot {{ snapshot_name }}"
-      with_items: "{{ vm_snapshot_facts.guest_snapshots.snapshots }}"
-      when: vm_snapshot_facts.guest_snapshots | length > 0

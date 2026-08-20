@@ -1,0 +1,12 @@
+select disk {{ win_raw_disk_num }}
+{% if not win_is_disk_online | default(false) %}
+online disk
+{% endif %}
+attributes disk clear readonly
+clean
+{% if target_fs | default('NTFS') | lower == 'refs' %}
+convert gpt
+{% endif %}
+create partition primary
+format fs={{ target_fs | default('NTFS') }} quick
+assign letter={{ drive_letter_new }}

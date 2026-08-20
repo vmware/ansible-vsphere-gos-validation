@@ -65,14 +65,22 @@ echo "DONE" >/dev/ttyu0
 echo "Installing packages ..." > /dev/ttyu0
 env ASSUME_ALWAYS_YES=YES pkg bootstrap -y
 
+# Disable FreeBSD-kmods repository as its URL on Beta/RC/STABLE releases often returns 404
+if [ ! -d "/usr/local/etc/pkg/repos" ]; then
+    mkdir -p -m 0755 /usr/local/etc/pkg/repos
+fi
+echo 'FreeBSD-kmods: { enabled: no }' > /usr/local/etc/pkg/repos/FreeBSD-kmods.conf
+
 # Different packages between the 32bit image and 64bit image
 # The open-vm-tools is not installed by default
-packages_to_install="bash sudo wget curl e2fsprogs iozone lsblk open-vm-tools-nox11"
+packages_to_install="bash sudo wget curl e2fsprogs iozone lsblk python open-vm-tools-nox11"
 
 # Try to install package from CDROM repo. There is no default CDROM repo file FreeBSD_install_cdrom.conf on FreeBSD 15 or obove.
 failed_packages="$packages_to_install"
 if [ -f "/dist/packages/repos/FreeBSD_install_cdrom.conf" ]; then
-    mkdir -p /usr/local/etc/pkg/repos
+    if [ ! -d "/usr/local/etc/pkg/repos" ]; then
+        mkdir -p -m 0755 /usr/local/etc/pkg/repos
+    fi
     mount > /dev/ttyu0
     cp -rf /dist/packages/repos/FreeBSD_install_cdrom.conf /usr/local/etc/pkg/repos/FreeBSD_install_cdrom.conf
     env ASSUME_ALWAYS_YES=YES pkg update -f > /dev/ttyu0
@@ -83,7 +91,7 @@ if [ -f "/dist/packages/repos/FreeBSD_install_cdrom.conf" ]; then
         echo "Install package $package_to_install ..." > /dev/ttyu0
         env ASSUME_ALWAYS_YES=YES pkg install -y $package_to_install > /dev/ttyu0 2>&1
         ret=$?
-        if [ $ret == 0 ]
+        if [ $ret -eq 0 ]
         then 
             echo "Successfully installed the package $package_to_install from ISO repo" > /dev/ttyu0
         else
@@ -144,10 +152,12 @@ sed -i '' -e 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
 echo "DONE" >/dev/ttyu0
 
 # Enable services
-printf "Enabling sshd and ntpd services ..." > /dev/ttyu0
+printf "Enabling sshd, ntpd and vmtoolsd services ..." > /dev/ttyu0
 sysrc sshd_enable="YES"
 sysrc ntpd_enable="YES"
 sysrc ntpd_sync_on_start="YES"
+sysrc vmware_guest_kmod_enable="YES"
+sysrc vmware_guestd_enable="YES"
 echo "DONE" >/dev/ttyu0
 
 # Eanble ZFS

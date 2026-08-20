@@ -2,43 +2,59 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # The prerequsite of adding virtual TPM device to VM is key provider
-# configured on vCenter server.
-# When 'key_provider_type' parameter is set, add a new key provider with
-# specified type firstly, now only support Standard key provider configuration.
+# configured on vCenter server. This task file is used for adding
+# standard or native key provider when there is no default key provider
+# configured on vCenter server. 
 #
-# Parameters:
-#   key_provider_type: valid values are 'standard', 'native', now only 'standard'
-#     is supported.
-#   vc_cert_path: the file path on local machine for saving vCenter certificate.
-#
-- name: "Set fact of default key provider type"
-  ansible.builtin.set_fact:
-    key_provider_type: 'standard'
-  when: key_provider_type is undefined or not key_provider_type
+- name: "Get existing key provider on vCenter"
+  include_tasks: vcenter_get_key_provider.yml
 
-- name: "Check configured key provider type"
-  ansible.builtin.assert:
-    that:
-      - key_provider_type | lower == 'standard'
-    fail_msg: "Now the valid value of parameter 'key_provider_type' is 'standard', while configured value is '{{ key_provider_type }}'."
+- name: "Skip adding new key provider"
+  ansible.builtin.debug:
+    msg: "Skip adding new key provider since there is default one already configured."
+  when: has_default_key_provider
 
-- name: "Check required parameter"
-  ansible.builtin.assert:
-    that:
-      - vc_cert_path is defined
-      - vc_cert_path
-    fail_msg: "Parameter 'vc_cert_path' is required to be set to a valid path in local machine."
+- name: "Add new key provider when there is no default one"
+  when: not has_default_key_provider
+  block:
+    - name: "Set fact of the key provider type"
+      ansible.builtin.set_fact:
+        key_provider_type: "{{ key_provider_type | lower }}"
+      when: key_provider_type is defined
 
-- name: "Set fact of new key provider name"
-  ansible.builtin.set_fact:
-    new_kp_name: "{{ key_provider_type | lower }}{{ current_test_timestamp }}"
+    - name: "Set fact of the key provider type according to ESXi and vCenter versions"
+      ansible.builtin.set_fact:
+        key_provider_type: >-
+          {%- if esxi_version is version('7.0.3', '>=') and vcenter_version is version('7.0.3', '>=') -%}native
+          {%- else -%}standard
+          {%- endif -%}
+      when: key_provider_type is undefined
 
-- name: "Add key provider on vCenter server"
-  include_tasks: vcenter_add_standard_kp.yml
-  vars:
-    standard_kp_name: "{{ new_kp_name }}"
-    vc_cert_download_path: "{{ vc_cert_path }}"
+    - name: "Display key provider type"
+      ansible.builtin.debug: var=key_provider_type
 
-- name: "Set fact of key provider added to vCenter"
-  ansible.builtin.set_fact:
-    key_provider_added: true
+    - name: "Check key provider type"
+      ansible.builtin.assert:
+        that:
+          - key_provider_type in ['standard', 'native']
+        fail_msg: "Parameter 'key_provider_type' is set to '{{ key_provider_type }}', which is not expected 'standard' or 'native'."
+
+    - name: "Set fact of new key provider name"
+      ansible.builtin.set_fact:
+        new_kp_name: "{{ key_provider_type }}{{ current_test_timestamp }}"
+
+    - name: "Add standard key provider on vCenter server"
+      include_tasks: vcenter_add_standard_kp.yml
+      vars:
+        standard_kp_name: "{{ new_kp_name }}"
+      when: key_provider_type == 'standard'
+
+    - name: "Add native key provider on vCenter server"
+      include_tasks: vcenter_add_native_kp.yml
+      vars:
+        native_kp_name: "{{ new_kp_name }}"
+      when: key_provider_type == 'native'
+
+    - name: "Set fact of key provider has been added on vCenter server"
+      ansible.builtin.set_fact:
+        key_provider_added: true

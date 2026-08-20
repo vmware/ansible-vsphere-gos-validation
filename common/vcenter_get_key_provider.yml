@@ -1,0 +1,39 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Get configured key provider info on vCenter server.
+#
+- name: "Initialize the fact of having default key provider"
+  ansible.builtin.set_fact:
+    has_default_key_provider: false
+    default_key_provider: []
+
+- name: "Get all key providers on vCenter server"
+  vmware.vmware.key_provider_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+  register: key_providers
+
+- name: "Display the key provider info on vCenter server"
+  ansible.builtin.debug: var=key_providers
+
+- name: "Set fact of the default key provider"
+  ansible.builtin.set_fact:
+    default_key_provider: "{{ key_providers.key_providers | dict2items | selectattr('value.default') | map(attribute='value') }}"
+  when:  
+    - key_providers.key_providers is defined
+    - key_providers.key_providers | length > 0
+
+- name: "Display default key provider"
+  ansible.builtin.debug: var=default_key_provider
+
+- name: "Set fact of having default key provider"
+  ansible.builtin.set_fact:
+    has_default_key_provider: true
+  when: default_key_provider | length == 1
+
+- name: "Display default key provider"
+  ansible.builtin.debug:
+    msg: "There is {{ has_default_key_provider | ternary(1, 0) }} default key provider configured."
