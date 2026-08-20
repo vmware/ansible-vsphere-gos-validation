@@ -17,11 +17,17 @@
     old_base_snapshot_exist: "{{ snapshot_exist }}"
     old_snapshot_new_name: "{{ base_snapshot_name }}-{{ current_test_timestamp }}"
 
+- name: "Set fact for old base snapshot description"
+  ansible.builtin.set_fact:
+    old_snapshot_description: "{{ (vm_snapshot_facts.guest_snapshots.snapshots | selectattr('name', 'equalto', base_snapshot_name) | map(attribute='description') | first) | default('') }}"
+  when: old_base_snapshot_exist
+
 - name: "Rename current base snapshot to {{ old_snapshot_new_name }}"
   include_tasks: vm_rename_snapshot.yml
   vars:
     current_snapshot_name: "{{ base_snapshot_name }}"
     new_snapshot_name: "{{ old_snapshot_new_name }}"
+    new_snapshot_description: "{{ rename_snapshot_new_description | default(old_snapshot_description | default('')) }}"
   when:
     - old_base_snapshot_exist
     - not remove_old_base_snapshot | default(false)
