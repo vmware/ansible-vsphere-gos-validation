@@ -531,6 +531,49 @@ class CallbackModule(CallbackBase):
 
         return formatted_msg
 
+    def _get_task_call_trace(self, task):
+        """
+        Get the call trace of a task by traversing its parent blocks
+        """
+        trace = []
+        current = task
+        base_dir = self.cwd
+        if not base_dir.endswith(os.path.sep):
+            base_dir += os.path.sep
+
+        while current is not None:
+            if hasattr(current, 'get_path'):
+                path = current.get_path()
+                if path:
+                    if path.startswith(base_dir):
+                        path = path[len(base_dir):]
+
+                    file_path = re.sub(r':\d+$', '', path)
+                    
+                    name = getattr(current, 'get_name', lambda: '')()
+                    action = getattr(current, 'action', '')
+                    
+                    details = []
+                    if name:
+                        details.append("name: {}".format(name))
+                    if action:
+                        details.append("module: {}".format(action))
+                    
+                    formatted_path = path
+                    if details:
+                        formatted_path += " ({})".format(", ".join(details))
+
+                    if not trace:
+                        trace.append((formatted_path, file_path))
+                    else:
+                        prev_file_path = trace[-1][1]
+                        if file_path != prev_file_path:
+                            trace.append((formatted_path, file_path))
+            current = getattr(current, '_parent', None)
+
+        trace.reverse()
+        return [t[0] for t in trace]
+
     def _print_task_details(self, result,
                             task_status=None,
                             delegated_vars=None,
@@ -649,6 +692,12 @@ class CallbackModule(CallbackBase):
             result_in_json = json.loads(self._dump_results(result._result, indent=4))
             error_msg = extract_error_msg(result_in_json)
             task_details += "\nerror message:\n" + error_msg
+
+            call_trace = self._get_task_call_trace(task)
+            if call_trace and len(call_trace) > 1:
+                task_details += "call trace:\n"
+                for trace_path in call_trace:
+                    task_details += "  - {}\n".format(trace_path)
 
             self.add_logger_file_handler(self.failed_tasks_log)
 
