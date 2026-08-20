@@ -12,27 +12,60 @@ import sys
 import random
 import fcntl
 import glob
+import os
+import subprocess
 
 def get_default_interface():
+    # Try Linux /proc/net/route first
     try:
-        with open('/proc/net/route', 'r') as f:
-            for line in f:
-                parts = line.strip().split()
-                # Destination is parts[1], '00000000' indicates the default route
-                if len(parts) > 1 and parts[1] == '00000000':
-                    return parts[0]
+        if os.path.exists('/proc/net/route'):
+            with open('/proc/net/route', 'r') as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) > 1 and parts[1] == '00000000':
+                        return parts[0]
     except Exception:
         pass
+        
+    # Fallback for FreeBSD/macOS using netstat
+    try:
+        output = subprocess.check_output(['netstat', '-rn']).decode('utf-8')
+        for line in output.splitlines():
+            parts = line.split()
+            if len(parts) >= 4 and parts[0] == 'default':
+                # For FreeBSD/macOS, the interface is usually the 4th or 6th column
+                # Example: default 192.168.1.1 UGS em0
+                for part in parts[3:]:
+                    if not part.startswith('UG') and not part.replace('.', '').isdigit():
+                        return part
+    except Exception:
+        pass
+        
     return None
 
 def get_mac_address(iface):
+    # Try Linux /sys/class/net
     try:
-        with open('/sys/class/net/%s/address' % iface, 'r') as f:
-            return f.read().strip()
+        if os.path.exists('/sys/class/net/%s/address' % iface):
+            with open('/sys/class/net/%s/address' % iface, 'r') as f:
+                return f.read().strip()
     except Exception:
-        return None
+        pass
+        
+    # Fallback for FreeBSD/macOS using ifconfig
+    try:
+        output = subprocess.check_output(['ifconfig', iface]).decode('utf-8')
+        for line in output.splitlines():
+            line = line.strip()
+            if line.startswith('ether '):
+                return line.split()[1]
+    except Exception:
+        pass
+        
+    return None
 
 def get_ip_address(ifname):
+    # Try ioctl (Linux/macOS)
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         if sys.version_info[0] >= 3:
@@ -45,17 +78,30 @@ def get_ip_address(ifname):
             struct.pack('256s', ifname_bytes[:15])
         )[20:24])
     except Exception:
-        return None
+        pass
+        
+    # Fallback for FreeBSD using ifconfig
+    try:
+        output = subprocess.check_output(['ifconfig', ifname]).decode('utf-8')
+        for line in output.splitlines():
+            line = line.strip()
+            if line.startswith('inet '):
+                return line.split()[1]
+    except Exception:
+        pass
+        
+    return None
 
 def get_dhcp_server(ifname):
-    # 1. Try to find from common lease files
+    # 1. Try to find from common lease files (Linux & FreeBSD)
     lease_patterns = [
         '/var/lib/dhcp/dhclient.%s.leases' % ifname,
         '/var/lib/dhcp/dhclient.leases',
         '/var/lib/dhclient/dhclient-%s.leases' % ifname,
         '/var/lib/dhclient/dhclient.leases',
         '/var/lib/NetworkManager/dhclient-*.lease',
-        '/var/lib/NetworkManager/internal-*.lease'
+        '/var/lib/NetworkManager/internal-*.lease',
+        '/var/db/dhclient.leases.%s' % ifname  # FreeBSD
     ]
     
     actual_files = []
@@ -88,13 +134,26 @@ def get_dhcp_server(ifname):
         pass
 
     # 3. Fallback to default gateway
+    # Linux /proc/net/route
     try:
-        with open('/proc/net/route', 'r') as f:
-            for line in f:
-                parts = line.strip().split()
-                if len(parts) > 2 and parts[1] == '00000000' and parts[0] == ifname:
-                    gw_hex = parts[2]
-                    return socket.inet_ntoa(struct.pack('<L', int(gw_hex, 16)))
+        if os.path.exists('/proc/net/route'):
+            with open('/proc/net/route', 'r') as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) > 2 and parts[1] == '00000000' and parts[0] == ifname:
+                        gw_hex = parts[2]
+                        return socket.inet_ntoa(struct.pack('<L', int(gw_hex, 16)))
+    except Exception:
+        pass
+        
+    # FreeBSD/macOS netstat
+    try:
+        output = subprocess.check_output(['netstat', '-rn']).decode('utf-8')
+        for line in output.splitlines():
+            parts = line.split()
+            if len(parts) >= 4 and parts[0] == 'default':
+                # The gateway IP is usually the 2nd column
+                return parts[1]
     except Exception:
         pass
         
