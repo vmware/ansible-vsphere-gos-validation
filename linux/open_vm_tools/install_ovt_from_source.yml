@@ -26,6 +26,8 @@
   ansible.builtin.set_fact:
     ovt_dependencies: "{{ _ovt_build_config.dependencies | default([]) }}"
     ovt_configure_options: "{{ _ovt_build_config.configure_options | default([]) }}"
+    ovt_tarball_version: "{{ (linux_ovt_tarball_url | default('')) | regex_search('(\\d+\\.\\d+\\.\\d+)') }}"
+
   vars:
     _ovt_build_config: "{{ lookup('file', ovt_build_config_file_path) | from_yaml }}"
 
@@ -35,7 +37,8 @@
   when:
     - guest_os_ansible_system == 'linux'
     - ovt_dependencies | select('search', 'gtk[^0-9]*3') | length < 2
-    - ovt_dependencies | select('search', 'gtk[^0-9]*4') | length < 2
+    - (ovt_tarball_version and ovt_tarball_version is version('13.1.0', '<')) or
+      (ovt_dependencies | select('search', 'gtk[^0-9]*4') | length < 2)
 
 - name: "Add '--with-fuse=fuse' configure option on {{ vm_guest_os_distribution }}"
   ansible.builtin.set_fact:
