@@ -2,9 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """
-Send a DHCPRELEASE packet to a DHCP server to release the current IP address.
+Send a DHCPRELEASE packet to the DHCP server to release the current DHCP IP address.
 Compatible with Python 2.x and 3.x without external dependencies.
-Works on various Linux distributions (Debian, Redhat, Ubuntu, SLES, etc.).
 """
 
 import socket
