@@ -1,0 +1,56 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Verify Windows desktop displayed after GOSC, applying workaround if initial check fails
+
+- name: "Retry to check Windows desktop displayed"
+  include_tasks:
+    file: check_desktop_display.yml
+    apply:
+      when: not (win_desktop_displayed | default(false))
+  vars:
+    gosc_screenshot_prefix: "screenshot_after_gosc"
+  loop: "{{ range(1, 47) | list }}"
+  loop_control:
+    loop_var: retry_time
+    pause: 20
+
+- name: "Apply workaround when Windows desktop display check failed"
+  when:
+    - tesseract_is_installed
+    - not (win_desktop_displayed | default(false))
+  block:
+    - name: "Register Appx packages as workaround for desktop display issue"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: >-
+          Add-AppxPackage -Register -Path 'C:\Windows\SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\appxmanifest.xml' -DisableDevelopmentMode;
+          Add-AppxPackage -Register -Path 'C:\Windows\SystemApps\Microsoft.UI.Xaml.CBS_8wekyb3d8bbwe\appxmanifest.xml' -DisableDevelopmentMode;
+          Add-AppxPackage -Register -Path 'C:\Windows\SystemApps\MicrosoftWindows.Client.Core_cw5n1h2txyewy\appxmanifest.xml' -DisableDevelopmentMode
+        win_execute_cmd_ignore_error: true
+
+    - name: "Reboot Windows guest OS after registering Appx packages"
+      include_tasks: ../utils/win_shutdown_restart.yml
+      vars:
+        set_win_power_state: "restart"
+
+    - name: "Retry to check Windows desktop displayed after reboot"
+      include_tasks:
+        file: check_desktop_display.yml
+        apply:
+          when: not (win_desktop_displayed | default(false))
+      vars:
+        gosc_screenshot_prefix: "screenshot_after_gosc_workaround"
+      loop: "{{ range(1, 47) | list }}"
+      loop_control:
+        loop_var: retry_time
+        pause: 20
+
+- name: "Check Windows desktop displayed"
+  ansible.builtin.assert:
+    that:
+      - win_desktop_displayed
+    fail_msg: >-
+      The text extracted from the VM console screenshots '{{ text_in_screenshot }}' does not contain
+      the expected keyword indicating that the Windows desktop was displayed within 900s after GOSC.
+  when: tesseract_is_installed
