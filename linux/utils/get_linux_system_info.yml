@@ -154,6 +154,37 @@
       - "Guest OS session desktop: {{ guest_os_session_desktop }}"
       - "Guest OS cloud-init version: {{ cloudinit_version }}"
       - "Guest OS network manager: {{ guest_os_network_manager }}"
+      - "Guest OS SLES operating mode: {{ sles_operating_mode | default('standard') }}"
+      - "Guest OS SLES is immutable: {{ is_sles_immutable | default(false) }}"
+
+- name: "Check if SLES Guest OS is running in Immutable mode"
+  ansible.builtin.stat:
+    path: "/usr/sbin/transactional-update"
+  register: check_transactional_update
+  delegate_to: "{{ vm_guest_ip }}"
+  when:
+    - guest_os_ansible_distribution in ['SLES', 'SLED']
+    - guest_os_ansible_distribution_major_ver | int >= 16
+
+- name: "Set SLES operating mode facts"
+  ansible.builtin.set_fact:
+    is_sles_immutable: >-
+      {{
+        (check_transactional_update.stat.exists is defined and check_transactional_update.stat.exists) or
+        (sles_operating_mode is defined and sles_operating_mode | lower == 'immutable') or
+        (is_sles_immutable is defined and is_sles_immutable)
+      }}
+    sles_operating_mode: >-
+      {{
+        'immutable' if (
+          (check_transactional_update.stat.exists is defined and check_transactional_update.stat.exists) or
+          (sles_operating_mode is defined and sles_operating_mode | lower == 'immutable') or
+          (is_sles_immutable is defined and is_sles_immutable)
+        ) else 'standard'
+      }}
+  when:
+    - guest_os_ansible_distribution in ['SLES', 'SLED']
+    - guest_os_ansible_distribution_major_ver | int >= 16
 
 - name: "Set fact that ansible system information about guest OS has been retrieved"
   ansible.builtin.set_fact:
