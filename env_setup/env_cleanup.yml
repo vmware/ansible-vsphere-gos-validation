@@ -31,20 +31,14 @@
     - name: "Cleanup VM when cleanup_vm is set to true"
       when: cleanup_vm | bool
       block:
-        - name: "Get VM power state"
-          include_tasks: ../common/vm_get_power_state.yml
-
         - name: "Release DHCP IP address in guest OS"
           include_tasks: ../common/vm_release_dhcp_ip.yml
-          when:
-            - vm_power_state_get == 'poweredOn'
-            - release_vm_dhcp_ip | bool
+          when: release_vm_dhcp_ip | bool
 
         - name: "Power off VM"
           include_tasks: ../common/vm_set_power_state.yml
           vars:
             vm_power_state_set: 'powered-off'
-          when: vm_power_state_get != 'poweredOff'
 
         - name: "Remove VM"
           include_tasks: ../common/vm_remove.yml
