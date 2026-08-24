@@ -12,11 +12,6 @@
         content: "{{ vars | to_nice_json }}"
         mode: '0644'
 
-    - name: "Set cleanup VM to False by default"
-      ansible.builtin.set_fact:
-        cleanup_vm: false
-      when: cleanup_vm is undefined
-
     # Revert to VM base snapshot firstly, or the network testbed cleanup tasks may fail.
     # Parameter 'vm_not_revert_base' is used internally, and please be aware that if it's
     # set to true, the following tasks may be affected.
@@ -33,21 +28,30 @@
     - name: "Cleanup network environment"
       include_tasks: ../common/network_testbed_cleanup.yml
 
-    - name: "Cleanup new deployed VM"
-      when:
-        - cleanup_vm | bool
-        - new_vm
+    - name: "Cleanup VM when cleanup_vm is set to true"
+      when: cleanup_vm | bool
       block:
+        - name: "Release DHCP IP address in guest OS"
+          include_tasks: ../common/vm_release_dhcp_ip.yml
+          when: release_vm_dhcp_ip | bool
+
         - name: "Power off VM"
           include_tasks: ../common/vm_set_power_state.yml
           vars:
             vm_power_state_set: 'powered-off'
+
         - name: "Remove VM"
           include_tasks: ../common/vm_remove.yml
+          vars:
+            vm_remove_ignore_errors: true
+
         - name: "Set VM cleaned flag to true and VM exists to false"
           ansible.builtin.set_fact:
             vm_cleaned_up: true
             vm_exists: false
+          when:
+            - vm_remove_result.changed is defined
+            - vm_remove_result.changed
 
     - name: "Restore base snapshot for Windows Update installation"
       when:
