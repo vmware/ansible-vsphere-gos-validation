@@ -13,6 +13,11 @@
   vars:
     gosc_network_type: "dhcp"
   tasks:
+    - name: "Test code"
+      ansible.builtin.set_fact:
+        vm_password: "B1gd3m0z!"
+        tesseract_is_installed: true
+
     - name: "Wait for VM IP address after GOSC"
       include_tasks: ../../common/vm_wait_guest_ip.yml
       vars:
@@ -24,14 +29,10 @@
         always_update_inventory: true
       when: gosc_network_type == "dhcp"
 
-    - name: "Test setup"
-      include_tasks: ../../windows/setup/test_setup.yml
+    - name: "Set current test case index, name and log folder"
+      include_tasks: ../../common/set_current_testcase_facts.yml
       vars:
-        create_test_case_folder: true
-
-    - name: "Set fact of tesseract_is_installed"
-      ansible.builtin.set_fact:
-        tesseract_is_installed: true
+        test_log_folder_mode: "0777"
 
     - name: "Try the workaround when Windows desktop display check failed"
       include_tasks: verify_desktop_display.yml

@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Verify Windows desktop displayed after GOSC, applying workaround if initial check fails
-
 - name: "Retry to check Windows desktop displayed"
   include_tasks:
     file: check_desktop_display.yml
@@ -13,13 +12,18 @@
   loop: "{{ range(1, 47) | list }}"
   loop_control:
     loop_var: retry_time
-    pause: 20
+    pause: 5
 
 - name: "Apply workaround when Windows desktop display check failed"
   when:
     - tesseract_is_installed
     - not (win_desktop_displayed | default(false))
   block:
+    - name: "Update in-memory inventory after GOSC"
+      include_tasks: ../utils/win_update_inventory.yml
+      vars:
+        always_update_inventory: true
+
     - name: "Register Appx packages as workaround for desktop display issue"
       include_tasks: ../utils/win_execute_cmd.yml
       vars:
@@ -27,9 +31,8 @@
           Add-AppxPackage -Register -Path 'C:\Windows\SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\appxmanifest.xml' -DisableDevelopmentMode;
           Add-AppxPackage -Register -Path 'C:\Windows\SystemApps\Microsoft.UI.Xaml.CBS_8wekyb3d8bbwe\appxmanifest.xml' -DisableDevelopmentMode;
           Add-AppxPackage -Register -Path 'C:\Windows\SystemApps\MicrosoftWindows.Client.Core_cw5n1h2txyewy\appxmanifest.xml' -DisableDevelopmentMode
-        win_execute_cmd_ignore_error: true
 
-    - name: "Reboot Windows guest OS after registering Appx packages"
+    - name: "Restart Windows guest OS after registering Appx packages"
       include_tasks: ../utils/win_shutdown_restart.yml
       vars:
         set_win_power_state: "restart"
@@ -44,7 +47,7 @@
       loop: "{{ range(1, 47) | list }}"
       loop_control:
         loop_var: retry_time
-        pause: 20
+        pause: 10
 
 - name: "Check Windows desktop displayed"
   ansible.builtin.assert:
