@@ -1,0 +1,37 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Release DHCP IP address in guest OS
+- name: "Release DHCP IP address in Windows guest OS"
+  when: gosv_test_suite == 'windows'
+  block:
+    - name: "Refresh VM guest IP in the in-memory inventory"
+      include_tasks: ../windows/utils/win_update_inventory.yml
+
+    - name: "Execute release DHCP IP address command in guest OS"
+      ansible.windows.win_shell: "ipconfig /release"
+      delegate_to: "{{ vm_guest_ip }}"
+      async: 5
+      poll: 0
+      ignore_errors: true
+      ignore_unreachable: true
+      when: vm_guest_ip is defined and vm_guest_ip
+
+- name: "Release DHCP IP address in Linux guest OS"
+  when: gosv_test_suite == 'linux'
+  block:
+    - name: "Refresh VM guest IP in the in-memory inventory"
+      include_tasks: update_inventory.yml
+
+    - name: "Execute release DHCP IP address script in guest OS"
+      ansible.builtin.script: ../linux/utils/scripts/dhcp_release.py
+      args:
+        executable: "{{ guest_os_python_executable | default('python3') }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      ignore_errors: true
+      ignore_unreachable: true
+      when: vm_guest_ip is defined and vm_guest_ip
+
+    - name: "Debug release DHCP IP address result"
+      ansible.builtin.debug: var=release_dhcp_ip_result
+      when: release_dhcp_ip_result is defined
