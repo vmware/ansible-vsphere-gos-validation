@@ -432,6 +432,8 @@ class CallbackModule(CallbackBase):
         self.current_log_dir = None
         self.full_debug_log = "full_debug.log"
         self.failed_tasks_log = "failed_tasks.log"
+        self.failed_tasks_json = "failed_tasks.json"
+        self.failed_tasks_info = []
         self.known_issues_log = "known_issues.log"
         self.test_results_log = "results.log"
         self.guest_info_json_file = "guest_info.json"
@@ -693,11 +695,32 @@ class CallbackModule(CallbackBase):
             error_msg = extract_error_msg(result_in_json)
             task_details += "\nerror message:\n" + error_msg
 
+            failed_task_dict = OrderedDict([
+                ('play', current_play),
+                ('task', task_name),
+                ('task_path', task_path)
+            ])
+            failed_task_dict['host'] = result._host.get_name() if result._host else ""
+            if delegated_vars:
+                failed_task_dict['delegated_host'] = delegated_vars.get('ansible_host', '')
+
+            failed_task_dict['status'] = task_status
+            if result._task.loop:
+                failed_task_dict['loop_item'] = loop_item
+
+            failed_task_dict['error_message'] = error_msg.strip()
+
             call_trace = self._get_task_call_trace(task)
             if call_trace and len(call_trace) > 1:
                 task_details += "call trace:\n"
                 for trace_path in call_trace:
                     task_details += "  - {}\n".format(trace_path)
+                failed_task_dict['call_trace'] = call_trace
+
+            failed_task_dict['result'] = result_in_json
+
+            self.failed_tasks_info.append(failed_task_dict)
+            self._write_failed_tasks_json()
 
             self.add_logger_file_handler(self.failed_tasks_log)
 
@@ -753,6 +776,13 @@ class CallbackModule(CallbackBase):
         if hasattr(play, "_ds") and hasattr(play._ds, "_data_source"):
             path = play._ds._data_source
         return path
+
+    def _write_failed_tasks_json(self):
+        if not self.log_dir:
+            return
+        json_file_path = os.path.join(self.log_dir, self.failed_tasks_json)
+        with open(json_file_path, 'w') as json_file:
+            json.dump(self.failed_tasks_info, json_file, indent=4)
 
     def write_to_logfile(self, log_file, msg):
         log_file_path = os.path.join(self.log_dir, log_file)
@@ -963,6 +993,47 @@ class CallbackModule(CallbackBase):
                 self._display.display("VM guest info is dumped into:\n{}".format(json_file_path),
                                       color=C.COLOR_DEBUG)
 
+    def _dump_vm_info_json(self):
+        """
+        Dump VM info into a json file
+        """
+        if not self.log_dir:
+            return
+            
+        json_file_path = os.path.join(self.log_dir, "vm_info.json")
+        vm_info_dict = OrderedDict()
+        
+        vm_info_dict['vm_name'] = self.testing_vars.get('vm_name', '')
+        vm_info_dict['vm_ip'] = self._ansible_gosv_facts.get('vm_guest_ip', '')
+        vm_info_dict['gos_distribution'] = self._ansible_gosv_facts.get('vm_guest_os_distribution', '')
+        vm_info_dict['vm_guestid'] = self._ansible_gosv_facts.get('vm_guest_id', '')
+        vm_info_dict['hardware_version'] = self._ansible_gosv_facts.get('vm_hardware_version', '')
+        vm_info_dict['firmware'] = self._ansible_gosv_facts.get('vm_firmware', '')
+        vm_info_dict['secureboot_enabled'] = self._ansible_gosv_facts.get('vm_secureboot_enabled', '')
+        vm_info_dict['network_adapter'] = self.testing_vars.get('network_adapter_type', '') or self._ansible_gosv_facts.get('network_adapter_type', '')
+        vm_info_dict['bootdisk_controller'] = self.testing_vars.get('boot_disk_controller', '')
+        vm_info_dict['vmtools_version'] = self._ansible_gosv_facts.get('guestinfo_vmtools_info', '')
+        
+        if ('windows' not in str(vm_info_dict['gos_distribution']).lower() and 
+            'windows' not in str(vm_info_dict['vm_guestid']).lower() and
+            'windows' not in str(self._ansible_gosv_facts.get('guestinfo_guest_id', '')).lower()):
+            vm_info_dict['cloudinit_version'] = self._ansible_gosv_facts.get('cloudinit_version', '')
+            gui_installed = str(self._ansible_gosv_facts.get('guest_os_with_gui', ''))
+            if gui_installed == 'True':
+                display_manager = self._ansible_gosv_facts.get('guest_os_display_manager', '').upper()
+                session_type = self._ansible_gosv_facts.get('guest_os_session_type', '')
+                if display_manager:
+                    gui_installed = f"{gui_installed} ({display_manager}"
+                    if session_type:
+                        gui_installed += f" {session_type}"
+                    gui_installed += ")"
+            vm_info_dict['gui_installed'] = gui_installed
+        else:
+            vm_info_dict['vbs_enabled'] = self._ansible_gosv_facts.get('vm_vbs_enabled', '')
+        
+        with open(json_file_path, 'w') as json_file:
+            json.dump(vm_info_dict, json_file, indent=4)
+
     def _get_exception_traceback(self, result):
         if 'exception' in result:
             msg = "An exception occurred during task execution. "
@@ -1001,6 +1072,8 @@ class CallbackModule(CallbackBase):
                            "esxi_get_version_build.yml",
                            "esxi_get_model.yml",
                            "vm_get_vm_info.yml",
+                           "vm_get_boot_info.yml",
+                           "vm_get_vbs_status.yml",
                            "vm_upgrade_hardware_version.yml",
                            "vm_get_guest_info.yml",
                            "get_guest_system_info.yml",
@@ -1276,6 +1349,9 @@ class CallbackModule(CallbackBase):
 
         # Dump guest info into a json file
         self._dump_guest_info()
+
+        # Dump VM info into a json file
+        self._dump_vm_info_json()
 
         # Debug about ansible facts
         # print("DEBUG: retieved ansible facts\n{}".format(json.dumps(self._ansible_gosv_facts,
