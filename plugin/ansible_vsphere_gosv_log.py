@@ -591,6 +591,7 @@ class CallbackModule(CallbackBase):
 
         # Get the current test case name or play name
         current_play = self._play_path
+        play_number = None
         if self._last_test_id:
             current_play = self._last_test_id
         elif self._play_name:
@@ -698,12 +699,21 @@ class CallbackModule(CallbackBase):
             error_msg = extract_error_msg(result_in_json)
             task_details += "\nerror message:\n" + error_msg
 
+            play_number_match = re.match(r'^(\d+)_(.*)$', current_play)
+            if play_number_match:
+                play_number = int(play_number_match.group(1))
+                play_name_without_number = play_number_match.group(2)
+            else:
+                play_name_without_number = current_play
+
             failed_task_dict = OrderedDict([
                 ('failed_time', time.strftime("%Y-%m-%d %H:%M:%S,%03d")),
-                ('play', current_play),
-                ('task', task_name),
-                ('task_path', task_path)
             ])
+            if play_number is not None:
+                failed_task_dict['play_number'] = play_number
+            failed_task_dict['play'] = play_name_without_number
+            failed_task_dict['task'] = task_name
+            failed_task_dict['task_path'] = task_path
             failed_task_dict['host'] = result._host.get_name() if result._host else ""
             if delegated_vars:
                 failed_task_dict['delegated_host'] = delegated_vars.get('ansible_host', '')
