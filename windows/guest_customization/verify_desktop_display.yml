@@ -7,17 +7,25 @@
     file: check_desktop_display.yml
     apply:
       when: not (win_desktop_displayed | default(false))
-  vars:
-    gosc_screenshot_prefix: "screenshot_after_gosc"
   loop: "{{ range(1, 47) | list }}"
   loop_control:
     loop_var: retry_time
     pause: 20
 
+- name: "Set fact of whether desktop display workaround is applicable"
+  ansible.builtin.set_fact:
+    workaround_applied: >-
+      {{
+        (guest_os_product_type == 'server' and guest_os_build_num == '26100') or
+        (guest_os_product_type == 'client' and guest_os_build_num == '26100' and win_os_version_build is version('10.0.26100.1742', '>')) or
+        (guest_os_product_type == 'client' and guest_os_build_num == '26200' and win_os_version_build is version('10.0.26200.6584', '>='))
+      }}
+
 - name: "Apply workaround when Windows desktop display check failed"
   when:
     - tesseract_is_installed
-    - not (win_desktop_displayed | default(false))
+    - not win_desktop_displayed
+    - workaround_applied | bool
   block:
     - name: "Update in-memory inventory after GOSC"
       include_tasks: ../utils/win_update_inventory.yml
