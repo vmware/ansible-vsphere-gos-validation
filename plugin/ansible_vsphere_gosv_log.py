@@ -623,31 +623,34 @@ class CallbackModule(CallbackBase):
             result_host = "[{}]".format(result._host.get_name())
 
         log_failed_tasks = False
+        task_result_str = ""
         # Log task result facts
         if task_status == "ok":
-            task_details += "ok: {}".format(result_host)
+            task_result_str = "ok: {}".format(result_host)
         elif task_status == "changed":
-            task_details += "changed: {}".format(result_host)
+            task_result_str = "changed: {}".format(result_host)
         elif task_status == "failed":
             if result._task.loop:
-                task_details += "failed: {}".format(result_host)
+                task_result_str = "failed: {}".format(result_host)
             else:
-                task_details += "fatal: {}: FAILED!".format(result_host)
+                task_result_str = "fatal: {}: FAILED!".format(result_host)
             log_failed_tasks = True
         elif task_status == "unreachable":
-            task_details += "fatal: {}: UNREACHABLE!".format(result_host)
+            task_result_str = "fatal: {}: UNREACHABLE!".format(result_host)
             log_failed_tasks = True
         elif task_status == "skipped":
-            task_details += "skipping: {}".format(result_host)
+            task_result_str = "skipping: {}".format(result_host)
         else:
-            task_details += result_host
+            task_result_str = result_host
 
         if result._task.loop:
-            task_details += " => (item={})".format(loop_item)
+            task_result_str += " => (item={})".format(loop_item)
             if result._task.ignore_errors:
                 ignore_errors = True
 
-        task_details += " => {}".format(self._dump_results(result._result, indent=4))
+        task_result_str += " => {}".format(self._dump_results(result._result, indent=4))
+        
+        task_details += task_result_str
 
         if 'include_vars' in str(task.action):
             # update testing vars with include_vars
@@ -696,6 +699,7 @@ class CallbackModule(CallbackBase):
             task_details += "\nerror message:\n" + error_msg
 
             failed_task_dict = OrderedDict([
+                ('failed_time', time.strftime("%Y-%m-%d %H:%M:%S,%03d")),
                 ('play', current_play),
                 ('task', task_name),
                 ('task_path', task_path)
@@ -717,7 +721,7 @@ class CallbackModule(CallbackBase):
                     task_details += "  - {}\n".format(trace_path)
                 failed_task_dict['call_trace'] = call_trace
 
-            failed_task_dict['result'] = result_in_json
+            failed_task_dict['task_result'] = task_result_str
 
             self.failed_tasks_info.append(failed_task_dict)
             self._write_failed_tasks_json()
