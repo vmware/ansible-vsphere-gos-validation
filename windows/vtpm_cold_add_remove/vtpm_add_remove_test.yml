@@ -60,9 +60,18 @@
     cloned_vm_name: "{{ vm_name_clone_to }}"
   when: vm_with_vtpm
 
+- name: "Set fact of vtpm_cloned_vm_exists"
+  ansible.builtin.set_fact:
+    vtpm_cloned_vm_exists: true
+
 - name: "Switch to cloned VM for testing"
   ansible.builtin.set_fact:
     vm_name: "{{ vm_name_clone_to }}"
+
+- name: "Test code: To check the cloned VM is removed or not"
+  ansible.builtin.fail:
+    msg: "To check the cloned VM is removed or not"
+  when: true
 
 - name: "Get cloned VM file path"
   include_tasks: ../../common/vm_get_config.yml
@@ -80,9 +89,3 @@
 - name: "Perform cold remove vTPM device test"
   include_tasks: cold_remove_vtpm.yml
 
-- name: "Power off cloned VM"
-  include_tasks: ../../common/vm_set_power_state.yml
-  vars:
-    vm_power_state_set: 'powered-off'
-- name: "Remove cloned VM"
-  include_tasks: ../../common/vm_remove.yml
