@@ -1021,7 +1021,7 @@ class CallbackModule(CallbackBase):
         vm_info_dict['vm_ip'] = self._ansible_gosv_facts.get('vm_guest_ip', '')
         vm_info_dict['gos_distribution'] = self._ansible_gosv_facts.get('vm_guest_os_distribution', '')
         vm_info_dict['vm_guestid'] = self._ansible_gosv_facts.get('vm_guest_id', '')
-        vm_info_dict['hardware_version'] = self._ansible_gosv_facts.get('vm_hardware_version', '')
+        vm_info_dict['hardware_version'] = self._ansible_gosv_facts.get('vm_hardware_version_num', '')
         vm_info_dict['firmware'] = self._ansible_gosv_facts.get('vm_firmware', '')
         vm_info_dict['secureboot_enabled'] = self._ansible_gosv_facts.get('vm_secureboot_enabled', '')
         vm_info_dict['network_adapter'] = self.testing_vars.get('network_adapter_type', '') or self._ansible_gosv_facts.get('network_adapter_type', '')
