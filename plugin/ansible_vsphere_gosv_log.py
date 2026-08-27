@@ -704,21 +704,21 @@ class CallbackModule(CallbackBase):
                 play_number = int(play_number_match.group(1))
                 play_name_without_number = play_number_match.group(2)
             else:
+                play_number = None
                 play_name_without_number = current_play
 
             failed_task_dict = OrderedDict([
-                ('failed_time', time.strftime("%Y-%m-%d %H:%M:%S,%03d")),
+                ('timestamp', time.strftime("%Y-%m-%d %H:%M:%S,%03d")),
             ])
             if play_number is not None:
-                failed_task_dict['play_number'] = play_number
-            failed_task_dict['play'] = play_name_without_number
-            failed_task_dict['task'] = task_name
+                failed_task_dict['test_case_number'] = play_number
+            failed_task_dict['test_case_name'] = play_name_without_number
+            failed_task_dict['task_name'] = task_name
             failed_task_dict['task_path'] = task_path
-            failed_task_dict['host'] = result._host.get_name() if result._host else ""
             if delegated_vars:
                 failed_task_dict['delegated_host'] = delegated_vars.get('ansible_host', '')
 
-            failed_task_dict['status'] = task_status
+            failed_task_dict['task_status'] = task_status
             if result._task.loop:
                 failed_task_dict['loop_item'] = loop_item
 
@@ -731,7 +731,7 @@ class CallbackModule(CallbackBase):
                     task_details += "  - {}\n".format(trace_path)
                 failed_task_dict['call_trace'] = call_trace
 
-            failed_task_dict['task_result'] = task_result_str
+            failed_task_dict['task_result'] = task_result_str.split('\n')
 
             self.failed_tasks_info.append(failed_task_dict)
             self._write_failed_tasks_json()
@@ -1086,8 +1086,6 @@ class CallbackModule(CallbackBase):
                            "esxi_get_version_build.yml",
                            "esxi_get_model.yml",
                            "vm_get_vm_info.yml",
-                           "vm_get_boot_info.yml",
-                           "vm_get_vbs_status.yml",
                            "vm_upgrade_hardware_version.yml",
                            "vm_get_guest_info.yml",
                            "get_guest_system_info.yml",
