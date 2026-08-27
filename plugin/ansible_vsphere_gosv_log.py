@@ -725,7 +725,7 @@ class CallbackModule(CallbackBase):
             failed_task_dict['error_message'] = error_msg.strip()
 
             call_trace = self._get_task_call_trace(task)
-            if call_trace and len(call_trace) > 1:
+            if call_trace and len(call_trace) > 0:
                 task_details += "call trace:\n"
                 for trace_path in call_trace:
                     task_details += "  - {}\n".format(trace_path)
@@ -733,8 +733,9 @@ class CallbackModule(CallbackBase):
 
             failed_task_dict['task_result'] = task_result_str.split('\n')
 
-            self.failed_tasks_info.append(failed_task_dict)
-            self._write_failed_tasks_json()
+            if task_name != "Testing exit due to failure":
+                self.failed_tasks_info.append(failed_task_dict)
+                self._write_failed_tasks_json()
 
             self.add_logger_file_handler(self.failed_tasks_log)
 
