@@ -1,17 +1,11 @@
 # Copyright 2021-2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Revert to snapshot of VM
+# Revert to the specified snapshot of VM. Please get VM snapshots info
+# and check if specified snapshot exists firstly before using this task file.
 # Parameters:
-#   snapshot_name: the name of snapshot to revert
-#   skip_if_not_exist: if set to true, revert snapshot task will not fail when snapshot doesn't exist.
-#   Default value is false.
+#   snapshot_name: the name of snapshot to revert.
 #
-- name: "Set fact of skipping not existing snapshot to false"
-  ansible.builtin.set_fact:
-    skip_if_not_exist: false
-  when: skip_if_not_exist is undefined
-
 - name: "Check snapshot name is not empty"
   ansible.builtin.assert:
     that:
@@ -19,46 +13,23 @@
       - snapshot_name | length > 0
     fail_msg: "The parameter 'snapshot_name' is not defined or is empty."
 
-- name: "Check if snapshot {{ snapshot_name }} exists"
-  include_tasks: vm_check_snapshot_exist.yml
+- name: "Revert to snapshot {{ snapshot_name }}"
+  vmware.vmware.vm_snapshot_revert:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    snapshot_name: "{{ snapshot_name }}"
+  register: revert_result
 
-- name: "Ensure snapshot exists when skip_if_not_exist is set to false"
-  ansible.builtin.assert:
-    that:
-      - snapshot_exist
-    fail_msg: "The snapshot '{{ snapshot_name }}' does not exist on VM '{{ vm_name }}'."
-  when: not (skip_if_not_exist | bool)
+- name: "Display revert snapshot result"
+  ansible.builtin.debug: var=revert_result
+  when: enable_debug
 
-- name: "Skip reverting snapshot when it does not exist"
-  ansible.builtin.debug:
-    msg: "Snapshot '{{ snapshot_name }}' does not exist on VM '{{ vm_name }}'. Skipping revert task as 'skip_if_not_exist' is true."
-  when:
-    - not snapshot_exist
-    - skip_if_not_exist | bool
-
-- name: "Revert to the existing snapshot {{ snapshot_name }}"
-  when: snapshot_exist
-  block:
-    - name: "Revert to snapshot {{ snapshot_name }}"
-      vmware.vmware.vm_snapshot_revert:
-        hostname: "{{ vsphere_host_name }}"
-        username: "{{ vsphere_host_user }}"
-        password: "{{ vsphere_host_user_password }}"
-        validate_certs: "{{ validate_certs | default(false) }}"
-        datacenter: "{{ vsphere_host_datacenter }}"
-        folder: "{{ vm_folder }}"
-        name: "{{ vm_name }}"
-        snapshot_name: "{{ snapshot_name }}"
-      register: revert_result
-
-    - name: "Display revert snapshot result"
-      ansible.builtin.debug: var=revert_result
-      when: enable_debug
-
-    - name: "Wait for VM current snapshot is the expected one after revert to snapshot"
-      include_tasks: vm_wait_expected_snapshot.yml
-      vars:
-        expected_snapshot_name: "{{ snapshot_name }}"
-      when:
-        - revert_result.changed is defined
-        - revert_result.changed
+- name: "Wait for VM current snapshot is as expected after reverting"
+  include_tasks: vm_wait_expected_snapshot.yml
+  vars:
+    expected_snapshot_name: "{{ snapshot_name }}"
