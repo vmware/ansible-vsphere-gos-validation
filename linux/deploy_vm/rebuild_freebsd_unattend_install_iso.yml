@@ -14,14 +14,14 @@
     freebsd_iso_version: "{{ (src_iso_file_path | basename | regex_search('(\\d+\\.\\d+)', '\\1'))[0] | default('0.0') }}"
 
 # Determine if pycdlib patch is required:
-# - FreeBSD 14.x: < 14.6
-# - FreeBSD 15.x: < 15.2
+# - FreeBSD 14.x: >= 14.0 and < 14.6
+# - FreeBSD 15.x: >= 15.1 and < 15.2 (FreeBSD 15.0 is excluded as it does not have duplicate directory record issue)
 - name: "Set fact whether pycdlib patch is required for FreeBSD ISO"
   ansible.builtin.set_fact:
     need_pycdlib_patch: >-
       {{
         (freebsd_iso_version is version('14.0', '>=') and freebsd_iso_version is version('14.6', '<')) or
-        (freebsd_iso_version is version('15.0', '>=') and freebsd_iso_version is version('15.2', '<'))
+        (freebsd_iso_version is version('15.1', '>=') and freebsd_iso_version is version('15.2', '<'))
       }}
 
 - name: "Set fact of pycdlib patch directory and environment"
