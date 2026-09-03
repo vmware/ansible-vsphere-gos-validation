@@ -8,10 +8,17 @@
   include_tasks: ../utils/reload_module.yml
   vars:
     module_name: "vmw_pvrdma"
-  when: esxi_version is version('7.0.1', '<=')
+  when: >
+    (esxi_version is version('7.0.1', '<=') or
+    (('').join(new_network_adapter_dmesg) is search('failed to activate device'))
 
 - name: "Check RDMA device port state"
+  when: esxi_version is version('7.0.1', '>')
   block:
+    - name: "Wait for guest OS initialize RDMA device"
+      ansible.builtin.pause:
+        seconds: 10
+
     - name: "Get RDMA devices in guest OS after hot-add"
       include_tasks: ../utils/get_rdma_device_info.yml
 
@@ -39,4 +46,3 @@
         new_rdma_device.ports.port_1 is undefined or
         new_rdma_device.ports.port_1.state is undefined or
         ('PORT_ACTIVE' not in new_rdma_device.ports.port_1.state)
-  when: esxi_version is version('7.0.1', '>')

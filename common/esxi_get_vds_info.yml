@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Gather information of the vSphere Distributed Switch on the ESXi host
+- name: "Wait for VMware inventory to synchronize"
+  ansible.builtin.pause:
+    seconds: 5
+
+# Add retry logic to handle VMware inventory synchronization delay or
+# there are other tasks that is running on the same host.
 - name: "Get all registered vSphere Distributed Switch on host '{{ esxi_hostname }}'"
   community.vmware.vmware_dvswitch_info:
     hostname: "{{ esxi_hostname }}"
@@ -14,6 +20,11 @@
       - summary.portgroupName
       - overallStatus
   register: get_host_vds_result
+  retries: 5
+  delay: 5
+  until:
+    - get_host_vds_result.failed is defined
+    - not get_host_vds_result.failed
 
 - name: "Display the vSphere Distributed Switch info on host '{{ esxi_hostname }}'"
   ansible.builtin.debug: var=get_host_vds_result
