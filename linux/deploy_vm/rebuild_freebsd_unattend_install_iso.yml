@@ -7,6 +7,56 @@
 #   src_iso_file_path: Local path to the source ISO image file
 #   src_iso_dir_path: Local path to the directory containing the source ISO image file.
 #
+
+# Extract FreeBSD version from source ISO file name
+- name: "Set fact of FreeBSD ISO version"
+  ansible.builtin.set_fact:
+    freebsd_iso_version: "{{ (src_iso_file_path | basename | regex_search('(\\d+\\.\\d+)', '\\1'))[0] | default('0.0') }}"
+
+# Determine if pycdlib patch is required:
+# - FreeBSD 14.x: >= 14.0 and < 14.6
+# - FreeBSD 15.x: >= 15.1 and < 15.2 (FreeBSD 15.0 is excluded as it does not have duplicate directory record issue)
+- name: "Set fact whether pycdlib patch is required for FreeBSD ISO"
+  ansible.builtin.set_fact:
+    need_pycdlib_patch: >-
+      {{
+        (freebsd_iso_version is version('14.0', '>=') and freebsd_iso_version is version('14.6', '<')) or
+        (freebsd_iso_version is version('15.1', '>=') and freebsd_iso_version is version('15.2', '<'))
+      }}
+
+- name: "Set fact of pycdlib patch directory and environment"
+  ansible.builtin.set_fact:
+    pycdlib_patch_dir: "{{ src_iso_dir_path }}/pycdlib_patch"
+    pycdlib_patch_env: >-
+      {{
+        {'PYTHONPATH': (src_iso_dir_path + '/pycdlib_patch:' + lookup('env', 'PYTHONPATH'))}
+        if need_pycdlib_patch
+        else {}
+      }}
+
+- name: "Create directory for pycdlib patch"
+  ansible.builtin.file:
+    path: "{{ pycdlib_patch_dir }}"
+    state: directory
+    mode: '0755'
+  when: need_pycdlib_patch
+
+- name: "Create sitecustomize.py to patch pycdlib for FreeBSD ISO duplicate name issue"
+  ansible.builtin.copy:
+    dest: "{{ pycdlib_patch_dir }}/sitecustomize.py"
+    mode: '0644'
+    content: |
+      try:
+          import pycdlib.dr
+          _orig_add_child = pycdlib.dr.DirectoryRecord._add_child
+          def _patched_add_child(self, child, logical_block_size, allow_duplicate=False, *args, **kwargs):
+              kwargs.pop('allow_duplicate', None)
+              return _orig_add_child(self, child, logical_block_size, True, *args, **kwargs)
+          pycdlib.dr.DirectoryRecord._add_child = _patched_add_child
+      except Exception:
+          pass
+  when: need_pycdlib_patch
+
 - name: "Set fact of files to be updated in FreeBSD unattended install ISO"
   ansible.builtin.set_fact:
     freebsd_iso_files:
@@ -27,11 +77,14 @@
         dest: "{{ src_iso_dir_path }}"
         files:
           - "{{ dest_boot_loader_conf[1:] }}"
+      environment: "{{ pycdlib_patch_env }}"
 
     - name: "Add kern.kstack_pages option in FreeBSD boot loader"
       ansible.builtin.lineinfile:
         path: "{{ src_boot_loader_conf }}"
         line: 'kern.kstack_pages="8"'
+        create: true
+        mode: '0644'
 
     - name: "Update fact of files to be updated in FreeBSD unattended install ISO"
       ansible.builtin.set_fact:
@@ -47,3 +100,4 @@
     src_iso: "{{ src_iso_file_path }}"
     dest_iso: "{{ rebuilt_unattend_iso_path }}"
     add_files: "{{ freebsd_iso_files }}"
+  environment: "{{ pycdlib_patch_env }}"
