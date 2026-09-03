@@ -1,11 +1,24 @@
 # Copyright 2021-2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- include_tasks: win_guest_reconfig.yml
+- name: "In guest configure before taking base snapshot"
+  include_tasks: win_guest_reconfig.yml
 
-- include_tasks: ../../common/vm_take_snapshot.yml
+- name: "Get VM info before taking base snapshot"
+  when: vm_info_retrieved is undefined or not vm_info_retrieved
+  block:
+    - name: "Get VM info at base snapshot"
+      include_tasks: ../../common/vm_get_vm_info.yml
+
+    - name: "Set fact that VM info at base snapshot retrieved"
+      ansible.builtin.set_fact:
+        vm_info_retrieved: true
+
+- name: "Take base snapshot"
+  include_tasks: ../../common/vm_take_snapshot.yml
   vars:
     snapshot_name: "{{ base_snapshot_name }}"
-- name: Set fact of base snapshot existence
+
+- name: "Set fact of base snapshot exists"
   ansible.builtin.set_fact:
     base_snapshot_exists: true

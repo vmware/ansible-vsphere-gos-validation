@@ -15,15 +15,18 @@
     # Revert to VM base snapshot firstly, or the network testbed cleanup tasks may fail.
     # Parameter 'vm_not_revert_base' is used internally, and please be aware that if it's
     # set to true, the following tasks may be affected.
+    - name: "Check whether base snapshot exists or not"
+      include_tasks: ../common/vm_check_snapshot_exist.yml
+      vars:
+        snapshot_name: "{{ base_snapshot_name }}"
+
     - name: "Revert to snapshot {{ base_snapshot_name }}"
       include_tasks: ../common/vm_revert_snapshot.yml
       vars:
         snapshot_name: "{{ base_snapshot_name }}"
-        skip_if_not_exist: true
       when:
         - not vm_not_revert_base | default(false)
-        - base_snapshot_exists is defined
-        - base_snapshot_exists | bool
+        - snapshot_exist
 
     - name: "Cleanup network environment"
       include_tasks: ../common/network_testbed_cleanup.yml
