@@ -27,7 +27,7 @@
 - name: "Collect VM's information"
   when:
     - vm_exists is defined
-    - vm_exists | bool
+    - vm_exists
   block:
     - name: "Get VM's config, guest and summary properties"
       include_tasks: vm_get_config.yml
@@ -114,15 +114,29 @@
         dump_memory: true
         vm_take_snapshot_ignore_err: true
       when:
+        - not exit_testing_when_fail | bool
         - take_fail_snapshot is defined
         - take_fail_snapshot | bool
         - ansible_failed_task is defined
         - ansible_failed_task.name is defined
         - ansible_failed_task.name is not match('Skip testcase:')
 
+    - name: "Cleanup VM when cleanup_vm and exit_testing_when_fail are set to true"
+      when:
+        - cleanup_vm | bool
+        - exit_testing_when_fail | bool
+      block:
+        - name: "Power off VM"
+          include_tasks: vm_set_power_state.yml
+          vars:
+            vm_power_state_set: 'powered-off'
+
+        - name: "Remove VM"
+          include_tasks: vm_remove.yml
+          vars:
+            vm_remove_ignore_errors: true
+
 - name: "Testing exit due to failure"
   ansible.builtin.fail:
     msg: "Exit testing because 'exit_testing_when_fail' is set to {{ exit_testing_when_fail }} in test case {{ current_testcase_name }}"
-  when:
-    - exit_testing_when_fail is defined
-    - exit_testing_when_fail | bool
+  when: exit_testing_when_fail | bool

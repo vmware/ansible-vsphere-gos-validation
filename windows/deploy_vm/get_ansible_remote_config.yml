@@ -4,24 +4,31 @@
 # Download ConfigureRemotingForAnsible.ps1 script from github
 # for connecting Windows guest OS
 #
-- name: Set fact of the ConfigureRemotingForAnsible.ps1 script URL
+- name: "Set fact of the ConfigureRemotingForAnsible.ps1 script URL"
   ansible.builtin.set_fact:
     config_remote_windows: "https://raw.githubusercontent.com/ansible/ansible-documentation/devel/examples/scripts/ConfigureRemotingForAnsible.ps1"
-- name: Set fact of the local path for downloaded script
+
+- name: "Set fact of the local path for downloaded script"
   ansible.builtin.set_fact:
     config_remote_windows_local: "{{ local_cache }}/{{ config_remote_windows.split('/')[-1] }}"
 
-- name: Download ConfigureRemotingForAnsible.ps1 script from URL
+- name: "Download ConfigureRemotingForAnsible.ps1 script from URL"
   get_url:
     url: "{{ config_remote_windows }}"
     dest: "{{ config_remote_windows_local }}"
     validate_certs: false
     use_proxy: "{{ use_localhost_proxy | default(false) }}"
+  register: get_config_remote_file
+  retries: 5
+  delay: 10
+  until:
+    - get_config_remote_file.status_code is defined
+    - get_config_remote_file.status_code | int == 200
   environment:
     HTTPS_PROXY: "{{ http_proxy_localhost | default(omit) }}"
 
-- name: Check downloaded script exists locally
+- name: "Check downloaded script exists locally"
   ansible.builtin.stat:
     path: "{{ config_remote_windows_local }}"
   register: config_remote_file
-  failed_when: not config_remote_file.stat.exists
+  failed_when: not (config_remote_file.stat.exists | default(false))
