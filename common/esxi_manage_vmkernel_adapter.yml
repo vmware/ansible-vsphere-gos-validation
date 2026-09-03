@@ -26,14 +26,14 @@
   ansible.builtin.assert:
     that:
       - vmk_portgroup_name is defined and vmk_portgroup_name
-      - vmk_device is defined and vmk_device
       - vmk_state is defined and vmk_state in ['present', 'absent']
+      - (vmk_state == 'present') or (vmk_state == 'absent' and vmk_device is defined and vmk_device)
     fail_msg: >-
       At least one of parameters 'vmk_portgroup_name', 'vmk_device' and 'vmk_state' is incorrect.
 
 - name: "Set operation for managing VMkernel network adapter"
   ansible.builtin.set_fact:
-    vmk_op: "{% if vmk_state == 'present' %}add{% else %}remove{% endif %}"
+    vmk_op: "{% if vmk_state == 'present' %}add/configure{% else %}remove{% endif %}"
 
 - name: "{{ vmk_op | capitalize }} VMkernel network adapter for port group '{{ vmk_portgroup_name }}'"
   community.vmware.vmware_vmkernel:
@@ -50,6 +50,11 @@
     network: "{{ vmk_network | default(omit) }}"
     enable_mgmt: "{{ vmk_enable_mgmt | default(false) }}"
   register: manage_vmk_result
+  retries: 10
+  delay: 5
+  until:
+    - manage_vmk_result.failed is defined
+    - not manage_vmk_result.failed
 
 - name: "Display the result of managing VMkernel network adapter"
   ansible.builtin.debug: var=manage_vmk_result

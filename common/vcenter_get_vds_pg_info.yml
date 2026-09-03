@@ -1,0 +1,55 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Gather information about vSphere Distributed Switch Port Group (PG) with specified name or key.
+# If both vds_pg_name and vds_pg_key are specified or only vds_pg_name is specified,
+# the PG with the specified name will be returned.
+# If only vds_pg_key is specified, the PG with the specified key will be returned.
+# If neither vds_pg_name nor vds_pg_key is specified, all the PG info will be returned.
+# Parameters:
+#   vds_pg_name (optional): The vSphere Distributed Switch Port Group name.
+#   vds_pg_key (optional): The vSphere Distributed Switch Port Group key.
+#
+- name: "Initialize the fact of vSphere Distributed Switch Port Group info"
+  ansible.builtin.set_fact:
+    vds_pg_info: {}
+
+- name: "Get info of vSphere Distributed Switch Port Group"
+  community.vmware.vmware_dvs_portgroup_info:
+    hostname: "{{ vsphere_host_name }}"
+    username: "{{ vsphere_host_user }}"
+    password: "{{ vsphere_host_user_password }}"
+    datacenter: "{{ vsphere_host_datacenter }}"
+    validate_certs: "{{ validate_certs | default(false) }}"
+  register: get_vds_pg_result
+
+- name: "Display the result of getting vSphere Distributed Switch Port Group info"
+  ansible.builtin.debug: var=get_vds_pg_result
+  when: enable_debug
+
+- name: "Set fact of all the vSphere Distributed Switch Port Groups"
+  ansible.builtin.set_fact:
+    vds_pg_info: "{{ get_vds_pg_result.dvs_portgroup_info | default({}) }}"
+  when:
+    - vds_pg_name is undefined or vds_pg_name | length == 0
+    - vds_pg_key is undefined or vds_pg_key | length == 0
+
+- name: "Set fact of vSphere Distributed Switch Port Group"
+  when: >
+    (vds_pg_name is defined and vds_pg_name | length > 0) or
+    (vds_pg_key is defined and vds_pg_key | length > 0)
+  block:
+    - name: "Set fact of vSphere Distributed Switch Port Group with name '{{ vds_pg_name }}'"
+      ansible.builtin.set_fact:
+        vds_pg_info: "{{ get_vds_pg_result.dvs_portgroup_info.values() | flatten | selectattr('portgroup_name', 'equalto', vds_pg_name) | list | first | default({}) }}"
+      when: vds_pg_name is defined and vds_pg_name | length > 0
+
+    - name: "Set fact of vSphere Distributed Switch Port Group with key '{{ vds_pg_key }}'"
+      ansible.builtin.set_fact:
+        vds_pg_info: "{{ get_vds_pg_result.dvs_portgroup_info.values() | flatten | selectattr('key', 'equalto', vds_pg_key) | list | first | default({}) }}"
+      when:
+        - vds_pg_name is undefined or vds_pg_name | length == 0
+        - vds_pg_key is defined and vds_pg_key | length > 0
+
+    - name: "Display the vSphere Distributed Switch Port Group info"
+      ansible.builtin.debug: var=vds_pg_info
