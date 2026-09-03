@@ -9,16 +9,24 @@
 #     interface testing.
 #   vss_portgroup_name: the name of port group added for new network interface testing.
 #
-- name: "Power off the deployed router VM"
-  include_tasks: vm_set_power_state.yml
+- name: "Check router VM existence"
+  include_tasks: vm_check_exist.yml
   vars:
-    vm_power_state_set: 'powered-off'
     vm_name: "{{ router_vm_name }}"
 
-- name: "Remove the deployed router VM"
-  include_tasks: vm_remove.yml
-  vars:
-    vm_name: "{{ router_vm_name }}"
+- name: "Cleanup router VM when it exists"
+  when: vm_exists
+  block:
+    - name: "Power off router VM"
+      include_tasks: vm_set_power_state.yml
+      vars:
+        vm_power_state_set: 'powered-off'
+        vm_name: "{{ router_vm_name }}"
+
+    - name: "Remove router VM"
+      include_tasks: vm_remove.yml
+      vars:
+        vm_name: "{{ router_vm_name }}"
 
 - name: "Remove the added port group on vSphere Standard Switch"
   include_tasks: esxi_remove_portgroup.yml
