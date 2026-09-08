@@ -34,28 +34,29 @@
         else {}
       }}
 
-- name: "Create directory for pycdlib patch"
-  ansible.builtin.file:
-    path: "{{ pycdlib_patch_dir }}"
-    state: directory
-    mode: '0755'
+- name: "Create pycdlib patch for FreeBSD ISO duplicate name issue"
   when: need_pycdlib_patch
+  block:
+    - name: "Create directory for pycdlib patch"
+      ansible.builtin.file:
+        path: "{{ pycdlib_patch_dir }}"
+        state: directory
+        mode: '0755'
 
-- name: "Create sitecustomize.py to patch pycdlib for FreeBSD ISO duplicate name issue"
-  ansible.builtin.copy:
-    dest: "{{ pycdlib_patch_dir }}/sitecustomize.py"
-    mode: '0644'
-    content: |
-      try:
-          import pycdlib.dr
-          _orig_add_child = pycdlib.dr.DirectoryRecord._add_child
-          def _patched_add_child(self, child, logical_block_size, allow_duplicate=False, *args, **kwargs):
-              kwargs.pop('allow_duplicate', None)
-              return _orig_add_child(self, child, logical_block_size, True, *args, **kwargs)
-          pycdlib.dr.DirectoryRecord._add_child = _patched_add_child
-      except Exception:
-          pass
-  when: need_pycdlib_patch
+    - name: "Create sitecustomize.py to patch pycdlib for FreeBSD ISO duplicate name issue"
+      ansible.builtin.copy:
+        dest: "{{ pycdlib_patch_dir }}/sitecustomize.py"
+        mode: '0644'
+        content: |
+          try:
+              import pycdlib.dr
+              _orig_add_child = pycdlib.dr.DirectoryRecord._add_child
+              def _patched_add_child(self, child, logical_block_size, allow_duplicate=False, *args, **kwargs):
+                  kwargs.pop('allow_duplicate', None)
+                  return _orig_add_child(self, child, logical_block_size, True, *args, **kwargs)
+              pycdlib.dr.DirectoryRecord._add_child = _patched_add_child
+          except Exception:
+              pass
 
 - name: "Set fact of files to be updated in FreeBSD unattended install ISO"
   ansible.builtin.set_fact:
