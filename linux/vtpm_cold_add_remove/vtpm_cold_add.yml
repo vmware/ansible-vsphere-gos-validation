@@ -4,17 +4,6 @@
 - name: "Handle VM without vTPM device situation"
   when: not vm_with_vtpm
   block:
-    - name: "Fix UEFI vTPM boot loop on Ubuntu 26.04 Server by copying fallback EFI loader"
-      ansible.builtin.shell: >
-        if [ -f /boot/efi/EFI/ubuntu/grubx64.efi.x ]; then
-        - curtin in-target --target=/target -- sh -c 'if [ -f /boot/efi/EFI/ubuntu/grubx64.efi ]; then mkdir -p /boot/efi/EFI/BOOT && cp /boot/efi/EFI/ubuntu/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI; fi'
-      when:
-        - esxi_version is version('8.0.0', '==')
-        - guest_os_ansible_distribution == "Ubuntu"
-        - guest_os_ansible_distribution_ver is match('^26\.04')
-        - guest_os_edition == "Server"
-      delegate_to: "{{ vm_guest_ip }}"
-
     - name: "Power off instant cloned VM"
       include_tasks: ../../common/vm_set_power_state.yml
       vars:
