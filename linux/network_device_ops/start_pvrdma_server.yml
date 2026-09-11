@@ -6,43 +6,41 @@
 - name: "Set command for starting a listening process on server VM"
   ansible.builtin.set_fact:
     pvrdma_server_start_cmd: "rping -s -a {{ pvrdma_server_vm_ipv4 }} -P"
+    pvrdma_service_name: "pvrdma-rping-server"
 
-- name: "Start listening process on server VM for RDMA ping-pong test"
-  ansible.builtin.shell: "{{ pvrdma_server_start_cmd }} &"
+- name: "Start listening process via systemd-run on server VM"
+  include_tasks: ../utils/execute_shell_cmd.yml
   vars:
-    ansible_async_dir: /tmp/.ansible_async/
-  async: 120
-  poll: 0
-  delegate_to: "{{ vm_guest_ip }}"
-  changed_when: false
-  ignore_unreachable: true
-  ignore_errors: true
-  register: pvrdma_server_job
-  until:
-    - pvrdma_server_job.started is defined
-    - pvrdma_server_job.started == 1
-  retries: 10
-  delay: 5
+    lin_shell_cmd: >
+      systemd-run --unit={{ pvrdma_service_name }}
+      --remain-after-exit
+      {{ pvrdma_server_start_cmd }}
 
-- name: "Display async job result"
-  ansible.builtin.debug: var=pvrdma_server_job
+- name: "Pause 5 seconds to let the rping server systemd service crash if it's going to"
+  ansible.builtin.pause:
+    seconds: 5
 
-- name: "Check async job is started on server VM"
-  ansible.builtin.assert:
-    that:
-      - pvrdma_server_job.started is defined
-      - pvrdma_server_job.started == 1
-    fail_msg: >
-      Failed to start an async job '{{ pvrdma_server_start_cmd }}' on server VM.
-      {{ pvrdma_server_job.msg if pvrdma_server_job.msg is defined else '' }}
-    success_msg: "Successfully started an async job '{{ pvrdma_server_start_cmd }}' on server VM"
-
-- name: "Check the listening process is started on server VM"
-  include_tasks: ../utils/check_process_status.yml
+- name: "Check if the rping server systemd service started successfully"
+  include_tasks: ../utils/execute_shell_cmd.yml
   vars:
-    expected_process_state: "present"
-    process_name: "{{ pvrdma_server_start_cmd }}"
+    lin_shell_cmd: "systemctl is-active {{ pvrdma_service_name }}"
+    lin_shell_cmd_ignore_errors: true
 
-- name: "Set fact of the listening process pid on server VM"
+- name: "Set fact for rping server systemd service status"
   ansible.builtin.set_fact:
-    rping_server_process_pid: "{{ running_process_info[0].pid }}"
+    pvrdma_service_status: "{{ lin_shell_cmd_output.rc }}"
+
+- name: "Fetch logs if the rping server systemd service failed to start or crashed"
+  include_tasks: ../utils/execute_shell_cmd.yml
+  vars:
+    lin_shell_cmd: "journalctl -u {{ pvrdma_service_name }} --no-pager"
+    lin_shell_cmd_ignore_errors: true
+  when: pvrdma_service_status | int != 0
+
+- name: "Fail with logs if the rping server systemd service failed to start or crashed"
+  ansible.builtin.fail:
+    msg: |
+      The rping server failed to start or crashed immediately.
+      Logs:
+      {{ lin_shell_cmd_output.stdout }}
+  when: pvrdma_service_status | int != 0
