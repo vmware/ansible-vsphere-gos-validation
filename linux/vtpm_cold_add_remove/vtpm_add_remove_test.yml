@@ -48,6 +48,18 @@
   vars:
     network_config_file_path: "{{ guest_primary_nic_config_path }}"
 
+- name: "Fix UEFI vTPM boot loop on Ubuntu 26.04 Server by copying fallback EFI loader"
+  ansible.builtin.shell: >
+    if [ -f /boot/efi/EFI/ubuntu/grubx64.efi ]; then
+      mkdir -p /boot/efi/EFI/BOOT && cp /boot/efi/EFI/ubuntu/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI
+    fi
+  when:
+    - esxi_version is version('8.0.0', '==')
+    - guest_os_ansible_distribution == "Ubuntu"
+    - guest_os_ansible_distribution_ver is match('^26\.04')
+    - guest_os_edition == "Server"
+  delegate_to: "{{ vm_guest_ip }}"
+
 - name: "Set facts of cloned VM name and save current VM info"
   ansible.builtin.set_fact:
     vm_name_clone_to: "{{ vm_name }}_clone_{{ current_test_timestamp }}"
