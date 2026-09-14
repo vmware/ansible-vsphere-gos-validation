@@ -141,7 +141,8 @@
   delegate_to: "{{ vm_guest_ip }}"
   when:
     - guest_os_ansible_distribution in ['SLES', 'SLED']
-    - guest_os_ansible_distribution_major_ver | int >= 16
+    - guest_os_ansible_distribution_ver is defined
+    - guest_os_ansible_distribution_ver is version('16.1', '>=')
 
 - name: "Set SLES operating mode facts"
   ansible.builtin.set_fact:
@@ -149,23 +150,20 @@
       {{
         (check_transactional_update.stat.exists is defined and check_transactional_update.stat.exists) or
         (guest_os_release.VARIANT_ID is defined and guest_os_release.VARIANT_ID | lower in ['immutable', 'transactional']) or
-        (guest_os_release.VARIANT is defined and 'immutable' in guest_os_release.VARIANT | lower) or
-        (sles_operating_mode is defined and sles_operating_mode | lower == 'immutable') or
-        (is_sles_immutable is defined and is_sles_immutable)
+        (guest_os_release.VARIANT is defined and 'immutable' in guest_os_release.VARIANT | lower)
       }}
     sles_operating_mode: >-
       {{
         'immutable' if (
           (check_transactional_update.stat.exists is defined and check_transactional_update.stat.exists) or
           (guest_os_release.VARIANT_ID is defined and guest_os_release.VARIANT_ID | lower in ['immutable', 'transactional']) or
-          (guest_os_release.VARIANT is defined and 'immutable' in guest_os_release.VARIANT | lower) or
-          (sles_operating_mode is defined and sles_operating_mode | lower == 'immutable') or
-          (is_sles_immutable is defined and is_sles_immutable)
+          (guest_os_release.VARIANT is defined and 'immutable' in guest_os_release.VARIANT | lower)
         ) else 'standard'
       }}
   when:
     - guest_os_ansible_distribution in ['SLES', 'SLED']
-    - guest_os_ansible_distribution_major_ver | int >= 16
+    - guest_os_ansible_distribution_ver is defined
+    - guest_os_ansible_distribution_ver is version('16.1', '>=')
 
 - name: "Print Linux guest OS information"
   ansible.builtin.debug:
