@@ -10,7 +10,6 @@
     autoinstall_start_msg: ""
     autoinstall_ipv4_msg: ""
     autoinstall_complete_msg: "Autoinstall is completed."
-    expected_sles_operating_mode: "{{ sles_operating_mode | default('standard') }}"
 
 - name: "Update test case name for deploying VM from ISO image"
   ansible.builtin.set_fact:
@@ -189,16 +188,17 @@
 - name: "Get Linux system info"
   include_tasks: ../utils/get_linux_system_info.yml
 
-- name: "Verify deployed SLES operating mode matches expected mode"
+- name: "Verify deployed SLES operating mode is immutable"
   ansible.builtin.assert:
     that:
-      - sles_operating_mode | lower == expected_sles_operating_mode | lower
-    fail_msg: "Expected SLES operating mode: '{{ expected_sles_operating_mode }}', but detected: '{{ sles_operating_mode }}'."
-    success_msg: "Verified SLES operating mode matches expected '{{ expected_sles_operating_mode }}' mode."
+      - is_sles_immutable is defined and is_sles_immutable
+    fail_msg: "Expected SLES VM operating mode to be 'immutable', but detected '{{ sles_operating_mode | default('standard') }}'."
+    success_msg: "Successfully verified SLES VM is running in 'immutable' mode."
   when:
     - guest_os_ansible_distribution in ['SLES', 'SLED']
     - guest_os_ansible_distribution_ver is defined
     - guest_os_ansible_distribution_ver is version('16.1', '>=')
+    - sles_operating_mode is defined and sles_operating_mode | lower == 'immutable'
 
 - name: "Wait for Linux system is ready for login"
   when: guest_os_ansible_system == "linux"
