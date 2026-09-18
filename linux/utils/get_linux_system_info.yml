@@ -134,36 +134,27 @@
 - name: "Get guest OS network manager"
   include_tasks: get_network_manager.yml
 
-- name: "Check if SLES Guest OS is running in Immutable mode"
-  ansible.builtin.stat:
-    path: "/usr/sbin/transactional-update"
-  register: check_transactional_update
-  delegate_to: "{{ vm_guest_ip }}"
+- name: "Get SLES operating mode facts"
   when:
     - guest_os_ansible_distribution in ['SLES', 'SLED']
     - guest_os_ansible_distribution_ver is defined
     - guest_os_ansible_distribution_ver is version('16.1', '>=')
+  block:
+    - name: "Check if SLES Guest OS is running in Immutable mode"
+      ansible.builtin.stat:
+        path: "/usr/sbin/transactional-update"
+      register: check_transactional_update
+      delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Set SLES operating mode facts"
-  ansible.builtin.set_fact:
-    is_sles_immutable: >-
-      {{
-        (check_transactional_update.stat.exists is defined and check_transactional_update.stat.exists) or
-        (guest_os_release.VARIANT_ID is defined and guest_os_release.VARIANT_ID | lower in ['immutable', 'transactional']) or
-        (guest_os_release.VARIANT is defined and 'immutable' in guest_os_release.VARIANT | lower)
-      }}
-    sles_operating_mode: >-
-      {{
-        'immutable' if (
-          (check_transactional_update.stat.exists is defined and check_transactional_update.stat.exists) or
-          (guest_os_release.VARIANT_ID is defined and guest_os_release.VARIANT_ID | lower in ['immutable', 'transactional']) or
-          (guest_os_release.VARIANT is defined and 'immutable' in guest_os_release.VARIANT | lower)
-        ) else 'standard'
-      }}
-  when:
-    - guest_os_ansible_distribution in ['SLES', 'SLED']
-    - guest_os_ansible_distribution_ver is defined
-    - guest_os_ansible_distribution_ver is version('16.1', '>=')
+    - name: "Set SLES operating mode facts"
+      ansible.builtin.set_fact:
+        is_sles_immutable: >-
+          {{
+            (check_transactional_update.stat.exists is defined and check_transactional_update.stat.exists) or
+            (guest_os_release.VARIANT_ID is defined and guest_os_release.VARIANT_ID | lower in ['immutable', 'transactional']) or
+            (guest_os_release.VARIANT is defined and 'immutable' in guest_os_release.VARIANT | lower)
+          }}
+        sles_operating_mode: "{{ 'immutable' if ((check_transactional_update.stat.exists is defined and check_transactional_update.stat.exists) or (guest_os_release.VARIANT_ID is defined and guest_os_release.VARIANT_ID | lower in ['immutable', 'transactional']) or (guest_os_release.VARIANT is defined and 'immutable' in guest_os_release.VARIANT | lower)) else 'standard' }}"
 
 - name: "Print Linux guest OS information"
   ansible.builtin.debug:
@@ -185,8 +176,13 @@
       - "Guest OS session desktop: {{ guest_os_session_desktop }}"
       - "Guest OS cloud-init version: {{ cloudinit_version }}"
       - "Guest OS network manager: {{ guest_os_network_manager }}"
+
+- name: "Print SLES operating mode information"
+  ansible.builtin.debug:
+    msg:
       - "Guest OS SLES operating mode: {{ sles_operating_mode | default('standard') }}"
       - "Guest OS SLES is immutable: {{ is_sles_immutable | default(false) }}"
+  when: guest_os_ansible_distribution in ['SLES', 'SLED']
 
 - name: "Set fact that ansible system information about guest OS has been retrieved"
   ansible.builtin.set_fact:
