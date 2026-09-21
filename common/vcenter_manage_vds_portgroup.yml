@@ -57,6 +57,7 @@
     fail_msg: "Failed to {{ vds_portgroup_op }} distributed port group '{{ vds_portgroup_name }}'"
 
 - name: "Wait for creating distributed port group is completed"
+  when: vds_portgroup_state == 'present'
   block:
     - name: "Wait for creating distributed port group is completed"
       community.vmware.vmware_dvs_portgroup_info:
@@ -75,11 +76,17 @@
         - wait_vds_pg_result.dvs_portgroup_info[vds_name] is defined
         - wait_vds_pg_result.dvs_portgroup_info[vds_name] | selectattr('portgroup_name', 'equalto', vds_portgroup_name) | length > 0
 
-    - name: "Check waiting for distributed port group result"
+    - name: "Set fact of newly created vSphere Distributed Switch Port Group info"
+      ansible.builtin.set_fact:
+        new_vds_portgroup_info: "{{ wait_vds_pg_result.dvs_portgroup_info[vds_name] | selectattr('portgroup_name', 'equalto', vds_portgroup_name) | first }}"
+      when:
+        - wait_vds_pg_result.failed is defined
+        - not wait_vds_pg_result.failed
+
+    - name: "Check the result of creating distributed port group"
       ansible.builtin.assert:
         that:
-          - wait_vds_pg_result is defined
-          - wait_vds_pg_result.failed is defined
-          - not wait_vds_pg_result.failed
-        fail_msg: "Timed out waiting for portgroup '{{ vds_portgroup_name }}' to be created in 150 seconds."
-  when: vds_portgroup_state == 'present'
+          - new_vds_portgroup_info is defined
+          - new_vds_portgroup_info | length > 0
+        fail_msg: "Failed to create distributed port group '{{ vds_portgroup_name }}' in vSphere Distributed Switch '{{ vds_name }}'."
+        success_msg: "Successfully created distributed port group '{{ vds_portgroup_name }}' in vSphere Distributed Switch '{{ vds_name }}'."
