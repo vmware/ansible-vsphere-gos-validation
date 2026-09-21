@@ -79,7 +79,7 @@
       register: ovt_tarball_download_result
   rescue:
     - name: "Download open-vm-tools source tarball (fallback via curl)"
-      ansible.builtin.shell: >
+      ansible.builtin.command: >
         curl -ksSL "{{ linux_ovt_tarball_url }}"
         -o "{{ guest_ovt_download_dir }}/{{ linux_ovt_tarball_url | basename }}"
       register: ovt_tarball_download_result
@@ -91,10 +91,17 @@
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Unarchive open-vm-tools source tarball"
-  ansible.builtin.unarchive:
-    src: "{{ guest_ovt_download_dir }}/{{ linux_ovt_tarball_url | basename }}"
-    dest: "{{ guest_ovt_download_dir }}"
-    remote_src: true
+  block:
+    - name: "Unarchive open-vm-tools source tarball via builtin unarchive module"
+      ansible.builtin.unarchive:
+        src: "{{ guest_ovt_download_dir }}/{{ linux_ovt_tarball_url | basename }}"
+        dest: "{{ guest_ovt_download_dir }}"
+        remote_src: true
+  rescue:
+    - name: "Unarchive open-vm-tools source tarball (fallback via tar command)"
+      ansible.builtin.command: >
+        tar -xzf "{{ guest_ovt_download_dir }}/{{ linux_ovt_tarball_url | basename }}"
+        -C "{{ guest_ovt_download_dir }}"
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Search open-vm-tools configure.ac file"
