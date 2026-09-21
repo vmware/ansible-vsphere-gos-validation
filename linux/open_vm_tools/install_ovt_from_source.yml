@@ -69,13 +69,22 @@
   delegate_to: "{{ vm_guest_ip }}"
 
 - name: "Download open-vm-tools source tarball"
-  ansible.builtin.get_url:
-    url: "{{ linux_ovt_tarball_url }}"
-    dest: "{{ guest_ovt_download_dir }}"
-    validate_certs: false
-    mode: "0644"
+  block:
+    - name: "Download open-vm-tools source tarball via get_url"
+      ansible.builtin.get_url:
+        url: "{{ linux_ovt_tarball_url }}"
+        dest: "{{ guest_ovt_download_dir }}"
+        validate_certs: false
+        mode: "0644"
+      register: ovt_tarball_download_result
+  rescue:
+    - name: "Download open-vm-tools source tarball (fallback via curl)"
+      ansible.builtin.shell: >
+        curl -ksSL "{{ linux_ovt_tarball_url }}"
+        -o "{{ guest_ovt_download_dir }}/{{ linux_ovt_tarball_url | basename }}"
+        --chmod 0644
+      register: ovt_tarball_download_result
   delegate_to: "{{ vm_guest_ip }}"
-  register: ovt_tarball_download_result
 
 - name: "Unarchive open-vm-tools source tarball"
   ansible.builtin.unarchive:
