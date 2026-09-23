@@ -14,6 +14,7 @@
     manager: auto
   delegate_to: "{{ vm_guest_ip }}"
   register: guest_package_facts
+  ignore_errors: true
   ignore_unreachable: true
 
 - name: "Test network connection when guest OS unreachable"
@@ -45,8 +46,43 @@
         dict2items |
         map(attribute='value') |
         flatten |
-        map(attribute='name')
+        map(attribute='name') |
+        unique
       }}
   when:
+    - guest_package_facts is not failed
+    - guest_package_facts.ansible_facts is defined
     - guest_package_facts.ansible_facts.packages is defined
     - guest_package_facts.ansible_facts.packages | length > 0
+
+# Fallback when package_facts fails (e.g. required python library is missing on target OS)
+- name: "Get installed packages via OS command when package_facts failed"
+  when: guest_installed_packages | length == 0
+  block:
+    - name: "Set fact of package query command for {{ guest_os_ansible_distribution }}"
+      ansible.builtin.set_fact:
+        package_query_cmd: >-
+          {%- if guest_os_ansible_pkg_mgr is search('yum|dnf|zypper|tdnf|rpm') or guest_os_family in ['Suse', 'RedHat', 'VMware Photon OS'] -%}
+          rpm -qa --queryformat '%{NAME}\n'
+          {%- elif guest_os_family in ['Debian', 'Astra Linux (Orel)'] or guest_os_ansible_pkg_mgr == 'apt' -%}
+          dpkg-query -W -f='${Package}\n'
+          {%- elif guest_os_family == 'FreeBSD' or guest_os_ansible_pkg_mgr == 'pkg' -%}
+          pkg query %n
+          {%- endif -%}
+
+    - name: "Execute package query command on {{ guest_os_ansible_distribution }}"
+      ansible.builtin.command: "{{ package_query_cmd }}"
+      delegate_to: "{{ vm_guest_ip }}"
+      register: package_query_output
+      ignore_errors: true
+      when:
+        - package_query_cmd is defined
+        - package_query_cmd | length > 0
+
+    - name: "Set fact of installed packages from command output"
+      ansible.builtin.set_fact:
+        guest_installed_packages: "{{ package_query_output.stdout_lines | unique }}"
+      when:
+        - package_query_output is defined
+        - package_query_output.stdout_lines is defined
+        - package_query_output.stdout_lines | length > 0

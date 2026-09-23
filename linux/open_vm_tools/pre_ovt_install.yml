@@ -21,13 +21,15 @@
     - vmtools_is_installed
     - not update_vmtools
 
-# Flatcar and RHCOS doesn't support to install open-vm-tools
+# Flatcar, RHCOS and SLES/SLED 16.1 or later Immutable Mode don't support installing open-vm-tools
 - name: "Skip test case for {{ guest_os_ansible_distribution }}"
   include_tasks: ../../common/skip_test_case.yml
   vars:
     skip_msg: "Skip test case {{ ansible_play_name }} because {{ guest_os_ansible_distribution }} doesn't support installing open-vm-tools"
     skip_reason: "Not Supported"
-  when: guest_os_ansible_distribution in ['Flatcar', 'RHCOS']
+  when: >-
+    guest_os_ansible_distribution in ['Flatcar', 'RHCOS'] or
+    (is_sles_immutable | default(false))
 
 - name: "Skip test case when current open-vm-tools is not installed from package"
   include_tasks: ../../common/skip_test_case.yml
@@ -52,6 +54,23 @@
     fail_msg: "The value of 'linux_ovt_install_type' must be 'package' or 'source'"
     success_msg: "The open-vm-tools install type is {{ linux_ovt_install_type }}"
 
+# Testing open-vm-tools source install is not supported on ProLinux, FusionOS 22,
+# and RHEL/CentOS/OracleLinux 7 or earlier releases.
+- name: "Skip test case for {{ guest_os_ansible_distribution }}"
+  include_tasks: ../../common/skip_test_case.yml
+  vars:
+    skip_msg: >-
+      Skip test case {{ ansible_play_name }} because installing open-vm-tools from
+      source is not supported on {{ vm_guest_os_distribution }}.
+    skip_reason: "Not Supported"
+  when:
+    - ansible_play_name == 'ovt_verify_src_install'
+    - (guest_os_ansible_distribution == 'ProLinux' or
+       (guest_os_ansible_distribution == 'FusionOS' and
+        guest_os_ansible_distribution_major_ver | int == 22) or
+       (guest_os_ansible_distribution in ['RedHat', 'CentOS', 'OracleLinux'] and
+        guest_os_ansible_distribution_major_ver | int <= 7))
+
 - name: "Skip test case when open-vm-tools install type is not applicable"
   include_tasks: ../../common/skip_test_case.yml
   vars:
@@ -73,23 +92,6 @@
   when:
     - linux_ovt_install_type == 'source'
     - linux_ovt_tarball_url is undefined or not linux_ovt_tarball_url
-
-# Testing open-vm-tools source install is not supported on ProLinux, FusionOS 22,
-# and RHEL/CentOS/OracleLinux 7 or earlier releases.
-- name: "Skip test case for {{ guest_os_ansible_distribution }}"
-  include_tasks: ../../common/skip_test_case.yml
-  vars:
-    skip_msg: >-
-      Skip test case {{ ansible_play_name }} because installing open-vm-tools from
-      source is not supported on {{ vm_guest_os_distribution }}.
-    skip_reason: "Not Supported"
-  when:
-    - linux_ovt_install_type == "source"
-    - (guest_os_ansible_distribution == 'ProLinux' or
-       (guest_os_ansible_distribution == 'FusionOS' and
-        guest_os_ansible_distribution_major_ver | int == 22) or
-       (guest_os_ansible_distribution in ['RedHat', 'CentOS', 'OracleLinux'] and
-        guest_os_ansible_distribution_major_ver | int <= 7))
 
 - name: "Initialize fact whether to uninstall open-vm-tools"
   ansible.builtin.set_fact:
