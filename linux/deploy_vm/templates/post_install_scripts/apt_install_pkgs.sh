@@ -22,6 +22,14 @@ if [ "X$cdrom_missing_pkgs" != "X" ]; then
 {% if unattend_installer == 'Debian' %}
     echo "deb http://deb.debian.org/debian/ $VERSION_CODENAME main contrib" >> /etc/apt/sources.list
 {% elif unattend_installer == 'Pardus' %}
+    # Comment out CDROM repo so apt update does not fail on missing CDROM
+    sed -i 's/^[[:blank:]]*deb cdrom:/# deb cdrom:/' /etc/apt/sources.list
+
+    # Configure APT to ignore SSL certificate validation for HTTPS mirrors/proxies
+    mkdir -p /etc/apt/apt.conf.d
+    echo 'Acquire::https::Verify-Peer "false";' > /etc/apt/apt.conf.d/99ssl-insecure
+    echo 'Acquire::https::Verify-Host "false";' >> /etc/apt/apt.conf.d/99ssl-insecure
+
     {% include 'add_pardus_repo.sh' %}
 {% endif %}
 
