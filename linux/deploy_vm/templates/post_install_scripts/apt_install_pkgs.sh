@@ -25,16 +25,35 @@ if [ "X$cdrom_missing_pkgs" != "X" ]; then
     # Comment out CDROM repo so apt update does not fail on missing CDROM
     sed -i 's/^[[:blank:]]*deb cdrom:/# deb cdrom:/' /etc/apt/sources.list
 
-    # Configure APT to ignore SSL certificate validation for HTTPS mirrors/proxies
+    # Configure APT to ignore SSL certificate validation for HTTPS mirrors/proxies and retry downloads
     mkdir -p /etc/apt/apt.conf.d
     echo 'Acquire::https::Verify-Peer "false";' > /etc/apt/apt.conf.d/99ssl-insecure
     echo 'Acquire::https::Verify-Host "false";' >> /etc/apt/apt.conf.d/99ssl-insecure
+    echo 'Acquire::Retries "3";' >> /etc/apt/apt.conf.d/99ssl-insecure
+    echo 'Acquire::ForceIPv4 "true";' >> /etc/apt/apt.conf.d/99ssl-insecure
+
+    # Replace depo.pardus.org.tr with direct mirror bilgemdepo.pardus.org.tr to avoid
+    # Mirrorbits 302 redirects to flaky/unreachable university mirrors (itu/deu/ktu)
+    sed -i 's/depo\.pardus\.org\.tr/bilgemdepo.pardus.org.tr/g' /etc/apt/sources.list
+    if [ -d /etc/apt/sources.list.d ]; then
+        sed -i 's/depo\.pardus\.org\.tr/bilgemdepo.pardus.org.tr/g' /etc/apt/sources.list.d/*.list 2>/dev/null || true
+    fi
 
     {% include 'add_pardus_repo.sh' %}
 {% endif %}
 
     echo "APT source list with online repos:"
     cat /etc/apt/sources.list
+{% if unattend_installer == 'Pardus' %}
+    if [ -d /etc/apt/sources.list.d ]; then
+        for f in /etc/apt/sources.list.d/*.list; do
+            if [ -f "$f" ]; then
+                echo "--- $f ---"
+                cat "$f"
+            fi
+        done
+    fi
+{% endif %}
 
     echo "Updating list of available packages"
     apt update -y 2>&1
@@ -45,10 +64,18 @@ if [ "X$cdrom_missing_pkgs" != "X" ]; then
         pkg_in_online_repo=$?
         if [ $pkg_in_online_repo -eq 0 ]; then
             echo "Installing package $pkg from online repo"
-            apt install -y $pkg 2>&1
-            if [ $? -ne 0 ]; then
-                echo "ERROR: Failed to install package $pkg from online repo"
-            fi
+            for retry in 1 2 3; do
+                apt install -y $pkg 2>&1
+                if [ $? -eq 0 ]; then
+                    break
+                fi
+                if [ $retry -lt 3 ]; then
+                    echo "Retrying to install package $pkg from online repo (attempt $((retry+1)))..."
+                    sleep 2
+                else
+                    echo "ERROR: Failed to install package $pkg from online repo"
+                fi
+            done
         else
             echo "ERROR: Failed to find package $pkg from CDROM and online repo"
         fi
