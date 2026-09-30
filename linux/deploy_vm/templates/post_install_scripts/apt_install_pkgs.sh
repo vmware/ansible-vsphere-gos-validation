@@ -37,18 +37,10 @@ if [ "X$cdrom_missing_pkgs" != "X" ]; then
         pkg_in_online_repo=$?
         if [ $pkg_in_online_repo -eq 0 ]; then
             echo "Installing package $pkg from online repo"
-            for retry in 1 2 3; do
-                apt install -y $pkg 2>&1
-                if [ $? -eq 0 ]; then
-                    break
-                fi
-                if [ $retry -lt 3 ]; then
-                    echo "Retrying to install package $pkg from online repo (attempt $((retry+1)))..."
-                    sleep 2
-                else
-                    echo "ERROR: Failed to install package $pkg from online repo"
-                fi
-            done
+            apt install -y $pkg 2>&1
+            if [ $? -ne 0 ]; then
+                echo "ERROR: Failed to install package $pkg from online repo"
+            fi
         else
             echo "ERROR: Failed to find package $pkg from CDROM and online repo"
         fi
