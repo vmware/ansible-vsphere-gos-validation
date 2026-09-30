@@ -3,33 +3,23 @@ sed -i 's/^[[:blank:]]*deb cdrom:/# deb cdrom:/' /etc/apt/sources.list
 
 # Configure APT to ignore SSL certificate validation for HTTPS mirrors/proxies and retry downloads
 mkdir -p /etc/apt/apt.conf.d
-echo 'Acquire::https::Verify-Peer "false";' > /etc/apt/apt.conf.d/99ssl-insecure
-echo 'Acquire::https::Verify-Host "false";' >> /etc/apt/apt.conf.d/99ssl-insecure
-echo 'Acquire::Retries "3";' >> /etc/apt/apt.conf.d/99ssl-insecure
-echo 'Acquire::ForceIPv4 "true";' >> /etc/apt/apt.conf.d/99ssl-insecure
+cat << 'EOF' > /etc/apt/apt.conf.d/99ssl-insecure
+Acquire::https::Verify-Peer "false";
+Acquire::https::Verify-Host "false";
+Acquire::Retries "3";
+Acquire::ForceIPv4 "true";
+EOF
 
 # Replace depo.pardus.org.tr with direct mirror bilgemdepo.pardus.org.tr to avoid
 # Mirrorbits 302 redirects to flaky/unreachable university mirrors (itu/deu/ktu)
-sed -i 's/depo\.pardus\.org\.tr/bilgemdepo.pardus.org.tr/g' /etc/apt/sources.list
+sed -i 's/depo\.pardus\.org\.tr/bilgemdepo.pardus.org.tr/g' /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null || true
 
 # Check and add official Pardus repos if they are not already configured
 check_and_add_repo() {
     local repo_pattern="$1"
     local repo_line="$2"
-    local repo_found=0
 
-    if [ -f /etc/apt/sources.list ] && grep -qE "$repo_pattern" /etc/apt/sources.list 2>/dev/null; then
-        repo_found=1
-    elif [ -d /etc/apt/sources.list.d ]; then
-        for f in /etc/apt/sources.list.d/*.list; do
-            if [ -f "$f" ] && grep -qE "$repo_pattern" "$f" 2>/dev/null; then
-                repo_found=1
-                break
-            fi
-        done
-    fi
-
-    if [ $repo_found -eq 0 ]; then
+    if ! grep -rqE "$repo_pattern" /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null; then
         echo "$repo_line" >> /etc/apt/sources.list
     fi
 }
