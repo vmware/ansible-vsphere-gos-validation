@@ -14,14 +14,3 @@ fi
 
 echo "Boot command"
 cat /proc/cmdline
-
-{% if unattend_installer == 'Pardus' %}
-# Force Pardus installer to use CDROM packages for GRUB by cleaning online repos from /target
-mkdir -p /usr/lib/post-base-installer.d /usr/lib/pre-pkgsel.d
-cat << 'EOF' > /usr/lib/post-base-installer.d/05clean-target-apt
-#!/bin/sh
-rm -rf /target/etc/apt/sources.list.d/* /target/var/lib/apt/lists/*
-EOF
-chmod +x /usr/lib/post-base-installer.d/05clean-target-apt
-cp -f /usr/lib/post-base-installer.d/05clean-target-apt /usr/lib/pre-pkgsel.d/
-{% endif %}

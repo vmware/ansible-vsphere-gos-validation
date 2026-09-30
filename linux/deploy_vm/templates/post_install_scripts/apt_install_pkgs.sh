@@ -35,25 +35,12 @@ if [ "X$cdrom_missing_pkgs" != "X" ]; then
     # Replace depo.pardus.org.tr with direct mirror bilgemdepo.pardus.org.tr to avoid
     # Mirrorbits 302 redirects to flaky/unreachable university mirrors (itu/deu/ktu)
     sed -i 's/depo\.pardus\.org\.tr/bilgemdepo.pardus.org.tr/g' /etc/apt/sources.list
-    if [ -d /etc/apt/sources.list.d ]; then
-        sed -i 's/depo\.pardus\.org\.tr/bilgemdepo.pardus.org.tr/g' /etc/apt/sources.list.d/*.list 2>/dev/null || true
-    fi
 
     {% include 'add_pardus_repo.sh' %}
 {% endif %}
 
     echo "APT source list with online repos:"
     cat /etc/apt/sources.list
-{% if unattend_installer == 'Pardus' %}
-    if [ -d /etc/apt/sources.list.d ]; then
-        for f in /etc/apt/sources.list.d/*.list; do
-            if [ -f "$f" ]; then
-                echo "--- $f ---"
-                cat "$f"
-            fi
-        done
-    fi
-{% endif %}
 
     echo "Updating list of available packages"
     apt update -y 2>&1
