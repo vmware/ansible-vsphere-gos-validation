@@ -1,3 +1,17 @@
+# Comment out CDROM repo so apt update does not fail on missing CDROM
+sed -i 's/^[[:blank:]]*deb cdrom:/# deb cdrom:/' /etc/apt/sources.list
+
+# Configure APT to ignore SSL certificate validation for HTTPS mirrors/proxies and retry downloads
+mkdir -p /etc/apt/apt.conf.d
+echo 'Acquire::https::Verify-Peer "false";' > /etc/apt/apt.conf.d/99ssl-insecure
+echo 'Acquire::https::Verify-Host "false";' >> /etc/apt/apt.conf.d/99ssl-insecure
+echo 'Acquire::Retries "3";' >> /etc/apt/apt.conf.d/99ssl-insecure
+echo 'Acquire::ForceIPv4 "true";' >> /etc/apt/apt.conf.d/99ssl-insecure
+
+# Replace depo.pardus.org.tr with direct mirror bilgemdepo.pardus.org.tr to avoid
+# Mirrorbits 302 redirects to flaky/unreachable university mirrors (itu/deu/ktu)
+sed -i 's/depo\.pardus\.org\.tr/bilgemdepo.pardus.org.tr/g' /etc/apt/sources.list
+
 # Check and add official Pardus repos if they are not already configured
 check_and_add_repo() {
     local repo_pattern="$1"
