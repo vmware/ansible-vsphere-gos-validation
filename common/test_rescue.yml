@@ -27,7 +27,7 @@
 - name: "Collect VM's information"
   when:
     - vm_exists is defined
-    - vm_exists | bool
+    - vm_exists
   block:
     - name: "Get VM's config, guest and summary properties"
       include_tasks: vm_get_config.yml
@@ -114,7 +114,7 @@
         dump_memory: true
         vm_take_snapshot_ignore_err: true
       when:
-        - take_fail_snapshot is defined
+        - not (exit_testing_when_fail | bool and cleanup_vm | bool)
         - take_fail_snapshot | bool
         - ansible_failed_task is defined
         - ansible_failed_task.name is defined
@@ -123,6 +123,4 @@
 - name: "Testing exit due to failure"
   ansible.builtin.fail:
     msg: "Exit testing because 'exit_testing_when_fail' is set to {{ exit_testing_when_fail }} in test case {{ current_testcase_name }}"
-  when:
-    - exit_testing_when_fail is defined
-    - exit_testing_when_fail | bool
+  when: exit_testing_when_fail | bool
