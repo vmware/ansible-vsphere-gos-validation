@@ -1,0 +1,113 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This case is to test the PK Capsule Update.
+#   By installing pkupdatefw driver and the Windows Updates(2026.7B and later), 
+#   the valid PK can be updated to the OS.
+#   It applies to the VM with vTPM and secure boot enabled.
+
+- name: pk_capsule_update
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_test_case_folder: true
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case due to VM is not 64 bit: {{ guest_os_ansible_architecture | default('NA') }}"
+            skip_reason: "Not Applicable"
+          when: guest_os_ansible_architecture == "32-bit"
+      
+        - name: "Get the PK from the guest OS before testing"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              (Get-SecureBootUEFI -Name PK -Decoded).Subject -match 'Windows OEM Devices PK'
+
+        - name: "Verify if PK is NULL"
+          ansible.builtin.assert:
+            that:
+              -  not win_powershell_cmd_output.failed
+              -  win_powershell_cmd_output.stdout_lines[0].strip() == "False"
+            fail_msg: "PK is not NULL"
+
+        - name: "Enable secure boot"
+          when: vm_secureboot_enabled is undefined or not vm_secureboot_enabled
+          block:
+            - name: "Enable secure boot"
+              include_tasks: ../secureboot_enable_disable/change_secureboot_config.yml
+              vars:
+                change_secureboot: 'enable'
+
+        - name: "Set the facts for the drive letter"
+          ansible.builtin.set_fact:
+            drive_letter_new: 'Z'
+
+        - name: "Set the facts for the pkupdatefw driver"
+          ansible.builtin.set_fact:
+            pkupdatefw_nfs_dir: "{{ drive_letter_new }}:\\pkupdatefw"
+            pkupdatefw_dest_dir: 'C:\\pkupdatefw'
+      
+        - name: "Set mount command for accessing the shared folder"
+          ansible.builtin.set_fact:
+            win_nfs_mount_cmd: |-
+              {%- if windows_nfs_username is defined and windows_nfs_username and 
+                windows_nfs_password is defined and windows_nfs_password -%}
+              {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_nfs_share ~ ' ' ~ windows_nfs_password ~ ' /user:' ~ windows_nfs_username }}
+              {%- else -%}
+              {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_nfs_share }}
+              {%- endif -%}
+          no_log: "{{ hide_secrets | default(false) }}"
+
+        - name: "Copy pkupdatefw files to guest OS"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_execute_cmd_no_log: "{{ hide_secrets | default(false) }}"
+            win_powershell_cmd: >-
+              {{ win_nfs_mount_cmd }};
+              if (-not (Test-Path -Path '{{ pkupdatefw_dest_dir }}')) { New-Item -ItemType Directory -Path '{{ pkupdatefw_dest_dir }}' -Force; };
+              Copy-Item -Path '{{ pkupdatefw_nfs_dir }}\*' -Destination '{{ pkupdatefw_dest_dir }}' -Recurse -Force -ErrorAction Stop;
+              net use {{ drive_letter_new }}: /delete
+
+        - name: "Install the pkupdatefw driver"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              pnputil /add-driver "{{ pkupdatefw_dest_dir }}\*.inf" /install
+
+        - name: "Shutdown the VM"
+          include_tasks: ../utils/win_shutdown_restart.yml
+          vars:
+            set_win_power_state: "shutdown"
+
+        - name: "Poweron VM"
+          include_tasks: ../../common/vm_set_power_state.yml
+          vars:
+            vm_power_state_set: "powered-on"
+        - name: "Get VM IP address"
+          include_tasks: ../utils/win_update_inventory.yml
+
+        - name: "Get the PK from the guest OS after installing the pkupdatefw driver"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              (Get-SecureBootUEFI -Name PK -Decoded).Subject -match 'Windows OEM Devices PK'
+
+        - name: "Verify if PK is valid"
+          ansible.builtin.assert:
+            that:
+              -  not win_powershell_cmd_output.failed
+              -  win_powershell_cmd_output.stdout_lines[0].strip() == "True"
+            fail_msg: "PK is not valid"
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true
