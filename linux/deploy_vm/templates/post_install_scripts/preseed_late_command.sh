@@ -6,13 +6,13 @@
 required_pkgs="open-vm-tools"
 {% if unattend_installer == 'Ubuntu-Ubiquity' %}
 # Ubuntu Desktop required packages
-required_pkgs="$required_pkgs open-vm-tools-desktop build-essential openssh-server vim locales cloud-init rdma-core rdmacm-utils ibverbs-utils"
+required_pkgs="$required_pkgs open-vm-tools-desktop build-essential openssh-server vim locales cloud-init rdma-core rdmacm-utils ibverbs-utils curl"
 {% elif unattend_installer == 'Debian' %}
 # Debian required packages
-required_pkgs="$required_pkgs open-vm-tools-desktop cloud-init debconf-utils rdma-core rdmacm-utils ibverbs-utils"
+required_pkgs="$required_pkgs open-vm-tools-desktop cloud-init debconf-utils rdma-core rdmacm-utils ibverbs-utils curl"
 {% elif unattend_installer == 'Pardus' %}
 # Pardus required packages
-required_pkgs="$required_pkgs openssh-server build-essential sg3-utils vim python3-apt dbus lsof"
+required_pkgs="$required_pkgs openssh-server build-essential sg3-utils vim python3-apt dbus lsof curl"
 if [ "X$OS_DM" != "X" ]; then
   required_pkgs="$required_pkgs open-vm-tools-desktop"
 fi
