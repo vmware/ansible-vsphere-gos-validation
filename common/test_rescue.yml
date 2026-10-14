@@ -22,7 +22,7 @@
   vars:
     dir_path: "{{ current_test_log_folder }}"
     dir_mode: "0777"
-  when: not current_test_folder_result.stat.exists
+  when: not (current_test_folder_result.stat.exists | default(false) | bool)
 
 - name: "Collect VM's information"
   when:
@@ -48,9 +48,9 @@
 
     - name: "Extract text from VM screenshot at failed test case {{ current_testcase_name }}"
       when:
-        - extract_screenshot_text | default(false)
-        - tesseract_is_installed
-        - vm_screenshot_local_path
+        - extract_screenshot_text | default(false) | bool
+        - tesseract_is_installed | default(false) | bool
+        - vm_screenshot_local_path is defined and vm_screenshot_local_path | length > 0
       block:
         - name: "Extract text from screenshot file"
           include_tasks: extract_text_from_screenshot.yml
@@ -74,21 +74,20 @@
       with_items:
         - "{{ vm_vmx_path | default(vm_name ~ '.vmx') | basename }}"
         - "vmware.log"
-      when: vm_dir_name is defined and vm_dir_name
+      when: vm_dir_name is defined and vm_dir_name | length > 0
 
     - name: "Set fact of the downloaded vmware.log file"
       ansible.builtin.set_fact:
         download_fail_vmware_log: "{{ datastore_file_download_result.dest }}"
       when:
-        - datastore_file_download_success
+        - datastore_file_download_success is defined and datastore_file_download_success | bool
         - datastore_file_download_result.dest is defined
         - datastore_file_download_result.dest | basename == "vmware.log"
 
     - name: "Check Windows guest BSOD in vmware.log"
       when:
         - gosv_test_suite == 'windows'
-        - download_fail_vmware_log is defined
-        - download_fail_vmware_log | length != 0
+        - download_fail_vmware_log is defined and download_fail_vmware_log | length > 0
       block:
         - name: "Look up Windows guest BSOD in vmware.log"
           ansible.builtin.set_fact:

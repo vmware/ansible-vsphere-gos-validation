@@ -70,7 +70,7 @@
         vm_change_power_state: "{{ vm_answer_question_result }}"
       when:
         - vm_answer_question_result is defined
-        - vm_answer_question_result
+        - vm_answer_question_result | length > 0
 
 - name: "Failed to set VM power state"
   ansible.builtin.fail:
@@ -79,13 +79,13 @@
       {{ vm_change_power_state.msg | default('') }}
   when: >
     vm_change_power_state is undefined or
-    (vm_change_power_state.failed is defined and vm_change_power_state.failed)
+    (vm_change_power_state.failed is defined and vm_change_power_state.failed | bool)
 
 - name: "Display the result of changing VM power state"
   ansible.builtin.debug: var=vm_change_power_state
 
 - name: "Wait for VM having expected power state"
-  when: vm_change_power_state.changed
+  when: vm_change_power_state.changed | bool
   block:
     - name: "Wait {{ vm_set_power_state_sleep | default(10) }} seconds after setting VM power state"
       ansible.builtin.pause:

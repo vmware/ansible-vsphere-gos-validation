@@ -78,7 +78,7 @@
       ansible.builtin.assert:
         that:
           - win_enable_bl_cmd_result is defined
-          - not (win_enable_bl_cmd_result.stderr is defined and win_enable_bl_cmd_result.stderr)
+          - not (win_enable_bl_cmd_result.stderr is defined and win_enable_bl_cmd_result.stderr | length > 0)
         fail_msg: "Execute 'Enable-BitLocker' command in guest OS returns error: {{ win_enable_bl_cmd_result.stderr | default('') }}"
 
 # Command "manage-bde" returns noting in Windows Server 2016 through
@@ -120,7 +120,7 @@
 - name: "Check 'C:' drive key protector is TPM"
   ansible.builtin.assert:
     that:
-      - win_bde_vol_info
+      - win_bde_vol_info is defined and win_bde_vol_info | length > 0
       - win_bde_vol_info.KeyProtector is defined
       - win_bde_vol_info.KeyProtector is search('Tpm')
     fail_msg: "Not get 'Tpm' from the 'KeyProtector' property: {{ win_bde_vol_info.KeyProtector | default('') }}"
