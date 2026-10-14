@@ -6,18 +6,18 @@
 - name: "Check ESXi host information is provided"
   ansible.builtin.assert:
     that:
-      - esxi_hostname is defined and esxi_hostname
-      - esxi_username is defined and esxi_username
-      - esxi_password is defined and esxi_password
+      - esxi_hostname is defined and esxi_hostname | length > 0
+      - esxi_username is defined and esxi_username | length > 0
+      - esxi_password is defined and esxi_password | length > 0
     fail_msg: "Invalid variables: esxi_hostname, esxi_username and esxi_password must be set"
 
 # Check VM variables
 - name: "Check VM information is provided"
   ansible.builtin.assert:
     that:
-      - vm_name is defined and vm_name
-      - vm_username is defined and vm_username
-      - vm_password is defined and vm_password
+      - vm_name is defined and vm_name | length > 0
+      - vm_username is defined and vm_username | length > 0
+      - vm_password is defined and vm_password | length > 0
     fail_msg: "Invalid variables: vm_name, vm_username and vm_password must be set"
 
 - name: "Check username is root for existing Linux VM"
@@ -26,11 +26,11 @@
       - vm_username == "root"
     fail_msg: "Existing VM must use root to run test"
   when:
-    - not new_vm
+    - not (new_vm | bool)
     - gosv_test_suite == "linux"
 
 - name: "Check variables when testing on new VM"
-  when: new_vm
+  when: new_vm | bool
   block:
     - name: "Check VM deploy method"
       ansible.builtin.assert:
@@ -42,14 +42,14 @@
     - name: "Check datastore is defined"
       ansible.builtin.assert:
         that:
-          - datastore is defined and datastore
+          - datastore is defined and datastore | length > 0
         fail_msg: "'datastore' must be set for new VM"
 
     # Check variables for deploying VM from OVA
     - name: "Check variables for deploying VM from OVA"
       ansible.builtin.assert:
         that:
-          - ova_path is defined and ova_path
+          - ova_path is defined and ova_path | length > 0
           - (ova_nfs_server_path is undefined or
              (not ova_nfs_server_path) or
              ova_nfs_server_path.split(':') | length == 2)
@@ -62,22 +62,22 @@
         - name: "Check 'guest_id' for new VM"
           ansible.builtin.assert:
             that:
-              - guest_id is defined and guest_id
+              - guest_id is defined and guest_id | length > 0
             fail_msg: "Parameter 'guest_id' is set to '{{ guest_id | default('') }}', which must be set to a valid value in vars/test.yml"
 
         - name: "Check variables for installing OS from ISO images"
           ansible.builtin.assert:
             that:
-              - (os_installation_iso_url is undefined and os_installation_iso_list is defined and os_installation_iso_list) or
-                ((os_installation_iso_url is defined and os_installation_iso_url) or (os_installation_iso_checksum is defined and os_installation_iso_checksum and os_installation_iso_checksum.split(':')[0] in ['md5', 'sha256']))
+              - (os_installation_iso_url is undefined and os_installation_iso_list is defined and os_installation_iso_list | length > 0) or
+                ((os_installation_iso_url is defined and os_installation_iso_url | length > 0) or (os_installation_iso_checksum is defined and os_installation_iso_checksum | length > 0 and os_installation_iso_checksum.split(':')[0] in ['md5', 'sha256']))
             fail_msg: "Please either set os_installation_iso_url and/or os_installation_iso_checksum for downloading OS image, or set os_installation_iso_list with ISO images located on ESXi datastore"
 
     - name: "Check vCenter is set when create new VM with vTPM"
       ansible.builtin.assert:
         that:
-          - vcenter_hostname is defined and vcenter_hostname
-          - vcenter_username is defined and vcenter_username
-          - vcenter_password is defined and vcenter_password
-          - datacenter is defined and datacenter
+          - vcenter_hostname is defined and vcenter_hostname | length > 0
+          - vcenter_username is defined and vcenter_username | length > 0
+          - vcenter_password is defined and vcenter_password | length > 0
+          - datacenter is defined and datacenter | length > 0
         fail_msg: "vCenter hostname, user account and datacenter info should be set when creating new VM with vTPM device"
       when: virtual_tpm is defined and virtual_tpm | bool

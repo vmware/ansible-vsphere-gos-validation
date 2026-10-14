@@ -11,9 +11,9 @@
       - vm_serial_backing is defined
       - vm_serial_backing.type is defined
       - vm_serial_backing.type in ['device', 'file', 'pipe', 'network']
-      - ((vm_serial_backing.type == 'device' and vm_serial_backing.deviceName | default('')) or
-        (vm_serial_backing.type == 'file' and vm_serial_backing.fileName | default('')) or
-        (vm_serial_backing.type == 'pipe' and vm_serial_backing.pipeName | default('')))
+      - ((vm_serial_backing.type == 'device' and vm_serial_backing.deviceName | default('') | length > 0) or
+        (vm_serial_backing.type == 'file' and vm_serial_backing.fileName | default('') | length > 0) or
+        (vm_serial_backing.type == 'pipe' and vm_serial_backing.pipeName | default('') | length > 0))
     fail_msg: "Parameter 'vm_serial_backing' must be set with the backing info of a serial port."
 
 - name: "Remove the serial port backing file before removing serial port"
@@ -47,7 +47,7 @@
   ansible.builtin.assert:
     that:
       - remove_serial_port.changed is defined
-      - remove_serial_port.changed
+      - remove_serial_port.changed | bool
     fail_msg: >-
       Failed to remove serial port {{ vm_serial_backing }} from VM because the result of reconfiguring
       VM task for removing serial port is not changed.

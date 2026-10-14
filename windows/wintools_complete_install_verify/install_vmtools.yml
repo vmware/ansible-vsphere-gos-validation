@@ -59,7 +59,7 @@
   ansible.builtin.assert:
     that:
       - create_sched_task_result.changed is defined
-      - create_sched_task_result.changed
+      - create_sched_task_result.changed | bool
     fail_msg: "Not get the 'changed' state in the result of creating scheduled task '{{ create_sched_task_result | default('') }}'."
 
 - name: "Pause 5 seconds after creating VMware Tools install scheduled task"
@@ -88,7 +88,7 @@
   when: >
     (sched_task_status.attempts is undefined or sched_task_status.attempts | int < 45) and
     ((sched_task_status.msg is defined and sched_task_status.msg | lower is search("connection")) or
-    (sched_task_status.unreachable is defined and sched_task_status.unreachable))
+    (sched_task_status.unreachable is defined and sched_task_status.unreachable | bool))
   block:
     - name: "Get VM IP address again to refresh the connection"
       include_tasks: ../utils/win_update_inventory.yml

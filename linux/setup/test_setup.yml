@@ -71,12 +71,12 @@
     skip_reason: "Blocked"
   when:
     - skip_test_no_vmtools is defined
-    - skip_test_no_vmtools
+    - skip_test_no_vmtools | bool
     - not (vmtools_is_running is defined and vmtools_is_running | bool)
 
 - name: "Take a base snapshot if it does not exist"
   include_tasks: create_base_snapshot.yml
-  when: not base_snapshot_exists
+  when: not (base_snapshot_exists | bool)
 
 - name: "Get VMware Tools version and build"
   include_tasks: ../utils/get_guest_ovt_version_build.yml
@@ -89,7 +89,7 @@
   when:
     - vmtools_is_running is defined
     - vmtools_is_running | bool
-    - guestinfo_gathered is undefined or not guestinfo_gathered
+    - guestinfo_gathered is undefined or not (guestinfo_gathered | bool)
 
 # Hit issue in Ubuntu 22.04 casually: Temporary failure in name resolution. Restarting servcie can fix it
 - name: "Check if it needs to restart systemd-resolved or not to get DNS servers"

@@ -4,7 +4,7 @@
 - name: "Check VMware Tools source parameters"
   ansible.builtin.assert:
     that:
-      - (vmtools_url_path is defined and vmtools_url_path) or (vmtools_iso_path is defined and vmtools_iso_path)
+      - (vmtools_url_path is defined and vmtools_url_path | length > 0) or (vmtools_iso_path is defined and vmtools_iso_path | length > 0)
     fail_msg: "One of parameters 'vmtools_url_path', 'vmtools_iso_path' must be set when 'vmtools_esxi_bundled' is set to '{{ vmtools_esxi_bundled }}'."
   when:
     - vmtools_esxi_bundled is defined
@@ -12,7 +12,7 @@
 
 - name: "Set install ESXi bundled VMware Tools by default"
   ansible.builtin.set_fact:
-    vmtools_esxi_bundled: "{{ (vmtools_url_path is undefined or not vmtools_url_path) and (vmtools_iso_path is undefined or not vmtools_iso_path) }}"
+    vmtools_esxi_bundled: "{{ (vmtools_url_path is undefined or vmtools_url_path | length == 0) and (vmtools_iso_path is undefined or vmtools_iso_path | length == 0) }}"
   when: vmtools_esxi_bundled is undefined
 
 - name: "Skip test case"

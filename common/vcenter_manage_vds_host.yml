@@ -11,7 +11,7 @@
 - name: "Check parameters for managing ESXi host on vSphere Distributed Switch"
   ansible.builtin.assert:
     that:
-      - vds_name is defined and vds_name
+      - vds_name is defined and vds_name | length > 0
       - vds_host_state is defined
       - vds_host_state in ['present', 'absent']
       - vds_host_vmnics is undefined or vds_host_vmnics | type_debug == 'list'
@@ -43,7 +43,7 @@
 
 - name: "Diplay the result of managing ESXi host for vSphere Distributed Switch"
   ansible.builtin.debug: var=manage_vds_host_result
-  when: enable_debug
+  when: enable_debug | bool
 
 - name: "Get info about the vSphere Distributed Switch"
   include_tasks: vcenter_get_vds_info.yml
@@ -51,7 +51,7 @@
 - name: "Check ESXi host is {{ vds_host_state }} in the vSphere Distributed Switch"
   ansible.builtin.assert:
     that:
-      - vds_info
+      - vds_info is defined and vds_info | length > 0
       - vds_info.configure is defined
       - vds_info.configure.hosts is defined
       - ((vds_host_state == 'present' and esxi_hostname in vds_info.configure.hosts) or
