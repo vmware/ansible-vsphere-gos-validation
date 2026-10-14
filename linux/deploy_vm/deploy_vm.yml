@@ -58,7 +58,7 @@
 
         - name: "Print VM guest IP address"
           ansible.builtin.debug: var=vm_guest_ip
-          when: vm_guest_ip is defined and vm_guest_ip
+          when: vm_guest_ip is defined and vm_guest_ip | length > 0
       rescue:
         - name: "Display ESXi and CPU model information at deployment failure"
           ansible.builtin.debug:
@@ -66,7 +66,7 @@
               VM deployment failed on server {{ esxi_model_info }} with
               ESXi version {{ esxi_version }} build {{ esxi_build }} installed.
               The server's CPU model is {{ esxi_cpu_model_info }}
-              {{ ' (code name ' ~ esxi_cpu_code_name ~ ')' if esxi_cpu_code_name }}
+              {{ ' (code name ' ~ esxi_cpu_code_name ~ ')' if esxi_cpu_code_name is defined and esxi_cpu_code_name | length > 0 }}
           tags:
             - fail_message
 
@@ -100,7 +100,7 @@
         - name: "Clean up local cache"
           when:
             - unattend_iso_cache is defined
-            - unattend_iso_cache
+            - unattend_iso_cache | bool
           block:
             # Remove original OS ISO image downloaded from ESXi datastore
             - name: "Remove source ISO image from local cache"

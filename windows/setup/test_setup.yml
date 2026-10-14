@@ -96,17 +96,17 @@
 - name: "Get VM guest info including guest id, full name, family and detailed data"
   include_tasks: ../../common/vm_get_guest_info.yml
   when:
-    - vmtools_is_running
-    - guestinfo_gathered is undefined or not guestinfo_gathered
+    - vmtools_is_running | bool
+    - guestinfo_gathered is undefined or not (guestinfo_gathered | bool)
 
 - name: "Take a base snapshot if it does not exist"
   include_tasks: create_base_snapshot.yml
-  when: not base_snapshot_exists
+  when: not (base_snapshot_exists | bool)
 
 - name: "Set fact of whether VM boot disk controller is known"
   ansible.builtin.set_fact:
-    vm_boot_disk_ctrl_got: "{{ win_boot_disk_ctrl_type is defined and win_boot_disk_ctrl_type }}"
+    vm_boot_disk_ctrl_got: "{{ win_boot_disk_ctrl_type is defined and win_boot_disk_ctrl_type | length > 0 }}"
 
 - name: "Get boot disk controller type in guest OS"
   include_tasks: ../utils/win_get_boot_disk_ctrl_type.yml
-  when: not vm_boot_disk_ctrl_got
+  when: not (vm_boot_disk_ctrl_got | bool)

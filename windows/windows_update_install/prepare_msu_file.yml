@@ -58,8 +58,8 @@
 - name: "Set mount command for accessing the shared folder"
   ansible.builtin.set_fact:
     win_nfs_mount_cmd: |-
-      {%- if windows_nfs_username is defined and windows_nfs_username and 
-        windows_nfs_password is defined and windows_nfs_password -%}
+      {%- if windows_nfs_username is defined and windows_nfs_username | length > 0 and 
+        windows_nfs_password is defined and windows_nfs_password | length > 0 -%}
       {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_nfs_share ~ ' ' ~ windows_nfs_password ~ ' /user:' ~ windows_nfs_username }}
       {%- else -%}
       {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_nfs_share }}
@@ -113,5 +113,5 @@
     - name: "Verify if the .msu file is copied to {{ msu_dest_dir }}"
       ansible.builtin.assert:
         that:
-          - win_check_file_exist_result
+          - win_check_file_exist_result is defined and win_check_file_exist_result | bool
         fail_msg: "The .msu file is not found in {{ msu_dest_dir }} in guest OS."
