@@ -55,7 +55,7 @@ ipv4=$(ifconfig ${ifdev} | awk '/inet [0-9]+/ {print $2}')
 echo "{{ autoinstall_ipv4_msg }}$ipv4" > /dev/ttyu0
 
 # Set Proxy.
-{% if http_proxy_vm is defined and http_proxy_vm %}
+{% if http_proxy_vm is defined and http_proxy_vm | length > 0 %}
 printf "Setting proxy to {{ http_proxy_vm }} ... " >/dev/ttyu0
 setenv HTTP_PROXY {{ http_proxy_vm }}
 echo "DONE" >/dev/ttyu0

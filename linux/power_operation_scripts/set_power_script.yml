@@ -28,7 +28,7 @@
 - name: "Check current configuration is expected"
   ansible.builtin.assert:
     that:
-      - script_file_path
+      - script_file_path is defined and script_file_path | length > 0
       - power_script_result.stdout is defined
       - power_script_result.stdout.strip() == script_file_path
     fail_msg: "The {{ power_script_op }} script is {{ power_script_result.stdout | default('') }}, not expected {{ script_file_path }}."
@@ -42,7 +42,7 @@
 - name: "Check the configuration is expected in tools.conf"
   ansible.builtin.assert:
     that:
-      - script_file_in_conf_file
+      - script_file_in_conf_file is defined and script_file_in_conf_file | length > 0
       - tools_conf_content_result.stdout is defined
       - tools_conf_content_result.stdout.find(script_file_in_conf_file) != -1
     fail_msg: "Failed to find the {{ script_file_in_conf_file }} in tool.conf for {{ power_script_op }} script."
@@ -89,7 +89,7 @@
 
 - name: "Check the script file running as expected"
   when:
-    - script_tag_path is defined and script_tag_path
+    - script_tag_path is defined and script_tag_path | length > 0
     - power_script_type == "custom"
     - power_script_op != "suspend"
   block:
@@ -100,7 +100,7 @@
       register: tag_path_exist_result
       until:
         - tag_path_exist_result.stat.exists is defined
-        - tag_path_exist_result.stat.exists
+        - tag_path_exist_result.stat.exists | bool
       retries: 30
       delay: 5
 
@@ -108,7 +108,7 @@
       ansible.builtin.assert:
         that:
           - tag_path_exist_result.stat.exists is defined
-          - tag_path_exist_result.stat.exists
+          - tag_path_exist_result.stat.exists | bool
         fail_msg: "Failed to find {{ script_tag_path }} for {{ power_script_type }} {{ power_script_op }}."
         success_msg: "Successfully found the {{ script_tag_path }} for {{ power_script_type }} {{ power_script_op }}."
 
