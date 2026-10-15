@@ -14,7 +14,7 @@
     guest_file_path: "{{ cloudinit_bin_path }}"
 
 - name: "Get cloud-init version"
-  when: guest_file_exists
+  when: guest_file_exists | bool
   block:
     # Some OS might print cloud-init version to stderr
     - name: "Get cloud-init version from package info"
@@ -30,7 +30,8 @@
         - get_cloudinit_version.rc is defined
         - get_cloudinit_version.rc == 0
         - get_cloudinit_version.stdout is defined
-        - get_cloudinit_version.stdout
+        - get_cloudinit_version.stdout | length > 0
 
 - name: "Print the cloud-init version"
   ansible.builtin.debug: var=cloudinit_version
+  when: enable_debug is defined and enable_debug | bool

@@ -18,8 +18,8 @@
     skip_msg: "Test case '{{ ansible_play_name }}' is skipped because VM has open-vm-tools and update_vmtools is set to: {{ update_vmtools }}"
     skip_reason: "Skipped"
   when:
-    - vmtools_is_installed
-    - not update_vmtools
+    - vmtools_is_installed | bool
+    - not (update_vmtools | bool)
 
 # Flatcar and RHCOS doesn't support to install open-vm-tools
 - name: "Skip test case for {{ guest_os_ansible_distribution }}"
@@ -37,13 +37,13 @@
       and the uninstall method is unknown.
     skip_reason: "Not Applicable"
   when:
-    - vmtools_is_installed
+    - vmtools_is_installed | bool
     - vmtools_install_type != 'package'
 
 - name: "Set open-vm-tools default install type"
   ansible.builtin.set_fact:
     linux_ovt_install_type: "package"
-  when: linux_ovt_install_type is undefined or not linux_ovt_install_type
+  when: linux_ovt_install_type is undefined or linux_ovt_install_type | length == 0
 
 - name: "Check open-vm-tools install type is valid"
   ansible.builtin.assert:

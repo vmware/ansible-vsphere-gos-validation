@@ -10,14 +10,14 @@
     - name: "Set current test case index, name and log folder"
       include_tasks: ../../common/set_current_testcase_facts.yml
       vars:
-        create_test_case_folder: "{{ new_vm }}"
+        create_test_case_folder: "{{ new_vm | bool }}"
 
     - name: "Skip test case"
       include_tasks: ../../common/skip_test_case.yml
       vars:
         skip_msg: "Skip test case due to new_vm is set to '{{ new_vm }}'"
         skip_reason: "Skipped"
-      when: not new_vm
+      when: not (new_vm | bool)
 
     - name: "Test case block"
       block:
@@ -109,7 +109,7 @@
                 local_path: "{{ src_iso_file_path }}"
               when:
                 - src_iso_file_path is defined
-                - src_iso_file_path
+                - src_iso_file_path | length > 0
 
             - name: "Remove ISO files from local cache folder {{ unattend_iso_cache }}"
               include_tasks: ../../common/delete_local_file.yml
@@ -118,7 +118,7 @@
               with_items: "{{ transferred_unattend_iso_list }}"
               when:
                 - transferred_unattend_iso_list is defined
-                - transferred_unattend_iso_list
+                - transferred_unattend_iso_list | length > 0
 
             - name: "Copy unattend install config files in cache folder to test log folder"
               ansible.builtin.copy:
@@ -133,7 +133,7 @@
         - name: "Unmount NFS share folder and remove mount folder"
           when:
             - nfs_mount_dir is defined
-            - nfs_mount_dir
+            - nfs_mount_dir | length > 0
           block:
             - name: "Umount NFS share points"
               include_tasks: ../../common/local_unmount.yml

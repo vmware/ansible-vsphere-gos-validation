@@ -28,7 +28,7 @@
             file_in_datastore_failed_ignore: true
           when:
             - os_installation_iso_upgrade is defined
-            - os_installation_iso_upgrade
+            - os_installation_iso_upgrade | length > 0
 
         # Parameter os_installation_iso_upgrade is required
         - name: "Check upgrade to OS installation ISO Image"
@@ -38,7 +38,7 @@
                 failure_msg: "Skip test case due to required parameter 'os_installation_iso_upgrade' is not set or empty: '{{ os_installation_iso_upgrade | default('') }}'."
               when: >
                 (os_installation_iso_upgrade is undefined) or
-                (os_installation_iso_upgrade == "")
+                (os_installation_iso_upgrade | length == 0)
             - name: "Set failure message"
               ansible.builtin.set_fact:
                 failure_msg: "Skip test case due to parameter 'os_installation_iso_upgrade' set file path does not exist: '{{ file_in_datastore_result | default('Fail') }}'."
@@ -51,7 +51,7 @@
                 skip_msg: "{{ failure_msg }}'"
                 skip_reason: "Blocked"
           when: >
-            (os_installation_iso_upgrade is undefined or os_installation_iso_upgrade == "") or
+            (os_installation_iso_upgrade is undefined or os_installation_iso_upgrade | length == 0) or
             (file_in_datastore_result is undefined or file_in_datastore_result == 'Fail')
 
         - name: "Set fact of the guest OS distribution before upgrade"

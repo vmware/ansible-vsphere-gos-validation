@@ -25,8 +25,8 @@
     - name: "Set default RPM GPG key"
       when:
         - gpg_check is defined
-        - gpg_check
-        - gpg_key_path is undefined or not gpg_key_path
+        - gpg_check | bool
+        - gpg_key_path is undefined or gpg_key_path | length == 0
       block:
         - name: "Get default RPM GPG key file"
           include_tasks: get_rpm_gpg_key_file.yml
@@ -34,12 +34,12 @@
         - name: "Set default RPM GPG key"
           ansible.builtin.set_fact:
             gpg_key_path: "file://{{ guest_rpm_gpg_key_path }}"
-          when: guest_rpm_gpg_key_path
+          when: guest_rpm_gpg_key_path | length > 0
 
         - name: "Test failed because not found RPM GPG key"
           ansible.builtin.fail:
             msg: "Can't not add repository when GPG check is enabled but RPM GPG key is not found."
-          when: not guest_rpm_gpg_key_path
+          when: guest_rpm_gpg_key_path | length == 0
 
     - name: "Set fact of the prefix of repository base URL"
       ansible.builtin.set_fact:
@@ -60,6 +60,7 @@
 
     - name: "Display the result of adding yum repository"
       ansible.builtin.debug: var=add_yum_repo_result
+      when: enable_debug is defined and enable_debug | bool
 
     - name: "Update yum repository file"
       when:

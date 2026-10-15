@@ -66,7 +66,7 @@
   when:
     - gosc_failed_items | length > 0
     - guest_os_ansible_distribution == "Ubuntu"
-    - enable_cloudinit_gosc
+    - enable_cloudinit_gosc | bool
     - ip_assignment == "dhcp"
 
 - name: "Ignore Perl GOSC failure on DNS customization for {{ guest_os_ansible_distribution }} on vCenter {{ vcenter_version }}"
@@ -74,7 +74,7 @@
     - gosc_failed_items | length > 0
     - guest_os_ansible_distribution == "Debian"
     - guest_os_ansible_distribution_major_ver is version('13', '<=')
-    - not enable_cloudinit_gosc
+    - not (enable_cloudinit_gosc | bool)
     - vcenter_version is version('9.0.1', '<=')
   block:
     - name: "Ignore DNS customization failures"
@@ -113,7 +113,7 @@
         gosc_failed_items: "{{ gosc_failed_items | difference(ignored_gosc_failed_items) }}"
   when:
     - gosc_failed_items | length > 0
-    - enable_cloudinit_gosc
+    - enable_cloudinit_gosc | bool
     - ip_assignment == "static"
     - (vcenter_version is version('6.5.0', '==') and vcenter_build | int < 14020092) or (vcenter_version is version('6.7.0', '==') and vcenter_build | int < 13010631)
 

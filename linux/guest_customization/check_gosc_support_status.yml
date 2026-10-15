@@ -6,7 +6,7 @@
   vars:
     skip_msg: "Test case '{{ ansible_play_name }}' is skipped because vCenter server is not configured"
     skip_reason: "Not Applicable"
-  when: not vcenter_is_defined
+  when: not (vcenter_is_defined | bool)
 
 - name: "Skip test case"
   include_tasks: ../../common/skip_test_case.yml
@@ -15,7 +15,7 @@
       Test case '{{ ansible_play_name }}' is blocked because cloud-init GOSC
       requires installed VMware Tools is open-vm-tools
     skip_reason: "Blocked"
-  when: enable_cloudinit_gosc and not vmtools_is_ovt
+  when: (enable_cloudinit_gosc | bool) and not (vmtools_is_ovt | bool)
 
 - name: "Skip test case"
   include_tasks: ../../common/skip_test_case.yml
@@ -40,7 +40,7 @@
     - name: "Check Perl GOSC support status for VMware Photon OS"
       when:
         - guest_os_ansible_distribution == 'VMware Photon OS'
-        - not enable_cloudinit_gosc
+        - not (enable_cloudinit_gosc | bool)
       block:
         - name: "Get open-vm-tools package info"
           include_tasks: ../utils/get_installed_package_info.yml
@@ -59,7 +59,7 @@
           vars:
             skip_msg: "Perl GOSC is not applicable for {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} with not bundled open-vm-tools {{ vmtools_version }}."
             skip_reason: "Not Applicable"
-          when: not gosc_is_supported
+          when: not (gosc_is_supported | bool)
 
     - name: "Set default guest OS list not support GOSC"
       ansible.builtin.set_fact:
@@ -80,7 +80,7 @@
 
     - name: "Set cloud-init GOSC support status for {{ vm_guest_os_distribution }}"
       when:
-        - enable_cloudinit_gosc
+        - enable_cloudinit_gosc | bool
         - ((guest_os_ansible_distribution == "Debian" and guest_os_ansible_distribution_major_ver | int <= 13) or
            (guest_os_ansible_distribution == "Pardus GNU/Linux" and guest_os_ansible_distribution_major_ver | int <= 25))
       block:
@@ -98,7 +98,7 @@
 
     - name: "Check Perl GOSC support status for {{ vm_guest_os_distribution }}"
       when:
-        - not enable_cloudinit_gosc
+        - not (enable_cloudinit_gosc | bool)
         - guest_os_ansible_distribution not in gos_not_support_gosc
       block:
         - name: "Set fact of Perl GOSC support matrix"
@@ -182,7 +182,7 @@
           GOSC is supported for {{ vm_guest_os_distribution }} with open-vm-tools {{ vmtools_version }}
           on vCenter Server {{ vcenter_version }} build {{ vcenter_build }}.
           See https://partnerweb.vmware.com/programs/guestOS/guest-os-customization-matrix.pdf.
-      when: gosc_is_supported
+      when: gosc_is_supported | bool
 
     - name: "Skip test case due to GOSC is not supported for {{ vm_guest_os_distribution }}"
       include_tasks: ../../common/skip_test_case.yml
@@ -193,4 +193,4 @@
           vCenter Server {{ vcenter_version }} build {{ vcenter_build }}.
           See https://partnerweb.vmware.com/programs/guestOS/guest-os-customization-matrix.pdf.
         skip_reason: "Not Supported"
-      when: not gosc_is_supported
+      when: not (gosc_is_supported | bool)
