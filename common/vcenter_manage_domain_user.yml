@@ -50,7 +50,7 @@
 - name: "Set default user domain of vCenter Server"
   ansible.builtin.set_fact:
     vcenter_domain_name: "{{ vcenter_username.split('@')[-1] }}"
-  when: vcenter_domain_name is undefined or not vcenter_domain_name
+  when: vcenter_domain_name is undefined or vcenter_domain_name | length == 0
 
 - name: "Set command for adding domain user"
   ansible.builtin.set_fact:
@@ -82,14 +82,14 @@
 
 - name: "Display result of managing domain user"
   ansible.builtin.debug: var=manage_domain_user_result
-  when: enable_debug | bool
+  when: enable_debug is defined and enable_debug | bool
 
 - name: "Check the result of managing domain user '{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}'"
   ansible.builtin.assert:
     that:
       - manage_domain_user_result.unreachable is undefined
       - manage_domain_user_result.failed is defined
-      - not manage_domain_user_result.failed
+      - not (manage_domain_user_result.failed | bool)
     fail_msg: >-
       Failed to {{ vcenter_domain_user_op }} domain user '{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}'.
       {%- if manage_domain_user_result.rc is defined and manage_domain_user_result.rc != 0 -%}
@@ -123,14 +123,14 @@
 
     - name: "Display result of adding domain user to user group"
       ansible.builtin.debug: var=modify_user_group_result
-      when: enable_debug | bool
+      when: enable_debug is defined and enable_debug | bool
 
     - name: "Check the result of adding domain user to user group '{{ vcenter_domain_user_group }}'"
       ansible.builtin.assert:
         that:
           - modify_user_group_result.unreachable is undefined
           - modify_user_group_result.failed is defined
-          - not modify_user_group_result.failed
+          - not (modify_user_group_result.failed | bool)
         fail_msg: >-
           Failed to add domain user '{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}'
           to user group '{{ vcenter_domain_user_group }}'.
@@ -147,4 +147,4 @@
   when:
     - vcenter_domain_user_op == "add"
     - vcenter_domain_user_group is defined
-    - vcenter_domain_user_group
+    - vcenter_domain_user_group | length > 0

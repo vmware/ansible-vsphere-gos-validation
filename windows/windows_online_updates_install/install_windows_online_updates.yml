@@ -16,7 +16,7 @@
   ansible.builtin.set_fact:
     win_updates_categories_expect: >-
       {{ win_updates_categories_expect + ["Upgrades"] }}
-  when: win_check_is_updated
+  when: win_check_is_updated | bool
 
 - name: "Resume Windows Update in guest OS"
   include_tasks: ../utils/win_pause_resume_win_update.yml
@@ -28,14 +28,14 @@
     win_updates_reject_list: "{{ windows_updates_reject_list.split(',') | map('trim') }}"
   when:
     - windows_updates_reject_list is defined
-    - windows_updates_reject_list
+    - windows_updates_reject_list | length > 0
 
 # Ignore errors when not expect guest OS to be updated
 - name: "Search Windows online updates"
   include_tasks: ../utils/win_get_online_updates.yml
   vars:
-    win_updates_ignore_errors: "{{ not win_check_is_updated }}"
-    win_get_updates_retries: "{{ 5 if win_check_is_updated else 1 }}"
+    win_updates_ignore_errors: "{{ not (win_check_is_updated | bool) }}"
+    win_get_updates_retries: "{{ 5 if (win_check_is_updated | bool) else 1 }}"
 
 - name: "Try to install Windows online updates"
   include_tasks: ../utils/win_install_online_updates.yml
@@ -52,9 +52,9 @@
       newer than the current build '{{ win_os_build_before_update }}'.
     skip_reason: "Not Applicable"
   when:
-    - not win_check_is_updated
-    - win_online_updates_succeed
-    - not win_online_updates_installed
+    - not (win_check_is_updated | bool)
+    - win_online_updates_succeed | bool
+    - not (win_online_updates_installed | bool)
 
 # Fail test case when not all updates installed and not expect guest OS to be updated
 - name: "Not all Windows updates installed in guest OS"
@@ -65,8 +65,8 @@
       newer than the current build '{{ win_os_build_before_update }}', please check the
       failure messages of not installed updates.
   when:
-    - not win_check_is_updated
-    - not win_online_updates_succeed
+    - not (win_check_is_updated | bool)
+    - not (win_online_updates_succeed | bool)
 
 # Fail test case when no or not all updates installed while expect guest OS to be updated
 - name: "No or not all Windows updates installed in guest OS"
@@ -76,5 +76,5 @@
       configured expected build number is '{{ windows_updated_build_num }}', while after trying to
       install Windows updates in guest OS, no update or not all updates installed.
   when:
-    - win_check_is_updated
-    - not win_online_updates_installed or not win_online_updates_succeed
+    - win_check_is_updated | bool
+    - not (win_online_updates_installed | bool) or not (win_online_updates_succeed | bool)

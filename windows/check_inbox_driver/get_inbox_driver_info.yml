@@ -15,7 +15,7 @@
 - name: "Set fact of PVSCSI driver info"
   ansible.builtin.set_fact:
     inbox_pvscsi_info: "{{ inbox_pvscsi_info | combine({item.split(' : ')[0].strip(): item.split(' : ')[1].strip()}) }}"
-  when: item
+  when: item | length > 0
   loop: "{{ win_driver_info }}"
 - name: "Add PVSCSI driver info to list"
   ansible.builtin.set_fact:
@@ -30,7 +30,7 @@
 - name: "Set fact of VMXNET3 driver info"
   ansible.builtin.set_fact:
     inbox_vmxnet3_info: "{{ inbox_vmxnet3_info | combine({item.split(' : ')[0].strip(): item.split(' : ')[1].strip()}) }}"
-  when: item
+  when: item | length > 0
   loop: "{{ win_driver_info }}"
 - name: "Add VMXNET3 driver info to list"
   ansible.builtin.set_fact:
@@ -39,6 +39,7 @@
 
 - name: "Print inbox drivers info"
   ansible.builtin.debug: var=inbox_drivers_info
+  when: enable_debug is defined and enable_debug | bool
 
 # Collect inbox drivers info in json file
 - name: "Save inbox drivers info"

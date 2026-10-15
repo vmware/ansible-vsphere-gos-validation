@@ -36,9 +36,9 @@
       vars:
         service_name: "ssh"
       when: >
-        not service_info or
+        service_info | length == 0 or
         service_info.name is undefined or
-        not service_info.name or
+        service_info.name | length == 0 or
         service_info.state is undefined or
         service_info.state != "running"
 
@@ -46,16 +46,16 @@
       ansible.builtin.set_fact:
         sshd_service_info: "{{ service_info }}"
       when:
-        - service_info
+        - service_info | length > 0
         - service_info.name is defined
-        - service_info.name
+        - service_info.name | length > 0
         - service_info.state is defined
         - service_info.state == "running"
 
     - name: "Check sshd or ssh service exists"
       ansible.builtin.assert:
         that:
-          - sshd_service_info is defined and sshd_service_info | length > 0
+          - sshd_service_info | length > 0
         fail_msg: "Failed to find sshd or ssh service in guest OS"
 
     - name: "Restart {{ sshd_service_info.name }}"
@@ -67,4 +67,5 @@
 
     - name: "Print {{ sshd_service_info.name }} restart result"
       ansible.builtin.debug: var=restart_sshd_result
+      when: enable_debug is defined and enable_debug | bool
   when: sshd_config_file_exists | bool

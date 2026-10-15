@@ -161,7 +161,7 @@
     jid: "{{ ovt_installer_result.ansible_job_id }}"
   delegate_to: "{{ vm_guest_ip }}"
   register: ovt_install_job_result
-  until: ovt_install_job_result.finished
+  until: ovt_install_job_result.finished | bool
   retries: 60
   delay: 10
 
@@ -197,8 +197,8 @@
     service_file: "{{ vgauth_service_file }}"
     service_file_local_path: "{{ vgauth_service_file_local_path | default('') }}"
   when:
-    - vgauth_service_name
-    - vgauth_service_file
+    - vgauth_service_name | length > 0
+    - vgauth_service_file | length > 0
 
 - name: "Add and enable open-vm-tools service"
   include_tasks: add_enable_service.yml

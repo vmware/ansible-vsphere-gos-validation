@@ -19,14 +19,14 @@
     vm_key_id_info: "{{ vm_config.config.keyId }}"
   when:
     - vm_config.config.keyId is defined
-    - vm_config.config.keyId
+    - vm_config.config.keyId | length > 0
 
 - name: "Set fact of disk 'keyId' info from VM config.hardware.device"
   ansible.builtin.set_fact:
     vm_disk_key_id_info: "{{ vm_disk_key_id_info + [item.backing.keyId] }}"
   when:
     - item.backing.keyId is defined
-    - item.backing.keyId
+    - item.backing.keyId | length > 0
   with_items: "{{ vm_config.config.hardware.device |
                   selectattr('_vimtype', 'equalto', 'vim.vm.device.VirtualDisk') }}"
   no_log: true
@@ -36,3 +36,4 @@
     msg:
       - "The VM 'KeyId' info in VM config: {{ vm_key_id_info }}"
       - "The disk 'KeyId' info in VM config.hardware.device: {{ vm_disk_key_id_info }}"
+  when: enable_debug is defined and enable_debug | bool

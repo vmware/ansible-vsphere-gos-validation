@@ -13,7 +13,7 @@
     supported_guest_ids: []
 
 - name: "Set guest id pattern and bit from short-name in tools.conf"
-  when: guest_short_name
+  when: guest_short_name | length > 0
   block:
     - name: "Set facts of guest id pattern and bit from short-name in tools.conf"
       ansible.builtin.set_fact:
@@ -25,7 +25,7 @@
         guest_id_major_version: "{{ guest_id_pattern | regex_search('\\d+$') | default(0) }}"
 
 - name: "Set guest id pattern and bit from guest OS release"
-  when: not guest_short_name
+  when: guest_short_name | length == 0
   block:
     - name: "Set fact of guest id bit"
       ansible.builtin.set_fact:
@@ -49,7 +49,7 @@
          vmtools_version is version('12.5.0', '<'))
 
     - name: "Set guest id pattern for {{ guest_os_ansible_distribution }}"
-      when: not guest_is_otherlinux
+      when: not (guest_is_otherlinux | bool)
       block:
         - name: "Initialize facts to map guest id for {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
@@ -89,8 +89,8 @@
   ansible.builtin.set_fact:
     supported_guest_ids: "{{ esxi_guest_ids_for_bit | select('match', guest_id_pattern) }}"
   when:
-    - guest_id_pattern
-    - not guest_is_otherlinux
+    - guest_id_pattern | length > 0
+    - not (guest_is_otherlinux | bool)
 
 # Not found supported guest ids for guest OS distribution, then look for supported other Linux guest ids
 - name: "Get supported other Linux guest ids"
@@ -101,6 +101,7 @@
 
 - name: "Display supported guest ids for {{ vm_guest_os_distribution }}"
   ansible.builtin.debug: var=supported_guest_ids
+  when: enable_debug is defined and enable_debug | bool
 
 - name: "Set fact of expected guest id for {{ vm_guest_os_distribution }}"
   ansible.builtin.set_fact:
@@ -129,6 +130,6 @@
 - name: "Check expected guest id is not empty"
   ansible.builtin.assert:
     that:
-      - expected_guest_id is defined and expected_guest_id | length > 0
+      - expected_guest_id | length > 0
     fail_msg: >-
       Failed to match a proper guest id for {{ vm_guest_os_distribution }} on ESXi {{ esxi_version }}.

@@ -57,7 +57,7 @@
     - win_boot_disk_ctrl_type in ['lsilogicsas', 'paravirtual']
 
 - name: "Handle BitLocker Device Encryption not enabled automatically situation"
-  when: not win_bde_auto_enable
+  when: not (win_bde_auto_enable | bool)
   block:
     - name: "Set fact of the command for enabling BitLocker in guest OS"
       ansible.builtin.set_fact:
@@ -103,7 +103,7 @@
 # while key protector is None
 - name: "Add TPM protector"
   when:
-    - win_bde_auto_enable
+    - win_bde_auto_enable | bool
     - win_bde_vol_info_before.KeyProtector is undefined or win_bde_vol_info_before.KeyProtector is not search('Tpm')
   block:
     - name: "Add TPM protector for C: drive encryption"

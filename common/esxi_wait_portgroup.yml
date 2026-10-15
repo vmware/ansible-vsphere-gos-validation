@@ -35,12 +35,12 @@
 
 - name: "Display the portgroup facts"
   ansible.builtin.debug: var=portgroup_facts
-  when: enable_debug
+  when: enable_debug is defined and enable_debug | bool
 
 - name: "Check waiting for portgroup result"
   ansible.builtin.assert:
     that:
       - portgroup_facts is defined
       - portgroup_facts.failed is defined
-      - not portgroup_facts.failed
+      - not (portgroup_facts.failed | bool)
     fail_msg: "Timed out waiting for portgroup '{{ wait_for_portgroup_name }}' info retrieved in {{ esxi_wait_portgroup_timeout | default(300) }} seconds."

@@ -42,9 +42,9 @@
             skip_msg: "Skip test case {{ ansible_play_name }} is because of missing vCenter Server variables."
             skip_reason: "Not Applicable"
           when: >
-            (not vcenter_is_defined) or
-            (vcenter_ssh_username is undefined or not vcenter_ssh_username) or
-            (vcenter_ssh_password is undefined or not vcenter_ssh_password)
+            (not (vcenter_is_defined | bool)) or
+            (vcenter_ssh_username is undefined or vcenter_ssh_username | length == 0) or
+            (vcenter_ssh_password is undefined or vcenter_ssh_password | length == 0)
 
         - name: "Verify 'VGAuthService' is running"
           ansible.builtin.assert:
@@ -69,7 +69,7 @@
           vars:
             skip_msg: "Test case {{ ansible_play_name }} is blocked because SSH connection to vCenter Server failed."
             skip_reason: "Blocked"
-          when: not ssh_connect_success
+          when: not (ssh_connect_success | bool)
 
         - name: "Set NTP servers on vCenter Server and ESXi server"
           include_tasks: ../../linux/host_verify_saml_token/set_vsphere_ntp_servers.yml
@@ -84,7 +84,7 @@
             win_powershell_cmd: "& '{{ vmtools_toolboxcmd_path }}' timesync enable"
           when:
             - vmtools_toolboxcmd_exists is defined
-            - vmtools_toolboxcmd_exists
+            - vmtools_toolboxcmd_exists | bool
 
         - name: "Initialize facts about domain user information"
           ansible.builtin.set_fact:
