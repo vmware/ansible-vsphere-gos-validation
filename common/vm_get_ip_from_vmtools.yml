@@ -11,7 +11,7 @@
   ansible.builtin.assert:
     that:
       - vm_primary_nic_mac is defined
-      - vm_primary_nic_mac
+      - vm_primary_nic_mac | length > 0
     fail_msg: "Parameter 'vm_primary_nic_mac' must be set for getting VM's guest IPv4 address."
 
 - name: "Initialize VM guest IP/IP list variables"
@@ -32,7 +32,7 @@
 - name: "Get all IP address in VM guest info"
   ansible.builtin.set_fact:
     vm_guest_all_ip: "{{ vm_guest_all_ip | union(item.ipAddress) }}"
-  when: item.ipAddress is defined and item.ipAddress
+  when: item.ipAddress is defined and item.ipAddress | length > 0
   with_items: "{{ vm_guest_net }}"
 
 - name: "Set the fact of MAC and IP addresses"
@@ -40,7 +40,7 @@
     vm_guest_mac_ipv4: "{{ vm_guest_mac_ipv4 |
                            combine({item.macAddress: (item.ipAddress | ansible.utils.ipv4)[0]}) }}"
   when:
-    - item.macAddress is defined and item.macAddress
+    - item.macAddress is defined and item.macAddress | length > 0
     - item.ipAddress is defined
     - item.ipAddress | ansible.utils.ipv4 | length == 1
   with_items: "{{ vm_guest_net }}"
@@ -53,7 +53,7 @@
     vm_guest_ip: "{{ vm_guest_mac_ipv4[vm_primary_nic_mac] }}"
   when:
     - vm_guest_mac_ipv4[vm_primary_nic_mac] is defined
-    - vm_guest_mac_ipv4[vm_primary_nic_mac]
+    - vm_guest_mac_ipv4[vm_primary_nic_mac] | length > 0
 
 - name: "Display VM's guest IP addresses retrieved by VMware Tools"
   ansible.builtin.debug:

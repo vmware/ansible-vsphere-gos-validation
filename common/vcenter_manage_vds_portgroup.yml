@@ -17,8 +17,8 @@
 - name: "Check paramters for managing a distributed port group"
   ansible.builtin.assert:
     that:
-      - vds_name is defined and vds_name
-      - vds_portgroup_name is defined and vds_portgroup_name
+      - vds_name is defined and vds_name | length > 0
+      - vds_portgroup_name is defined and vds_portgroup_name | length > 0
       - vds_portgroup_state is defined
       - vds_portgroup_state in ['present', 'absent']
     fail_msg: >-
@@ -46,14 +46,14 @@
 
 - name: "Display the result of managing distributed port group"
   ansible.builtin.debug: var=manage_vds_portgroup_result
-  when: enable_debug
+  when: enable_debug | bool
 
 - name: "Check the result of managing distributed port group"
   ansible.builtin.assert:
     that:
       - manage_vds_portgroup_result is defined
       - manage_vds_portgroup_result.changed is defined
-      - manage_vds_portgroup_result.changed
+      - manage_vds_portgroup_result.changed | bool
     fail_msg: "Failed to {{ vds_portgroup_op }} distributed port group '{{ vds_portgroup_name }}'"
 
 - name: "Wait for creating distributed port group is completed"
