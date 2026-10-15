@@ -20,9 +20,10 @@
     win_tpm_info: "{{ win_powershell_cmd_output.stdout | replace('\u0000', '') | from_yaml }}"
   when:
     - win_powershell_cmd_output.failed is defined
-    - not win_powershell_cmd_output.failed
+    - not (win_powershell_cmd_output.failed | bool)
     - win_powershell_cmd_output.stdout is defined
-    - win_powershell_cmd_output.stdout
+    - win_powershell_cmd_output.stdout | length > 0
 
 - name: "Display the TPM device info got in guest OS"
   ansible.builtin.debug: var=win_tpm_info
+  when: enable_debug is defined and enable_debug | bool

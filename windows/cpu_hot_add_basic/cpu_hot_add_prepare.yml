@@ -7,7 +7,7 @@
 
 - name: "Enable VM CPU hot add or set initial VM CPU number"
   when: >
-    (not vm_cpu_hotadd_enabled and enable_vm_cpu_hotadd) or
+    (not (vm_cpu_hotadd_enabled | bool) and (enable_vm_cpu_hotadd | bool)) or
     (vm_cpu_num | int != initial_cpu_num | int) or
     (vm_cpu_cores_per_socket | int != initial_cores_num | int)
   block:
@@ -18,8 +18,8 @@
     - name: "Enable VM CPU hot add"
       include_tasks: ../../common/vm_enable_cpu_hotadd.yml
       when:
-        - not vm_cpu_hotadd_enabled
-        - enable_vm_cpu_hotadd
+        - not (vm_cpu_hotadd_enabled | bool)
+        - enable_vm_cpu_hotadd | bool
 
     - name: "Set VM CPU number to the initial value"
       include_tasks: ../../common/vm_set_cpu_number.yml

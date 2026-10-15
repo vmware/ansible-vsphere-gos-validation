@@ -29,11 +29,12 @@
           ansible.builtin.shell: cat "{{ hosts_template_file }}" | grep '.*fqdn}} .*hostname}}.*' | awk '{ print $1 }'
           delegate_to: "{{ vm_guest_ip }}"
           register: fqdn_hostname_bind_ip
-          failed_when: fqdn_hostname_bind_ip.stderr
+          failed_when: fqdn_hostname_bind_ip.stderr | length > 0
         - name: "Print the IP address list to be binding with FQDN and hostname from hosts template file"
           ansible.builtin.debug: var=fqdn_hostname_bind_ip
-      when: hosts_template_file
-  when: enable_cloudinit_gosc
+          when: enable_debug is defined and enable_debug | bool
+      when: hosts_template_file | length > 0
+  when: enable_cloudinit_gosc | bool
 
 - name: "Shutdown OS"
   include_tasks: ../utils/shutdown.yml

@@ -2,18 +2,18 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 - name: "Handle VM without vTPM device situation"
-  when: not vm_with_vtpm
+  when: not (vm_with_vtpm | bool)
   block:
     - name: "Power off instant cloned VM"
       include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: 'powered-off'
-      when: not vmtools_is_running
+      when: not (vmtools_is_running | bool)
     - name: "Shutdown instant cloned VM"
       include_tasks: ../../common/vm_set_power_state.yml
       vars:
         vm_power_state_set: 'shutdown-guest'
-      when: vmtools_is_running
+      when: vmtools_is_running | bool
 
     - name: "Add key provider on vCenter server"
       include_tasks: ../../common/vcenter_add_key_provider.yml

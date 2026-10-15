@@ -37,7 +37,7 @@
     - name: "Check the primary network adapter MAC address of client VM '{{ pvrdma_client_vm_name }}'"
       ansible.builtin.assert:
         that:
-          - pvrdma_client_vm_primary_nic_mac is defined and pvrdma_client_vm_primary_nic_mac | length > 0
+          - pvrdma_client_vm_primary_nic_mac | length > 0
           - pvrdma_client_vm_primary_nic_mac != pvrdma_server_vm_primary_nic_mac
         fail_msg: >-
           The primary network adapter's MAC address of client VM '{{ pvrdma_client_vm_name }}'
@@ -57,14 +57,14 @@
         src_path: "{{ guest_primary_nic_config_path }}"
         dest_path: "{{ current_test_log_folder }}/{{ guest_primary_nic_config_path | ansible.builtin.basename }}_after_clone"
         guest_file_ops_ignore_error: true
-      when: vmtools_is_running
+      when: vmtools_is_running | bool
 
     - name: "Refresh client VM's guest IP till it has different IP with server VM"
       include_tasks:
         file: refresh_pvrdma_client_vm_ip.yml
         apply:
           when: >
-             (not pvrdma_client_vm_guest_ip) or
+             (pvrdma_client_vm_guest_ip is undefined or pvrdma_client_vm_guest_ip | length == 0) or
              (pvrdma_client_vm_guest_ip in pvrdma_client_vm_invalid_ips)
       with_list: "{{ range(1, 11) | list }}"
       loop_control:
@@ -98,6 +98,7 @@
 
     - name: "Display inventory hosts in group 'target_vm'"
       ansible.builtin.debug: var=groups['target_vm']
+      when: enable_debug is defined and enable_debug | bool
 
     - name: "Set fact of client VM is ready for PVRDMA testing"
       ansible.builtin.set_fact:
@@ -127,7 +128,7 @@
         msg: "PVRDMA testing on client VM succeeded"
   rescue:
     - name: "Collect client VM's guest OS information for triage"
-      when: pvrdma_client_vm_ready
+      when: pvrdma_client_vm_ready | bool
       block:
         - name: "Collect client VM's guest OS logs"
           include_tasks: ../setup/linux_test_rescue.yml

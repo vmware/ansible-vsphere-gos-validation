@@ -35,7 +35,7 @@
     win_check_file_exist_file: "{{ win_updates_log_file }}"
 
 - name: "Fetch Windows online updates log file"
-  when: win_check_file_exist_result
+  when: win_check_file_exist_result | bool
   block:
     - name: "Get log file from guest OS to local machine"
       include_tasks: ../utils/win_get_file.yml
@@ -61,8 +61,8 @@
 # If guest OS has been updated, take a new base snapshot and remove the old one.
 - name: "Reset base snapshot if Windows online updates installed"
   when:
-    - win_online_updates_succeed
-    - win_online_updates_installed
+    - win_online_updates_succeed | bool
+    - win_online_updates_installed | bool
   block:
     - name: "Get guest OS version build"
       include_tasks: ../utils/win_get_os_version.yml

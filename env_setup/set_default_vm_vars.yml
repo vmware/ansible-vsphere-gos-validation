@@ -131,7 +131,7 @@
       Please check your configuration in vars/test.yml.
   when:
     - firmware == 'efi'
-    - secureboot_enabled
+    - secureboot_enabled | bool
 
 - name: "Check CPU number and cores per socket values for new VM"
   ansible.builtin.assert:
@@ -155,14 +155,14 @@
       }}
   when:
     - cpu_number is defined and cpu_number | int > 0
-    - cpu_cores_per_socket is undefined or not cpu_cores_per_socket
+    - cpu_cores_per_socket is undefined or cpu_cores_per_socket | int == 0
 
 # CPU number is not defined, then set the recommended ones
 - name: "Set fact of the default CPU number and cores per socket for new VM"
   ansible.builtin.set_fact:
     cpu_number: "{{ (guest_config_options.rec_cpu_cores_per_socket | int) * (guest_config_options.rec_cpu_socket | int) }}"
     cpu_cores_per_socket: "{{ guest_config_options.rec_cpu_cores_per_socket }}"
-  when: cpu_number is undefined or not cpu_number
+  when: cpu_number is undefined or cpu_number | int == 0
 
 - name: "Check Windows VM CPU socket number"
   include_tasks: check_cpu_socket.yml

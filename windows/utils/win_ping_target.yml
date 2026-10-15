@@ -11,9 +11,10 @@
 - name: "Check ping target IP address is specified"
   ansible.builtin.fail:
     msg: "Please specify ping target IP address"
-  when: win_ping_target_ip is undefined or not win_ping_target_ip
+  when: win_ping_target_ip is undefined or win_ping_target_ip | length == 0
 - ansible.builtin.debug:
     msg: "Will ping this target IP address: {{ win_ping_target_ip }}"
+  when: enable_debug is defined and enable_debug | bool
 
 - name: "Initialize the ping target result"
   ansible.builtin.set_fact:
@@ -21,13 +22,13 @@
 - name: "Set fact of the ping command"
   ansible.builtin.set_fact:
     win_ping_command: "ping -n 3 {{ win_ping_target_ip }}"
-  when: win_ping_src_ip is undefined or not win_ping_src_ip
+  when: win_ping_src_ip is undefined or win_ping_src_ip | length == 0
 - name: "Set fact of the ping command"
   ansible.builtin.set_fact:
     win_ping_command: "ping -n 3 -S {{ win_ping_src_ip }} {{ win_ping_target_ip }}"
   when:
     - win_ping_src_ip is defined
-    - win_ping_src_ip
+    - win_ping_src_ip | length > 0
 
 - name: "Ping target IP address in Windows guest OS"
   include_tasks: win_execute_cmd.yml

@@ -33,14 +33,14 @@
   ignore_errors: true
 - name: "Display getting device driver info result"
   ansible.builtin.debug: var=win_get_device_driver_result
-  when: enable_debug
+  when: enable_debug is defined and enable_debug | bool
 
 - name: "Getting device driver info failed"
   ansible.builtin.fail:
     msg: "Failed to get the driver info of device with description keyword '{{ win_device_desc_keyword }}' in {{ win_get_device_driver_timeout | default(300) }} seconds."
   when:
     - win_get_device_driver_result.failed is defined
-    - win_get_device_driver_result.failed
+    - win_get_device_driver_result.failed | bool
 
 - name: "Set fact of device driver info"
   block:
@@ -51,7 +51,7 @@
       with_items: "{{ win_get_device_driver_result.stdout_lines }}"
   when:
     - win_get_device_driver_result.failed is defined
-    - not win_get_device_driver_result.failed
+    - not (win_get_device_driver_result.failed | bool)
 
 - name: "Display device driver info"
   ansible.builtin.debug:

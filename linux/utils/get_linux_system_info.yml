@@ -53,7 +53,7 @@
       }}
 
 - name: "Correct OS distribution info"
-  when: not guest_os_ansible_distrib_is_correct
+  when: not (guest_os_ansible_distrib_is_correct | bool)
   block:
     # Overwrite /etc/redhat-release with correct OS release information
     # for RHEL variant OS like ProLinux so that ansible can retrieve
@@ -70,9 +70,10 @@
 
     - name: "Display content of guest OS file /etc/redhat-release"
       ansible.builtin.debug: var=guest_os_redhat_release
+      when: enable_debug is defined and enable_debug | bool
 
     - name: "Correct guest OS distribution info"
-      when: guest_os_redhat_release | regex_search("Red *Hat", ignorecase=True)
+      when: guest_os_redhat_release is search("Red *Hat", ignorecase=True)
       block:
         - name: "Get content of guest OS file /etc/system-release"
           ansible.builtin.command: "cat /etc/system-release"
@@ -83,7 +84,7 @@
         - name: "Update /etc/redhat-release and refresh OS distribution info"
           when:
             - get_system_release.stdout is defined
-            - get_system_release.stdout
+            - get_system_release.stdout | length > 0
           block:
             - name: "Set fact of guest OS system release"
               ansible.builtin.set_fact:
