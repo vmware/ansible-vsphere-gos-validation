@@ -177,7 +177,7 @@
         ovf_vm_vmtools_info |
         combine({'Guest Tools Version': guestinfo_vmtools_info })
       }}
-  when: guestinfo_vmtools_info
+  when: guestinfo_vmtools_info | length > 0
 
 - name: "Get VM's guest OS distribution"
   block:
@@ -213,7 +213,7 @@
       when:
         - guest_detailed_data_dict.familyName is defined
         - guest_detailed_data_dict.familyName =='Linux'
-  when: guestinfo_detailed_data
+  when: guestinfo_detailed_data | length > 0
 
 - name: "Collect guest OS distribution and VMware tools info"
   ansible.builtin.set_fact:
@@ -226,6 +226,7 @@
 
 - name: "Display the VM hardware configuration deployed from OVF or OVA"
   ansible.builtin.debug: var=ovf_vm_hardware_config
+  when: enable_debug is defined and enable_debug | bool
 
 # Save the VM hardware info to json file
 - name: "Set fact of json file name for VM hardware configuration info"
@@ -233,17 +234,17 @@
     ovf_vm_hardware_config_file: "{{ ('-').join(ovf_vm_guest_os.split(',')[0].split(' ')) }}-{{ ovf_vm_guest_build.replace('.', '-') }}-{{ ovf_vm_guest_bitness }}bit-ovf-config.json"
   when:
     - ovf_vm_guest_os is search('Windows')
-    - ovf_vm_guest_build
-    - ovf_vm_guest_bitness
+    - ovf_vm_guest_build | length > 0
+    - ovf_vm_guest_bitness | length > 0
 
 # Save the VM hardware info to json file
 - name: "Set fact of json file name for VM hardware configuration info"
   ansible.builtin.set_fact:
     ovf_vm_hardware_config_file: "{{ ovf_vm_guest_os | regex_replace(' \\(.*\\)', '') | replace(' ', '-') }}-{{ ovf_vm_guest_bitness }}bit-ovf-config.json"
   when:
-    - ovf_vm_guest_os
+    - ovf_vm_guest_os | length > 0
     - ovf_vm_guest_os is not search('Windows')
-    - ovf_vm_guest_bitness
+    - ovf_vm_guest_bitness | length > 0
 
 - name: "Dump VM hardware configuration info to json file"
   ansible.builtin.copy:

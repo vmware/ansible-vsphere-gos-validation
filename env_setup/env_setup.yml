@@ -30,20 +30,20 @@
     - name: "Check VM '{{ vm_name }}' does not exist"
       ansible.builtin.assert:
         that:
-          - not vm_exists
+          - not (vm_exists | bool)
         fail_msg: "Cann't deploy VM as a VM with same name '{{ vm_name }}' already exists. Please provide a new vm_name."
-      when: new_vm
+      when: new_vm | bool
 
     - name: "Check VM '{{ vm_name }}' exists"
       ansible.builtin.assert:
         that:
           - vm_exists is defined and vm_exists | bool
         fail_msg: "VM '{{ vm_name }}' doesn't exist. Please set new_vm to True to deploy the VM or provide an existing VM name."
-      when: not new_vm
+      when: not (new_vm | bool)
 
     - name: "Get vCenter Server version and build"
       include_tasks: ../common/vcenter_get_version_build.yml
-      when: vcenter_is_defined
+      when: vcenter_is_defined | bool
 
     - name: "Get ESXi version and build"
       include_tasks: ../common/esxi_get_version_build.yml
@@ -66,12 +66,12 @@
 
     - name: "Cleanup snapshots and get VM related information for existing VM"
       include_tasks: existing_vm_setup.yml
-      when: vm_exists
+      when: vm_exists | bool
 
     - name: "Set facts of new VM configurations"
       include_tasks: set_default_vm_vars.yml
       when:
-        - new_vm
+        - new_vm | bool
         - vm_deploy_method == "iso"
 
     - name: "Enable guest IP hack on ESXi host to get IP address of VM without VMware Tools available"
@@ -91,4 +91,4 @@
         msg: >-
           Tesseract OCR engine is required for extracting text from VM screenshot at test failure. Please install
           Tesseract OCR for full functionality by referring to https://github.com/tesseract-ocr/tesseract?tab=readme-ov-file#installing-tesseract.
-      when: not tesseract_is_installed
+      when: not (tesseract_is_installed | bool)

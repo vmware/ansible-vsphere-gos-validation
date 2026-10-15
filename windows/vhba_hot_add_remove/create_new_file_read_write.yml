@@ -91,13 +91,13 @@
 
     - name: "Handle known issue on {{ new_disk_node_ctrl_type }} {{ test_disk_ctrl_type }} controller"
       include_tasks: handle_nvme_boot_known_issue.yml
-      when: nvme_boot_known_issue
+      when: nvme_boot_known_issue | bool
 
     - name: "Restart guest OS failed on {{ guest_os_ansible_distribution }}"
       ansible.builtin.fail:
         msg: "{{ disk_issue_msg }}"
-      when: not nvme_boot_known_issue
+      when: not (nvme_boot_known_issue | bool)
 
 - name: "Check new file content again after guest OS restart"
   include_tasks: check_file_after_restart.yml
-  when: not restart_guest_os.failed | default(false)
+  when: not (restart_guest_os.failed | default(false) | bool)

@@ -22,7 +22,7 @@
 
 # Guest OS has /usr/bin/resolvectl command
 - name: "Get DNS servers and search domains for {{ guest_os_ansible_distribution }}"
-  when: resolvectl_status_result
+  when: resolvectl_status_result | bool
   block:
     - name: "Fetch the output file of '{{ guest_resolvectl_cmd }} status'"
       include_tasks: ../../common/vm_guest_file_operation.yml
@@ -43,7 +43,7 @@
         resolvectl_dns_result: "{{ vm_shell_result.exit_code is defined and vm_shell_result.exit_code == 0 }}"
 
     - name: "Get DNS servers for {{ guest_os_ansible_distribution }}"
-      when: resolvectl_dns_result
+      when: resolvectl_dns_result | bool
       block:
         - name: "Fetch the output file of '{{ guest_resolvectl_cmd }} dns'"
           include_tasks: ../../common/vm_guest_file_operation.yml
@@ -68,7 +68,7 @@
         resolvectl_domain_result: "{{ vm_shell_result.exit_code is defined and vm_shell_result.exit_code == 0 }}"
 
     - name: "Get DNS search domains for {{ guest_os_ansible_distribution }}"
-      when: resolvectl_domain_result
+      when: resolvectl_domain_result | bool
       block:
         - name: "Fetch the output file of '{{ guest_resolvectl_cmd }} domain'"
           include_tasks: ../../common/vm_guest_file_operation.yml
@@ -118,7 +118,7 @@
 # For Ubuntu 18.04.4 or later guest, try to use systemd-resolve command
 - name: "Get DNS servers and search domains for {{ guest_os_ansible_distribution }}"
   when:
-    - not resolvectl_status_result
+    - not (resolvectl_status_result | bool)
     - guest_os_ansible_distribution == 'Ubuntu'
   block:
     - name: "Run command '/usr/bin/systemd-resolve --status' to get DNS servers and search domains"
@@ -133,7 +133,7 @@
         systemd_resolve_result: "{{ vm_shell_result.exit_code is defined and vm_shell_result.exit_code == 0 }}"
 
     - name: "Get DNS servers and search domains from systemd-resolve status"
-      when: systemd_resolve_result
+      when: systemd_resolve_result | bool
       block:
         - include_tasks: ../../common/vm_guest_file_operation.yml
           vars:

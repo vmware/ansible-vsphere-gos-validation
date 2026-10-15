@@ -32,7 +32,7 @@
 - name: "Set default process uid to root"
   ansible.builtin.set_fact:
     process_uid: "root"
-  when: process_uid is undefined or not process_uid
+  when: process_uid is undefined or process_uid | length == 0
 
 - block:
     - name: "Get user '{{ process_uid }}' process '{{ process_name }}' }}"
@@ -41,6 +41,7 @@
 
     - name: "Print running process info"
       ansible.builtin.debug: var=running_process_info
+      when: enable_debug is defined and enable_debug | bool
 
     - name: "Check process '{{ process_name }}' is running"
       ansible.builtin.assert:

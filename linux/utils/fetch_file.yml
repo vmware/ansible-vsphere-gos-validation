@@ -39,19 +39,19 @@
       delay: 10
       until:
         - fetch_guest_file.failed is defined
-        - not fetch_guest_file.failed
+        - not (fetch_guest_file.failed | bool)
       ignore_errors: "{{ fetch_file_ignore_errors | default(false) }}"
       delegate_to: "{{ vm_guest_ip }}"
 
     - name: "Display the result of fetching guest file"
       ansible.builtin.debug: var=fetch_guest_file
-      when: enable_debug
+      when: enable_debug is defined and enable_debug | bool
 
     - name: "Set fact of the local file path for the fetched guest OS file"
       ansible.builtin.set_fact:
         fetch_file_local_path: "{{ fetch_guest_file.dest }}"
       when:
         - fetch_guest_file.failed is defined
-        - not fetch_guest_file.failed
+        - not (fetch_guest_file.failed | bool)
         - fetch_guest_file.dest is defined
-        - fetch_guest_file.dest
+        - fetch_guest_file.dest | length > 0

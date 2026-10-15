@@ -53,7 +53,7 @@
     esxi_service_name: "ntpd"
     esxi_service_state: "{{ esxi_service_running | ternary('unchanged', 'start') }}"
     esxi_service_policy: "on"
-  when: (not esxi_service_running) or (not esxi_service_policy_on)
+  when: (not (esxi_service_running | bool)) or (not (esxi_service_policy_on | bool))
 
 # Get firewall rule for NTP traffic
 - name: "Get firewall rule for NTP traffic on ESXi server"
@@ -70,6 +70,6 @@
     rule_enabled: true
   when: >-
     esxi_firewall_rule_info.enabled is undefined or
-    not esxi_firewall_rule_info.enabled or
+    not (esxi_firewall_rule_info.enabled | bool) or
     esxi_firewall_rule_info.allowed_hosts.all_ip is undefined or
-    not esxi_firewall_rule_info.allowed_hosts.all_ip
+    not (esxi_firewall_rule_info.allowed_hosts.all_ip | bool)

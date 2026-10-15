@@ -17,8 +17,8 @@
 
 - name: "Get VM info after reverting to base snapshot"
   when:
-    - base_snapshot_exists
-    - vm_info_retrieved is undefined or not vm_info_retrieved
+    - base_snapshot_exists | bool
+    - vm_info_retrieved is undefined or not (vm_info_retrieved | bool)
   block:
     - name: "Get VM info at base snapshot"
       include_tasks: ../../common/vm_get_vm_info.yml
@@ -34,12 +34,12 @@
   vars:
     vm_power_state_set: "restarted"
   when:
-    - base_snapshot_exists
+    - base_snapshot_exists | bool
     - guest_os_ansible_distribution is defined
     - guest_os_ansible_distribution == 'FreeBSD'
 
 - name: "Get '{{ vm_guest_id }}' guest config options with VM hardware version '{{ vm_hardware_version_num }}'"
-  when: guest_options_retrieved is undefined or not guest_options_retrieved
+  when: guest_options_retrieved is undefined or not (guest_options_retrieved | bool)
   block:
     - name: "Get VM guest options"
       include_tasks: ../../common/esxi_get_guest_config_options.yml
@@ -56,10 +56,11 @@
 
 - name: "Print VM guest IP address"
   ansible.builtin.debug: var=vm_guest_ip
+  when: enable_debug is defined and enable_debug | bool
 
 - name: "Get guest OS system info"
   include_tasks: ../utils/get_linux_system_info.yml
-  when: guest_os_system_info_retrieved is undefined or not guest_os_system_info_retrieved
+  when: guest_os_system_info_retrieved is undefined or not (guest_os_system_info_retrieved | bool)
 
 - name: "Get VMware Tools status"
   include_tasks: ../../common/vm_get_vmtools_status.yml
@@ -82,7 +83,7 @@
   include_tasks: ../utils/get_guest_ovt_version_build.yml
   when:
     - vmtools_is_installed | bool
-    - vmtools_info_retrieved is undefined or not vmtools_info_retrieved
+    - vmtools_info_retrieved is undefined or not (vmtools_info_retrieved | bool)
 
 - name: "Get VM guest info including guest id, full name, family and detailed data"
   include_tasks: ../../common/vm_get_guest_info.yml

@@ -4,7 +4,7 @@
 # Handle guest customization known issues with workarounds
 #
 - name: "Handle Perl GOSC known issues"
-  when: not enable_cloudinit_gosc
+  when: not (enable_cloudinit_gosc | bool)
   block:
     # Perl GOSC fails on CentOS/RHEL 10 or their varieties on vCenter Server 8.0.3 because
     # /etc/sysconfig/network-scripts doesn't exist.
@@ -24,7 +24,7 @@
             guest_file_path: "{{ guest_sysconfig_network_dir }}"
 
         - name: "Add Perl GOSC workaround for {{ vm_guest_os_distribution }} on vCenter Server {{ vcenter_version }}"
-          when: not guest_file_exists
+          when: not (guest_file_exists | bool)
           block:
             - name: "Create directory {{ guest_sysconfig_network_dir }} on {{ vm_guest_os_distribution }}"
               ansible.builtin.shell: "mkdir -p {{ guest_sysconfig_network_dir }}"
@@ -73,7 +73,7 @@
 # Cloud-init GOSC failure on Oracle Linux 8.7 and 9.1
 - name: "Handle known issue for {{ vm_guest_os_distribution }} on vCenter Server {{ vcenter_version }}"
   when:
-    - enable_cloudinit_gosc
+    - enable_cloudinit_gosc | bool
     - guest_os_ansible_distribution == "OracleLinux"
     - guest_os_ansible_distribution_ver in ['8.7', '9.1']
   block:

@@ -180,7 +180,7 @@
         - name: "Collect GOSC log"
           when:
             - gosc_deploypkg_log_local is defined
-            - gosc_deploypkg_log_local
+            - gosc_deploypkg_log_local | length > 0
           block:
             - name: "Get stat of {{ gosc_deploypkg_log_local }}"
               ansible.builtin.stat:
@@ -194,12 +194,12 @@
                 src_path: "{{ gosc_deploypkg_log_file }}"
                 dest_path: "{{ gosc_deploypkg_log_local }}"
               when:
-                - not (gosc_deploypkg_log_stat.stat.exists | default(false))
+                - not (gosc_deploypkg_log_stat.stat.exists | default(false) | bool)
                 - vmtools_is_running is defined
                 - vmtools_is_running | bool
 
         - name: "Colect cloud-init logs"
           include_tasks: ../utils/collect_cloudinit_logs.yml
           when: >
-            enable_cloudinit_gosc or
+            (enable_cloudinit_gosc | bool) or
             (guest_os_ansible_distribution == "VMware Photon OS")

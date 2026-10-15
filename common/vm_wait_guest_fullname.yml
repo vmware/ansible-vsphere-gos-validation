@@ -36,12 +36,13 @@
   ignore_errors: true
   until:
     - vm_guestinfo.instance.guest.toolsRunningStatus | default('') == "guestToolsRunning"
-    - vm_guestinfo.instance.guest.guestFullName | default('')
-    - ((not wait_guest_fullname) or
-      (wait_guest_fullname and wait_guest_fullname == vm_guestinfo.instance.guest.guestFullName))
+    - vm_guestinfo.instance.guest.guestFullName | default('') | length > 0
+    - ((wait_guest_fullname | length == 0) or
+      (wait_guest_fullname | length > 0 and wait_guest_fullname == vm_guestinfo.instance.guest.guestFullName))
 
 - name: "Print VM guest info"
   ansible.builtin.debug: var=vm_guestinfo
+  when: enable_debug is defined and enable_debug | bool
 
 - name: "Check VMware Tools is running and collects guest OS fullname successfully"
   ansible.builtin.assert:

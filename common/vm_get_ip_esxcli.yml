@@ -27,7 +27,7 @@
   register: get_vm_ip_esxcli
   until:
     - get_vm_ip_esxcli.stdout is defined
-    - get_vm_ip_esxcli.stdout
+    - get_vm_ip_esxcli.stdout | length > 0
     - (get_vm_ip_esxcli.stdout | from_yaml)[vm_primary_nic_mac] is defined
     - (get_vm_ip_esxcli.stdout | from_yaml)[vm_primary_nic_mac] != '0.0.0.0'
     - (get_vm_ip_esxcli.stdout | from_yaml)[vm_primary_nic_mac] is not match('^169.254.')
@@ -41,10 +41,11 @@
     vm_guest_mac_ipv4: "{{ get_vm_ip_esxcli.stdout | from_yaml }}"
   when:
     - get_vm_ip_esxcli.failed is defined
-    - not get_vm_ip_esxcli.failed
+    - not (get_vm_ip_esxcli.failed | bool)
 
 - name: "Print the fact of primary MAC and IPv4 address for VM '{{ vm_name }}'"
   ansible.builtin.debug: var=vm_guest_mac_ipv4
+  when: enable_debug is defined and enable_debug | bool
 
 - name: "Set fact of VM guest IP with primary IP for VM '{{ vm_name }}'"
   ansible.builtin.set_fact:

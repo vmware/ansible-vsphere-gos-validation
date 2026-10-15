@@ -9,7 +9,7 @@
 - name: "Set default VMware Tools debug log directory"
   ansible.builtin.set_fact:
     vmtools_log_dir: "/tmp/vmware-tools"
-  when: vmtools_log_dir is undefined or not vmtools_log_dir
+  when: vmtools_log_dir is undefined or vmtools_log_dir | length == 0
 
 # VMware Tools config file on Linux
 - name: "Set fact of VMware Tools config file for {{ guest_os_ansible_distribution }}"
@@ -63,7 +63,7 @@
       [{{ vmtools_logging_section }}]
       {{ vmtools_logging_options }}
   delegate_to: "{{ vm_guest_ip }}"
-  when: not guest_file_exists
+  when: not (guest_file_exists | bool)
 
 - name: "Update VMware Tools config file with logging options"
   include_tasks: ../../common/update_ini_style_file.yml
@@ -74,7 +74,7 @@
     option_value: "{{ item.value }}"
     ini_state: present
   loop: "{{ vmtools_logging_options | replace('=',': ') | from_yaml | dict2items }}"
-  when: guest_file_exists
+  when: guest_file_exists | bool
 
 - name: "Get content of {{ vmtools_config_file }}"
   ansible.builtin.shell: "cat {{ vmtools_config_file }}"

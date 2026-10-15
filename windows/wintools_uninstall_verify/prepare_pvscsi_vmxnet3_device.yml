@@ -18,7 +18,7 @@
 
 # Not PVSCSI boot disk controller
 - name: "Check if VM has non-boot PVSCSI controller"
-  when: not vm_has_pvscsi_boot_disk
+  when: not (vm_has_pvscsi_boot_disk | bool)
   block:
     - name: "Get PVSCSI controller number in guest OS"
       include_tasks: ../utils/win_get_ctrl_num.yml
@@ -40,8 +40,8 @@
 # VM has no such device
 - name: "VM without PVSCSI controller"
   when:
-    - not vm_has_pvscsi_boot_disk
-    - not vm_has_pvscsi_ctrl
+    - not (vm_has_pvscsi_boot_disk | bool)
+    - not (vm_has_pvscsi_ctrl | bool)
   block:
     - name: "Add a PVSCSI controller to VM"
       include_tasks: ../../common/vm_manage_controller.yml
@@ -60,7 +60,7 @@
 
 - name: "Add a VMXNET3 network adapter to VM"
   include_tasks: add_new_vmxnet3_net_adapter.yml
-  when: not vm_has_vmxnet3_net
+  when: not (vm_has_vmxnet3_net | bool)
 
 - name: "Get loaded PVSCSI and VMXNET3 drivers info"
   include_tasks: get_pvscsi_vmxnet3_info.yml
