@@ -26,7 +26,6 @@ packages:
   - rdmacm-utils
   - ibverbs-utils
   - tpm2-tools
-  - bsdextrautils
 
 runcmd:
 {% for cmd in cloudinit_runcmd %}
@@ -34,5 +33,6 @@ runcmd:
 {% endfor %}
   - echo 'Force apt-get to use IPv4 address' >/dev/ttyS0
   - echo 'Acquire::ForceIPv4 "true";' >>/etc/apt/apt.conf.d/99force-ipv4
+  - os_major_ver=$(grep VERSION= /etc/os-release | grep -Eo "[0-9]+\.[0-9]+" | cut -d '.' -f 1); [ $os_major_ver -ge 22 ] && (apt-get install -y bsdextrautils)
 
 final_message: "{{ cloudinit_final_msg }}"
