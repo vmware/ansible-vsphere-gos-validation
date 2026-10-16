@@ -262,10 +262,11 @@ class VmDetailInfo(VmGuestInfo):
 
             self.Guest_OS_Distribution = ansible_gosv_facts.get('vm_guest_os_distribution', '')
 
-            if 'is_sles_immutable' in ansible_gosv_facts:
-                self.SLES_Operating_Mode = 'Immutable' if ansible_gosv_facts.get('is_sles_immutable') else 'Standard'
-            elif ansible_gosv_facts.get('sles_operating_mode'):
-                self.SLES_Operating_Mode = ansible_gosv_facts.get('sles_operating_mode').capitalize()
+            if 'SLES' in self.Guest_OS_Distribution or 'SLED' in self.Guest_OS_Distribution:
+                if 'is_sles_immutable' in ansible_gosv_facts:
+                    self.SLES_Operating_Mode = 'Immutable' if ansible_gosv_facts.get('is_sles_immutable') else 'Standard'
+                elif ansible_gosv_facts.get('sles_operating_mode'):
+                    self.SLES_Operating_Mode = ansible_gosv_facts.get('sles_operating_mode').capitalize()
 
             if 'CloudImage' in self.Guest_OS_Distribution:
                 self.Cloud_Image_Build = (ansible_gosv_facts.get('cloud_image_build_name', '') + " (serial: "
