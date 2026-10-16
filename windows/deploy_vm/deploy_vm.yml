@@ -59,6 +59,22 @@
             extract_screenshot_text: true
             exit_testing_when_fail: true
       always:
+        - name: "Cleanup VM when cleanup_vm set to true and VM exists"
+          when:
+            - cleanup_vm | bool
+            - vm_exists is defined
+            - vm_exists
+          block:
+            - name: "Power off VM"
+              include_tasks: ../../common/vm_set_power_state.yml
+              vars:
+                vm_power_state_set: 'powered-off'
+
+            - name: "Remove VM"
+              include_tasks: ../../common/vm_remove.yml
+              vars:
+                vm_remove_ignore_errors: true
+
         - name: "Remove NFS mount point"
           when: nfs_mount_dir is defined and nfs_mount_dir
           block:
