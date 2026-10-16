@@ -2,11 +2,12 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Get ESXi server major version and update version, build bumber info by vmware_host_facts module
-- name: "Initialize ESXi version info to N/A"
+- name: "Initialize ESXi server version info"
   ansible.builtin.set_fact:
-    esxi_version: 'N/A'
-    esxi_build: 'N/A'
-    esxi_update_version: 'N/A'
+    esxi_version: ''
+    esxi_build: ''
+    esxi_update_version: ''
+
 - name: "Get ESXi server product info"
   community.vmware.vmware_host_facts:
     hostname: "{{ vsphere_host_name }}"
@@ -24,31 +25,47 @@
   no_log: true
 
 - name: "Get ESXi server version and build number"
-  when: not (gather_host_facts_result.failed | default(false) | bool)
+  when:
+    - gather_host_facts_result.failed is defined
+    - not gather_host_facts_result.failed
   block:
     - name: "Set fact of the ESXi server version and build number"
       ansible.builtin.set_fact:
         esxi_version: "{{ gather_host_facts_result.ansible_facts.config.product.version }}"
         esxi_build: "{{ gather_host_facts_result.ansible_facts.config.product.build }}"
+      when:
+        - gather_host_facts_result.ansible_facts.config.product.version is defined
+        - gather_host_facts_result.ansible_facts.config.product.version | length > 0
+        - gather_host_facts_result.ansible_facts.config.product.build is defined
+        - gather_host_facts_result.ansible_facts.config.product.build | length > 0
 
     - name: "Get ESXi server update version"
-      when: esxi_version is version('7.0.0', '<')
+      when:
+        - esxi_version | length > 0
+        - esxi_version is version('7.0.0', '<')
       block:
         - name: "Looking for ESXi update level in host config options"
           ansible.builtin.set_fact:
             esxi_update_level: "{{ gather_host_facts_result.ansible_facts.config.option | selectattr('key', 'equalto', 'Misc.HostAgentUpdateLevel') }}"
+          when:
+            - gather_host_facts_result.ansible_facts.config.option is defined
+            - gather_host_facts_result.ansible_facts.config.option | length > 0
 
         - name: "Set fact of the ESXi server update version"
           ansible.builtin.set_fact:
             esxi_update_version: "{{ esxi_update_level[0]['value'] }}"
-          when: esxi_update_level | length > 0
+          when:
+            - esxi_update_level is defined
+            - esxi_update_level | length > 0
+            - esxi_update_level[0]['value'] is defined
+            - esxi_update_level[0]['value'] | length > 0
 
-- name: "Failed to get ESXi product info"
-  ansible.builtin.fail:
-    msg: >-
-      Failed to get ESXi server properties 'config.product.version', 'config.product.build' and 'config.option'.
-      Caught error: {{ gather_host_facts_result.msg | default('') }}
-  when: gather_host_facts_result.failed
+- name: "Check if ESXi server version and build number are got or not"
+  ansible.builtin.assert:
+    that:
+      - esxi_version | length > 0
+      - esxi_build | length > 0
+    fail_msg: "Failed to get ESXi server version and build number: {{ gather_host_facts_result.msg | default('') }}."
 
 # For log plugin to gather ESXi info in result file
 - name: "Print ESXi server hostname"
