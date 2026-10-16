@@ -55,6 +55,23 @@
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
       always:
+        - name: "Clean up cloned VM"
+          when: 
+            - vtpm_cloned_vm_exists is defined
+            - vtpm_cloned_vm_exists
+          block:
+            - name: "Get cloned VM power state"
+              include_tasks: ../../common/vm_get_power_state.yml
+
+            - name: "Power off cloned VM if running"
+              include_tasks: ../../common/vm_set_power_state.yml
+              vars:
+                vm_power_state_set: 'powered-off'
+              when: vm_power_state_get != "poweredOff"
+
+            - name: "Remove cloned VM"
+              include_tasks: ../../common/vm_remove.yml
+
         - name: "Revert back VM name and VM primary MAC address"
           ansible.builtin.set_fact:
             vm_name: "{{ vm_name_clone_from }}"

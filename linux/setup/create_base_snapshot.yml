@@ -7,6 +7,16 @@
 - name: "Do configurations on VM prior to testing"
   include_tasks: reconfig_existing_vm.yml
 
+- name: "Get VM info before creating base snapshot"
+  when: vm_info_retrieved is undefined or not vm_info_retrieved
+  block:
+    - name: "Get VM info at base snapshot"
+      include_tasks: ../../common/vm_get_vm_info.yml
+
+    - name: "Set fact that VM info at base snapshot retrieved"
+      ansible.builtin.set_fact:
+        vm_info_retrieved: true
+
 - name: "Take a baseline snapshot on VM for testing"
   include_tasks: ../../common/vm_take_snapshot.yml
   vars:

@@ -27,20 +27,5 @@
       include_tasks: check_runonce_command.yml
     - name: "Check timezone configured"
       include_tasks: check_timezone.yml
-    - name: "Retry to check Windows desktop displayed"
-      include_tasks:
-        file: check_desktop_display.yml
-        apply:
-          when: not (win_desktop_displayed | default(false))
-      loop: "{{ range(1, 47) | list }}"
-      loop_control:
-        loop_var: retry_time
-        pause: 20
-    - name: "Check Windows desktop displayed"
-      ansible.builtin.assert:
-        that:
-          - win_desktop_displayed
-        fail_msg: >-
-          The text extracted from the VM console screenshots '{{ text_in_screenshot }}' does not contain
-          the expected keyword indicating that the Windows desktop was displayed within 900s after GOSC.
-      when: tesseract_is_installed
+    - name: "Verify Windows desktop displayed"
+      include_tasks: verify_desktop_display.yml

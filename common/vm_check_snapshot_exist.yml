@@ -7,13 +7,14 @@
 # Return:
 #   snapshot_exist: the flag of snapshot exist
 #
-- include_tasks: vm_get_snapshot_facts.yml
-
-- name: Initialize snapshot existence result
+- name: "Initialize snapshot existence result"
   ansible.builtin.set_fact:
     snapshot_exist: false
 
-- name: Loop snapshot list to find specified snapshot
+- name: "Get VM snapshot info"
+  include_tasks: vm_get_snapshot_facts.yml
+
+- name: "Loop snapshot list to find specified snapshot"
   ansible.builtin.set_fact:
     snapshot_exist: "{{ vm_snapshot_facts.guest_snapshots.snapshots | selectattr('name', 'equalto', snapshot_name) | length == 1 }}"
   when:
@@ -21,6 +22,6 @@
     - vm_snapshot_facts.guest_snapshots is defined
     - vm_snapshot_facts.guest_snapshots.snapshots is defined
 
-- name: "Snapshot {{ snapshot_name }} exist: {{ snapshot_exist }}"
+- name: "Display snapshot existence status"
   ansible.builtin.debug:
-    msg: "Snapshot '{{ snapshot_name }}' exist: {{ snapshot_exist }}"
+    msg: "Snapshot '{{ snapshot_name }}' exists: {{ snapshot_exist }}"
