@@ -109,18 +109,6 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
           echo "{{ autoinstall_complete_msg }}" >/dev/ttyS0
         |||
       }
-    ],
-    init: [
-      {
-        name: "init_script",
-        content: |||
-          #!/bin/bash
-          echo "Archive Agama installation logs" >/dev/ttyS0
-          cd /var/log
-          tar -czvf agama-installation.tar.gz agama-installation >/dev/ttyS0
-          echo "Agama installation logs can be found in /var/log/agama-installation.tar.gz" >/dev/ttyS0
-        |||
-      }
     ]
   }
 }
