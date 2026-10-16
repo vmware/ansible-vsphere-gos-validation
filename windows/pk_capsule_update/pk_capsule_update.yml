@@ -21,7 +21,7 @@
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
           vars:
-            skip_msg: "Skip test case due to VM is not 64 bit: {{ guest_os_ansible_architecture | default('NA') }}"
+            skip_msg: "Skip test case due to VM is not 64 bit: {{ guest_os_ansible_architecture }}"
             skip_reason: "Not Applicable"
           when: guest_os_ansible_architecture == "32-bit"
       
@@ -34,19 +34,22 @@
         - name: "Verify if PK is NULL"
           ansible.builtin.assert:
             that:
-              -  not win_powershell_cmd_output.failed
+              -  win_powershell_cmd_output.failed is defined
+              -  not (win_powershell_cmd_output.failed | bool)
+              -  win_powershell_cmd_output.stdout_lines is defined
+              -  win_powershell_cmd_output.stdout_lines | length > 0
               -  win_powershell_cmd_output.stdout_lines[0].strip() == "False"
             fail_msg: "PK is not NULL"
 
         - name: "Enable secure boot"
-          when: vm_secureboot_enabled is undefined or not vm_secureboot_enabled
+          when: vm_secureboot_enabled is undefined or not (vm_secureboot_enabled | bool)
           block:
             - name: "Enable secure boot"
               include_tasks: ../secureboot_enable_disable/change_secureboot_config.yml
               vars:
                 change_secureboot: 'enable'
 
-        - name: "Set the facts for the drive letter"
+        - name: "Set the fact for the drive letter"
           ansible.builtin.set_fact:
             drive_letter_new: 'Z'
 
@@ -58,8 +61,8 @@
         - name: "Set mount command for accessing the shared folder"
           ansible.builtin.set_fact:
             win_nfs_mount_cmd: |-
-              {%- if windows_nfs_username is defined and windows_nfs_username and 
-                windows_nfs_password is defined and windows_nfs_password -%}
+              {%- if windows_nfs_username is defined and windows_nfs_username | length > 0  and 
+                windows_nfs_password is defined and windows_nfs_password | length > 0  -%}
               {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_nfs_share ~ ' ' ~ windows_nfs_password ~ ' /user:' ~ windows_nfs_username }}
               {%- else -%}
               {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_nfs_share }}
