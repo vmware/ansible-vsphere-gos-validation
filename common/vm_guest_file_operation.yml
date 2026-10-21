@@ -55,14 +55,14 @@
       ignore_errors: true
     - name: "Print the result of create directory"
       ansible.builtin.debug: var=create_dir_op
-      when: enable_debug
+      when: enable_debug is defined and enable_debug | bool
     - name: "Ignore directory exists error or configured to ignore error"
       ansible.builtin.fail:
         msg: "Failed to create diretory: '{{ dir_path }}', due to {{ create_dir_op.msg }}"
       when:
-        - not guest_file_ops_ignore_error
+        - not (guest_file_ops_ignore_error | bool)
         - create_dir_op is defined
-        - not create_dir_op.changed
+        - not (create_dir_op.changed | bool)
         - ('msg' in create_dir_op) and (create_dir_op.msg.count('already exists') == 0)
 
 - name: "Delete directory in guest OS"
@@ -101,7 +101,7 @@
       vars:
         dir_path: "{{ dest_path | dirname }}"
         dir_mode: "0777"
-      when: not fetch_dir_stat.stat.exists
+      when: not (fetch_dir_stat.stat.exists | bool)
     - name: "Fetch file {{ src_path }}"
       community.vmware.vmware_guest_file_operation:
         hostname: "{{ vsphere_host_name }}"
