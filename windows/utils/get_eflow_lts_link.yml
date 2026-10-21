@@ -22,7 +22,7 @@
   register: get_eflow_url_result
 - name: "Display the result of getting EFLOW releases URL content"
   ansible.builtin.debug: var=get_eflow_url_result
-  when: enable_debug
+  when: enable_debug | default(true) | bool
 
 - name: "Set fact of EFLOW LTS releases"
   ansible.builtin.set_fact:
@@ -31,7 +31,7 @@
   ansible.builtin.set_fact:
     eflow_lts_download_link: "{{ 'https://aka.ms/AzEFLOW-X64-' ~ eflow_lts_releases.split('>')[1].split('LTS')[0].strip() | replace('.', '_') }}"
   when:
-    - eflow_lts_releases
+    - eflow_lts_releases | length > 0
     - eflow_lts_releases.split('>') | length > 1
 
 - name: "Display the download link of EFLOW LTS release"
@@ -40,5 +40,5 @@
 - name: "Check download link of EFLOW LTS release"
   ansible.builtin.assert:
     that:
-      - eflow_lts_download_link
+      - eflow_lts_download_link | length > 0
     fail_msg: "Failed to get the download link of EFLOW LTS release: {{ eflow_lts_download_link }}, please check manually on page {{ eflow_releases_url }}"

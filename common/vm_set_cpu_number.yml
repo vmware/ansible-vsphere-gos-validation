@@ -21,7 +21,7 @@
   register: vm_guest_facts
 - name: Display the VM CPU configure result
   ansible.builtin.debug: var=vm_guest_facts
-  when: enable_debug is defined and enable_debug
+  when: enable_debug | default(true) | bool
 
 - name: Set fact of the VM CPU number and cores per socket number
   ansible.builtin.set_fact:
@@ -34,7 +34,7 @@
       - vm_set_cpu_cores_result | int == num_cores_per_socket | int
     fail_msg: "Failed to set CPU cores per socket to '{{ num_cores_per_socket }}'"
     success_msg: "CPU cores per socket is set to {{ num_cores_per_socket }}"
-  when: num_cores_per_socket is defined and num_cores_per_socket
+  when: num_cores_per_socket is defined and num_cores_per_socket | int > 0
 
 - name: Check CPU number is set correctly
   ansible.builtin.assert:

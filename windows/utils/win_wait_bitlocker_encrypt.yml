@@ -37,21 +37,22 @@
   delay: 10
   until:
     - get_encrypt_result.stdout is defined
-    - get_encrypt_result.stdout | regex_search(win_bde_percent_search)
+    - get_encrypt_result.stdout is search(win_bde_percent_search)
 
 - name: "Print the getting BitLocker encrypted volume info result"
   ansible.builtin.debug: var=get_encrypt_result
+  when: enable_debug | default(true) | bool
 
 - name: "Get BitLocker encrypted volume info failed"
   ansible.builtin.fail:
     msg: "Failed to get BitLocker encrypted volume {{ win_bde_volume }} info due to: {{ get_encrypt_result.msg | default('') }}"
   when:
     - get_encrypt_result.unreachable is defined
-    - get_encrypt_result.unreachable
+    - get_encrypt_result.unreachable | bool
 
 - name: "Check getting BitLocker encrypted volume info result"
   ansible.builtin.assert:
     that:
       - get_encrypt_result.failed is defined
-      - not get_encrypt_result.failed
+      - not (get_encrypt_result.failed | bool)
     fail_msg: "Not get expected encryption percentage: {{ win_bde_percent }} after {{ win_wait_bde_timeout }} seconds."

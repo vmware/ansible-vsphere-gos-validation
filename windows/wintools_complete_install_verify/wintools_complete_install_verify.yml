@@ -42,12 +42,12 @@
               vars:
                 skip_msg: "Skip test case due to under development VMware Tools can not test on VM with VBS enabled."
                 skip_reason: "Not Applicable"
-              when: vm_vbs_enabled
+              when: vm_vbs_enabled | bool
 
         - name: "Handle update_vmtools is set to false situation"
           when:
-            - not update_vmtools | bool
-            - vmtools_is_installed
+            - not (update_vmtools | bool)
+            - vmtools_is_installed | bool
           block:
             - name: "VMware Tools is running"
               include_tasks: ../../common/skip_test_case.yml
@@ -56,14 +56,14 @@
                   Test case '{{ ansible_play_name }}' is skipped because VMware Tools is already installed
                   and running, while 'update_vmtools' is set to: {{ update_vmtools }}.
                 skip_reason: "Skipped"
-              when: vmtools_is_running
+              when: vmtools_is_running | bool
 
             - name: "VMware Tools is not running"
               ansible.builtin.fail:
                 msg: >
                   Expected VMware Tools running status is 'true' when it's already installed and 'update_vmtools'
                   is set to: {{ update_vmtools }}, but get '{{ vmtools_is_running }}'.
-              when: not vmtools_is_running
+              when: not (vmtools_is_running | bool)
 
         - name: "Get VMware Tools source ISO file"
           include_tasks: set_vmtools_source.yml
@@ -92,4 +92,4 @@
       always:
         - name: "Get VMware Tools install log file"
           include_tasks: get_vmtools_install_log.yml
-          when: get_vmtools_install_log is defined and get_vmtools_install_log
+          when: get_vmtools_install_log is defined and get_vmtools_install_log | bool

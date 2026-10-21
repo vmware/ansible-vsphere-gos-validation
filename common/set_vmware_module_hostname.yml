@@ -17,10 +17,10 @@
     vsphere_host_datacenter: "{{ datacenter }}"
     vcenter_is_defined: true
   when:
-    - vcenter_hostname is defined and vcenter_hostname
-    - vcenter_username is defined and vcenter_username
-    - vcenter_password is defined and vcenter_password
-    - datacenter is defined and datacenter
+    - vcenter_hostname is defined and vcenter_hostname | length > 0
+    - vcenter_username is defined and vcenter_username | length > 0
+    - vcenter_password is defined and vcenter_password | length > 0
+    - datacenter is defined and datacenter | length > 0
   no_log: "{{ hide_secrets | default(false) }}"
 
 - name: "Set ESXi hostname for Ansible VMware modules to connect"
@@ -29,10 +29,10 @@
     vsphere_host_user: "{{ esxi_username }}"
     vsphere_host_user_password: "{{ esxi_password }}"
     vsphere_host_datacenter: "ha-datacenter"
-  when: not vcenter_is_defined
+  when: not (vcenter_is_defined | bool)
   no_log: "{{ hide_secrets | default(false) }}"
 
 - name: "Set default VM folder when it's undefined"
   ansible.builtin.set_fact:
     vm_folder: "{{ '/' ~ vsphere_host_datacenter ~ '/vm'}}"
-  when: vm_folder is undefined or not vm_folder
+  when: vm_folder is undefined or vm_folder | length == 0

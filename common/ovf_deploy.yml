@@ -20,21 +20,21 @@
   register: ovf_deploy
 - name: Display the result of ovf template deploy
   ansible.builtin.debug: var=ovf_deploy
-  when: enable_debug is defined and enable_debug
+  when: enable_debug | default(true) | bool
 
 - name: "Update VM memory and CPU"
-  when: update_vm_mem_cpu is defined and update_vm_mem_cpu
+  when: update_vm_mem_cpu is defined and update_vm_mem_cpu | bool
   block:
     - name: "Update VM memory"
       include_tasks: vm_set_memory_size.yml
       when:
-        - memory_mb is defined and memory_mb
+        - memory_mb is defined and memory_mb | int > 0
         - ovf_deploy.instance.hw_memtotal_mb | int != memory_mb | int
 
     - name: "Update VM CPU"
       when: >-
-        (cpu_number is defined and cpu_number) or
-        (cpu_cores_per_socket is defined and cpu_cores_per_socket)
+        (cpu_number is defined and cpu_number | int > 0) or
+        (cpu_cores_per_socket is defined and cpu_cores_per_socket | int > 0)
       block:
         - name: "Set the facts of VM CPU and initial configuration"
           ansible.builtin.set_fact:

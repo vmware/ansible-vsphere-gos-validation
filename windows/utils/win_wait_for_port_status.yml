@@ -20,12 +20,13 @@
   ignore_errors: true
 - name: "Display the wait for port status result"
   ansible.builtin.debug: var=win_wait_port_result
+  when: enable_debug | default(true) | bool
 
 - name: "Check port status in task result"
   ansible.builtin.assert:
     that:
       - win_wait_port_result.failed is defined
-      - not win_wait_port_result.failed
+      - not (win_wait_port_result.failed | bool)
       - win_wait_port_result.state is defined
       - win_wait_port_result.state == win_wait_port_state | default('started')
     fail_msg: "Failed to wait for port '{{ win_port | default(5986) }}' state to be: {{ win_wait_port_state | default('started') }} in {{ win_wait_port_timeout | default(600) }} seconds."

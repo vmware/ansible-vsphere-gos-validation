@@ -15,11 +15,11 @@
     add_host_in_memory_inventory_shell: "/usr/bin/bash"
   when:
     - vcenter_hostname is defined
-    - vcenter_hostname
+    - vcenter_hostname | length > 0
     - vcenter_ssh_username is defined
-    - vcenter_ssh_username
+    - vcenter_ssh_username | length > 0
     - vcenter_ssh_password is defined
-    - vcenter_ssh_password
+    - vcenter_ssh_password | length > 0
 
 - name: "Get datastores on ESXi server"
   include_tasks: esxi_get_datastores.yml
@@ -33,7 +33,7 @@
 - name: "Check datastore and set temporary directory on ESXi server"
   when:
     - datastore is defined
-    - datastore
+    - datastore | length > 0
   block:
     - name: "Check '{{ datastore }}' exists on ESXi server"
       ansible.builtin.assert:
@@ -47,7 +47,7 @@
         esxi_tmp_path: "/vmfs/volumes/{{ datastore }}"
 
 - name: "Set temporary directory on the VMFS datastore with maximum free space on ESXi server"
-  when: datastore is undefined or not datastore
+  when: datastore is undefined or datastore | length == 0
   block:
     - name: "Check ESXi server has accessible VMFS datastores"
       ansible.builtin.assert:

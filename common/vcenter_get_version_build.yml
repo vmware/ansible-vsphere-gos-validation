@@ -4,11 +4,11 @@
 # Get vCenter version, build number info by vmware_about_info module
 - name: "Initialize vCenter server version and build"
   ansible.builtin.set_fact:
-    vcenter_version: 'N/A'
-    vcenter_build: 'N/A'
+    vcenter_version: ''
+    vcenter_build: ''
 
 - name: "Get vCenter server version and build info when vCenter server is specified"
-  when: vcenter_is_defined is defined and vcenter_is_defined
+  when: vcenter_is_defined is defined and vcenter_is_defined | bool
   block:
     - name: "Get vCenter server about info"
       community.vmware.vmware_about_info:
@@ -24,13 +24,15 @@
       when:
         - vcenter_about_info.about_info is defined
         - vcenter_about_info.about_info.version is defined
+        - vcenter_about_info.about_info.version | length > 0
         - vcenter_about_info.about_info.build is defined
+        - vcenter_about_info.about_info.build | length > 0
 
     - name: "Check vCenter version and build number"
       ansible.builtin.assert:
         that:
-          - vcenter_version and vcenter_version != 'N/A'
-          - vcenter_build and vcenter_build != 'N/A'
+          - vcenter_version | length > 0
+          - vcenter_build | length > 0
         fail_msg: "Failed to get vCenter version and build from VMware about info: {{ vcenter_about_info.about_info | default('') }}."
 
 # This debug info is for log plugin to get vCenter info

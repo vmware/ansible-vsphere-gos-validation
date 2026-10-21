@@ -19,9 +19,9 @@
 - name: "Check required parameter for managing VM disk"
   ansible.builtin.assert:
     that:
-      - disk_operation is defined and disk_operation
+      - disk_operation is defined and disk_operation | length > 0
       - disk_operation | lower in ['present', 'absent']
-      - disk_controller_type is defined and disk_controller_type
+      - disk_controller_type is defined and disk_controller_type | length > 0
       - disk_controller_type | lower in ['buslogic', 'lsilogic', 'lsilogicsas', 'paravirtual', 'sata', 'nvme']
       - ctrl_number is defined and ctrl_number | int < 4
       - unit_number is defined
@@ -40,7 +40,7 @@
     - name: "Set default disk provision type to 'thin'"
       ansible.builtin.set_fact:
         disk_provision_type: 'thin'
-      when: disk_provision_type is undefined or not disk_provision_type
+      when: disk_provision_type is undefined or disk_provision_type | length == 0
 
 - name: "Manage disk on VM with state {{ disk_operation }}"
   community.vmware.vmware_guest_disk:
@@ -64,4 +64,4 @@
 
 - name: "Display the result of manageing VM disk"
   ansible.builtin.debug: var=manage_disk_result
-  when: enable_debug
+  when: enable_debug | default(true) | bool

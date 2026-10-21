@@ -25,8 +25,8 @@
       vars:
         snapshot_name: "{{ base_snapshot_name }}"
       when:
-        - not vm_not_revert_base | default(false)
-        - snapshot_exist
+        - not (vm_not_revert_base | default(false) | bool)
+        - snapshot_exist | bool
 
     - name: "Cleanup network environment"
       include_tasks: ../common/network_testbed_cleanup.yml
@@ -54,13 +54,13 @@
             vm_exists: false
           when:
             - vm_remove_result.changed is defined
-            - vm_remove_result.changed
+            - vm_remove_result.changed | bool
 
     - name: "Restore base snapshot for Windows Update installation"
       when:
         - win_update_snapshot_name is defined
-        - win_update_snapshot_name
-        - (vm_exists is defined and vm_exists)
+        - win_update_snapshot_name | length > 0
+        - vm_exists is defined and vm_exists | bool
       block:
         - name: "Revert to original base snapshot {{ win_update_snapshot_name }}"
           include_tasks: ../common/vm_revert_snapshot.yml
@@ -70,7 +70,7 @@
           include_tasks: ../common/vm_remove_snapshot.yml
           vars:
             snapshot_name: "{{ base_snapshot_name }}"
-          when: base_snapshot_exists
+          when: base_snapshot_exists | bool
         - name: "Rename snapshot {{ win_update_snapshot_name }} to {{ base_snapshot_name }}"
           include_tasks: ../common/vm_rename_snapshot.yml
           vars:

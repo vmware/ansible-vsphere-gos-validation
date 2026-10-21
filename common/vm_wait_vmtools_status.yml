@@ -22,17 +22,17 @@
 - name: "Set fact of VMware tools not running status"
   ansible.builtin.set_fact:
     vmtools_running_status: 'guestToolsNotRunning'
-  when: not vm_wait_vmtools_running
+  when: not (vm_wait_vmtools_running | bool)
 
 - name: "Set fact of VMware tools running status"
   ansible.builtin.set_fact:
     vmtools_running_status: 'guestToolsRunning'
-  when: vm_wait_vmtools_running
+  when: vm_wait_vmtools_running | bool
 
 - name: "Initialize the timeout seconds for waiting VMware Tools running status"
   ansible.builtin.set_fact:
     vm_wait_vmtools_timeout: 300
-  when: vm_wait_vmtools_timeout is undefined or not vm_wait_vmtools_timeout
+  when: vm_wait_vmtools_timeout is undefined or vm_wait_vmtools_timeout | int == 0
 
 - name: "Wait for VMware Tools running status becomes '{{ vmtools_running_status }}'"
   community.vmware.vmware_guest_tools_info:
@@ -51,7 +51,7 @@
 
 - name: "Display the wait for VMware tools status result"
   ansible.builtin.debug: var=get_vmtools_info
-  when: enable_debug
+  when: enable_debug | default(true) | bool
 
 - name: "Check VMware Tools running status is '{{ vmtools_running_status }}'"
   ansible.builtin.assert:
@@ -64,7 +64,7 @@
       It's timed out to wait for VMware Tools running status became '{{ vmtools_running_status }}'
       in {{ vm_wait_vmtools_timeout }} seconds.
       Current VMware Tools running status is '{{ get_vmtools_info.vmtools_info.vm_tools_running_status | default("") }}'.
-  when: not (vm_wait_vmtools_ignore_error | default(false))
+  when: not (vm_wait_vmtools_ignore_error | default(false) | bool)
 
 - name: "Set fact of VMware Tools installed status"
   ansible.builtin.set_fact:

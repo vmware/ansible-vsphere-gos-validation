@@ -11,7 +11,7 @@
   ansible.builtin.assert:
     that:
       - extract_log_file_path is defined
-      - extract_log_file_path
+      - extract_log_file_path | length > 0
       - extract_log_file_path is ansible.builtin.abs
     fail_msg: "Parameter 'extract_log_file_path' must be set with a local absolute path"
 
@@ -28,10 +28,11 @@
   ansible.builtin.set_fact:
     errors_in_log: "{{ extract_error_result.stdout_lines | select }}"
   when:
-    - not extract_error_result.failed
+    - not (extract_error_result.failed | bool)
     - extract_error_result.stdout_lines is defined
     - extract_error_result.stdout_lines | length > 0
 
 - name: "Display extracted errors from log file"
   ansible.builtin.debug:
     msg: "{{ errors_in_log }}"
+  when: enable_debug | default(true) | bool

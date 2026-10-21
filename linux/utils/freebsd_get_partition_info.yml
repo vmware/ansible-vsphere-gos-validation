@@ -42,12 +42,12 @@
     disk_partition_info: "{{ freebsd_geom_part_list | selectattr('name', 'equalto', disk_partition_name) | first }}"
   when:
     - disk_partition_name is defined
-    - disk_partition_name
+    - disk_partition_name | length > 0
 
 - name: "Set fact of disk partition info by UUID"
   when:
     - disk_partition_uuid is defined
-    - disk_partition_uuid
+    - disk_partition_uuid | length > 0
   block:
     - name: "Set fact of disk partition info by UUID"
       ansible.builtin.set_fact:
@@ -59,3 +59,4 @@
 
 - name: "Print disk partition info on FreeBSD"
   ansible.builtin.debug: var=disk_partition_info
+  when: enable_debug | default(true) | bool

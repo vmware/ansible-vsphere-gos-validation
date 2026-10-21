@@ -19,9 +19,9 @@
 - name: "Check required parameter"
   ansible.builtin.assert:
     that:
-      - new_vhba_type is defined and new_vhba_type
+      - new_vhba_type is defined and new_vhba_type | length > 0
       - new_vhba_type in valid_vhba_type_list
-      - disk_controller_facts_data is defined and disk_controller_facts_data
+      - disk_controller_facts_data is defined and disk_controller_facts_data | length > 0
     fail_msg: "'new_vhba_type' and 'disk_controller_facts_data' are required parameters, and valid 'new_vhba_type' value '{{ valid_vhba_type_list }}'."
 
 - name: "Initialize the new vhba bus number and found status"
@@ -40,7 +40,7 @@
     new_vhba_bus_found: "{{ (item | string) not in disk_controller_facts_data[new_vhba_type] }}"
   loop: "{{ range(0, 4) | list }}"
   when:
-    - not new_vhba_bus_found
+    - not (new_vhba_bus_found | bool)
     - disk_controller_facts_data[new_vhba_type] | length < 4
 
 - name: "Print the new vhba result"

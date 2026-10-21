@@ -13,7 +13,7 @@
   ansible.builtin.assert:
     that:
       - vds_name is defined
-      - vds_name
+      - vds_name | length > 0
       - vds_state is defined
       - vds_state in ['present', 'absent']
     fail_msg: "At least one of parameters 'vds_name', 'vds_state' is incorrect."
@@ -23,7 +23,7 @@
     vds_uplink_quantity: 1
   when:
     - vds_state == 'present'
-    - vds_uplink_quantity is undefined or not vds_uplink_quantity
+    - vds_uplink_quantity is undefined or vds_uplink_quantity | int == 0
 
 - name: "Set operation for managing vSphere Distributed Switch"
   ansible.builtin.set_fact:
@@ -44,13 +44,13 @@
 
 - name: "Display the result of managing vSphere Distributed Switch '{{ vds_name }}'"
   ansible.builtin.debug: var=manage_vds_result
-  when: enable_debug
+  when: enable_debug | default(true) | bool
 
 - name: "Check the result of managing vSphere Distributed Switch '{{ vds_name }}'"
   ansible.builtin.assert:
     that:
       - manage_vds_result is defined
       - manage_vds_result.changed is defined
-      - manage_vds_result.changed
+      - manage_vds_result.changed | bool
     fail_msg: "Failed to {{ vds_op }} vSphere Distributed Switch '{{ vds_name }}'"
     success_msg: "Successfully {{ vds_op }}d vSphere Distributed Switch '{{ vds_name }}'"

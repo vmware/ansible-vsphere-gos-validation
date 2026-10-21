@@ -19,7 +19,7 @@
 - name: "Check test file exists in guest OS"
   ansible.builtin.assert:
     that:
-      - win_check_file_exist_result
+      - win_check_file_exist_result is defined and win_check_file_exist_result | bool
     success_msg: "New created file is found in guest OS"
     fail_msg: "New created file is not found in guest OS: {{ write_test_file_path }}"
 
@@ -42,7 +42,7 @@
   ansible.builtin.assert:
     that:
       - get_file_content_result1.stdout is defined
-      - get_file_content_result1.stdout
+      - get_file_content_result1.stdout | length > 0
       - "test_line in get_file_content_result1.stdout"
     fail_msg: "The file content is '{{ get_file_content_result1.stdout }}', which should contain: '{{ test_line }}'"
 
@@ -91,13 +91,13 @@
 
     - name: "Handle known issue on {{ new_disk_node_ctrl_type }} {{ test_disk_ctrl_type }} controller"
       include_tasks: handle_nvme_boot_known_issue.yml
-      when: nvme_boot_known_issue
+      when: nvme_boot_known_issue | bool
 
     - name: "Restart guest OS failed on {{ guest_os_ansible_distribution }}"
       ansible.builtin.fail:
         msg: "{{ disk_issue_msg }}"
-      when: not nvme_boot_known_issue
+      when: not (nvme_boot_known_issue | bool)
 
 - name: "Check new file content again after guest OS restart"
   include_tasks: check_file_after_restart.yml
-  when: not restart_guest_os.failed | default(false)
+  when: not (restart_guest_os.failed | default(false) | bool)

@@ -10,9 +10,9 @@
   ansible.builtin.assert:
     that:
       - vcenter_is_defined is defined
-      - vcenter_is_defined
+      - vcenter_is_defined | bool
       - vcenter_domain_user_name is defined
-      - vcenter_domain_user_name
+      - vcenter_domain_user_name | length > 0
     fail_msg: >-
       vCenter Server information must be defined in testing vars file and
       parameter 'vcenter_domain_user_name' must be set for gathering domain user info.
@@ -22,7 +22,7 @@
 - name: "Set default user domain of vCenter Server"
   ansible.builtin.set_fact:
     vcenter_domain_name: "{{ vcenter_username.split('@')[-1] }}"
-  when: vcenter_domain_name is undefined or not vcenter_domain_name
+  when: vcenter_domain_name is undefined or vcenter_domain_name | length == 0
 
 - name: "Initialize the fact of vCenter Server domain user"
   ansible.builtin.set_fact:
@@ -48,3 +48,4 @@
 
 - name: "Display gathered domain user information"
   ansible.builtin.debug: var=vcenter_domain_user_info
+  when: enable_debug | default(true) | bool

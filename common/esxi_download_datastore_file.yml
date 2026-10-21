@@ -31,15 +31,15 @@
         msg: "Failed to get URL for file '{{ src_file_path }}' in datastore '{{ src_datastore }}'"
       when:
         - download_file_fail_ignore is defined
-        - not download_file_fail_ignore
+        - not (download_file_fail_ignore | bool)
         - ((ds_file_result is undefined) or
            (ds_file_result.url is undefined) or
-           (not ds_file_result.url))
+           (ds_file_result.url | length == 0))
 
     - name: "Download ESXi datastore file from URL"
       when:
         - ds_file_result.url is defined
-        - ds_file_result.url
+        - ds_file_result.url | length > 0
       block:
         - name: "Set fact of downloading URL for the src datastore file"
           ansible.builtin.set_fact:
@@ -59,7 +59,7 @@
 
         - name: "Print datastore file download result"
           ansible.builtin.debug: var=datastore_file_download_result
-          when: enable_debug
+          when: enable_debug | default(true) | bool
 
         - name: "Set fact of downloading datastore file success status"
           ansible.builtin.set_fact:

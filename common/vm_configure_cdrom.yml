@@ -32,13 +32,13 @@
     cdrom_type: 'client'
   when:
     - cdrom_state == 'present'
-    - cdrom_type is undefined or not cdrom_type
+    - cdrom_type is undefined or cdrom_type | length == 0
 
 - name: "Check ISO file is set"
   ansible.builtin.assert:
     that:
       - cdrom_iso_file is defined
-      - cdrom_iso_file
+      - cdrom_iso_file | length > 0
     fail_msg: "'cdrom_iso_file' must be set to connect CD/DVD drive to an ISO file"
   when:
     - cdrom_state == 'present'
@@ -92,7 +92,7 @@
 
 - name: "Display the result of reconfiguring VM CDROM"
   ansible.builtin.debug: var=vm_config_cdrom_result
-  when: enable_debug
+  when: enable_debug | default(true) | bool
 
 - name: "Remove question auto answer from VM's extra config"
   include_tasks: vm_set_extra_config.yml
@@ -102,4 +102,4 @@
         value: ""
       - key: "msg.autoAnswer"
         value: ""
-  when: cdrom_config_auto_answer
+  when: cdrom_config_auto_answer | bool

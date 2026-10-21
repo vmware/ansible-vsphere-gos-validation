@@ -38,8 +38,10 @@
           ansible.builtin.set_fact:
             real_time: "{{ ' '.join((host_facts.ansible_facts.host_date_time.date, host_facts.ansible_facts.host_date_time.time)) }}"
           when:
-            - host_facts.ansible_facts.host_date_time is defined
-            - host_facts.ansible_facts.host_date_time
+            - host_facts.ansible_facts.host_date_time.date is defined
+            - host_facts.ansible_facts.host_date_time.date | length > 0
+            - host_facts.ansible_facts.host_date_time.time is defined
+            - host_facts.ansible_facts.host_date_time.time | length > 0
 
         - name: "Set the fact of host time got from guest OS"
           ansible.builtin.set_fact:
@@ -51,8 +53,8 @@
         - name: "Check if host time is got or not"
           ansible.builtin.assert:
             that:
-              - real_time
-              - stat_time
+              - real_time | length > 0
+              - stat_time | length > 0
             fail_msg: "Failed to get the host time either from ESXi host '{{ real_time }}' or from guest OS '{{ stat_time }}'."
             success_msg: >-
               In guest OS, VMware Tools stat host time is: '{{ stat_time }}'.

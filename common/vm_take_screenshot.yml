@@ -31,7 +31,7 @@
         keys_send:
           - TAB
         vm_send_key_ignore_errors: true
-      when: vm_screen_active | default(false)
+      when: vm_screen_active | default(false) | bool
 
     - name: "Take console screenshot for VM '{{ vm_name }}'"
       community.vmware.vmware_guest_screenshot:
@@ -48,14 +48,14 @@
     
     - name: "Display taking VM screenshot result"
       ansible.builtin.debug: var=vm_take_screenshot_result
-      when: enable_debug
+      when: enable_debug | default(true) | bool
     
     - name: "Set fact of local file path for the VM screenshot"
       when:
         - vm_take_screenshot_result.screenshot_info.download_local_path is defined
-        - vm_take_screenshot_result.screenshot_info.download_local_path
+        - vm_take_screenshot_result.screenshot_info.download_local_path | length > 0
         - vm_take_screenshot_result.screenshot_info.screenshot_file is defined
-        - vm_take_screenshot_result.screenshot_info.screenshot_file
+        - vm_take_screenshot_result.screenshot_info.screenshot_file | length > 0
       block:
         - name: "Set fact of VM screenshot file name"
           ansible.builtin.set_fact:
@@ -64,7 +64,7 @@
         - name: "Set fact of default VM screenshot file name at local"
           ansible.builtin.set_fact:
             vm_screenshot_local_name: "{{ vm_screenshot_file_name }}"
-          when: vm_screenshot_local_name is undefined or not vm_screenshot_local_name
+          when: vm_screenshot_local_name is undefined or vm_screenshot_local_name | length == 0
     
         - name: "Set facts of VM screenshot file downloaded path and expected path at local"
           ansible.builtin.set_fact:

@@ -14,9 +14,9 @@
   ansible.builtin.assert:
     that:
       - service_name is defined
-      - service_name
+      - service_name | length > 0
       - service_file is defined
-      - service_file
+      - service_file | length > 0
     fail_msg: "'service_name' and 'service_file' must be set for adding guest OS service"
 
 # If there is no open-vm-tools package uninstalled before installing open-vm-tools from source,
@@ -28,7 +28,7 @@
     dest: "{{ service_file }}"
     mode: "0755"
   delegate_to: "{{ vm_guest_ip }}"
-  when: service_file_local_path is undefined or not service_file_local_path
+  when: service_file_local_path is undefined or service_file_local_path | length == 0
 
 # If there is open-vm-tools package uninstalled before installing open-vm-tools from source,
 # originial service file would be downloaded from guest OS. So here the new service file
@@ -41,7 +41,7 @@
   delegate_to: "{{ vm_guest_ip }}"
   when:
     - service_file_local_path is defined
-    - service_file_local_path
+    - service_file_local_path | length > 0
 
 - name: "Enable Linux systemd service {{ service_name }}"
   when: guest_os_ansible_system == 'linux'
@@ -69,7 +69,7 @@
       delegate_to: "{{ vm_guest_ip }}"
       when:
         - service_file_local_path is defined
-        - service_file_local_path
+        - service_file_local_path | length > 0
 
     - name: "Enable FreeBSD service {{ service_name }}"
       include_tasks: ../utils/replace_or_add_line_in_file.yml

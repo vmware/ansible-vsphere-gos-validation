@@ -11,7 +11,7 @@
 - name: "Initialize the timeout seconds for waiting expected power status"
   ansible.builtin.set_fact:
     wait_power_state_timeout: 120
-  when: wait_power_state_timeout is undefined or not wait_power_state_timeout
+  when: wait_power_state_timeout is undefined or wait_power_state_timeout | int == 0
 
 - name: "Wait for VM power status to '{{ expected_power_status }}'"
   community.vmware.vmware_guest_info:
@@ -31,7 +31,7 @@
 
 - name: "Display gathered VM facts"
   ansible.builtin.debug: var=vm_power_gather_facts
-  when: enable_debug is defined and enable_debug
+  when: enable_debug | default(true) | bool
 
 - name: "Check VM power status is '{{ expected_power_status }}'"
   ansible.builtin.assert:

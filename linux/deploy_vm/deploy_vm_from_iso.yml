@@ -38,11 +38,11 @@
 - name: "Display warning message about undefined unattend_install_conf"
   ansible.builtin.debug:
     msg: "unattend_install_conf is not defined or set to a file path, will not generate unattend ISO file"
-  when: unattend_install_conf is undefined or not unattend_install_conf
+  when: unattend_install_conf is undefined or unattend_install_conf | length == 0
 
 - name: "Generate unattend install ISO file"
   include_tasks: create_unattend_install_iso.yml
-  when: unattend_install_conf is defined and unattend_install_conf
+  when: unattend_install_conf | length > 0
 
 - name: "Compose VM CDROMs to mount OS install ISO files"
   include_tasks: ../../common/compose_vm_cdroms.yml
@@ -68,7 +68,7 @@
     - unattend_install_conf | lower is not search('minimal|server_without_gui|ubuntu/server')
 
 - name: "Set video memory size"
-  when: vm_video_memory_mb
+  when: vm_video_memory_mb is defined and vm_video_memory_mb | int > 0
   block:
     - name: "Get VM's video card info"
       include_tasks: ../../common/vm_get_video_card.yml
@@ -91,7 +91,7 @@
       vars:
         secure_boot_enabled_set: "{{ secureboot_enabled }}"
         enter_bios_setup: "{{ (unattend_installer == 'Agama' and sle_opensuse_version is version('16.0', '==')) }}"
-      when: secureboot_enabled or (unattend_installer == 'Agama' and sle_opensuse_version is version('16.0', '=='))
+      when: (secureboot_enabled | bool) or (unattend_installer == 'Agama' and sle_opensuse_version is version('16.0', '=='))
 
     - name: "Handle virtual TPM device"
       when:
@@ -151,7 +151,7 @@
   include_tasks: delete_unattend_install_iso.yml
   when:
     - transferred_unattend_iso_list is defined
-    - transferred_unattend_iso_list
+    - transferred_unattend_iso_list | length > 0
 
 - name: "Change the boot disk to be first boot device in boot order"
   include_tasks: ../../common/vm_set_boot_options.yml
@@ -202,7 +202,7 @@
       vars:
         wait_service_name: "{{ guest_os_systemd_logind_service }}"
         wait_service_state: "running"
-      when: systemd_logind_not_ready
+      when: systemd_logind_not_ready | bool
 
     # Wait for 'display-manager' service running. Even though it is not running at last,
     # it is OK because it is not mandatory.
@@ -212,11 +212,11 @@
         wait_service_name: "{{ guest_os_display_manager_service }}"
         wait_service_state: "running"
         wait_service_ignore_errors: true
-      when: display_manager_not_ready
+      when: display_manager_not_ready | bool
 
     - name: "Check guest OS desktop environment again"
       include_tasks: ../utils/check_guest_os_gui.yml
-      when: systemd_logind_not_ready or display_manager_not_ready
+      when: (systemd_logind_not_ready | bool) or (display_manager_not_ready | bool)
 
 - name: "Upgrade Oracle Linux 9.0 kernel from UEK R7 GA to latest UEK R7"
   when:
@@ -251,7 +251,7 @@
         - ol9_uekr7_upgrade_result.rc == 0
 
     - name: "Check Oracle Linux 9.0 kernel UEK R7 is upgraded"
-      when: ol9_uekr7_is_upgraded
+      when: ol9_uekr7_is_upgraded | bool
       block:
         - name: "Reboot Oracle Linux"
           include_tasks: ../utils/reboot.yml

@@ -21,13 +21,13 @@
 
 - name: "Display the result of removing VM"
   ansible.builtin.debug: var=vm_remove_result
-  when: enable_debug
+  when: enable_debug | default(true) | bool
 
 - name: "Check the result of removing VM"
   ansible.builtin.assert:
     that:
       - vm_remove_result.changed is defined
-      - vm_remove_result.changed
+      - vm_remove_result.changed | bool
     fail_msg: "Failed to remove VM '{{ vm_name }}' from VC/ESXi '{{ vsphere_host_name }}' due to '{{ vm_remove_result.msg | default('') }}'."
     success_msg: "VM '{{ vm_name }}' on VC/ESXi '{{ vsphere_host_name }}' is removed successfully."
-  when: not vm_remove_ignore_errors | default(false)
+  when: not (vm_remove_ignore_errors | default(false) | bool)

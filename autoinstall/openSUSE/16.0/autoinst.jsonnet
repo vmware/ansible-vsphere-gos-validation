@@ -31,7 +31,7 @@ local nicName = agama.findByID(agama.lshw, 'network').logicalname;
       add: ["gnome"]
     }
   },
-{% if new_user is defined and new_user %}
+{% if new_user is defined and new_user | length > 0 %}
   user: {
     fullName: "{{ new_user }}",
     password: "{{ vm_password }}",

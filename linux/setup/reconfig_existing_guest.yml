@@ -43,13 +43,13 @@
   block:
     - name: "Get VMware Tools status"
       include_tasks: ../../common/vm_get_vmtools_status.yml
-      when: vmtools_is_running is undefined or not vmtools_is_running
+      when: vmtools_is_running is undefined or not (vmtools_is_running | bool)
 
     - name: "Disable iptables to allow ping"
       include_tasks: ../utils/disable_iptables.yml
       when:
-        - not new_vm
-        - vmtools_is_running
+        - not (new_vm | bool)
+        - vmtools_is_running | bool
 
     # VMware Photon OS needs to disable DNSSEC and DNSOverTLS while connecting online repo
     - name: "Disable DNSSEC and DNSOverTLS settings for VMware Photon OS"
@@ -76,7 +76,7 @@
 
     - name: "Mask 'PackageKit' service"
       when:
-        - service_info
+        - service_info | length > 0
         - service_info.state is defined
       block:
         - name: "Mask 'PackageKit' service"
@@ -91,7 +91,7 @@
   block:
     - name: "Set FreeBSD kernel state"
       include_tasks: ../utils/freebsd_set_kernel_state.yml
-      when: not new_vm
+      when: not (new_vm | bool)
 
     - name: "Update /etc/fstab with partition UUID"
       include_tasks: ../utils/freebsd_update_fstab_with_uuid.yml

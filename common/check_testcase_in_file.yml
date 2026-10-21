@@ -16,9 +16,9 @@
   when: >
     check_testcase_list is undefined or
     check_testcase_file_path is undefined or
-    not check_testcase_list or
+    check_testcase_list | length == 0 or
     check_testcase_list is string or
-    not check_testcase_file_path
+    check_testcase_file_path | length == 0
 - ansible.builtin.debug:
     msg:
       - "Specified test case file: {{ check_testcase_file_path }}"
@@ -40,7 +40,7 @@
   register: check_result
 - name: "Display the search result"
   ansible.builtin.debug: var=check_result
-  when: enable_debug is defined and enable_debug
+  when: enable_debug | default(true) | bool
 - name: Set found specified name in test case file
   ansible.builtin.set_fact:
     check_testcase_in_file: true
