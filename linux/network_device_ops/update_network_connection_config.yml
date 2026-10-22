@@ -50,8 +50,8 @@
       when: network_connection_name
       register: nmcli_down_result
       failed_when:
-        - nmcli_down_result.rc != 0
-        - "'is not an active connection' not in nmcli_down_result.stderr"
+        - nmcli_down_result.rc is undefined or nmcli_down_result.rc != 0
+        - "'is not an active connection' not in (nmcli_down_result.stderr | default(''))"
 
     - name: "Remove the existing created network connection file '{{ network_config_path }}'"
       ansible.builtin.shell: "rm -f '{{ network_config_path }}'"
