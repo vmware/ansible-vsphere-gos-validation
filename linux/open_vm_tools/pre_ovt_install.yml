@@ -21,13 +21,15 @@
     - vmtools_is_installed
     - not update_vmtools
 
-# Flatcar and RHCOS doesn't support to install open-vm-tools
+# Flatcar, RHCOS and SLES/SLED 16.1 or later Immutable Mode don't support installing open-vm-tools
 - name: "Skip test case for {{ guest_os_ansible_distribution }}"
   include_tasks: ../../common/skip_test_case.yml
   vars:
     skip_msg: "Skip test case {{ ansible_play_name }} because {{ guest_os_ansible_distribution }} doesn't support installing open-vm-tools"
     skip_reason: "Not Supported"
-  when: guest_os_ansible_distribution in ['Flatcar', 'RHCOS']
+  when: >-
+    guest_os_ansible_distribution in ['Flatcar', 'RHCOS'] or
+    is_sles_immutable
 
 - name: "Skip test case when current open-vm-tools is not installed from package"
   include_tasks: ../../common/skip_test_case.yml
