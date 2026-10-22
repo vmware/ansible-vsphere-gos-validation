@@ -61,14 +61,14 @@ autoinstall:
     - curtin in-target --target=/target -- systemctl disable apt-daily.service apt-daily.timer
     - curtin in-target --target=/target -- systemctl disable apt-daily-upgrade.service apt-daily-upgrade.timer
 {% if (ubuntu_version is defined and ubuntu_version | length != 0) and ubuntu_version is version('26.10', '==') %}
-    # Install RDMA packages after Subiquity restores the online APT sources.
+    # Install NVDIMM and RDMA packages after Subiquity restores the online APT sources.
     - |
       if [ ! -f /target/etc/apt/sources.list.d/ubuntu.sources ]; then
         cp /target/etc/apt/sources.list.d/ubuntu.sources.curtin.orig \
            /target/etc/apt/sources.list.d/ubuntu.sources
       fi
     - curtin in-target --target=/target -- apt-get update
-    - curtin in-target --target=/target -- env DEBIAN_FRONTEND=noninteractive apt-get install -y rdma-core rdmacm-utils ibverbs-utils
+    - curtin in-target --target=/target -- env DEBIAN_FRONTEND=noninteractive apt-get install -y ndctl rdma-core rdmacm-utils ibverbs-utils
 {% endif %}
     - echo "{{ autoinstall_complete_msg }}" >/dev/ttyS0
   shutdown: 'poweroff'
