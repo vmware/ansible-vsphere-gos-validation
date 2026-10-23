@@ -1,0 +1,67 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Configure existing Kylin Base and Updates repositories using the alternate domain.
+- name: "Find Kylin repository configuration files"
+  ansible.builtin.find:
+    paths: /etc/yum.repos.d
+    patterns: "*.repo"
+  delegate_to: "{{ vm_guest_ip }}"
+  register: kylin_repo_files
+
+# Read configuration without refreshing metadata. Preserve the installed OS's repository IDs and paths.
+- name: "Find required Kylin repository configuration changes"
+  ansible.builtin.command:
+    argv:
+      - "{{ guest_os_python_executable }}"
+      - -c
+      - |
+        import configparser
+        import json
+        import re
+        import sys
+        from urllib.parse import urlsplit
+
+        changes = []
+        for path in json.loads(sys.argv[1]):
+            config = configparser.ConfigParser(interpolation=None)
+            with open(path) as source:
+                config.read_file(source)
+            for section in config.sections():
+                urls = config.get(section, "baseurl", fallback="").split()
+                matched = False
+                for index, url in enumerate(urls):
+                    parsed = urlsplit(url)
+                    if (parsed.scheme not in ("http", "https") or
+                            parsed.hostname not in ("updates.kylinos.cn", "update.cs2c.com.cn") or
+                            not re.match(r"^/NS/.+/os/adv/lic/(base|updates)(/|$)", parsed.path)):
+                        continue
+                    matched = True
+                    if parsed.hostname == "updates.kylinos.cn":
+                        host_start = parsed.netloc.rfind("@") + 1
+                        netloc = (parsed.netloc[:host_start] + "update.cs2c.com.cn" +
+                                  parsed.netloc[host_start + len(parsed.hostname):])
+                        urls[index] = url.replace("://" + parsed.netloc, "://" + netloc, 1)
+                if matched:
+                    for option, value in (("baseurl", " ".join(urls)), ("enabled", "1")):
+                        if config.get(section, option, fallback="") != value:
+                            changes.append({"path": path, "section": section, "option": option, "value": value})
+        print(json.dumps(changes))
+      - "{{ kylin_repo_files.files | map(attribute='path') | list | to_json }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  check_mode: false
+  changed_when: false
+  register: kylin_repo_changes
+
+- name: "Update Kylin Base and Updates repository configuration"
+  community.general.ini_file:
+    path: "{{ item.path }}"
+    section: "{{ item.section }}"
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    create: false
+    no_extra_spaces: true
+  delegate_to: "{{ vm_guest_ip }}"
+  loop: "{{ kylin_repo_changes.stdout | from_json }}"
+  loop_control:
+    label: "{{ item.section }}: {{ item.option }}"

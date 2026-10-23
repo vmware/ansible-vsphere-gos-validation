@@ -141,39 +141,9 @@
   include_tasks: photon_config_repo.yml
   when: guest_os_ansible_distribution == "VMware Photon OS"
 
-- name: "Configure online repositories for Kylin Linux Advanced Server 11"
-  when:
-    - guest_os_ansible_distribution == "Kylin Linux Advanced Server"
-    - guest_os_ansible_distribution_major_ver | regex_replace('^[Vv]', '') | int == 11
-  block:
-    - name: "Find Kylin repository configuration files"
-      ansible.builtin.find:
-        paths: /etc/yum.repos.d
-        patterns: "*.repo"
-      delegate_to: "{{ vm_guest_ip }}"
-      register: kylin_repo_files
-
-    - name: "Use the alternate Kylin repository domain"
-      ansible.builtin.replace:
-        path: "{{ item.path }}"
-        regexp: '^([ \t]*baseurl[ \t]*=[ \t]*https?://)updates\.kylinos\.cn(?=/)'
-        replace: '\1update.cs2c.com.cn'
-      delegate_to: "{{ vm_guest_ip }}"
-      loop: "{{ kylin_repo_files.files }}"
-      loop_control:
-        label: "{{ item.path }}"
-
-    # Enable the standard repositories even if an earlier DVD-only configuration disabled them.
-    # Configure them directly to avoid refreshing metadata while discovering disabled repositories.
-    - name: "Enable Kylin Base and Updates repositories"
-      ansible.builtin.command:
-        argv:
-          - dnf
-          - config-manager
-          - --set-enabled
-          - v11-adv-os
-          - v11-adv-updates
-      delegate_to: "{{ vm_guest_ip }}"
+- name: "Configure online repositories for Kylin Linux Advanced Server"
+  include_tasks: kylin_config_repo.yml
+  when: guest_os_ansible_distribution == "Kylin Linux Advanced Server"
 
 - name: "Display the list of guest OS online repositories"
   ansible.builtin.debug: var=guest_online_repos
