@@ -7,6 +7,7 @@
 # so os_installation_iso_list must be set to add local repositories for them.
 # ProLinux online repositories is not accessible, so it also requires os_installation_iso_list to add
 # local repositories.
+# Kylin uses only installation media repositories to avoid depending on its online repositories.
 - name: "Check OS installation ISO for {{ vm_guest_os_distribution }}"
   ansible.builtin.assert:
     that:
@@ -14,7 +15,9 @@
       - os_installation_iso_list | type_debug == 'list'
       - os_installation_iso_list | length >= 1
     fail_msg: "'os_installation_iso_list' must be set with a list of installation ISO image(s) of {{ vm_guest_os_distribution }}"
-  when: guest_os_ansible_distribution in ['SLES', 'SLED', 'RedHat', 'ProLinux']
+  when: >-
+    guest_os_ansible_distribution in
+    ['SLES', 'SLED', 'RedHat', 'ProLinux', 'Kylin Linux Advanced Server']
 
 - name: "Disable all existing repositories on {{ vm_guest_os_distribution }}"
   include_tasks: enable_disable_repos.yml
@@ -23,6 +26,15 @@
   when: >-
     guest_os_ansible_distribution in ['RedHat', 'ProLinux'] or
     guest_os_family == 'Suse'
+
+# Verbose repository discovery refreshes online metadata before repositories can be disabled.
+# Disable Kylin repositories directly so an unavailable online repository cannot block DVD setup.
+- name: "Disable all existing repositories on {{ vm_guest_os_distribution }}"
+  ansible.builtin.command: >-
+    {{ 'yum-config-manager --disable' if guest_os_ansible_pkg_mgr == 'yum'
+       else 'dnf config-manager --set-disabled' }} '*'
+  delegate_to: "{{ vm_guest_ip }}"
+  when: guest_os_ansible_distribution == 'Kylin Linux Advanced Server'
 
 # If os_installation_iso_list is set for openSUSE, AlmaLinux, Rocky, CentOS, OracleLinux, MIRACLE LINUX and etc,
 # we can configure local DVD repositories for package installation.
@@ -39,7 +51,9 @@
 - name: "Add guest OS official online repositories on {{ vm_guest_os_distribution }}"
   include_tasks: add_official_online_repo.yml
   when:
-    - guest_os_ansible_distribution not in ['SLES', 'SLED', 'RedHat', 'ProLinux', 'FreeBSD']
+    - >-
+      guest_os_ansible_distribution not in
+      ['SLES', 'SLED', 'RedHat', 'ProLinux', 'FreeBSD', 'Kylin Linux Advanced Server']
     - guest_os_family != "Debian"
 
 # Debian family OS like Debian, Ubuntu, Pardus, we can just add their official APT sources
@@ -49,6 +63,7 @@
 
 - name: "Add online repositories for installing open-vm-tools"
   when:
+    - guest_os_ansible_distribution != 'Kylin Linux Advanced Server'
     - current_testcase_name is defined
     - current_testcase_name is match("ovt_verify_(pkg|src)_install")
     - guest_os_ansible_system == "linux"
