@@ -24,22 +24,20 @@
 
 - name: "Set facts of open-vm-tools packages and processes for {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
-    ovt_packages: |-
-      {%- if guest_os_family == 'FreeBSD' -%}["open-vm-tools-nox11"]
-      {%- elif guest_os_family == "Suse" -%}["open-vm-tools", "libvmtools0"]
-      {%- else -%}["open-vm-tools"]
-      {%- endif -%}
+    ovt_packages: >-
+      {{ ['open-vm-tools-nox11'] if guest_os_family == 'FreeBSD' else
+         ['open-vm-tools', 'libvmtools0'] if guest_os_family == 'Suse' else
+         ['open-vm-tools'] }}
     ovt_processes:
       - {"uid": "root", "cmd":"vmtoolsd"}
   when: guest_os_with_gui is undefined or not (guest_os_with_gui | bool)
 
 - name: "Set facts of open-vm-tools packages and processes for {{ guest_os_ansible_distribution }}"
   ansible.builtin.set_fact:
-    ovt_packages: |-
-      {%- if guest_os_family == 'FreeBSD' -%}["open-vm-tools"]
-      {%- elif guest_os_family == "Suse" -%}["open-vm-tools", "open-vm-tools-desktop", "libvmtools0"]
-      {%- else -%}["open-vm-tools", "open-vm-tools-desktop"]
-      {%- endif -%}
+    ovt_packages: >-
+      {{ ['open-vm-tools'] if guest_os_family == 'FreeBSD' else
+         ['open-vm-tools', 'open-vm-tools-desktop', 'libvmtools0'] if guest_os_family == 'Suse' else
+         ['open-vm-tools', 'open-vm-tools-desktop'] }}
     ovt_processes:
       - {"uid": "root", "cmd":"vmtoolsd"}
       - {'uid':'vmware', 'cmd':'vmtoolsd -n vmusr'}
