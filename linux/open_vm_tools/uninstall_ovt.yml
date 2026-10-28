@@ -9,12 +9,28 @@
 - name: "Get installed packages on {{ vm_guest_os_distribution }}"
   include_tasks: ../utils/get_installed_packages.yml
 
+- name: "Check open-vm-tools package list"
+  ansible.builtin.assert:
+    that:
+      - ovt_packages is defined
+      - ovt_packages | type_debug == 'list'
+      - ovt_packages | length > 0
+    fail_msg: "Expected a non-empty list of open-vm-tools packages, got {{ ovt_packages | default('undefined') }}"
+
 - name: "Set fact of installed open-vm-tools related packages"
   ansible.builtin.set_fact:
-    installed_ovt_packages: "{{ ovt_packages | select('in', guest_installed_packages) }}"
+    installed_ovt_packages: "{{ ovt_packages | select('in', guest_installed_packages) | list }}"
 
 - name: "Display open-vm-tools related packages which are installed in guest OS"
   ansible.builtin.debug: var=installed_ovt_packages
+
+- name: "Check installed open-vm-tools packages were found for removal"
+  ansible.builtin.assert:
+    that:
+      - installed_ovt_packages | length > 0
+    fail_msg: >-
+      No installed packages matched {{ ovt_packages }}. Cannot uninstall open-vm-tools
+      through the package manager; check the guest package inventory and VMware Tools status.
 
 # Uninstall open-vm-tools packages
 - name: "Uninstall open-vm-tools related packages on {{ vm_guest_os_distribution }}"
