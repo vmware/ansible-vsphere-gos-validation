@@ -43,23 +43,31 @@ if [ "$system" == "FreeBSD" ]; then
     echo "FreeBSD release version is $freebsd_version"
     freebsd_patches_dir="/usr/ports/emulators/open-vm-tools/files"
 
-    module_patches=`find /usr/ports/emulators/open-vm-kmod/files -name 'patch-*' | grep -v Makefile`
+    module_patches=`find /usr/ports/emulators/open-vm-kmod/files -name 'patch-*' 2>/dev/null | grep -v Makefile`
     cd modules/freebsd/
     for module_patch in $module_patches; do
-        echo "Applying patch $module_patch"
-        patch <$module_patch
-        if [ $? -ne 0 ]; then
-            echo "ERROR: Failed to apply patch $module_patch" >&2
+        if patch -C -s -f <$module_patch >/dev/null 2>&1; then
+            echo "Applying patch $module_patch"
+            patch <$module_patch
+            if [ $? -ne 0 ]; then
+                echo "ERROR: Failed to apply patch $module_patch" >&2
+            fi
+        else
+            echo "Skipping patch $module_patch (not applicable)"
         fi
     done
     cd $CURRENT_DIR
 
-    ovt_patches=`find /usr/ports/emulators/open-vm-tools/files -name 'patch-*' | grep -E 'vmmemctl_os.c|vmblock_vfsops.c|dndcp_stringxx_string.hh'`
+    ovt_patches=`find /usr/ports/emulators/open-vm-tools/files -name 'patch-*' 2>/dev/null | grep -E 'vmmemctl_os.c|vmblock_vfsops.c|dndcp_stringxx_string.hh'`
     for ovt_patch in $ovt_patches; do
-        echo "Applying patch $ovt_patch"
-        patch <$ovt_patch
-        if [ $? -ne 0 ]; then
-            echo "ERROR: Failed to apply patch $ovt_patch" >&2
+        if patch -C -s -f <$ovt_patch >/dev/null 2>&1; then
+            echo "Applying patch $ovt_patch"
+            patch <$ovt_patch
+            if [ $? -ne 0 ]; then
+                echo "ERROR: Failed to apply patch $ovt_patch" >&2
+            fi
+        else
+            echo "Skipping patch $ovt_patch (not applicable)"
         fi
     done
 fi
