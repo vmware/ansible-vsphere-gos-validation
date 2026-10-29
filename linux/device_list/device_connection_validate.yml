@@ -54,7 +54,7 @@
         device_label: "{{ cd_ctrl_label }}"
 
     # Search for the CD/DVD drive device
-    - name: "Find CD/DVD drive device with controllerKey = {{ vm_devices_with_label[0].key }} and unitNumber = {{ device_unit }}"
+    - name: "Find CD/DVD drive device with controllerKey = {{ vm_devices_with_label[0].key | default('') }} and unitNumber = {{ device_unit | default('') }}"
       ansible.builtin.set_fact:
         cd_device: "{{ vm_device }}"
       with_items: "{{ vm_config.config.hardware.device }}"
@@ -64,7 +64,7 @@
         - vm_device.controllerKey | int == vm_devices_with_label[0].key | int
         - vm_device.unitNumber | int == device_unit | int
 
-    - name: "Map '{{ device_name }}:{{ device_unit }}' to '{{ cd_device.deviceInfo.label }}'"
+    - name: "Map '{{ device_name }}:{{ device_unit | default('') }}' to '{{ cd_device.deviceInfo.label | default('') }}'"
       ansible.builtin.set_fact:
         device_label: "{{ cd_device.deviceInfo.label }}"
   when: "'ide' in device_name or 'sata' in device_name"

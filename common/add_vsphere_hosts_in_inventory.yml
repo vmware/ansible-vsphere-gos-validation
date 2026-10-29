@@ -35,14 +35,14 @@
     - datastore is defined
     - datastore | length > 0
   block:
-    - name: "Check '{{ datastore }}' exists on ESXi server"
+    - name: "Check '{{ datastore | default('') }}' exists on ESXi server"
       ansible.builtin.assert:
         that:
           - esxi_datastores | selectattr('name', 'equalto', datastore) | length == 1
         fail_msg: "Datastore '{{ datastore }}' doesn't exist or is not accessible on ESXi server"
         success_msg: "Datastore '{{ datastore }}' is accessible on ESXi server"
 
-    - name: "Set fact of temporary directory on ESXi server datastore '{{ datastore }}'"
+    - name: "Set fact of temporary directory on ESXi server datastore '{{ datastore | default('') }}'"
       ansible.builtin.set_fact:
         esxi_tmp_path: "/vmfs/volumes/{{ datastore }}"
 
@@ -66,7 +66,7 @@
             last
           }}
 
-    - name: "Set fact of temporary directory on ESXi server datastore '{{ esxi_max_free_datastore }}'"
+    - name: "Set fact of temporary directory on ESXi server datastore"
       ansible.builtin.set_fact:
         esxi_tmp_path: "/vmfs/volumes/{{ esxi_max_free_datastore }}"
 
