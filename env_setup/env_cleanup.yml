@@ -7,10 +7,24 @@
   gather_facts: false
   tasks:
     - name: "Dump all variables used in tests"
-      ansible.builtin.copy:
-        dest: "{{ testrun_log_path }}/all_vars.json"
-        content: "{{ vars | to_nice_json }}"
-        mode: '0644'
+      block:
+        - name: "Write all test variables to JSON"
+          ansible.builtin.copy:
+            dest: "{{ testrun_log_path }}/all_vars.json"
+            content: "{{ vars | to_nice_json }}"
+            mode: '0644'
+      rescue:
+        # Deferred expressions in vars may reference data changed by later tests.
+        - name: "Save collected facts when the full variable dump fails"
+          ansible.builtin.copy:
+            dest: "{{ testrun_log_path }}/all_vars.json"
+            content: >-
+              {{ {
+                '_dump_scope': 'ansible_facts',
+                '_dump_error': ansible_failed_result.msg | default('Full variable dump failed'),
+                'ansible_facts': ansible_facts
+              } | to_nice_json }}
+            mode: '0644'
 
     # Revert to VM base snapshot firstly, or the network testbed cleanup tasks may fail.
     # Parameter 'vm_not_revert_base' is used internally, and please be aware that if it's
