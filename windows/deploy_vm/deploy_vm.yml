@@ -60,15 +60,13 @@
             exit_testing_when_fail: true
       always:
         - name: "Cleanup VM when cleanup_vm set to true and VM exists"
+          include_tasks: ../../common/vm_remove.yml
+          vars:
+            vm_remove_ignore_errors: true
           when:
             - cleanup_vm | bool
             - vm_exists is defined and vm_exists | bool
-            - test_block_failed is defined and test_block_failed | bool
-          block:
-            - name: "Remove VM"
-              include_tasks: ../../common/vm_remove.yml
-              vars:
-                vm_remove_ignore_errors: true
+            - test_block_failed is defined and test_block_failed | bool              
 
         - name: "Remove NFS mount point"
           when: nfs_mount_dir is defined and nfs_mount_dir
