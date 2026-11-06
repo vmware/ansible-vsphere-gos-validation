@@ -32,6 +32,21 @@ rc=0
 
 CURRENT_DIR=$PWD
 
+apply_patches() {
+    local patches="$1"
+    local patch_file
+    for patch_file in $patches; do
+        if patch -C -s -f < "$patch_file" > /dev/null 2>&1; then
+            echo "Applying patch $patch_file"
+            if ! patch < "$patch_file"; then
+                echo "ERROR: Failed to apply patch $patch_file" >&2
+            fi
+        else
+            echo "Skipping patch $patch_file (not applicable)"
+        fi
+    done
+}
+
 system=$(uname -s)
 if [ "$system" == "FreeBSD" ]; then
     # Create the directory path of tools.conf on FreeBSD
@@ -43,25 +58,15 @@ if [ "$system" == "FreeBSD" ]; then
     echo "FreeBSD release version is $freebsd_version"
     freebsd_patches_dir="/usr/ports/emulators/open-vm-tools/files"
 
-    module_patches=`find /usr/ports/emulators/open-vm-kmod/files -name 'patch-*' | grep -v Makefile`
+    module_patches=`find /usr/ports/emulators/open-vm-kmod/files -name 'patch-*' 2>/dev/null | grep -v Makefile`
+    echo "FreeBSD module patches: ${module_patches:-<none>}"
     cd modules/freebsd/
-    for module_patch in $module_patches; do
-        echo "Applying patch $module_patch"
-        patch <$module_patch
-        if [ $? -ne 0 ]; then
-            echo "ERROR: Failed to apply patch $module_patch" >&2
-        fi
-    done
-    cd $CURRENT_DIR
+    apply_patches "$module_patches"
+    cd "$CURRENT_DIR"
 
-    ovt_patches=`find /usr/ports/emulators/open-vm-tools/files -name 'patch-*' | grep -E 'vmmemctl_os.c|vmblock_vfsops.c|dndcp_stringxx_string.hh'`
-    for ovt_patch in $ovt_patches; do
-        echo "Applying patch $ovt_patch"
-        patch <$ovt_patch
-        if [ $? -ne 0 ]; then
-            echo "ERROR: Failed to apply patch $ovt_patch" >&2
-        fi
-    done
+    ovt_patches=`find /usr/ports/emulators/open-vm-tools/files -name 'patch-*' 2>/dev/null | grep -E 'vmmemctl_os.c|vmblock_vfsops.c|dndcp_stringxx_string.hh'`
+    echo "FreeBSD OVT patches: ${ovt_patches:-<none>}"
+    apply_patches "$ovt_patches"
 fi
 
 cmd_index=1
