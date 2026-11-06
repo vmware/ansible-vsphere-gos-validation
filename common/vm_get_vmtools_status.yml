@@ -27,7 +27,7 @@
   ignore_errors: true
 - name: "Display the result of getting VMware Tools info"
   ansible.builtin.debug: var=get_vmtools_info
-  when: enable_debug
+  when: enable_debug | default(true) | bool
 
 - name: "Set fact of VMware Tools status"
   ansible.builtin.set_fact:
@@ -37,13 +37,13 @@
     vmtools_is_ovt: "{{ (get_vmtools_info.vmtools_info.vm_tools_install_type == 'guestToolsTypeOpenVMTools') or (get_vmtools_info.vmtools_info.vm_tools_version_status == 'guestToolsUnmanaged') }}"
   when:
     - "'failed' in get_vmtools_info"
-    - not get_vmtools_info.failed
+    - not (get_vmtools_info.failed | bool)
     - "'vmtools_info' in get_vmtools_info"
 
 - name: "VMware Tools is installed but not ready"
   when:
-    - vmtools_is_installed
-    - vmtools_not_ready
+    - vmtools_is_installed | bool
+    - vmtools_not_ready | bool
   block:
     - name: "Wait for VMware Tools running when it's executing scripts or not running"
       community.vmware.vmware_guest_tools_info:

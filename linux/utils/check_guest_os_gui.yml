@@ -17,14 +17,14 @@
   ansible.builtin.set_fact:
     guest_os_with_gui: true
   when:
-    - guest_os_display_manager
-    - display_manager_is_running
+    - guest_os_display_manager | length > 0
+    - display_manager_is_running | bool
 
 - name: "Get login session type and desktop on Linux"
   when:
     - guest_os_ansible_system == "linux"
-    - guest_os_with_gui
-    - systemd_logind_is_running
+    - guest_os_with_gui | bool
+    - systemd_logind_is_running | bool
   block:
     - name: "List all login sessions in guest OS"
       ansible.builtin.shell: "loginctl --no-legend list-sessions | awk '{print $1}'"
@@ -69,7 +69,7 @@
 - name: "Get login session type and desktop on FreeBSD"
   when:
     - guest_os_ansible_system == "freebsd"
-    - guest_os_with_gui
+    - guest_os_with_gui | bool
   block:
     - name: "Check Xorg or Xwayland is running or not"
       ansible.builtin.shell: "pgrep -l 'Xorg|Xwayland'"
@@ -87,7 +87,7 @@
         - pgrep_result.rc is defined
         - pgrep_result.rc == 0
         - pgrep_result.stdout is defined
-        - pgrep_result.stdout
+        - pgrep_result.stdout | length > 0
 
 - name: "Display guest OS desktop facts"
   ansible.builtin.debug:
@@ -96,3 +96,4 @@
       - "Guest OS display manager: {{ guest_os_display_manager }}"
       - "Guest OS session type: {{ guest_os_session_type }}"
       - "Guest OS session desktop: {{ guest_os_session_desktop }}"
+  when: enable_debug | default(true) | bool

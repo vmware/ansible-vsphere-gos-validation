@@ -22,7 +22,7 @@
   ansible.builtin.assert:
     that:
       - vcenter_is_defined is defined
-      - vcenter_is_defined
+      - vcenter_is_defined | bool
       - groups['vcenter'] is defined
       - vcenter_hostname in groups['vcenter']
     fail_msg: >-
@@ -35,9 +35,9 @@
   ansible.builtin.assert:
     that:
       - vcenter_domain_user_name is defined
-      - vcenter_domain_user_name
+      - vcenter_domain_user_name | length > 0
       - vcenter_domain_user_password is defined
-      - vcenter_domain_user_password
+      - vcenter_domain_user_password | length > 0
       - vcenter_domain_user_op is defined
       - vcenter_domain_user_op in ['add', 'delete']
     fail_msg: >-
@@ -50,7 +50,7 @@
 - name: "Set default user domain of vCenter Server"
   ansible.builtin.set_fact:
     vcenter_domain_name: "{{ vcenter_username.split('@')[-1] }}"
-  when: vcenter_domain_name is undefined or not vcenter_domain_name
+  when: vcenter_domain_name is undefined or vcenter_domain_name | length == 0
 
 - name: "Set command for adding domain user"
   ansible.builtin.set_fact:
@@ -82,22 +82,22 @@
 
 - name: "Display result of managing domain user"
   ansible.builtin.debug: var=manage_domain_user_result
-  when: enable_debug | bool
+  when: enable_debug | default(true) | bool
 
 - name: "Check the result of managing domain user '{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}'"
   ansible.builtin.assert:
     that:
       - manage_domain_user_result.unreachable is undefined
       - manage_domain_user_result.failed is defined
-      - not manage_domain_user_result.failed
+      - not (manage_domain_user_result.failed | bool)
     fail_msg: >-
       Failed to {{ vcenter_domain_user_op }} domain user '{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}'.
       {%- if manage_domain_user_result.rc is defined and manage_domain_user_result.rc != 0 -%}
           Return code is '{{ manage_domain_user_result.rc }}'.
       {%- endif -%}Hit error:
-      {%- if manage_domain_user_result.stderr is defined -%}
+      {%- if manage_domain_user_result.stderr is defined and manage_domain_user_result.stderr | length > 0 -%}
           {{ manage_domain_user_result.stderr }}
-      {%- elif manage_domain_user_result.msg is defined and manage_domain_user_result.msg -%}
+      {%- elif manage_domain_user_result.msg is defined and manage_domain_user_result.msg | length > 0 -%}
           {{ manage_domain_user_result.msg }}.
       {%- else -%}unknown
       {%- endif -%}
@@ -123,23 +123,23 @@
 
     - name: "Display result of adding domain user to user group"
       ansible.builtin.debug: var=modify_user_group_result
-      when: enable_debug | bool
+      when: enable_debug | default(true) | bool
 
     - name: "Check the result of adding domain user to user group '{{ vcenter_domain_user_group }}'"
       ansible.builtin.assert:
         that:
           - modify_user_group_result.unreachable is undefined
           - modify_user_group_result.failed is defined
-          - not modify_user_group_result.failed
+          - not (modify_user_group_result.failed | bool)
         fail_msg: >-
           Failed to add domain user '{{ vcenter_domain_user_name }}@{{ vcenter_domain_name }}'
           to user group '{{ vcenter_domain_user_group }}'.
           {%- if modify_user_group_result.rc is defined and modify_user_group_result.rc != 0 -%}
               Return code is '{{ modify_user_group_result.rc }}'.
           {%- endif -%}Hit error:
-          {%- if modify_user_group_result.stderr is defined -%}
+          {%- if modify_user_group_result.stderr is defined and modify_user_group_result.stderr | length > 0 -%}
               {{ modify_user_group_result.stderr }}
-          {%- elif modify_user_group_result.msg is defined and modify_user_group_result.msg -%}
+          {%- elif modify_user_group_result.msg is defined and modify_user_group_result.msg | length > 0 -%}
               {{ modify_user_group_result.msg }}
           {%- else -%}unknown
           {%- endif -%}
@@ -147,4 +147,4 @@
   when:
     - vcenter_domain_user_op == "add"
     - vcenter_domain_user_group is defined
-    - vcenter_domain_user_group
+    - vcenter_domain_user_group | length > 0

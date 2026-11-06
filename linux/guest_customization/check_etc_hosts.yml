@@ -37,7 +37,7 @@
   ansible.builtin.set_fact:
     expected_ips: "{{ fqdn_hostname_bind_ip.stdout_lines }}"
   when:
-    - enable_cloudinit_gosc
+    - enable_cloudinit_gosc | bool
     - fqdn_hostname_bind_ip is defined
 
 - name: "Append static IP address to expected IP list for perl GOSC"
@@ -45,20 +45,20 @@
     expected_ips: "{{ expected_ips | union([linux_gosc_spec['ip']]) }}"
   when:
     - ip_assignment == "static"
-    - not enable_cloudinit_gosc
+    - not (enable_cloudinit_gosc | bool)
 
 # In Ubuntu, may contain 127.0.1.1
 - name: "Append '127.0.1.1' to expected IP list for perl GOSC"
   ansible.builtin.set_fact:
     expected_ips: "{{ expected_ips | union(['127.0.1.1']) }}"
   when:
-    - not enable_cloudinit_gosc
+    - not (enable_cloudinit_gosc | bool)
 
 - name: "Remove ::1 from hostname binding list when not check IPv6 binding"
   ansible.builtin.set_fact:
     actual_ips: "{{ actual_ips | difference(['::1']) }}"
     expected_ips: "{{ expected_ips | difference(['::1']) }}"
-  when: not ipv6_hostname_check
+  when: not (ipv6_hostname_check | bool)
 
 - name: "Print IP bindings for hostname {{ linux_gosc_spec['hostname'] }} in /etc/hosts"
   ansible.builtin.debug:

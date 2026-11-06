@@ -21,6 +21,7 @@
 
 - name: "Display the result of adding native key provider"
   ansible.builtin.debug: var=add_nkp_result
+  when: enable_debug | default(true) | bool
 
 - name: "Backup native key provider"
   ansible.builtin.get_url:
@@ -31,8 +32,8 @@
       Authorization: "Bearer {{ add_nkp_result.export_info.token }}"
   when:
     - add_nkp_result.changed is defined
-    - add_nkp_result.changed
+    - add_nkp_result.changed | bool
     - add_nkp_result.export_info.url is defined
-    - add_nkp_result.export_info.url | length != 0
+    - add_nkp_result.export_info.url | length > 0
     - add_nkp_result.export_info.token is defined
-    - add_nkp_result.export_info.token | length != 0
+    - add_nkp_result.export_info.token | length > 0

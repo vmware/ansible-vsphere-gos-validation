@@ -26,7 +26,7 @@
         # Check if there is installed PVSCSI driver when there is no inbox driver
         - name: "Check if PVSCSI driver exists in Driver Store in guest OS"
           include_tasks: ../utils/win_check_pvscsi_driverstore.yml
-          when: not win_driver_info
+          when: win_driver_info | length == 0
 
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
@@ -37,8 +37,8 @@
             skip_reason: "Not Supported"
           when:
             - esxi_cpu_vendor == 'arm'
-            - not win_driver_info
-            - not win_pvscsi_driver_store_exists | default(false)
+            - win_driver_info | length == 0
+            - not (win_pvscsi_driver_store_exists | default(false) | bool)
 
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
@@ -49,8 +49,8 @@
             skip_reason: "Blocked"
           when:
             - esxi_cpu_vendor != 'arm'
-            - not win_driver_info
-            - not win_pvscsi_driver_store_exists | default(false)
+            - win_driver_info | length == 0
+            - not (win_pvscsi_driver_store_exists | default(false) | bool)
 
         - name: "Test run"
           include_tasks: vhba_test.yml

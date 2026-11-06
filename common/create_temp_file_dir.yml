@@ -13,7 +13,7 @@
 - name: "Set default tmp_state to file"
   ansible.builtin.set_fact:
     tmp_state: "file"
-  when: tmp_state is undefined or not tmp_state
+  when: tmp_state is undefined or tmp_state | length == 0
 
 - name: "Create temporary {{ tmp_state }}"
   ansible.builtin.tempfile:
@@ -22,7 +22,7 @@
     prefix: "{{ tmp_prefix | default(omit) }}"
     suffix: "{{ tmp_suffix | default(omit) }}"
   register: tmp_file_dir
-  failed_when: not tmp_file_dir.changed
+  failed_when: not (tmp_file_dir.changed | bool)
 
 - name: "Set fact of created temp dir path"
   ansible.builtin.set_fact:

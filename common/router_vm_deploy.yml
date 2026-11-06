@@ -16,12 +16,12 @@
 
 - name: "Display the result of file existence"
   ansible.builtin.debug: var=router_ova_stat
-  when: enable_debug
+  when: enable_debug | default(true) | bool
 
 - name: "Check file existence result"
   ansible.builtin.fail:
     msg: "The OVA template file for router VM '{{ router_vm_ova_path }}' doesn't exist"
-  when: not router_ova_stat.stat.exists
+  when: not (router_ova_stat.stat.exists | bool)
 
 - name: "Deploy router VM from OVA template"
   include_tasks: ovf_deploy.yml

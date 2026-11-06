@@ -35,7 +35,7 @@
       ansible.builtin.assert:
         that:
           - ds_file_result.url is defined
-          - ds_file_result.url
+          - ds_file_result.url | length > 0
         fail_msg: "Failed to get VM log file URL: {{ ds_file_result.url | default('') }}"
     - name: "Wait for message '{{ vm_wait_log_msg }}' appear in VM log {{ vm_wait_log_name }}"
       ansible.builtin.uri:
@@ -74,13 +74,14 @@
         msg:
           - "Found '{{ vm_wait_log_msg }}' message in VM log file '{{ vm_wait_log_name }}': {{ 'Success' if vm_wait_log_msg_success else 'Failure' }}"
           - "Found logs list: {{ vm_wait_log_msg_list }}"
+      when: enable_debug | default(true) | bool
 
     - name: "VM log info check failure"
       ansible.builtin.fail:
         msg: "Found '{{ vm_wait_log_msg }}' message in VM log file '{{ vm_wait_log_name }}' appearing '{{ vm_wait_log_msg_list | length }}' times, while expect '{{ vm_wait_log_msg_times | default(1) }} times.'"
       when:
         - vm_wait_log_ignore_errors is undefined or not (vm_wait_log_ignore_errors | bool)
-        - not vm_wait_log_msg_success
+        - not (vm_wait_log_msg_success | bool)
   when:
     - file_in_datastore_result is defined
     - file_in_datastore_result == 'Success'

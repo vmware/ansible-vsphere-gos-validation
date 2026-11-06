@@ -18,7 +18,7 @@
     script_file_path: "{{ win_powershell_cmd_output.stdout.rstrip() }}"
   when: 
     - win_powershell_cmd_output.stdout is defined
-    - win_powershell_cmd_output.stdout
+    - win_powershell_cmd_output.stdout | length > 0
 
 - name: "Check script file exists"
   include_tasks: ../utils/win_check_file_exist.yml
@@ -28,7 +28,7 @@
 - name: "Make sure default script script exists in guest OS"
   ansible.builtin.assert:
     that:
-      - win_check_file_exist_result
+      - win_check_file_exist_result is defined and win_check_file_exist_result | bool
     fail_msg: "The default script {{ script_file_path }} is not found in guest OS"
 
 - name: "Set default script file for {{ power_cmd_op }} script"

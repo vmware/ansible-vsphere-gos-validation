@@ -51,7 +51,7 @@
       [localization]
       msgCatalog = /usr/share/open-vm-tools
   delegate_to: "{{ vm_guest_ip }}"
-  when: not guest_file_exists
+  when: not (guest_file_exists | bool)
 
 - name: "Update VGAuthService config file with logging options"
   include_tasks: ../../common/update_ini_style_file.yml
@@ -62,7 +62,7 @@
     option_value: "{{ item.value }}"
     ini_state: present
   loop: "{{ vgauth_logging_options | replace('=',': ') | from_yaml | dict2items }}"
-  when: guest_file_exists
+  when: guest_file_exists | bool
 
 - name: "Save VGAuthService config file to local log directory"
   include_tasks: fetch_file.yml
@@ -91,7 +91,7 @@
   when:
     - guest_os_family in ["Debian", "Astra Linux (Orel)"]
     - vgauth_service_file is defined
-    - vgauth_service_file
+    - vgauth_service_file | length > 0
 
 - name: "Restart VGAuthService to make config take effect"
   include_tasks: service_operation.yml

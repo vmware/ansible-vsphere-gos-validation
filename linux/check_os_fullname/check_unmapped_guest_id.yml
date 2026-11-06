@@ -17,9 +17,9 @@
       {{
         not guestinfo_guest_id and
         guest_os_ansible_kernel in guestinfo_guest_full_name and
-        ((guest_os_release.PRETTY_NAME is defined and guest_os_release.PRETTY_NAME and
+        ((guest_os_release.PRETTY_NAME is defined and guest_os_release.PRETTY_NAME | length > 0 and
           guest_os_release.PRETTY_NAME in guestinfo_guest_full_name) or
-          (guest_os_release.NAME is defined and guest_os_release.NAME and
+          (guest_os_release.NAME is defined and guest_os_release.NAME | length > 0 and
           guest_os_release.NAME in guestinfo_guest_full_name))
       }}
 
@@ -42,7 +42,7 @@
     - name: "Set fact to ignore unmapped guest id for Rocky Linux with VMware Tools {{ vmtools_version }}"
       ansible.builtin.set_fact:
         ignore_unmapped_guest_id: "{{ guestinfo_equalto_vm_config }}"
-      when: ovt_vendor_is_rocky
+      when: ovt_vendor_is_rocky | bool
 
 # Guest ids of AlmaLinux and Rocky Linux are mapped to VM configured guest id when
 # VMware Tools version is 12.0.0 or later, and ESXi version is 7.0.3 or earlier
@@ -96,7 +96,7 @@
   ansible.builtin.set_fact:
     ignore_unmapped_guest_id: "{{ guestinfo_equalto_vm_config or guestinfo_shows_os_release }}"
   when:
-    - guest_is_otherlinux
+    - guest_is_otherlinux | bool
     - (guest_os_ansible_kernel is version('5.0', '>=') and
        vmtools_version is version('11.2.0', '>=') and
        esxi_version is version('7.0.0', '<=')) or
@@ -105,7 +105,7 @@
        esxi_version is version('7.0.3', '=='))
 
 - name: "Ignore unmapped guest id"
-  when: ignore_unmapped_guest_id
+  when: ignore_unmapped_guest_id | bool
   block:
     - name: "Ignore unmapped guest id for {{ vm_guest_os_distribution }} with VMware Tools {{ vmtools_version }} on ESXi {{ esxi_version }}"
       ansible.builtin.debug:

@@ -42,9 +42,9 @@
             skip_msg: "Skip test case {{ ansible_play_name }} is because of missing vCenter Server variables."
             skip_reason: "Not Applicable"
           when: >
-            (not vcenter_is_defined) or
-            (vcenter_ssh_username is undefined or not vcenter_ssh_username) or
-            (vcenter_ssh_password is undefined or not vcenter_ssh_password)
+            (not (vcenter_is_defined | bool)) or
+            (vcenter_ssh_username is undefined or vcenter_ssh_username | length == 0) or
+            (vcenter_ssh_password is undefined or vcenter_ssh_password | length == 0)
 
         - name: "Check VMware Tools capability exists for host verified SAML token"
           include_tasks: ../../common/vm_check_vmtools_capability.yml
@@ -59,7 +59,7 @@
           vars:
             skip_msg: "Test case {{ ansible_play_name }} is blocked because SSH connection to vCenter Server failed."
             skip_reason: "Blocked"
-          when: not ssh_connect_success
+          when: not (ssh_connect_success | bool)
 
         - name: "Set NTP servers on vCenter Server and ESXi server"
           include_tasks: set_vsphere_ntp_servers.yml
@@ -112,9 +112,9 @@
         - name: "Check VGAuthService log is collected successfully"
           ansible.builtin.assert:
             that:
-              - vgauth_log_file_exists
-              - vgauth_log_is_collected
-              - vgauth_log_file_dest
+              - vgauth_log_file_exists is defined and vgauth_log_file_exists | bool
+              - vgauth_log_is_collected is defined and vgauth_log_is_collected | bool
+              - vgauth_log_file_dest is defined and vgauth_log_file_dest | length > 0
             fail_msg: "Failed to collect VGAuthService log"
             success_msg: "The VGAuthService log is collected to {{ vgauth_log_file_dest }}"
 
@@ -135,7 +135,7 @@
           include_tasks: ../utils/collect_vgauth_logs.yml
           vars:
             vgauth_log_file_src: "{{ vgauth_latest_log_file | default('') }}"
-          when: vgauth_log_is_collected is undefined or not vgauth_log_is_collected
+          when: vgauth_log_is_collected is undefined or not (vgauth_log_is_collected | bool)
 
         - name: "Collect VMware Tools logs"
           include_tasks: ../utils/collect_vmtools_logs.yml

@@ -41,19 +41,20 @@
 
 - name: "Print the result of generating VM support bundle"
   ansible.builtin.debug: var=get_vm_support
-  when: enable_debug
+  when: enable_debug | default(true) | bool
 
 - name: "Set fact of the gathered VM support bundle"
   ansible.builtin.set_fact:
     vm_support_bundle_path: "{{ (get_vm_support.stdout_lines[0] | regex_replace('File: (.*\\.tgz)', '\\1')).strip(\"'\") }}"
   when:
     - get_vm_support.failed is defined
-    - not get_vm_support.failed
+    - not (get_vm_support.failed | bool)
     - get_vm_support.stdout_lines is defined
     - get_vm_support.stdout_lines | length > 0
 
 - name: "Print the VM support bundle file path"
   ansible.builtin.debug: var=vm_support_bundle_path
+  when: enable_debug | default(true) | bool
 
 - name: "Transfer VM support bundle to local"
   include_tasks: esxi_download_datastore_file.yml

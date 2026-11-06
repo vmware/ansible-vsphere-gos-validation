@@ -83,9 +83,9 @@
       ansible.builtin.set_fact:
         winsrv_app_quiesce_support: true
       when:
-        - guestinfo_guest_full_name | regex_search('Windows Server ([0-9]{4})')
+        - guestinfo_guest_full_name is search('Windows Server ([0-9]{4})')
         - guestinfo_guest_full_name | regex_search('Windows Server ([0-9]{4})') == guest_os_ansible_distribution | regex_search('Windows Server ([0-9]{4})')
-        - win_boot_disk_ctrl_type in ['lsilogicsas', 'paravirtual'] or (win_boot_disk_ctrl_type == 'nvme' and winsrv_2022_app_quiesce is defined and winsrv_2022_app_quiesce)
+        - win_boot_disk_ctrl_type in ['lsilogicsas', 'paravirtual'] or (win_boot_disk_ctrl_type == 'nvme' and winsrv_2022_app_quiesce is defined and winsrv_2022_app_quiesce | bool)
 
 - name: "Check filesystem consistent quiescing taken"
   ansible.builtin.assert:
@@ -96,7 +96,7 @@
     fail_msg: >
       One file 'backup.xml' is expected in {{ vm_vss_manifests_new[0] | basename }} when
       taking filesystem consistent quiesce snapshot, while got files: {{ vm_vss_manifests_files.files | default([]) }}.
-  when: not winsrv_app_quiesce_support
+  when: not (winsrv_app_quiesce_support | bool)
 
 - name: "Check application consistent quiescing taken for Windows Server"
   ansible.builtin.assert:
@@ -106,4 +106,4 @@
     fail_msg: >
       More than one files are expected in {{ vm_vss_manifests_new[0] | basename }} when
       taking application consistent quiesce snapshot, while got file: {{ vm_vss_manifests_files.files | default([]) }}.
-  when: winsrv_app_quiesce_support
+  when: winsrv_app_quiesce_support | bool

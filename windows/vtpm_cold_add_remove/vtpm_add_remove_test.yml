@@ -24,17 +24,17 @@
 - name: "Set fact of VM vTPM device exists"
   ansible.builtin.set_fact:
     vm_with_vtpm: true
-  when: device_info_with_label
+  when: device_info_with_label | length > 0
 
 - name: "Check if VM home files are encrypted when no vTPM device"
-  when: not vm_with_vtpm
+  when: not (vm_with_vtpm | bool)
   block:
     - name: "Get VM cryptographic key info"
       include_tasks: ../../common/vm_get_cryptokey_id.yml
     - name: "Set fact of VM home files are encrypted"
       ansible.builtin.set_fact:
         vm_home_encrypted: true
-      when: vm_key_id_info
+      when: vm_key_id_info | length > 0
 
 - name: "Set facts of cloned VM name and save current VM info"
   ansible.builtin.set_fact:
@@ -50,7 +50,7 @@
   vars:
     parent_vm_name: "{{ vm_name }}"
     cloned_vm_name: "{{ vm_name_clone_to }}"
-  when: not vm_with_vtpm
+  when: not (vm_with_vtpm | bool)
 
 # Clone a new VM when VM with vTPM device
 - name: "Clone a new VM from current VM"
@@ -58,7 +58,7 @@
   vars:
     parent_vm_name: "{{ vm_name }}"
     cloned_vm_name: "{{ vm_name_clone_to }}"
-  when: vm_with_vtpm
+  when: vm_with_vtpm | bool
 
 - name: "Set facts of the cloned VM exists and switch to cloned VM for testing"
   ansible.builtin.set_fact:

@@ -131,7 +131,7 @@
     - name: "Set cloud-init GOSC network configuration file on Ubuntu {{ guest_os_ansible_distribution_ver }}"
       ansible.builtin.set_fact:
         src_network_file: "/etc/netplan/50-cloud-init.yaml"
-      when: enable_cloudinit_gosc
+      when: enable_cloudinit_gosc | bool
 
 # On Debian 10/11 or Ubuntu Desktop eariler than 19.10, the network configure file is
 # /etc/network/interfaces
@@ -145,10 +145,10 @@
     - name: "Set traditional GOSC network configuration file on {{ vm_guest_os_distribution }}"
       ansible.builtin.set_fact:
         src_network_file: "/etc/network/interfaces"
-      when: not enable_cloudinit_gosc
+      when: not (enable_cloudinit_gosc | bool)
 
     - name: "Set cloud-init GOSC network configuration file on {{ vm_guest_os_distribution }}"
-      when: enable_cloudinit_gosc
+      when: enable_cloudinit_gosc | bool
       block:
         - name: "Set cloud-init GOSC network configuration file on {{ vm_guest_os_distribution }}"
           ansible.builtin.set_fact:
@@ -201,10 +201,11 @@
 - name: "Collect network configuration file on {{ vm_guest_os_distribution }}"
   when:
     - src_network_file is defined
-    - src_network_file
+    - src_network_file | length > 0
   block:
     - name: "Print the network configuration file on {{ vm_guest_os_distribution }}"
       ansible.builtin.debug: var=src_network_file
+      when: enable_debug | default(true) | bool
 
     - name: "Set local path to collected GOSC network configuration file"
       ansible.builtin.set_fact:

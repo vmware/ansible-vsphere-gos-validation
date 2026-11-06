@@ -18,10 +18,10 @@
         guest_os_edition: "CloudImage"
       when:
         - cloud_image_build_info_exists is defined
-        - cloud_image_build_info_exists
+        - cloud_image_build_info_exists | bool
 
     - name: "Current Ubuntu doesn't have a cloud image build"
-      when: cloud_image_build_info_exists is undefined or not cloud_image_build_info_exists
+      when: cloud_image_build_info_exists is undefined or not (cloud_image_build_info_exists | bool)
       block:
         - name: "Get installed packages on Ubuntu"
           include_tasks: get_installed_packages.yml
@@ -50,7 +50,7 @@
 - name: "Get Fedora Edition"
   ansible.builtin.set_fact:
     guest_os_edition:  |-
-      {%- if guest_os_release.VARIANT_ID is defined and guest_os_release.VARIANT_ID -%}{{ guest_os_release.VARIANT_ID | capitalize }}
+      {%- if guest_os_release.VARIANT_ID is defined and guest_os_release.VARIANT_ID | length > 0 -%}{{ guest_os_release.VARIANT_ID | capitalize }}
       {%- elif 'Workstation Edition' in guest_os_release -%}Workstation
       {%- else -%}Server
       {%- endif -%}

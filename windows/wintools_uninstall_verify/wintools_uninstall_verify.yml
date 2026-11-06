@@ -33,13 +33,13 @@
         - name: "Check VMware Tools is running before uninstall"
           ansible.builtin.fail:
             msg: "VMware Tools installed: {{ vmtools_is_installed_before }}, running: {{ vmtools_is_running_before }}"
-          when: not vmtools_is_running_before
+          when: not (vmtools_is_running_before | bool)
 
         - name: "Make sure PVSCSI controller and VMXNET3 network adatper exist"
           include_tasks: prepare_pvscsi_vmxnet3_device.yml
           when:
             - esxi_cpu_vendor != 'arm'
-            - guest_os_with_inbox_drivers
+            - guest_os_with_inbox_drivers | bool
 
         # In Windows Server 2012 R2 or older OS there is no cmdlet 'Get-PnpDevice',
         # so here only check in newer OS
@@ -54,14 +54,14 @@
           include_tasks: verify_drivers_status.yml
           when:
             - esxi_cpu_vendor != 'arm'
-            - guest_os_with_inbox_drivers
+            - guest_os_with_inbox_drivers | bool
 
         - name: "Cleanup network configurations for added network adapter"
           when:
             - esxi_cpu_vendor != 'arm'
-            - guest_os_with_inbox_drivers
+            - guest_os_with_inbox_drivers | bool
             - new_network_adapter_mac is defined
-            - new_network_adapter_mac
+            - new_network_adapter_mac | length > 0
           block:
             - name: "Remove added network adapter"
               include_tasks: ../../common/vm_remove_network_adapter.yml
