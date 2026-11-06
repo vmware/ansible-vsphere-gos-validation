@@ -132,8 +132,8 @@
     guest_online_repos:
       - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_OSS"
         baseurl: >-
-          {{ 'https://download.opensuse.org/distribution/leap/$releasever/repo/oss/' 
-             if (guest_os_ansible_distribution_ver is version('16.0', '>=')) 
+          {{ 'https://download.opensuse.org/distribution/leap/$releasever/repo/oss/'
+             if guest_os_ansible_distribution_ver is version('16.0', '>=')
              else 'http://download.opensuse.org/distribution/leap/$releasever/repo/oss' }}
   when: guest_os_ansible_distribution == "openSUSE Leap"
 
@@ -141,16 +141,36 @@
   include_tasks: photon_config_repo.yml
   when: guest_os_ansible_distribution == "VMware Photon OS"
 
-- name: "Display the list of guest OS online repositories"
-  ansible.builtin.debug: var=guest_online_repos
-
 - name: "Add online repositories for {{ vm_guest_os_distribution }}"
   include_tasks: add_repo_from_baseurl.yml
   vars:
     repo_name: "{{ online_repo.name }}"
     repo_baseurl: "{{ online_repo.baseurl }}"
     gpg_check: "{{ guest_os_family in ['RedHat', 'VMware Photon OS'] }}"
+    repo_ignore_errors: "{{ guest_os_ansible_distribution == 'openSUSE Leap' and guest_os_ansible_distribution_major_ver | int == 16 }}"
   with_list: "{{ guest_online_repos }}"
   loop_control:
     loop_var: "online_repo"
   when: guest_online_repos | length > 0
+
+- name: "Use the SLC mirror if the official openSUSE Leap 16.x repository fails"
+  when:
+    - guest_os_ansible_distribution == "openSUSE Leap"
+    - guest_os_ansible_distribution_major_ver | int == 16
+    - add_zypper_repo_result is failed
+  block:
+    - name: "Select the SLC repository"
+      ansible.builtin.set_fact:
+        guest_online_repos:
+          - name: "{{ guest_os_ansible_distribution }}_{{ guest_os_ansible_distribution_ver }}_OSS"
+            baseurl: "https://slc-mirror.opensuse.org/distribution/leap/$releasever/repo/oss"
+
+    - name: "Add and refresh the SLC repository"
+      include_tasks: add_repo_from_baseurl.yml
+      vars:
+        repo_name: "{{ guest_online_repos[0].name }}"
+        repo_baseurl: "{{ guest_online_repos[0].baseurl }}"
+        repo_ignore_errors: false
+
+- name: "Display the list of guest OS online repositories"
+  ansible.builtin.debug: var=guest_online_repos
