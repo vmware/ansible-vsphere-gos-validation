@@ -92,4 +92,14 @@
       always:
         - name: "Get VMware Tools install log file"
           include_tasks: get_vmtools_install_log.yml
-          when: get_vmtools_install_log is defined and get_vmtools_install_log
+          when:
+            - get_vmtools_install_log is defined
+            - get_vmtools_install_log | bool
+
+        - name: "Cleanup VM when cleanup_vm set to true"
+          include_tasks: ../../common/vm_remove.yml
+          vars:
+            vm_remove_ignore_errors: true
+          when:
+            - cleanup_vm | bool
+            - test_block_failed is defined and test_block_failed | bool

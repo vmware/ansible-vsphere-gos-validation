@@ -35,7 +35,7 @@
             pvrdma_server_vm_name: "{{ vm_name }}"
             pvrdma_server_vm_guest_ip: "{{ vm_guest_ip }}"
             pvrdma_server_test_log_folder: "{{ current_test_log_folder }}/{{ vm_name }}"
-            pvrdma_client_vm_name: "{{ vm_name }}_client_{{ current_test_timestamp }}"
+            pvrdma_client_vm_name: "{{ (vm_name | length > 58) | ternary(vm_name[:58], vm_name) }}_client_{{ current_test_timestamp }}"
             pvrdma_client_vm_guest_ip: ""
             pvrdma_client_test_log_folder: "{{ current_test_log_folder }}/{{ vm_name }}_client_{{ current_test_timestamp }}"
             pvrdma_client_vm_invalid_ips: ["{{ vm_guest_ip }}"]
@@ -138,22 +138,15 @@
           ansible.builtin.copy:
             dest: "{{ current_test_log_folder }}/ib_devinfo.json"
             content: "{{ guest_rdma_device_info }}"
-
+  
         - name: "Collect server VM information at test failure"
           include_tasks: ../../common/test_rescue.yml
       always:
         - name: "Clean up client VM"
+          include_tasks: ../../common/vm_remove.yml
+          vars:
+            vm_name: "{{ pvrdma_client_vm_name }}"
+            vm_remove_ignore_errors: true
           when:
             - pvrdma_client_vm_exists is defined
-            - pvrdma_client_vm_exists
-          block:
-            - name: "Power off client VM"
-              include_tasks: ../../common/vm_set_power_state.yml
-              vars:
-                vm_name: "{{ pvrdma_client_vm_name }}"
-                vm_power_state_set: 'powered-off'
-
-            - name: "Remove client VM"
-              include_tasks: ../../common/vm_remove.yml
-              vars:
-                vm_name: "{{ pvrdma_client_vm_name }}"
+            - pvrdma_client_vm_exists | bool

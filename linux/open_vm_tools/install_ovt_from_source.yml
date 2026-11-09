@@ -56,9 +56,10 @@
   vars:
     package_list: "{{ ovt_dependencies }}"
 
-- name: "Set facts of open-vm-tools directory for downloading source tarball"
+- name: "Set facts of OVT download directory and tarball path"
   ansible.builtin.set_fact:
     guest_ovt_download_dir: "/root/ovt_source_{{ current_test_timestamp }}"
+    guest_ovt_dest_path: "/root/ovt_source_{{ current_test_timestamp }}/{{ linux_ovt_tarball_url | basename }}"
 
 - name: "Create directory for downloading open-vm-tools source tarball"
   ansible.builtin.file:
@@ -68,21 +69,46 @@
     recurse: true
   delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Download open-vm-tools source tarball"
+- name: "Download open-vm-tools source tarball via get_url"
   ansible.builtin.get_url:
     url: "{{ linux_ovt_tarball_url }}"
     dest: "{{ guest_ovt_download_dir }}"
     validate_certs: false
     mode: "0644"
-  delegate_to: "{{ vm_guest_ip }}"
   register: ovt_tarball_download_result
+  ignore_errors: true
+  delegate_to: "{{ vm_guest_ip }}"
 
-- name: "Unarchive open-vm-tools source tarball"
+- name: "Download open-vm-tools source tarball (fallback via curl)"
+  when:
+    - ovt_tarball_download_result.failed is defined
+    - ovt_tarball_download_result.failed
+  block:
+    - name: "Download open-vm-tools source tarball via curl"
+      ansible.builtin.command: curl -ksSL "{{ linux_ovt_tarball_url }}" -o "{{ guest_ovt_dest_path }}"
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Change downloaded tarball file permission"
+      ansible.builtin.file:
+        path: "{{ guest_ovt_dest_path }}"
+        mode: "0644"
+      delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Unarchive open-vm-tools source tarball via builtin unarchive module"
   ansible.builtin.unarchive:
-    src: "{{ ovt_tarball_download_result.dest }}"
+    src: "{{ guest_ovt_dest_path }}"
     dest: "{{ guest_ovt_download_dir }}"
     remote_src: true
+  register: unarchive_ovt_tar_result
+  ignore_errors: true
   delegate_to: "{{ vm_guest_ip }}"
+
+- name: "Unarchive open-vm-tools source tarball (fallback via tar command)"
+  ansible.builtin.command: tar -xzf "{{ guest_ovt_dest_path }}" -C "{{ guest_ovt_download_dir }}"
+  delegate_to: "{{ vm_guest_ip }}"
+  when:
+    - unarchive_ovt_tar_result.failed is defined
+    - unarchive_ovt_tar_result.failed
 
 - name: "Search open-vm-tools configure.ac file"
   ansible.builtin.shell: "find {{ guest_ovt_download_dir }} -name configure.ac"

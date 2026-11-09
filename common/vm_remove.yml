@@ -1,33 +1,57 @@
 # Copyright 2021-2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Delete VM from datastore on ESXi host.
+# Power off VM and delete it from datastore on ESXi host.
 # Parameters:
-#   vm_remove_ignore_errors (optional): ignore errors when removing VM.
+#   vm_remove_ignore_errors (optional): ignore errors during power-off and removal.
 #     Default value is false.
 #
-- name: "Remove VM '{{ vm_name }}' from VC/ESXi '{{ vsphere_host_name }}'"
-  community.vmware.vmware_guest:
-    hostname: "{{ vsphere_host_name }}"
-    username: "{{ vsphere_host_user }}"
-    password: "{{ vsphere_host_user_password }}"
-    validate_certs: "{{ validate_certs | default(false) }}"
-    datacenter: "{{ vsphere_host_datacenter }}"
-    folder: "{{ vm_folder }}"
-    name: "{{ vm_name }}"
-    state: "absent"
-  register: vm_remove_result
-  ignore_errors: "{{ vm_remove_ignore_errors | default(false) }}"
+- name: "Power off and remove VM"
+  ignore_errors: "{{ vm_remove_ignore_errors | default(false) | bool }}"
+  block:
+    - name: "Power off VM before removing it"
+      vmware.vmware.vm_powerstate:
+        hostname: "{{ vsphere_host_name }}"
+        username: "{{ vsphere_host_user }}"
+        password: "{{ vsphere_host_user_password }}"
+        validate_certs: "{{ validate_certs | default(false) }}"
+        datacenter: "{{ vsphere_host_datacenter }}"
+        folder: "{{ vm_folder }}"
+        name: "{{ vm_name }}"
+        state: 'powered-off'
+        timeout: 300
+        force: true
+      register: vm_remove_poweroff_result
 
-- name: "Display the result of removing VM"
-  ansible.builtin.debug: var=vm_remove_result
-  when: enable_debug
+    - name: "Display the result of powering off VM"
+      ansible.builtin.debug: var=vm_remove_poweroff_result
+      when: enable_debug | default(true) | bool
 
-- name: "Check the result of removing VM"
-  ansible.builtin.assert:
-    that:
-      - vm_remove_result.changed is defined
-      - vm_remove_result.changed
-    fail_msg: "Failed to remove VM '{{ vm_name }}' from VC/ESXi '{{ vsphere_host_name }}' due to '{{ vm_remove_result.msg | default('') }}'."
-    success_msg: "VM '{{ vm_name }}' on VC/ESXi '{{ vsphere_host_name }}' is removed successfully."
-  when: not vm_remove_ignore_errors | default(false)
+    - name: "Pause 5 seconds after powering off VM"
+      ansible.builtin.pause:
+        seconds: 5
+
+    - name: "Remove VM '{{ vm_name }}' from VC/ESXi '{{ vsphere_host_name }}'"
+      community.vmware.vmware_guest:
+        hostname: "{{ vsphere_host_name }}"
+        username: "{{ vsphere_host_user }}"
+        password: "{{ vsphere_host_user_password }}"
+        validate_certs: "{{ validate_certs | default(false) }}"
+        datacenter: "{{ vsphere_host_datacenter }}"
+        folder: "{{ vm_folder }}"
+        name: "{{ vm_name }}"
+        state: "absent"
+        force: true
+      register: vm_remove_result
+
+    - name: "Display the result of removing VM"
+      ansible.builtin.debug: var=vm_remove_result
+      when: enable_debug | default(true) | bool
+
+    - name: "Check the result of removing VM"
+      ansible.builtin.assert:
+        that:
+          - vm_remove_result is succeeded
+        fail_msg: "Failed to remove VM '{{ vm_name }}' from VC/ESXi '{{ vsphere_host_name }}' due to '{{ vm_remove_result.msg | default('') }}'."
+        success_msg: "VM '{{ vm_name }}' on VC/ESXi '{{ vsphere_host_name }}' is removed successfully."
+      when: not (vm_remove_ignore_errors | default(false) | bool)
