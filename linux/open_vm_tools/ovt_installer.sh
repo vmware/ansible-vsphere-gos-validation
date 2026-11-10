@@ -59,13 +59,13 @@ if [ "$system" == "FreeBSD" ]; then
     freebsd_patches_dir="/usr/ports/emulators/open-vm-tools/files"
 
     module_patches=`find /usr/ports/emulators/open-vm-kmod/files -name 'patch-*' 2>/dev/null | grep -v Makefile`
-    echo "FreeBSD module patches: ${module_patches:-<none>}"
+    printf 'FreeBSD module patches:\n%s\n' "${module_patches:-<none>}"
     cd modules/freebsd/
     apply_patches "$module_patches"
     cd "$CURRENT_DIR"
 
     ovt_patches=`find /usr/ports/emulators/open-vm-tools/files -name 'patch-*' 2>/dev/null | grep -E 'vmmemctl_os.c|vmblock_vfsops.c|dndcp_stringxx_string.hh'`
-    echo "FreeBSD OVT patches: ${ovt_patches:-<none>}"
+    printf 'FreeBSD OVT patches:\n%s\n' "${ovt_patches:-<none>}"
     apply_patches "$ovt_patches"
 fi
 
