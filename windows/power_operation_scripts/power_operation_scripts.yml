@@ -60,8 +60,14 @@
             - ['default', 'custom']
             - "{{ power_script_ops }}"
       rescue:
+        - name: "Get VM power state"
+          include_tasks: ../../common/vm_get_power_state.yml
+
         - name: "Stop VMware Tools and collect log files"
-          when: collect_power_scripts_logs is defined and collect_power_scripts_logs
+          when:
+            - collect_power_scripts_logs is defined
+            - collect_power_scripts_logs | bool
+            - vm_power_state_get == 'poweredOn'
           block:
             # Stop VMware Tools service in case of log file in use error
             - name: "Stop VMware Tools Service before getting its log file"
