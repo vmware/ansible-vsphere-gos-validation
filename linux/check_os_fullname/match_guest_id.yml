@@ -113,11 +113,11 @@
   block:
     - name: "Set fact of supported guest OS versions for {{ guest_os_ansible_distribution }} on ESXi {{ esxi_version }}"
       ansible.builtin.set_fact:
-        supported_guest_versions: "{{ supported_guest_ids | map('regex_replace', '(64)?Guest', '') | map('regex_search', '\\d+') | map('replace', 'None', 0) }}"
+        supported_guest_versions: "{{ supported_guest_ids | map('regex_replace', '(64)?Guest', '') | map('regex_search', '\\d+') | map('int') }}"
 
     - name: "Set fact of a matched closest guest id version"
       ansible.builtin.set_fact:
-        closest_guest_version: "{{ supported_guest_versions | map('int') | select('<=', guest_id_major_version | int) | max }}"
+        closest_guest_version: "{{ supported_guest_versions | select('<=', guest_id_major_version | int) | max }}"
 
     - name: "Set fact of the index of closest guest id in supported guest ids"
       ansible.builtin.set_fact:

@@ -37,13 +37,13 @@
     - vm_guestinfo.instance.guest.toolsRunningStatus is defined
     - vm_guestinfo.instance.guest.toolsRunningStatus == "guestToolsRunning"
     - vm_guestinfo.instance.guest.net is defined
-    - (vm_guestinfo.instance.guest.net | map(attribute='ipAddress') | flatten | ansible.utils.ipv4) | length > 0
+    - (vm_guestinfo.instance.guest.net | default([], true) | map(attribute='ipAddress') | flatten | ansible.utils.ipv4) | length > 0
     - vm_guestinfo.instance.guest.ipAddress is defined
-    - vm_guestinfo.instance.guest.ipAddress | length > 0
+    - vm_guestinfo.instance.guest.ipAddress | default('', true) | length > 0
     - vm_guestinfo.instance.guest.ipAddress is ansible.utils.ipv4
     - (vm_guestinfo.instance.guest.ipAddress in
-       vm_guestinfo.instance.guest.net | map(attribute='ipAddress') | flatten | ansible.utils.ipv4)
-    - (wait_ipv4 is undefined or wait_ipv4 | length == 0 or
+       vm_guestinfo.instance.guest.net | default([], true) | map(attribute='ipAddress') | flatten | ansible.utils.ipv4)
+    - (wait_ipv4 is undefined or wait_ipv4 | default('', true) | length == 0 or
        wait_ipv4 == vm_guestinfo.instance.guest.ipAddress)
 
 - name: "Check VMware Tools is running and collects guest IPv4 address successfully"
@@ -52,18 +52,18 @@
       - vm_guestinfo.instance.guest.toolsRunningStatus is defined
       - vm_guestinfo.instance.guest.toolsRunningStatus == "guestToolsRunning"
       - vm_guestinfo.instance.guest.ipAddress is defined
-      - vm_guestinfo.instance.guest.ipAddress | length > 0
+      - vm_guestinfo.instance.guest.ipAddress | default('', true) | length > 0
       - vm_guestinfo.instance.guest.ipAddress is ansible.utils.ipv4
       - (vm_guestinfo.instance.guest.ipAddress in
-         vm_guestinfo.instance.guest.net | map(attribute='ipAddress') | flatten | ansible.utils.ipv4)
-      - (wait_ipv4 is undefined or wait_ipv4 | length == 0 or
+         vm_guestinfo.instance.guest.net | default([], true) | map(attribute='ipAddress') | flatten | ansible.utils.ipv4)
+      - (wait_ipv4 is undefined or wait_ipv4 | default('', true) | length == 0 or
          wait_ipv4 == vm_guestinfo.instance.guest.ipAddress)
     fail_msg:
       - "It's timed out for VMware Tools collecting guest IPv4 address in {{ vm_get_ip_timeout }} seconds."
       - "VMware Tools running status is '{{ vm_guestinfo.instance.guest.toolsRunningStatus | default() }}'."
       - "VM's IP address in guest info is '{{ vm_guestinfo.instance.guest.ipAddress | default() }}'."
-      - "VM's all IP addresses in guest info are '{{ vm_guestinfo.instance.guest.net | default([]) | map(attribute='ipAddress') | flatten }}'."
+      - "VM's all IP addresses in guest info are '{{ vm_guestinfo.instance.guest.net | default([], true) | map(attribute='ipAddress') | flatten }}'."
     success_msg:
       - "Waiting for VM guest IPv4 address succeeded."
       - "VM's IP address in guest info is '{{ vm_guestinfo.instance.guest.ipAddress | default() }}'."
-      - "VM's all IP addresses in guest info are {{ vm_guestinfo.instance.guest.net | default([]) | map(attribute='ipAddress') | flatten }}."
+      - "VM's all IP addresses in guest info are {{ vm_guestinfo.instance.guest.net | default([], true) | map(attribute='ipAddress') | flatten }}."
