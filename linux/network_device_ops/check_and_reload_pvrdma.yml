@@ -1,8 +1,9 @@
 # Copyright 2023-2026 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-# Reload vmw_pvrdma module when ESXi version is 7.0.1 or earlier
-# or new RDMA device status is not active
+# Reload vmw_pvrdma module when ESXi version is 7.0.1 or earlier,
+# the paired vmxnet3 device was not ready during probe, or the new RDMA
+# device status is not active
 #
 - name: "Reload 'vmw_pvrdma' module"
   include_tasks: ../utils/reload_module.yml
@@ -10,7 +11,7 @@
     module_name: "vmw_pvrdma"
   when: >
     (esxi_version is version('7.0.1', '<=')) or
-    (('').join(new_network_adapter_dmesg) is search('failed to activate device'))
+    (('').join(new_network_adapter_dmesg) is search('failed to activate device|failed to get vmxnet3 device'))
 
 - name: "Check RDMA device port state"
   when: esxi_version is version('7.0.1', '>')
