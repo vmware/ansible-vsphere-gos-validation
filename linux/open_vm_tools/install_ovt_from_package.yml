@@ -27,13 +27,13 @@
 
 - name: "Display the packages install output"
   ansible.builtin.debug: var=ovt_install_result
-  when: enable_debug | bool
+  when: enable_debug | default(true) | bool
 
 - name: "Assert command is executed successfully"
   ansible.builtin.assert:
     that:
       - ovt_install_result.stdout is defined
-      - ovt_install_result.stdout
+      - ovt_install_result.stdout | length > 0
       - ovt_install_result.rc is defined
       - ovt_install_result.rc | int == 0
     fail_msg: >-
@@ -62,4 +62,4 @@
         service_name: "{{ vgauth_service_name }}"
         service_enabled: true
         service_state: "started"
-      when: vgauth_service_name
+      when: vgauth_service_name | length > 0

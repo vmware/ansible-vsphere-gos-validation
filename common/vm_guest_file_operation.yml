@@ -32,12 +32,12 @@
   include_tasks: vm_wait_vmtools_status.yml
   vars:
     vm_wait_vmtools_running: true
-  when: not tools_ready_in_guest_file_ops
+  when: not (tools_ready_in_guest_file_ops | bool)
 
 - name: "Create directory in guest OS"
   when: operation == "create_dir"
   block:
-    - name: "Create directory {{ dir_path }}"
+    - name: "Create directory {{ dir_path | default('') }}"
       community.vmware.vmware_guest_file_operation:
         hostname: "{{ vsphere_host_name }}"
         username: "{{ vsphere_host_user }}"
@@ -55,20 +55,20 @@
       ignore_errors: true
     - name: "Print the result of create directory"
       ansible.builtin.debug: var=create_dir_op
-      when: enable_debug
+      when: enable_debug | default(true) | bool
     - name: "Ignore directory exists error or configured to ignore error"
       ansible.builtin.fail:
         msg: "Failed to create diretory: '{{ dir_path }}', due to {{ create_dir_op.msg }}"
       when:
-        - not guest_file_ops_ignore_error
+        - not (guest_file_ops_ignore_error | bool)
         - create_dir_op is defined
-        - not create_dir_op.changed
+        - not (create_dir_op.changed | bool)
         - ('msg' in create_dir_op) and (create_dir_op.msg.count('already exists') == 0)
 
 - name: "Delete directory in guest OS"
   when: operation == "delete_dir"
   block:
-    - name: "Delete directory {{ dir_path }}"
+    - name: "Delete directory {{ dir_path | default('') }}"
       community.vmware.vmware_guest_file_operation:
         hostname: "{{ vsphere_host_name }}"
         username: "{{ vsphere_host_user }}"
@@ -86,7 +86,7 @@
       ignore_errors: "{{ guest_file_ops_ignore_error }}"
     - name: "Print result of delete directory in guest OS"
       ansible.builtin.debug: var=delete_dir_op
-      when: enable_debug
+      when: enable_debug | default(true) | bool
 
 - name: "Fetch file from guest OS"
   when: operation == "fetch_file"
@@ -101,8 +101,8 @@
       vars:
         dir_path: "{{ dest_path | dirname }}"
         dir_mode: "0777"
-      when: not fetch_dir_stat.stat.exists
-    - name: "Fetch file {{ src_path }}"
+      when: not (fetch_dir_stat.stat.exists | bool)
+    - name: "Fetch file {{ src_path | default('') }}"
       community.vmware.vmware_guest_file_operation:
         hostname: "{{ vsphere_host_name }}"
         username: "{{ vsphere_host_user }}"
@@ -119,12 +119,12 @@
       ignore_errors: "{{ guest_file_ops_ignore_error }}"
     - name: "Print result of fetch file from guest OS"
       ansible.builtin.debug: var=fetch_file_op
-      when: enable_debug
+      when: enable_debug | default(true) | bool
 
 - name: "Copy file to guest OS"
   when: operation == "copy_file"
   block:
-    - name: "Copy file {{ src_path }}"
+    - name: "Copy file {{ src_path | default('') }}"
       community.vmware.vmware_guest_file_operation:
         hostname: "{{ vsphere_host_name }}"
         username: "{{ vsphere_host_user }}"
@@ -142,4 +142,4 @@
       ignore_errors: "{{ guest_file_ops_ignore_error }}"
     - name: "Print result of copy file to guest OS"
       ansible.builtin.debug: var=copy_file_op
-      when: enable_debug
+      when: enable_debug | default(true) | bool

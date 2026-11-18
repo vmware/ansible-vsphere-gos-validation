@@ -25,13 +25,13 @@
   delay: 5
   until:
     - all_vm_facts.failed is defined
-    - not all_vm_facts.failed
+    - not (all_vm_facts.failed | bool)
 
 - name: "Check whether VM exists or not"
   when:
     - all_vm_facts is defined
     - all_vm_facts.virtual_machines is defined
-    - all_vm_facts.virtual_machines
+    - all_vm_facts.virtual_machines | length > 0
   block:
     - name: "Set fact of existing VM basic information"
       ansible.builtin.set_fact:
@@ -39,7 +39,7 @@
 
     - name: "A VM, template or vApp with name '{{ vm_name }}' exists"
       ansible.builtin.debug: var=existing_vm_info
-      when: enable_debug and existing_vm_info
+      when: enable_debug | default(true) | bool and existing_vm_info | length > 0
 
     - name: "Set fact of VM existence"
       ansible.builtin.set_fact:
@@ -48,3 +48,4 @@
 
 - name: "Print the fact that VM exists or not"
   ansible.builtin.debug: var=vm_exists
+  when: enable_debug | default(true) | bool

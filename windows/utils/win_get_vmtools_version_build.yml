@@ -38,7 +38,7 @@
 - name: "'vmtoolsd.exe' does not exist"
   ansible.builtin.assert:
     that:
-      - win_check_file_exist_result
+      - win_check_file_exist_result is defined and win_check_file_exist_result | bool
     fail_msg: "File '{{ vmtoolsd_path }}' does not exist in guest OS."
 
 - name: "Get VMware Tools info in guest OS"
@@ -57,24 +57,25 @@
   ansible.builtin.set_fact:
     vmtools_major_version: "{{ vmtools_info_from_vmtoolsd | regex_findall('\\d+') | first }}"
     vmtools_build_number: "{{ vmtools_info_from_vmtoolsd | regex_findall('\\d+') | last }}"
-  when: vmtools_info_from_vmtoolsd
+  when: vmtools_info_from_vmtoolsd | length > 0
 
 - name: "Set fact of VMware Tools version"
   ansible.builtin.set_fact:
     vmtools_version: "{{ vmtools_info_from_vmtoolsd | regex_search('(\\d+\\.){2}\\d+') }}"
   when:
-    - vmtools_major_version
+    - vmtools_major_version | length > 0
     - vmtools_major_version | int <= 12
 
 - name: "Set fact of VMware Tools version"
   ansible.builtin.set_fact:
     vmtools_version: "{{ vmtools_info_from_vmtoolsd | regex_search('(\\d+\\.){3}\\d+') }}"
   when:
-    - vmtools_major_version
+    - vmtools_major_version | length > 0
     - vmtools_major_version | int > 12
 
 - name: "Print VMware Tools info got in guest OS"
   ansible.builtin.debug: var=vmtools_info_from_vmtoolsd
+  when: enable_debug | default(true) | bool
 
 - name: "Print VMware Tools version and build number"
   ansible.builtin.debug:

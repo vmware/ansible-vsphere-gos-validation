@@ -122,7 +122,7 @@
       - find_configure_result.rc is defined
       - find_configure_result.rc == 0
       - find_configure_result.stdout is defined
-      - find_configure_result.stdout
+      - find_configure_result.stdout | length > 0
     fail_msg: "Failed to find open-vm-tools configure.ac file under directory {{ guest_ovt_download_dir }}"
     success_msg: "The open-vm-tools configure.ac file path is {{ find_configure_result.stdout }}"
 
@@ -161,7 +161,7 @@
     jid: "{{ ovt_installer_result.ansible_job_id }}"
   delegate_to: "{{ vm_guest_ip }}"
   register: ovt_install_job_result
-  until: ovt_install_job_result.finished
+  until: ovt_install_job_result.finished | bool
   retries: 60
   delay: 10
 
@@ -197,8 +197,8 @@
     service_file: "{{ vgauth_service_file }}"
     service_file_local_path: "{{ vgauth_service_file_local_path | default('') }}"
   when:
-    - vgauth_service_name
-    - vgauth_service_file
+    - vgauth_service_name | length > 0
+    - vgauth_service_file | length > 0
 
 - name: "Add and enable open-vm-tools service"
   include_tasks: add_enable_service.yml

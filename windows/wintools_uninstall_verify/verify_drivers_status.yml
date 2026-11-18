@@ -6,13 +6,13 @@
   include_tasks: check_pvscsi_not_uninstalled.yml
   when: >
     (win_pvscsi_installer[0] == 'Windows') or
-    (win_pvscsi_installer[0] == 'MSI' and vm_has_pvscsi_boot_disk)
+    (win_pvscsi_installer[0] == 'MSI' and (vm_has_pvscsi_boot_disk | bool))
 
 - name: "Check inboxed PVSCSI driver loaded"
   include_tasks: check_pvscsi_inbox_loaded.yml
   when:
     - win_pvscsi_installer[0] == 'MSI'
-    - not vm_has_pvscsi_boot_disk
+    - not (vm_has_pvscsi_boot_disk | bool)
 
 - name: "Check VMXNET3 driver not uninstalled"
   include_tasks: check_vmxnet3_not_uninstalled.yml
@@ -29,5 +29,5 @@
   ansible.builtin.assert:
     that:
       - gos_has_problem_device is defined
-      - not gos_has_problem_device
+      - not (gos_has_problem_device | bool)
     fail_msg: "Problem devices found in guest after VMware Tools uninstall, please check listed problem devices: {{ gos_problem_device_list }}"

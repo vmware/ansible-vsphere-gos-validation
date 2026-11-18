@@ -17,12 +17,12 @@
 
 - name: "Generate unattend install ISO file"
   include_tasks: create_unattend_install_iso.yml
-  when: unattend_install_conf is defined and unattend_install_conf
+  when: unattend_install_conf is defined and unattend_install_conf | length > 0
 
 - name: "Not Generate unattend install ISO file"
   ansible.builtin.debug:
     msg: "[WARNING] Parameter 'unattend_install_conf' is not configured in vars/test.yml."
-  when: unattend_install_conf is undefined or not unattend_install_conf
+  when: unattend_install_conf is undefined or unattend_install_conf | length == 0
 
 - name: "Compose VM CDROMs with ISO file list"
   include_tasks: ../../common/compose_vm_cdroms.yml
@@ -106,7 +106,7 @@
     vm_wait_log_hide_output: false
   when:
     - firmware == 'efi'
-    - secureboot_enabled
+    - secureboot_enabled | bool
 
 - name: "Wait for VM network adapter is connected"
   include_tasks: ../../common/vm_wait_network_connected.yml

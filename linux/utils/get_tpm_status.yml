@@ -26,12 +26,12 @@
     tpm_present: true
   when:
     - tpm_dev_result.failed is defined
-    - not tpm_dev_result.failed
+    - not (tpm_dev_result.failed | bool)
     - tpm_dev_result.stdout is defined
     - tpm_dev_result.stdout | length != 0
 
 - name: "Get TPM information when TPM is present"
-  when: tpm_present
+  when: tpm_present | bool
   block: 
     - name: "Get TPM info"
       ansible.builtin.shell: tpm2_getcap properties-variable
@@ -44,7 +44,7 @@
         tpm_info: "{{ tpm_info_results.stdout | from_yaml }}"
       when:
         - tpm_info_results.failed is defined
-        - not tpm_info_results.failed
+        - not (tpm_info_results.failed | bool)
         - tpm_info_results.stdout is defined
         - tpm_info_results.stdout | length != 0
 
@@ -59,7 +59,7 @@
         tpm_info: "{{ tpm_info | combine({'TPM2_PT_MANUFACTURER': tpm_manufacturer_results.stdout}) }}"
       when:
         - tpm_manufacturer_results.failed is defined
-        - not tpm_manufacturer_results.failed
+        - not (tpm_manufacturer_results.failed | bool)
         - tpm_manufacturer_results.stdout is defined
         - tpm_manufacturer_results.stdout | length != 0
 
@@ -74,9 +74,10 @@
         tpm_info: "{{ tpm_info | combine({'TPM2_PT_FAMILY_INDICATOR': tpm_family_results.stdout}) }}"
       when:
         - tpm_family_results.failed is defined
-        - not tpm_family_results.failed
+        - not (tpm_family_results.failed | bool)
         - tpm_family_results.stdout is defined
         - tpm_family_results.stdout | length != 0
 
 - name: "Display the TPM device info got in guest OS"
   ansible.builtin.debug: var=tpm_info
+  when: enable_debug | default(true) | bool

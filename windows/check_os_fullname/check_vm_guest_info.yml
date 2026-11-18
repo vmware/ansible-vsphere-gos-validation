@@ -32,7 +32,7 @@
 
 # VM configured guest ID is the guest ID for the previous version of current OS
 - name: "Set expected guest ID corresponding to previous OS version"
-  when: not current_guest_id_expected
+  when: not (current_guest_id_expected | bool)
   block:
     - name: "Get the previous version of current OS info in the guest OS defination list"
       include_tasks: get_previous_gos_info.yml
@@ -52,7 +52,7 @@
       VM configured guest ID '{{ vm_guest_id }}' should be the guest ID
       '{{ current_os_guest_id }}' for the current OS version '{{ guest_os_ansible_distribution }}'
       on ESXi host '{{ esxi_version }}' with VM hardware version '{{ vm_hardware_version_num }}'.
-  when: current_guest_id_expected
+  when: current_guest_id_expected | bool
 
 - name: "Check configured guest ID"
   ansible.builtin.assert:
@@ -62,7 +62,7 @@
       VM configured guest ID '{{ vm_guest_id }}' should be the guest ID
       '{{ previous_os_guest_id }}'for the previous version of current OS '{{ guest_os_ansible_distribution }}'
       on ESXi host '{{ esxi_version }}' with VM hardware version '{{ vm_hardware_version_num }}'.
-  when: not current_guest_id_expected
+  when: not (current_guest_id_expected | bool)
 
 # There is a situation that install old VMware Tools in the VM on
 # the new ESXi host, which causing guest ID and fullname are incorrect
@@ -81,8 +81,8 @@
       '{{ current_gos_info.win_guest_fullname }}' for the current OS version '{{ guest_os_ansible_distribution }}'
       on ESXi host '{{ esxi_version }}' with VMware Tools version '{{ vmtools_version }}'.
   when: >
-    current_guest_id_expected or
-    current_os_recognized
+    (current_guest_id_expected | bool) or
+    (current_os_recognized | bool)
 
 - name: "Check guest ID and fullname in VM guest info"
   ansible.builtin.assert:
@@ -96,5 +96,5 @@
       '{{ guest_os_ansible_distribution }}' on ESXi host '{{ esxi_version }}'
       with VMware Tools version '{{ vmtools_version }}'.
   when:
-    - not current_guest_id_expected
-    - not current_os_recognized
+    - not (current_guest_id_expected | bool)
+    - not (current_os_recognized | bool)

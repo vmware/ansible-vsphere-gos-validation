@@ -4,14 +4,14 @@
 - name: "Prepare vSphere Standard Switch network environment"
   include_tasks: vss_network_setup.yml
   when:
-    - vss_network_is_setup is undefined or not vss_network_is_setup
+    - vss_network_is_setup is undefined or not (vss_network_is_setup | bool)
     - esxi_cpu_vendor != 'arm'
     - network_testbed_type is undefined or network_testbed_type == 'vss'
-    - vds_network_is_setup is undefined or not vds_network_is_setup
+    - vds_network_is_setup is undefined or not (vds_network_is_setup | bool)
 
 - name: "Prepare vSphere Distributed Switch network environment"
   when:
-    - vds_network_is_setup is undefined or not vds_network_is_setup
+    - vds_network_is_setup is undefined or not (vds_network_is_setup | bool)
     - esxi_cpu_vendor == 'arm' or (network_testbed_type is defined and network_testbed_type == 'vds')
   block:
     - name: "Skip test case"
@@ -21,15 +21,15 @@
           Test case '{{ ansible_play_name }}' is skipped because vCenter server is not configured,
           which is required for setting up vSphere Distributed Switch networking.
         skip_reason: "Not Applicable"
-      when: not vcenter_is_defined
+      when: not (vcenter_is_defined | bool)
 
     - name: "Setup vSphere Distributed Switch network"
       include_tasks: vds_network_setup.yml
-      when: vcenter_is_defined
+      when: vcenter_is_defined | bool
 
 - name: "Check network environment with either type is setup"
   ansible.builtin.assert:
     that:
-      - (vds_network_is_setup is defined and vds_network_is_setup) or (vss_network_is_setup is defined and vss_network_is_setup)
+      - (vds_network_is_setup is defined and vds_network_is_setup | bool) or (vss_network_is_setup is defined and vss_network_is_setup | bool)
     fail_msg: >-
       Neither the vSphere Distributed Switch network environment nor the vSphere Standard Switch network environment is set up.

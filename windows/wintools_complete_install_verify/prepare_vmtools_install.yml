@@ -24,15 +24,16 @@
 
 - name: "Set fact of the files list for checking"
   ansible.builtin.set_fact:
-    win_vmtools_files_check: |-
-      {%- if esxi_cpu_vendor == 'arm' -%}['{{ wintools_setup_exe }}']
-      {%- else -%}['{{ wintools_setup_exe }}', 'VMwareToolsUpgrader.exe', 'manifest.txt']
-      {%- endif -%}
+    win_vmtools_files_check: >-
+      {{
+        [wintools_setup_exe] if esxi_cpu_vendor == 'arm' else
+        [wintools_setup_exe, 'VMwareToolsUpgrader.exe', 'manifest.txt']
+      }}
 
 - name: "Check VMware Tools files in installation ISO"
   ansible.builtin.assert:
     that:
-      - wintools_setup_exe
+      - wintools_setup_exe | length > 0
       - win_vmtools_files_check | difference(win_files_vmtools_iso) | length == 0
     fail_msg: >-
       Either VMware Tools installation setup file is not set: '{{ wintools_setup_exe }}',

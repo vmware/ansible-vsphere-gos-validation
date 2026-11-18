@@ -17,7 +17,7 @@
 - name: "Initialize the timeout seconds to wait for VMware Tools collecting guest OS hostname"
   ansible.builtin.set_fact:
     vm_get_hostname_timeout: 300
-  when: vm_get_hostname_timeout is undefined or not vm_get_hostname_timeout
+  when: vm_get_hostname_timeout is undefined or vm_get_hostname_timeout | int == 0
 
 - name: "Wait for VMware Tools collecting guest OS hostname"
   community.vmware.vmware_guest_info:
@@ -41,7 +41,7 @@
 
 - name: "Display the retrieved guest info"
   ansible.builtin.debug: var=vm_guest_facts
-  when: enable_debug
+  when: enable_debug | default(true) | bool
 
 - name: "Check VMware Tools collected guest OS hostname successfully"
   ansible.builtin.assert:

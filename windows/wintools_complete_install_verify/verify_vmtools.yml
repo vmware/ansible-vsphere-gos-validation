@@ -11,12 +11,13 @@
 
 - name: "Set fact of expected VMware Tools services"
   ansible.builtin.set_fact:
-    win_tools_services: |-
-      {%- if esxi_cpu_vendor != 'arm' and (vmtools_version is defined and vmtools_version is version('10.3.0', '>=')) -%}
-      ['VGAuthService', 'VMTools', 'vmvss']
-      {%- else -%}
-      ['VMTools']
-      {% endif %}
+    win_tools_services: >-
+      {{
+        ['VGAuthService', 'VMTools', 'vmvss']
+        if esxi_cpu_vendor != 'arm' and
+           (vmtools_version is defined and vmtools_version | length > 0 and vmtools_version is version('10.3.0', '>='))
+        else ['VMTools']
+      }}
 
 - name: "Retry to get VMware Tools services list"
   include_tasks:

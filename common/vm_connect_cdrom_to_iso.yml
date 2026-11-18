@@ -34,7 +34,7 @@
         vm_cdrom_device_info: "{{ item }}"
         vm_cdrom_device_info_got: "{{ true if (item.label == vm_cdrom_device_label) else false }}"
       with_items: "{{ cdrom_device_list }}"
-      when: not vm_cdrom_device_info_got
+      when: not (vm_cdrom_device_info_got | bool)
   when:
     - vm_cdrom_device_num is defined
     - vm_cdrom_device_num | int >= 1
@@ -48,7 +48,7 @@
 - name: "Check CDROM device info"
   ansible.builtin.assert:
     that:
-      - vm_cdrom_device_info
+      - vm_cdrom_device_info | length > 0
     fail_msg: "Not get VM 'CD/DVD drive {{ vm_cdrom_device_num | default('') }}' info."
 
 - name: "Display the CDROM device info"

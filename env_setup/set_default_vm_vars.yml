@@ -37,27 +37,27 @@
   ansible.builtin.set_fact:
     boot_disk_controller: >-
       {{
-          (boot_disk_controller is defined and boot_disk_controller)
+          (boot_disk_controller is defined and boot_disk_controller | length > 0)
           | ternary(boot_disk_controller, guest_config_options.default_disk_controller) | lower
       }}
     network_adapter_type: >-
       {{
-          (network_adapter_type is defined and network_adapter_type)
+          (network_adapter_type is defined and network_adapter_type | length > 0)
           | ternary(network_adapter_type, guest_config_options.default_ethernet) | lower
       }}
     firmware: >-
       {{
-          (firmware is defined and firmware)
+          (firmware is defined and firmware | length > 0)
           | ternary(firmware, guest_config_options.rec_firmware) | lower
       }}
     memory_mb: >-
       {{
-          (memory_mb is defined and memory_mb)
+          (memory_mb is defined and memory_mb | int > 0)
           | ternary(memory_mb, guest_config_options.rec_memory_mb) | int
       }}
     boot_disk_size_gb: >-
       {{
-          (boot_disk_size_gb is defined and boot_disk_size_gb)
+          (boot_disk_size_gb is defined and boot_disk_size_gb | int > 0)
           | ternary(boot_disk_size_gb, (guest_config_options.rec_disk_mb | int // 1024)) | int
       }}
 
@@ -131,7 +131,7 @@
       Please check your configuration in vars/test.yml.
   when:
     - firmware == 'efi'
-    - secureboot_enabled
+    - secureboot_enabled | bool
 
 - name: "Check CPU number and cores per socket values for new VM"
   ansible.builtin.assert:
@@ -142,8 +142,8 @@
       '{{ cpu_cores_per_socket }}'.
       Please check your configuration in vars/test.yml.
   when:
-    - cpu_number is defined and cpu_number
-    - cpu_cores_per_socket is defined and cpu_cores_per_socket
+    - cpu_number is defined and cpu_number | int > 0
+    - cpu_cores_per_socket is defined and cpu_cores_per_socket | int > 0
 
 # CPU number is defined, but cores per socket is not defined
 - name: "Set fact of CPU cores per socket for new VM"
@@ -154,15 +154,15 @@
           | ternary(guest_config_options.rec_cpu_cores_per_socket, 1)
       }}
   when:
-    - cpu_number is defined and cpu_number
-    - cpu_cores_per_socket is undefined or not cpu_cores_per_socket
+    - cpu_number is defined and cpu_number | int > 0
+    - cpu_cores_per_socket is undefined or cpu_cores_per_socket | int == 0
 
 # CPU number is not defined, then set the recommended ones
 - name: "Set fact of the default CPU number and cores per socket for new VM"
   ansible.builtin.set_fact:
     cpu_number: "{{ (guest_config_options.rec_cpu_cores_per_socket | int) * (guest_config_options.rec_cpu_socket | int) }}"
     cpu_cores_per_socket: "{{ guest_config_options.rec_cpu_cores_per_socket }}"
-  when: cpu_number is undefined or not cpu_number
+  when: cpu_number is undefined or cpu_number | int == 0
 
 - name: "Check Windows VM CPU socket number"
   include_tasks: check_cpu_socket.yml

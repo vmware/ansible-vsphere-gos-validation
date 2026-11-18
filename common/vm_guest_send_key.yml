@@ -29,15 +29,16 @@
 
 - name: "Display the result of sending keys or string to guest OS"
   ansible.builtin.debug: var=vm_sendkey
-  when: enable_debug
+  when: enable_debug | default(true) | bool
 
 - name: "Check sending keys or string to guest OS succeeds"
   ansible.builtin.assert:
     that:
-      - not vm_sendkey.failed
-      - vm_sendkey.changed
+      - not (vm_sendkey.failed | default(false) | bool)
+      - vm_sendkey.changed is defined
+      - vm_sendkey.changed | bool
     fail_msg: "Failed to send keys or string to guest OS"
     success_msg: "Successfully send keys or string to guest OS"
   when: >-
     (vm_send_key_ignore_errors is undefined or
-     not vm_send_key_ignore_errors)
+     not (vm_send_key_ignore_errors | bool))

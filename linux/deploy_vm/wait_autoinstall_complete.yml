@@ -79,13 +79,13 @@
     vm_wait_log_hide_output: false
   when:
     - firmware == 'efi'
-    - secureboot_enabled
+    - secureboot_enabled | bool
 
 # Check autoinstall start message
 - name: "Wait for autoinstall start message"
   when:
-    - unattend_installer
-    - autoinstall_start_msg
+    - unattend_installer | length > 0
+    - autoinstall_start_msg | length > 0
   block:
     # FreeBSD autoinstall start message is printed in the post-install script,
     # and Ubuntu-Subiquity installer prints start message after cloud-init loading,
@@ -109,8 +109,8 @@
 # Detect IPv4 address as early as we can
 - name: "Wait for guest OS obtained IPv4 address"
   when:
-    - unattend_installer
-    - autoinstall_ipv4_msg
+    - unattend_installer | length > 0
+    - autoinstall_ipv4_msg | length > 0
   block:
     # The IPv4 address message is printed after start message for 'Ubuntu-Subiquity', 'FreeBSD' and 'Agama',
     # so they need less timeout. The other OS installer prints it in the post-install script, and
@@ -140,7 +140,7 @@
     - name: "Check VM obtains IPv4 address"
       ansible.builtin.assert:
         that:
-          - autoinstall_ipv4_addr
+          - autoinstall_ipv4_addr is defined
           - autoinstall_ipv4_addr | length > 0
           - autoinstall_ipv4_addr[0] is ansible.utils.ipv4
         fail_msg: "Autoinstall failed due to no IPv4 address obtained."

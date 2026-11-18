@@ -132,7 +132,7 @@ class TestbedInfo(object):
         if ansible_gosv_facts:
             esxi_version = ansible_gosv_facts.get('esxi_version', '')
             esxi_update_version = ansible_gosv_facts.get('esxi_update_version', '')
-            if esxi_version and esxi_update_version and esxi_update_version != 'N/A':
+            if esxi_version and esxi_update_version:
                 esxi_version += ' U' + esxi_update_version
             self.esxi_info.update_property('version', esxi_version)
             self.esxi_info.update_property('build',
@@ -229,9 +229,7 @@ class VmGuestInfo(object):
         """
         self.Guest_OS_Distribution = ansible_gosv_facts.get('vm_guest_os_distribution', '')
         self.ESXi_Version = ansible_gosv_facts.get('esxi_version', '')
-        if (self.ESXi_Version and
-                ansible_gosv_facts.get('esxi_update_version', '') and
-                ansible_gosv_facts['esxi_update_version'] != 'N/A'):
+        if (self.ESXi_Version and ansible_gosv_facts.get('esxi_update_version', '')):
             self.ESXi_Version += ' U' + ansible_gosv_facts['esxi_update_version']
         self.ESXi_Build = ansible_gosv_facts.get('esxi_build', '')
         self.Hardware_Version = ansible_gosv_facts.get('vm_hardware_version','')

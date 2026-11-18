@@ -12,12 +12,12 @@
     msg:
       - "Before hot adding, the number of '{{ test_disk_ctrl_type }}' controller in guest OS: {{ ctrl_num_guest_before }}"
       - "After hot adding, the number of '{{ test_disk_ctrl_type }}' controller in guest OS: {{ ctrl_num_guest_after }}"
-  when: on_new_controller
+  when: on_new_controller | bool
 
 - name: "Handle known issue on NVMe disk hot add"
   include_tasks: handle_nvme_ops_known_issue.yml
   when:
-    - not on_new_controller
+    - not (on_new_controller | bool)
     - disk_num_guest_after | int != disk_num_guest_before | int + 1
     - test_disk_ctrl_type == 'nvme'
     - test_purpose == "hot-add"
@@ -39,7 +39,7 @@
       After hot adding a new disk to a new '{{ test_disk_ctrl_type }}' controller,
       disk controller number in guest OS is {{ ctrl_num_guest_after }}, which is not
       the same as the expected value {{ ctrl_num_guest_before | int + 1 }}.
-  when: on_new_controller
+  when: on_new_controller | bool
 
 - name: "Get NVMe spec version in guest OS"
   include_tasks: ../utils/win_get_nvme_spec_version.yml

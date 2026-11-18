@@ -40,7 +40,7 @@
 
 - name: "Display the Windows GOSC result"
   ansible.builtin.debug: var=win_gosc_result
-  when: enable_debug
+  when: enable_debug | default(true) | bool
 
 - name: "Check the Windows guest OS is customized"
   ansible.builtin.assert:
@@ -48,7 +48,7 @@
       - win_gosc_result.failed is defined
       - not win_gosc_result.failed
       - win_gosc_result.changed is defined
-      - win_gosc_result.changed
+      - win_gosc_result.changed | bool
     fail_msg: >-
       Guest customization failed on {{ vm_guest_os_distribution }} with error: {{ win_gosc_result.msg | default('') }}
       {{ ', warnings: ' ~ win_gosc_result.warnings if win_gosc_result.warnings | default('') else '' }}

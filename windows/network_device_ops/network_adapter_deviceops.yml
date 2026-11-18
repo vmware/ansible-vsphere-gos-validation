@@ -30,7 +30,8 @@
 - name: "Check new network adapter hot add operation"
   ansible.builtin.assert:
     that:
-      - add_adapter.changed
+      - add_adapter.changed is defined
+      - add_adapter.changed | bool
     fail_msg: "The result of hot adding VM network adapter task is not changed."
 
 - name: "Wait 10 seconds after network adapter hot added"
@@ -80,7 +81,8 @@
 - name: "Check network adapter remove operation"
   ansible.builtin.assert:
     that:
-      - remove_adapter.changed
+      - remove_adapter.changed is defined
+      - remove_adapter.changed | bool
     fail_msg: "The result of hot removing VM network adapter task is not changed."
 
 - name: "Wait 10 seconds after network adapter hot remove"
@@ -124,16 +126,16 @@
 - name: "Verify the number of network adapter and network connection status"
   ansible.builtin.assert:
     that:
-      - new_nic_mac_address | ansible.utils.hwaddr
+      - new_nic_mac_address | ansible.utils.hwaddr('bool')
       - nic_num_before_hotadd | int == nic_num_before_hotadd_guest | int
       - nic_num_after_hotadd | int == nic_num_after_hotadd_guest | int
       - nic_num_before_hotadd | int == nic_num_after_hotadd | int - 1
       - nic_num_after_hotadd_guest | int == nic_num_before_hotadd_guest | int + 1
       - nic_num_after_hotremove | int == nic_num_before_hotadd | int
       - nic_num_after_hotremove_guest | int == nic_num_before_hotadd_guest | int
-      - ping_result_after_hotadd
-      - not ping_result_after_disable
-      - ping_result_after_enable
-      - not ping_result_after_disconnect
-      - ping_result_after_reconnect
+      - ping_result_after_hotadd | bool
+      - not (ping_result_after_disable | bool)
+      - ping_result_after_enable | bool
+      - not (ping_result_after_disconnect | bool)
+      - ping_result_after_reconnect | bool
     fail_msg: "One or more check conditions failed, please check above displayed results."
