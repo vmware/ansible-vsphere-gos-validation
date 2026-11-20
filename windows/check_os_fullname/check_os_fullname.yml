@@ -42,6 +42,17 @@
           ansible.builtin.set_fact:
             current_gos_info: "{{ win_gos_info | selectattr('win_guest', 'equalto', current_gos) }}"
 
+        # Definitions are ordered oldest to newest within each OS family.
+        # Exclude placeholders that have no guest IDs.
+        - name: "Use the last defined OS in the same family when no exact match exists"
+          ansible.builtin.set_fact:
+            current_gos_info: >-
+              {{ (win_gos_info
+                  | selectattr('win_guest', 'match',
+                      '^Windows (?!Server )' if guest_os_product_type == 'client' else '^Windows Server ')
+                  | selectattr('win_guest_id') | list)[-1:] }}
+          when: current_gos_info | length == 0
+
         - name: "Check matched info"
           ansible.builtin.assert:
             that:
@@ -53,6 +64,7 @@
         - name: "Set fact of the matched current OS info"
           ansible.builtin.set_fact:
             current_gos_info: "{{ current_gos_info[0] }}"
+            current_gos: "{{ current_gos_info[0].win_guest }}"
 
         - name: "Handle Windows 11 known issue"
           include_tasks: win11_guest_info_exception.yml
