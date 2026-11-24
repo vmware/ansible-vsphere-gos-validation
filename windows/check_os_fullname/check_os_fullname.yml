@@ -38,46 +38,9 @@
           ansible.builtin.set_fact:
             current_gos: "{{ guest_os_ansible_distribution | regex_search('Windows( Server)? ([0-9]+)') }}"
 
-        - name: "Initialize usable Windows guest OS definitions"
-          ansible.builtin.set_fact:
-            usable_win_gos_info: []
-
-        - name: "Collect Windows guest OS definitions with available properties"
-          ansible.builtin.set_fact:
-            usable_win_gos_info: "{{ usable_win_gos_info + [item] }}"
-          loop: "{{ win_gos_info }}"
-          loop_control:
-            label: "{{ item.win_guest }}"
-          vars:
-            required_win_gos_keys:
-              - win_guest_id
-              - win_guest_vmtools
-              - win_guest_creation_esxi
-              - win_guest_creation_hwv
-              - win_guest_fullname
-          when:
-            - required_win_gos_keys | difference(item.keys() | list) | length == 0
-            - item.win_guest_id | default([]) | length > 0
-            - item.win_guest_fullname | default([]) | length > 0
-            - >-
-              item | dict2items | selectattr('key', 'match', '^win_guest_')
-              | map(attribute='value') | flatten
-              | select('in', ['NA', 'N/A']) | list | length == 0
-
         - name: "Get matched info in the guest OS defination list for current OS name"
           ansible.builtin.set_fact:
-            current_gos_info: "{{ usable_win_gos_info | selectattr('win_guest', 'equalto', current_gos) }}"
-
-        # Definitions are ordered oldest to newest within each OS family.
-        # Missing versions and entries with unavailable properties use the same fallback.
-        - name: "Use the last usable OS in the same family when no usable exact match exists"
-          ansible.builtin.set_fact:
-            current_gos_info: >-
-              {{ (usable_win_gos_info
-                  | selectattr('win_guest', 'match',
-                      '^Windows (?!Server )' if guest_os_product_type == 'client' else '^Windows Server ')
-                  | list)[-1:] }}
-          when: current_gos_info | length == 0
+            current_gos_info: "{{ win_gos_info | selectattr('win_guest', 'equalto', current_gos) }}"
 
         - name: "Check matched info"
           ansible.builtin.assert:
@@ -90,7 +53,25 @@
         - name: "Set fact of the matched current OS info"
           ansible.builtin.set_fact:
             current_gos_info: "{{ current_gos_info[0] }}"
-            current_gos: "{{ current_gos_info[0].win_guest }}"
+
+        - name: "Use previous guest OS info when current properties are unavailable"
+          when: current_gos_info.values() | list | flatten | intersect(['NA', 'N/A']) | length > 0
+          block:
+            - name: "Get the previous guest OS info"
+              include_tasks: get_previous_gos_info.yml
+
+            - name: "Check previous guest OS info is available"
+              ansible.builtin.assert:
+                that:
+                  - previous_gos_info is defined
+                  - previous_gos_info | length > 0
+                  - previous_gos_info.values() | list | flatten | intersect(['NA', 'N/A']) | length == 0
+                fail_msg: "No previous guest OS definition with available properties found for '{{ current_gos }}'."
+
+            - name: "Set current guest OS info to the previous version"
+              ansible.builtin.set_fact:
+                current_gos_info: "{{ previous_gos_info }}"
+                current_gos: "{{ previous_gos_info.win_guest }}"
 
         - name: "Handle Windows 11 known issue"
           include_tasks: win11_guest_info_exception.yml
