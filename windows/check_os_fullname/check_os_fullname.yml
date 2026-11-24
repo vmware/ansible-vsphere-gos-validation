@@ -38,19 +38,45 @@
           ansible.builtin.set_fact:
             current_gos: "{{ guest_os_ansible_distribution | regex_search('Windows( Server)? ([0-9]+)') }}"
 
+        - name: "Initialize usable Windows guest OS definitions"
+          ansible.builtin.set_fact:
+            usable_win_gos_info: []
+
+        - name: "Collect Windows guest OS definitions with available properties"
+          ansible.builtin.set_fact:
+            usable_win_gos_info: "{{ usable_win_gos_info + [item] }}"
+          loop: "{{ win_gos_info }}"
+          loop_control:
+            label: "{{ item.win_guest }}"
+          vars:
+            required_win_gos_keys:
+              - win_guest_id
+              - win_guest_vmtools
+              - win_guest_creation_esxi
+              - win_guest_creation_hwv
+              - win_guest_fullname
+          when:
+            - required_win_gos_keys | difference(item.keys() | list) | length == 0
+            - item.win_guest_id | default([]) | length > 0
+            - item.win_guest_fullname | default([]) | length > 0
+            - >-
+              item | dict2items | selectattr('key', 'match', '^win_guest_')
+              | map(attribute='value') | flatten
+              | select('in', ['NA', 'N/A']) | list | length == 0
+
         - name: "Get matched info in the guest OS defination list for current OS name"
           ansible.builtin.set_fact:
-            current_gos_info: "{{ win_gos_info | selectattr('win_guest', 'equalto', current_gos) }}"
+            current_gos_info: "{{ usable_win_gos_info | selectattr('win_guest', 'equalto', current_gos) }}"
 
         # Definitions are ordered oldest to newest within each OS family.
-        # Exclude placeholders that have no guest IDs.
-        - name: "Use the last defined OS in the same family when no exact match exists"
+        # Missing versions and entries with unavailable properties use the same fallback.
+        - name: "Use the last usable OS in the same family when no usable exact match exists"
           ansible.builtin.set_fact:
             current_gos_info: >-
-              {{ (win_gos_info
+              {{ (usable_win_gos_info
                   | selectattr('win_guest', 'match',
                       '^Windows (?!Server )' if guest_os_product_type == 'client' else '^Windows Server ')
-                  | selectattr('win_guest_id') | list)[-1:] }}
+                  | list)[-1:] }}
           when: current_gos_info | length == 0
 
         - name: "Check matched info"
