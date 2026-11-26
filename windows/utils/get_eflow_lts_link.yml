@@ -55,6 +55,12 @@
   ansible.builtin.set_fact:
     eflow_lts_download_link: "{{ eflow_lts_download_response.url | default('') }}"
 
+- name: "Check resolved EFLOW LTS download URL"
+  ansible.builtin.assert:
+    that:
+      - eflow_lts_download_link | trim | length > 0
+    fail_msg: "Resolved EFLOW LTS download URL is empty. Please check the redirect response: {{ eflow_lts_download_response }}"
+
 - name: "Get EFLOW LTS MSI link from Download Center"
   when: not (eflow_lts_download_link is search('[.]msi$', ignorecase=true))
   block:

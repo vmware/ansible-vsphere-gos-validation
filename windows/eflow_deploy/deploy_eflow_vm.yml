@@ -137,6 +137,31 @@
 #     - win_powershell_cmd_output.stdout is defined
 #     - "'failed' in win_powershell_cmd_output.stdout"
 
+- name: "Collect logs after EFLOW deployment failure"
+  when: >-
+    (win_powershell_cmd_output.failed | default(true) | bool) or
+    win_powershell_cmd_output.stdout is not defined or
+    (win_powershell_cmd_output.stdout | default('') is search('fail|exception', ignorecase=true))
+  ignore_errors: true
+  ignore_unreachable: true
+  block:
+    # Keep a separate result so log collection does not overwrite the deployment output.
+    - name: "Generate EFLOW diagnostic log archive"
+      ansible.windows.win_shell: >-
+        Set-ExecutionPolicy -ExecutionPolicy Bypass -Force;
+        Import-Module AzureEFLOW -ErrorAction Stop;
+        Get-EflowLogs
+      register: eflow_log_collection_result
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Fetch EFLOW diagnostic log archive"
+      ansible.builtin.fetch:
+        src: 'C:\Program Files\Azure IoT Edge\eflowlogs.zip'
+        dest: "{{ current_test_log_folder }}/eflowlogs.zip"
+        flat: true
+      delegate_to: "{{ vm_guest_ip }}"
+      when: not (eflow_log_collection_result.unreachable | default(false) | bool)
+
 - name: "Check EFLOW deploy result"
   ansible.builtin.assert:
     that:
