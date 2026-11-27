@@ -38,10 +38,12 @@
       reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DeviceGuard" /v "LsaCfgFlags" /t REG_DWORD /d 1 /f;
       reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DeviceGuard" /v "ConfigureSystemGuardLaunch" /t REG_DWORD /d 1 /f
 
-- name: "Check and enable AutoLogon before restart"
-  include_tasks: win_enable_autologon.yml
-
 - name: "Restart guest OS after configuration"
   include_tasks: win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"
+    win_query_user_ignore_error: true
+
+- name: "Enable AutoLogon if the console user query failed after restart"
+  include_tasks: win_enable_autologon.yml
+  when: not (query_user_succeeded | bool)
