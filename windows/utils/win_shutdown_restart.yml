@@ -11,6 +11,8 @@
 #     Default value is 300 seconds.
 #   win_reboot_ignore_error: whether to ignore OS reboot task failure or not,
 #     Default value is false.
+#   win_query_user_ignore_error: set to true to skip the user query assertion after reboot.
+#     Default value is false.
 #
 - name: "Set fact of the expected power state"
   ansible.builtin.set_fact:
@@ -76,9 +78,16 @@
           until:
             - query_user_result.stdout_lines is defined
             - query_user_result.stdout_lines | length != 0
+
+        - name: "Record whether the console user query returned output"
+          ansible.builtin.set_fact:
+            query_user_succeeded: >-
+              {{ query_user_result.stdout_lines is defined
+                 and query_user_result.stdout_lines | length != 0 }}
+
         - name: "Check query user result"
+          when: not (win_query_user_ignore_error | default(false) | bool)
           ansible.builtin.assert:
             that:
-              - query_user_result.stdout_lines is defined
-              - query_user_result.stdout_lines | length != 0
+              - query_user_succeeded
             fail_msg: "Not get logon user in console session after {{ win_query_user_timeout | default(300) }} seconds: {{ query_user_result }}"
