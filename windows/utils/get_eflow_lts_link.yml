@@ -34,11 +34,60 @@
     - eflow_lts_releases
     - eflow_lts_releases.split('>') | length > 1
 
-- name: "Display the download link of EFLOW LTS release"
-  debug: var=eflow_lts_download_link
-
 - name: "Check download link of EFLOW LTS release"
   ansible.builtin.assert:
     that:
       - eflow_lts_download_link
     fail_msg: "Failed to get the download link of EFLOW LTS release: {{ eflow_lts_download_link }}, please check manually on page {{ eflow_releases_url }}"
+
+# Some release links redirect to a Download Center HTML page instead of the MSI.
+# Use HEAD first to avoid downloading the installer on the Ansible controller.
+- name: "Resolve EFLOW LTS download URL redirects"
+  ansible.builtin.uri:
+    url: "{{ eflow_lts_download_link }}"
+    method: HEAD
+    follow_redirects: safe
+    status_code: [200, 403, 405]
+    timeout: 180
+  register: eflow_lts_download_response
+
+- name: "Set fact of resolved EFLOW LTS download URL"
+  ansible.builtin.set_fact:
+    eflow_lts_download_link: "{{ eflow_lts_download_response.url | default('') }}"
+
+- name: "Check resolved EFLOW LTS download URL"
+  ansible.builtin.assert:
+    that:
+      - eflow_lts_download_link | trim | length > 0
+    fail_msg: "Resolved EFLOW LTS download URL is empty. Please check the redirect response: {{ eflow_lts_download_response }}"
+
+- name: "Get EFLOW LTS MSI link from Download Center"
+  when: not (eflow_lts_download_link is search('[.]msi$', ignorecase=true))
+  block:
+    - name: "Get EFLOW LTS Download Center page"
+      ansible.builtin.uri:
+        url: "{{ eflow_lts_download_link }}"
+        return_content: true
+        timeout: 180
+      register: eflow_lts_download_page
+
+    - name: "Find MSI links for the selected EFLOW LTS X64 release"
+      ansible.builtin.set_fact:
+        eflow_lts_msi_links: "{{ eflow_lts_download_page.content | regex_findall(eflow_lts_msi_pattern) | unique | list }}"
+      vars:
+        eflow_lts_msi_pattern: >-
+          {{ 'https://download[.]microsoft[.]com/[^"<> ]*/AzureIoTEdge_LTS_' ~
+             (eflow_lts_releases.split('>')[1].split('LTS')[0].strip() | regex_escape) ~ '_X64[.]msi' }}
+
+    - name: "Check EFLOW LTS MSI link was found"
+      ansible.builtin.assert:
+        that:
+          - eflow_lts_msi_links | length == 1
+        fail_msg: "Expected one EFLOW LTS X64 MSI link on {{ eflow_lts_download_link }}, found {{ eflow_lts_msi_links }}."
+
+    - name: "Set fact of EFLOW LTS MSI download URL"
+      ansible.builtin.set_fact:
+        eflow_lts_download_link: "{{ eflow_lts_msi_links[0] }}"
+
+- name: "Display the download link of EFLOW LTS MSI"
+  ansible.builtin.debug: var=eflow_lts_download_link

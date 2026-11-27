@@ -94,7 +94,15 @@
       $msiPath = $([io.Path]::Combine($env:TEMP, 'AzureIoTEdge.msi'));
       $ProgressPreference = 'SilentlyContinue';
       Invoke-WebRequest "{{ eflow_lts_download_link }}" -OutFile $msiPath;
-      Start-Process -Wait msiexec -ArgumentList "/i",$msiPath,"/qn";
+      $msiProcess = Start-Process -Wait -PassThru -ErrorAction Stop msiexec
+      -ArgumentList "/i",$msiPath,"/qn","/norestart";
+      if ($msiProcess.ExitCode -notin @(0, 3010)) {
+        throw "Azure IoT Edge LTS installation failed with MSI exit code $($msiProcess.ExitCode)."
+      };
+      Write-Output "Azure IoT Edge LTS MSI exit code: $($msiProcess.ExitCode)";
+      if ($msiProcess.ExitCode -eq 3010) {
+        Write-Output 'A restart is required to complete the Azure IoT Edge LTS installation.'
+      };
       Start-Sleep -Seconds 5
 
 # For Windows client, use the default created vswitch "Default Switch" with default DHCP IP.
@@ -111,6 +119,8 @@
   vars:
     win_powershell_cmd: >-
       Set-ExecutionPolicy -ExecutionPolicy Bypass -Force;
+      Import-Module AzureEFLOW -ErrorAction Stop;
+      Get-Command Deploy-Eflow -ErrorAction Stop | Out-Null;
       {{ deploy_eflow_command }} -acceptEula Yes -acceptOptionalTelemetry No
     win_execute_cmd_ignore_error: true
 
@@ -126,6 +136,31 @@
 #     - "'AMD' in esxi_cpu_model_info"
 #     - win_powershell_cmd_output.stdout is defined
 #     - "'failed' in win_powershell_cmd_output.stdout"
+
+- name: "Collect logs after EFLOW deployment failure"
+  when: >-
+    (win_powershell_cmd_output.failed | default(true) | bool) or
+    win_powershell_cmd_output.stdout is not defined or
+    (win_powershell_cmd_output.stdout | default('') is search('fail|exception', ignorecase=true))
+  ignore_errors: true
+  ignore_unreachable: true
+  block:
+    # Keep a separate result so log collection does not overwrite the deployment output.
+    - name: "Generate EFLOW diagnostic log archive"
+      ansible.windows.win_shell: >-
+        Set-ExecutionPolicy -ExecutionPolicy Bypass -Force;
+        Import-Module AzureEFLOW -ErrorAction Stop;
+        Get-EflowLogs
+      register: eflow_log_collection_result
+      delegate_to: "{{ vm_guest_ip }}"
+
+    - name: "Fetch EFLOW diagnostic log archive"
+      ansible.builtin.fetch:
+        src: 'C:\Program Files\Azure IoT Edge\eflowlogs.zip'
+        dest: "{{ current_test_log_folder }}/eflowlogs.zip"
+        flat: true
+      delegate_to: "{{ vm_guest_ip }}"
+      when: not (eflow_log_collection_result.unreachable | default(false) | bool)
 
 - name: "Check EFLOW deploy result"
   ansible.builtin.assert:

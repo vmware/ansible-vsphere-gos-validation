@@ -51,8 +51,8 @@
 - name: "Get the new vss_manifests zip file to local"
   include_tasks: ../../common/esxi_download_datastore_file.yml
   vars:
-    src_datastore: "{{ datastore }}"
-    src_file_path: "{{ vm_vss_manifests_new[0].split(']')[1].strip() }}"
+    src_datastore: "{{ vm_vss_manifests_new[0].split(']', 1)[0].strip('[') }}"
+    src_file_path: "{{ vm_vss_manifests_new[0].split(']', 1)[1].strip() }}"
     dest_file_path: "{{ vm_vss_manifests_path }}"
 
 - name: "Get the list of files in the new vss_manifests zip file"
@@ -70,7 +70,9 @@
   when: guest_os_product_type == 'server'
   block:
     - name: "Handle Windows Server 2022 situation"
-      when: guest_os_product_version | int == 2022
+      when:
+        - guest_os_product_version is defined
+        - guest_os_product_version | int == 2022
       block:
         - name: "Get Windows Server 2022 build number"
           include_tasks: ../utils/win_get_os_version.yml
@@ -79,12 +81,17 @@
             winsrv_2022_app_quiesce: true
           when: win_os_version_build is version('10.0.20348.2582', '>=')
 
+    # VMware Tools may report an earlier server version for Windows Server 2028.
+    # Other versions require the reported and installed server versions to match.
     - name: "Set fact of support application consistent quiescing situation"
       ansible.builtin.set_fact:
         winsrv_app_quiesce_support: true
       when:
-        - guestinfo_guest_full_name | regex_search('Windows Server ([0-9]{4})')
-        - guestinfo_guest_full_name | regex_search('Windows Server ([0-9]{4})') == guest_os_ansible_distribution | regex_search('Windows Server ([0-9]{4})')
+        - guestinfo_guest_full_name is search('Windows Server ([0-9]{4})')
+        - >-
+          (guest_os_product_version is defined and guest_os_product_version | int == 2028) or
+          (guestinfo_guest_full_name | regex_search('Windows Server ([0-9]{4})')) ==
+          (guest_os_ansible_distribution | regex_search('Windows Server ([0-9]{4})'))
         - win_boot_disk_ctrl_type in ['lsilogicsas', 'paravirtual'] or (win_boot_disk_ctrl_type == 'nvme' and winsrv_2022_app_quiesce is defined and winsrv_2022_app_quiesce)
 
 - name: "Check filesystem consistent quiescing taken"

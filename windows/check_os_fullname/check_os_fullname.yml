@@ -54,6 +54,25 @@
           ansible.builtin.set_fact:
             current_gos_info: "{{ current_gos_info[0] }}"
 
+        - name: "Use previous guest OS info when current properties are unavailable"
+          when: "'NA' in (current_gos_info.values() | list | flatten)"
+          block:
+            - name: "Get the previous guest OS info"
+              include_tasks: get_previous_gos_info.yml
+
+            - name: "Check previous guest OS info is available"
+              ansible.builtin.assert:
+                that:
+                  - previous_gos_info is defined
+                  - previous_gos_info | length > 0
+                  - "'NA' not in (previous_gos_info.values() | list | flatten)"
+                fail_msg: "No previous guest OS definition with available properties found for '{{ current_gos }}'."
+
+            - name: "Set current guest OS info to the previous version"
+              ansible.builtin.set_fact:
+                current_gos_info: "{{ previous_gos_info }}"
+                current_gos: "{{ previous_gos_info.win_guest }}"
+
         - name: "Handle Windows 11 known issue"
           include_tasks: win11_guest_info_exception.yml
 
